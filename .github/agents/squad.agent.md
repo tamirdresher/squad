@@ -113,7 +113,7 @@ When triggered:
 
 ### Inherited Context (Upstream Sources)
 
-Repos may optionally inherit shared context from upstream Squad sources (org-level, team-level, or other repos). Upstream sources are declared in `.squad/upstream.json` and read **live** at session start — no local copy is maintained.
+Repos may optionally inherit shared context from upstream Squad sources — an org-level repo, a team-level repo, or any repo with a `.squad/` directory. Each upstream is just another Squad repo with its own team managing its content. Upstream sources are declared in `.squad/upstream.json` and read **live** at session start.
 
 **On session start:** Check if `.squad/upstream.json` exists. If it does, read each upstream source directly:
 
@@ -125,10 +125,12 @@ Repos may optionally inherit shared context from upstream Squad sources (org-lev
 3. From each resolved upstream, read the following alongside local context:
 
 - **Skills:** Read `{upstream}/.squad/skills/*/SKILL.md` — available alongside local skills. When routing skill-aware tasks, check both local and upstream skills.
-- **Decisions:** Read `{upstream}/.squad/decisions.md` — **read-only** inherited decisions. Agents respect them but cannot modify them. Present as `[inherited from {source}]` context.
+- **Decisions:** Read `{upstream}/.squad/decisions.md` — upstream decisions managed by the upstream repo's team. Present as `[from {source}]` context.
 - **Wisdom:** Read `{upstream}/.squad/identity/wisdom.md` — org/team-level wisdom layered under local. Local `.squad/identity/wisdom.md` takes precedence on conflicts.
 - **Casting policy:** Read `{upstream}/.squad/casting/policy.json` — upstream defaults. Local `.squad/casting/policy.json` overrides any field.
 - **Routing:** Read `{upstream}/.squad/routing.md` — upstream routing rules as fallback. Local `.squad/routing.md` always wins.
+
+**Upstream content is managed by the upstream repo's own squad** — it's not read-only by design, it's just managed in a separate repo. This repo's agents don't write to it because it's a different repository, but the upstream team updates it through their own sessions. For local-path upstreams, changes at the source are visible immediately on the next session.
 
 **Conflict resolution — "closest wins":** When the same content exists at multiple levels (local, team-inherited, org-inherited), the closest source wins. Local overrides team, team overrides org.
 
@@ -139,8 +141,6 @@ INHERITED CONTEXT:
   org-shared: skills (3), decisions ✓, wisdom ✓, routing ✓
   team-platform: skills (1), decisions ✓
 ```
-
-**Inherited content is NEVER modified by agents.** Upstream content is read-only. For local-path upstreams, changes at the source are visible immediately on the next session — no sync needed.
 
 **Display on session start:** After resolving upstreams, show the user what's inherited as part of the session greeting. This goes right after the team acknowledgment, before any work routing. Format:
 
@@ -847,7 +847,7 @@ If the user wants to remove someone:
 | `.squad/plugins/marketplaces.json` | **Authoritative plugin config.** Registered marketplace sources. | Squad CLI (`squad plugin marketplace`) | Squad (Coordinator) |
 | `.squad/upstream.json` | **Authoritative upstream config.** Declared upstream Squad sources. | Squad CLI (`squad upstream`) | Squad (Coordinator) |
 | `.squad/_upstream_repos/` | **Derived / local cache.** Auto-cloned git upstreams. Gitignored — never committed. | Squad (Coordinator) via git clone/pull | Squad (Coordinator) |
-| `.squad/_inherited/` | **Derived / read-only.** Legacy synced content from `squad upstream sync`. Being replaced by live reads + `_upstream_repos/`. | Squad CLI (`squad upstream sync`) | All agents (read-only) |
+| `.squad/_inherited/` | **Derived / legacy.** Synced content from older `squad upstream sync`. Replaced by live reads + `_upstream_repos/`. | Squad CLI (`squad upstream sync`) | All agents |
 
 **Rules:**
 1. If this file (`squad.agent.md`) and any other file conflict, this file wins.
