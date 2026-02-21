@@ -18,6 +18,10 @@ export { spawnAgent, loadAgentCharter, buildAgentPrompt } from './spawn.js';
 export type { SpawnOptions, SpawnResult, ToolDefinition } from './spawn.js';
 export { buildCoordinatorPrompt, parseCoordinatorResponse, formatConversationContext } from './coordinator.js';
 export type { CoordinatorConfig, RoutingDecision } from './coordinator.js';
+export { parseInput } from './router.js';
+export type { MessageType, ParsedInput } from './router.js';
+export { executeCommand } from './commands.js';
+export type { CommandContext, CommandResult } from './commands.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../../package.json') as { version: string };

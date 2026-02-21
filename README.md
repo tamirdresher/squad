@@ -106,6 +106,8 @@ npx github:bradygaster/squad-pr
 
 This resolves the package from the repository directly via git+ssh. Use this if you prefer not to depend on npm registry.
 
+**Migrating from GitHub-native?** See [Migration Guide: GitHub-native to npm](docs/migration-github-to-npm.md).
+
 ---
 
 ## Agents Work in Parallel — You Catch Up When You're Ready
