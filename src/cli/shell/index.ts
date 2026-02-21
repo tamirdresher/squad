@@ -12,6 +12,8 @@ export { SessionRegistry } from './sessions.js';
 export { StreamBridge } from './stream-bridge.js';
 export type { StreamBridgeOptions } from './stream-bridge.js';
 export { ShellRenderer } from './render.js';
+export { spawnAgent, loadAgentCharter, buildAgentPrompt } from './spawn.js';
+export type { SpawnOptions, SpawnResult, ToolDefinition } from './spawn.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../../package.json') as { version: string };

@@ -61,3 +61,16 @@ Recommend renaming `squad watch` to `squad triage` (40% better semantic accuracy
 - Pattern: version sourced via `createRequire(import.meta.url)` for ESM-compatible JSON import (matches existing codebase pattern in `github-dist.ts`)
 - Pattern: SessionRegistry is a simple stateful class — no persistence, no events — designed for ink UI to consume later (#242+)
 
+### 📌 #238: SDK-based agent spawning infrastructure — implemented
+- Created `src/cli/shell/spawn.ts`: `loadAgentCharter()`, `buildAgentPrompt()`, `spawnAgent()`
+- `loadAgentCharter(name, teamRoot?)` loads charter from `.squad/agents/{name}/charter.md` using `resolveSquad()` for directory resolution
+- `buildAgentPrompt(charter, options?)` constructs system prompt: "You are an AI agent..." + charter + optional context
+- `spawnAgent(name, task, registry, options?)` is the full lifecycle: load charter → parse role from `# Name — Role` header → register in SessionRegistry → set status to working → build prompt → return SpawnResult → set status to idle
+- Types exported: `SpawnOptions` (mode: sync/background, systemContext, tools), `SpawnResult` (agentName, status, response/error), `ToolDefinition` (name, description, parameters)
+- All exported from `src/cli/shell/index.ts` barrel
+- SDK session creation intentionally stubbed with TODO — CopilotClient session API wiring deferred until we understand the session management surface
+- PR #285 on branch `squad/238-sdk-spawning` → `bradygaster/dev`
+- Pattern: charter loading uses `resolveSquad()` (returns `.squad/` dir path) — `teamRoot` param constructs `.squad/` path from project root for testability
+- Pattern: role parsing from charter header is regex-based (`/^#\s+\w+\s+—\s+(.+)$/m`), falls back to "Agent" if no match
+- Foundation for #239 (stream bridge integration) and #241 (coordinator spawn orchestration)
+
