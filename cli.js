@@ -1,4 +1,13 @@
 #!/usr/bin/env node
+
+// Deprecation notice for GitHub-native distribution
+console.error('\x1b[33m');
+console.error('⚠  DEPRECATION NOTICE');
+console.error('   npx github:bradygaster/squad is deprecated.');
+console.error('   Switch to: npm install -g @bradygaster/squad-cli');
+console.error('   Or use:    npx @bradygaster/squad-cli');
+console.error('\x1b[0m');
+
 var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __esm = (fn, res) => function __init() {

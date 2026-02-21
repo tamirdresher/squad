@@ -123,6 +123,15 @@ describe('resolveGlobalSquadPath()', () => {
     expect(result).toBe(join(customXdg, 'squad'));
     expect(existsSync(result)).toBe(true);
   });
+
+  it('uses APPDATA on Windows', () => {
+    if (process.platform !== 'win32') return;
+
+    const appdata = process.env['APPDATA'];
+    if (!appdata) return; // APPDATA should always be set on Windows
+    const result = resolveGlobalSquadPath();
+    expect(result).toBe(join(appdata, 'squad'));
+  });
 });
 
 describe('ensureSquadPath()', () => {
@@ -150,5 +159,10 @@ describe('ensureSquadPath()', () => {
   it('rejects an arbitrary absolute path', () => {
     const arbitrary = join(TMP, 'some', 'other', 'dir', 'file.txt');
     expect(() => ensureSquadPath(arbitrary, squadRoot)).toThrow(/outside the \.squad\/ directory/);
+  });
+
+  it('rejects path traversal that escapes .squad/ via ..', () => {
+    const traversal = join(squadRoot, '..', 'evil.txt');
+    expect(() => ensureSquadPath(traversal, squadRoot)).toThrow(/outside the \.squad\/ directory/);
   });
 });
