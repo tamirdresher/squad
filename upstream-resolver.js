@@ -142,4 +142,30 @@ function buildInheritedContextBlock(resolved) {
   return lines.join('\n');
 }
 
-module.exports = { resolveUpstreams, buildInheritedContextBlock };
+/**
+ * Build user-facing display for session start greeting.
+ * Shows what upstream context is active so the user knows.
+ */
+function buildSessionDisplay(resolved) {
+  if (!resolved || resolved.upstreams.length === 0) return '';
+
+  const lines = ['📡 Inherited context:'];
+  for (const u of resolved.upstreams) {
+    const parts = [];
+    if (u.skills.length > 0) parts.push(`${u.skills.length} skill${u.skills.length > 1 ? 's' : ''}`);
+    if (u.decisions) parts.push('decisions');
+    if (u.wisdom) parts.push('wisdom');
+    if (u.castingPolicy) parts.push('casting');
+    if (u.routing) parts.push('routing');
+    const content = parts.length > 0 ? parts.join(', ') : '(empty)';
+    const hasContent = parts.length > 0;
+    if (hasContent) {
+      lines.push(`  ${u.name} (${u.type}) — ${content}`);
+    } else {
+      lines.push(`  ⚠️ ${u.name} (${u.type}) — source not reachable`);
+    }
+  }
+  return lines.join('\n');
+}
+
+module.exports = { resolveUpstreams, buildInheritedContextBlock, buildSessionDisplay };

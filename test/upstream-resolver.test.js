@@ -14,7 +14,7 @@ const path = require('path');
 const { execFileSync, execSync } = require('child_process');
 const os = require('os');
 
-const { resolveUpstreams, buildInheritedContextBlock } = require('../upstream-resolver');
+const { resolveUpstreams, buildInheritedContextBlock, buildSessionDisplay } = require('../upstream-resolver');
 
 const CLI = path.join(__dirname, '..', 'index.js');
 
@@ -304,5 +304,46 @@ describe('Coordinator resolver: upstream content is read and used', () => {
   it('buildInheritedContextBlock returns empty for null', () => {
     const block = buildInheritedContextBlock(null);
     assert.equal(block, '', 'should return empty string');
+  });
+
+  // ── Session display: user sees upstream context on start ──
+
+  it('buildSessionDisplay shows upstream summary for user greeting', () => {
+    const resolved = resolveUpstreams(path.join(repoDir, '.squad'));
+    const display = buildSessionDisplay(resolved);
+
+    assert.ok(display.includes('📡 Inherited context:'), 'should have header with emoji');
+    assert.ok(display.includes('org (local)'), 'should show org name and type');
+    assert.ok(display.includes('team (local)'), 'should show team name and type');
+    assert.ok(display.includes('decisions'), 'should list decisions');
+    assert.ok(display.includes('wisdom'), 'should list wisdom');
+    assert.ok(display.includes('skill'), 'should list skills');
+  });
+
+  it('buildSessionDisplay shows skill count correctly', () => {
+    const resolved = resolveUpstreams(path.join(repoDir, '.squad'));
+    const display = buildSessionDisplay(resolved);
+
+    // org has 3 skills (2 original + ci-cd-standards added in live update test)
+    assert.ok(display.includes('3 skills'), `org should show 3 skills in: ${display}`);
+    // team has 1 skill
+    assert.ok(display.includes('1 skill') && !display.includes('1 skills'), `team should show "1 skill" (no plural): ${display}`);
+  });
+
+  it('buildSessionDisplay returns empty when no upstreams', () => {
+    const display = buildSessionDisplay(null);
+    assert.equal(display, '');
+  });
+
+  it('buildSessionDisplay marks unreachable sources with warning', () => {
+    // Create a resolver result with an empty upstream (simulating unreachable)
+    const fakeResolved = {
+      upstreams: [
+        { name: 'dead-org', type: 'git', skills: [], decisions: null, wisdom: null, castingPolicy: null, routing: null }
+      ]
+    };
+    const display = buildSessionDisplay(fakeResolved);
+    assert.ok(display.includes('⚠️'), 'should show warning for unreachable source');
+    assert.ok(display.includes('dead-org'), 'should show the name');
   });
 });

@@ -142,6 +142,23 @@ INHERITED CONTEXT:
 
 **Inherited content is NEVER modified by agents.** Upstream content is read-only. For local-path upstreams, changes at the source are visible immediately on the next session — no sync needed.
 
+**Display on session start:** After resolving upstreams, show the user what's inherited as part of the session greeting. This goes right after the team acknowledgment, before any work routing. Format:
+
+```
+📡 Inherited context:
+  org (local) — 2 skills, decisions, wisdom, casting, routing
+  team (local) — 1 skill, decisions, wisdom
+```
+
+If an upstream source is unreachable (path missing, clone failed), warn inline:
+```
+📡 Inherited context:
+  org (local) — 2 skills, decisions, wisdom, casting, routing
+  ⚠️ team (git) — clone not found, run "squad upstream sync"
+```
+
+If no `upstream.json` exists, skip this block entirely — no message needed.
+
 ### Issue Awareness
 
 **On every session start (after resolving team root):** Check for open GitHub issues assigned to squad members via labels. Use the GitHub CLI or API to list issues with `squad:*` labels:
