@@ -111,6 +111,30 @@ When triggered:
 
 **Casting migration check:** If `.squad/team.md` exists but `.squad/casting/` does not, perform the migration described in "Casting & Persistent Naming → Migration — Already-Squadified Repos" before proceeding.
 
+### Inherited Context (Upstream Sources)
+
+Repos may optionally inherit shared context from upstream Squad sources (org-level, team-level, or other repos). Inherited content lives in `.squad/_inherited/{source-name}/` and is synced via `squad upstream sync`.
+
+**On session start:** Check if `.squad/_inherited/` exists. If it does, read inherited context alongside local context:
+
+- **Skills:** Read `.squad/_inherited/*/skills/*/SKILL.md` — these are available alongside local skills in `.squad/skills/`. When routing skill-aware tasks, check both local and inherited skills.
+- **Decisions:** Read `.squad/_inherited/*/decisions.md` — these are **read-only** inherited decisions. Agents should respect them but cannot modify them. Present as `[inherited from {source}]` context.
+- **Wisdom:** Read `.squad/_inherited/*/identity/wisdom.md` — org/team-level wisdom layered under local wisdom. Local `.squad/identity/wisdom.md` takes precedence on conflicts.
+- **Casting policy:** Read `.squad/_inherited/*/casting/policy.json` — upstream defaults. Local `.squad/casting/policy.json` overrides any field.
+- **Routing:** Read `.squad/_inherited/*/routing.md` — upstream routing rules as fallback. Local `.squad/routing.md` always wins.
+
+**Conflict resolution — "closest wins":** When the same content exists at multiple levels (local, team-inherited, org-inherited), the closest source wins. Local overrides team, team overrides org.
+
+**When spawning agents with inherited context:** Include an `INHERITED CONTEXT` block in the spawn prompt listing available inherited sources and their content types. Agents do NOT need to discover inherited content — the coordinator tells them what's available.
+
+```
+INHERITED CONTEXT:
+  org-shared: skills (3), decisions ✓, wisdom ✓, routing ✓
+  team-platform: skills (1), decisions ✓
+```
+
+**Inherited content is NEVER modified by agents.** Only `squad upstream sync` updates it.
+
 ### Issue Awareness
 
 **On every session start (after resolving team root):** Check for open GitHub issues assigned to squad members via labels. Use the GitHub CLI or API to list issues with `squad:*` labels:
@@ -797,6 +821,8 @@ If the user wants to remove someone:
 | `.squad/log/` | **Derived / append-only.** Session logs. Diagnostic archive. Never edited after write. | Scribe | All agents (read-only) |
 | `.squad/templates/` | **Reference.** Format guides for runtime files. Not authoritative for enforcement. | Squad (Coordinator) at init | Squad (Coordinator) |
 | `.squad/plugins/marketplaces.json` | **Authoritative plugin config.** Registered marketplace sources. | Squad CLI (`squad plugin marketplace`) | Squad (Coordinator) |
+| `.squad/upstream.json` | **Authoritative upstream config.** Declared upstream Squad sources. | Squad CLI (`squad upstream`) | Squad (Coordinator) |
+| `.squad/_inherited/` | **Derived / read-only.** Synced content from upstream sources. Never modified by agents. | Squad CLI (`squad upstream sync`) | All agents (read-only) |
 
 **Rules:**
 1. If this file (`squad.agent.md`) and any other file conflict, this file wins.

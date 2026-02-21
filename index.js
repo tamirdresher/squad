@@ -2,6 +2,7 @@
 
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 const GREEN = '\x1b[32m';
 const RED = '\x1b[31m';
@@ -69,6 +70,9 @@ if (cmd === '--help' || cmd === '-h' || cmd === 'help') {
   console.log(`             Default: checks every 10 minutes (Ctrl+C to stop)`);
   console.log(`  ${BOLD}plugin${RESET}     Manage plugin marketplaces`);
   console.log(`             Usage: plugin marketplace add|remove|list|browse`);
+  console.log(`  ${BOLD}upstream${RESET}   Manage upstream (parent) Squad sources for inherited context`);
+  console.log(`             Usage: upstream add|remove|list|sync`);
+  console.log(`             Sources: git URL, local path, or squad-export.json`);
   console.log(`  ${BOLD}export${RESET}     Export squad to a portable JSON snapshot`);
   console.log(`             Default: squad-export.json (use --out <path> to override)`);
   console.log(`  ${BOLD}import${RESET}     Import squad from an export file`);
@@ -830,6 +834,385 @@ if (cmd === 'plugin') {
   }
 
   fatal(`Unknown action: ${action}. Usage: squad plugin marketplace add|remove|list|browse`);
+}
+
+// --- Upstream subcommand ---
+if (cmd === 'upstream') {
+  const action = process.argv[3];
+  if (!action || !['add', 'remove', 'list', 'sync'].includes(action)) {
+    fatal('Usage: squad upstream add|remove|list|sync');
+  }
+
+  const squadDirInfo = detectSquadDir(dest);
+  if (squadDirInfo.isLegacy) showDeprecationWarning();
+  const upstreamFile = path.join(squadDirInfo.path, 'upstream.json');
+
+  function readUpstreams() {
+    if (!fs.existsSync(upstreamFile)) return { upstreams: [] };
+    try {
+      return JSON.parse(fs.readFileSync(upstreamFile, 'utf8'));
+    } catch {
+      return { upstreams: [] };
+    }
+  }
+
+  function writeUpstreams(data) {
+    fs.mkdirSync(path.dirname(upstreamFile), { recursive: true });
+    fs.writeFileSync(upstreamFile, JSON.stringify(data, null, 2) + '\n');
+  }
+
+  // Detect source type from a source string
+  function detectSourceType(source) {
+    if (source.endsWith('.json') && fs.existsSync(path.resolve(source))) {
+      return 'export';
+    }
+    if (source.startsWith('http://') || source.startsWith('https://') || source.endsWith('.git')) {
+      return 'git';
+    }
+    if (fs.existsSync(path.resolve(source))) {
+      return 'local';
+    }
+    // Default to git for owner/repo patterns
+    if (source.includes('/') && !source.includes('\\')) {
+      return 'git';
+    }
+    fatal(`Cannot determine source type for "${source}". Provide a git URL, local path, or export JSON file.`);
+  }
+
+  // Derive a name from the source
+  function deriveName(source, type) {
+    if (type === 'export') {
+      return path.basename(source, '.json').replace('squad-export', 'upstream');
+    }
+    if (type === 'git') {
+      const cleaned = source.replace(/\.git$/, '');
+      const parts = cleaned.split('/');
+      return parts[parts.length - 1] || 'upstream';
+    }
+    if (type === 'local') {
+      return path.basename(path.resolve(source)) || 'upstream';
+    }
+    return 'upstream';
+  }
+
+  // Read squad state from a resolved source directory
+  function readSquadState(sourceDir) {
+    const state = { skills: [], decisions: '', wisdom: '', casting_policy: null, routing: '' };
+
+    // Detect squad dir in source
+    let srcSquadDir = path.join(sourceDir, '.squad');
+    if (!fs.existsSync(srcSquadDir)) {
+      srcSquadDir = path.join(sourceDir, '.ai-team');
+    }
+    if (!fs.existsSync(srcSquadDir)) {
+      return null;
+    }
+
+    // Read skills
+    const skillsDir = path.join(srcSquadDir, 'skills');
+    if (fs.existsSync(skillsDir)) {
+      try {
+        for (const entry of fs.readdirSync(skillsDir)) {
+          const skillFile = path.join(skillsDir, entry, 'SKILL.md');
+          if (fs.existsSync(skillFile)) {
+            state.skills.push({ name: entry, content: fs.readFileSync(skillFile, 'utf8') });
+          }
+        }
+      } catch {}
+    }
+
+    // Read decisions
+    const decisionsPath = path.join(srcSquadDir, 'decisions.md');
+    if (fs.existsSync(decisionsPath)) {
+      state.decisions = fs.readFileSync(decisionsPath, 'utf8');
+    }
+
+    // Read wisdom
+    const wisdomPath = path.join(srcSquadDir, 'identity', 'wisdom.md');
+    if (fs.existsSync(wisdomPath)) {
+      state.wisdom = fs.readFileSync(wisdomPath, 'utf8');
+    }
+
+    // Read casting policy
+    const policyPath = path.join(srcSquadDir, 'casting', 'policy.json');
+    if (fs.existsSync(policyPath)) {
+      try {
+        state.casting_policy = JSON.parse(fs.readFileSync(policyPath, 'utf8'));
+      } catch {}
+    }
+
+    // Read routing
+    const routingPath = path.join(srcSquadDir, 'routing.md');
+    if (fs.existsSync(routingPath)) {
+      state.routing = fs.readFileSync(routingPath, 'utf8');
+    }
+
+    return state;
+  }
+
+  // Read squad state from an export JSON file
+  function readExportState(exportPath) {
+    const state = { skills: [], decisions: '', wisdom: '', casting_policy: null, routing: '' };
+    try {
+      const manifest = JSON.parse(fs.readFileSync(exportPath, 'utf8'));
+      if (manifest.version !== '1.0') {
+        console.error(`${RED}✗${RESET} Unsupported export version: ${manifest.version || 'missing'}`);
+        return null;
+      }
+      if (Array.isArray(manifest.skills)) {
+        for (const skillContent of manifest.skills) {
+          const nameMatch = skillContent.match(/^name:\s*["']?(.+?)["']?\s*$/m);
+          const skillName = nameMatch ? nameMatch[1].trim().toLowerCase().replace(/\s+/g, '-') : `skill-${manifest.skills.indexOf(skillContent)}`;
+          state.skills.push({ name: skillName, content: skillContent });
+        }
+      }
+      if (manifest.casting && manifest.casting.policy) {
+        state.casting_policy = manifest.casting.policy;
+      }
+    } catch (err) {
+      console.error(`${RED}✗${RESET} Failed to read export file: ${err.message}`);
+      return null;
+    }
+    return state;
+  }
+
+  // Write inherited state to _inherited/{name}/
+  function writeInheritedState(squadDir, name, state) {
+    const inheritedDir = path.join(squadDir, '_inherited', name);
+    fs.mkdirSync(inheritedDir, { recursive: true });
+
+    // Write skills
+    if (state.skills.length > 0) {
+      const skillsDir = path.join(inheritedDir, 'skills');
+      fs.mkdirSync(skillsDir, { recursive: true });
+      for (const skill of state.skills) {
+        const skillDir = path.join(skillsDir, skill.name);
+        fs.mkdirSync(skillDir, { recursive: true });
+        fs.writeFileSync(path.join(skillDir, 'SKILL.md'), skill.content);
+      }
+    }
+
+    // Write decisions (read-only context)
+    if (state.decisions) {
+      fs.writeFileSync(path.join(inheritedDir, 'decisions.md'), state.decisions);
+    }
+
+    // Write wisdom
+    if (state.wisdom) {
+      fs.mkdirSync(path.join(inheritedDir, 'identity'), { recursive: true });
+      fs.writeFileSync(path.join(inheritedDir, 'identity', 'wisdom.md'), state.wisdom);
+    }
+
+    // Write casting policy
+    if (state.casting_policy) {
+      fs.mkdirSync(path.join(inheritedDir, 'casting'), { recursive: true });
+      fs.writeFileSync(
+        path.join(inheritedDir, 'casting', 'policy.json'),
+        JSON.stringify(state.casting_policy, null, 2) + '\n'
+      );
+    }
+
+    // Write routing
+    if (state.routing) {
+      fs.writeFileSync(path.join(inheritedDir, 'routing.md'), state.routing);
+    }
+
+    // Write manifest marker
+    fs.writeFileSync(
+      path.join(inheritedDir, '_manifest.json'),
+      JSON.stringify({
+        source_name: name,
+        synced_at: new Date().toISOString(),
+        skills_count: state.skills.length,
+        has_decisions: !!state.decisions,
+        has_wisdom: !!state.wisdom,
+        has_casting_policy: !!state.casting_policy,
+        has_routing: !!state.routing
+      }, null, 2) + '\n'
+    );
+  }
+
+  if (action === 'add') {
+    const source = process.argv[4];
+    if (!source) {
+      fatal('Usage: squad upstream add <source>\n  Source: git URL (https://github.com/org/repo.git), local path, or squad-export.json');
+    }
+
+    const type = detectSourceType(source);
+    const nameIdx = process.argv.indexOf('--name');
+    const name = (nameIdx !== -1 && process.argv[nameIdx + 1])
+      ? process.argv[nameIdx + 1]
+      : deriveName(source, type);
+
+    const data = readUpstreams();
+    if (data.upstreams.some(u => u.name === name)) {
+      fatal(`Upstream "${name}" already exists. Use a different --name or remove it first.`);
+    }
+
+    const entry = {
+      name,
+      type,
+      source: type === 'local' || type === 'export' ? path.resolve(source) : source,
+      added_at: new Date().toISOString(),
+      last_synced: null
+    };
+    if (type === 'git') {
+      const refIdx = process.argv.indexOf('--ref');
+      entry.ref = (refIdx !== -1 && process.argv[refIdx + 1]) ? process.argv[refIdx + 1] : 'main';
+    }
+
+    data.upstreams.push(entry);
+    writeUpstreams(data);
+
+    console.log(`${GREEN}✓${RESET} Added upstream: ${BOLD}${name}${RESET} (${type}: ${entry.source})`);
+    console.log(`\nRun ${BOLD}squad upstream sync${RESET} to pull inherited content.`);
+    process.exit(0);
+  }
+
+  if (action === 'remove') {
+    const name = process.argv[4];
+    if (!name) {
+      fatal('Usage: squad upstream remove <name>');
+    }
+
+    const data = readUpstreams();
+    const before = data.upstreams.length;
+    data.upstreams = data.upstreams.filter(u => u.name !== name);
+    if (data.upstreams.length === before) {
+      fatal(`Upstream "${name}" not found. Run "squad upstream list" to see configured upstreams.`);
+    }
+    writeUpstreams(data);
+
+    // Remove inherited content
+    const inheritedDir = path.join(squadDirInfo.path, '_inherited', name);
+    if (fs.existsSync(inheritedDir)) {
+      fs.rmSync(inheritedDir, { recursive: true, force: true });
+      console.log(`${GREEN}✓${RESET} Removed inherited content for ${BOLD}${name}${RESET}`);
+    }
+
+    // Clean up empty _inherited/ dir
+    const parentInherited = path.join(squadDirInfo.path, '_inherited');
+    if (fs.existsSync(parentInherited)) {
+      try {
+        const remaining = fs.readdirSync(parentInherited);
+        if (remaining.length === 0) {
+          fs.rmdirSync(parentInherited);
+        }
+      } catch {}
+    }
+
+    console.log(`${GREEN}✓${RESET} Removed upstream: ${BOLD}${name}${RESET}`);
+    process.exit(0);
+  }
+
+  if (action === 'list') {
+    const data = readUpstreams();
+    if (data.upstreams.length === 0) {
+      console.log(`${DIM}No upstreams configured${RESET}`);
+      console.log(`\nAdd one with: ${BOLD}squad upstream add <source>${RESET}`);
+      console.log(`  Sources: git URL, local path, or squad-export.json`);
+      process.exit(0);
+    }
+    console.log(`\n${BOLD}Configured upstreams:${RESET}\n`);
+    for (const u of data.upstreams) {
+      const synced = u.last_synced ? `synced ${u.last_synced.split('T')[0]}` : 'never synced';
+      const ref = u.ref ? ` (ref: ${u.ref})` : '';
+      console.log(`  ${BOLD}${u.name}${RESET}  →  ${u.type}: ${u.source}${ref}  ${DIM}(${synced})${RESET}`);
+    }
+    console.log();
+    process.exit(0);
+  }
+
+  if (action === 'sync') {
+    const data = readUpstreams();
+    if (data.upstreams.length === 0) {
+      fatal('No upstreams configured. Run "squad upstream add <source>" first.');
+    }
+
+    const { execSync } = require('child_process');
+    const specificName = process.argv[4];
+    const toSync = specificName
+      ? data.upstreams.filter(u => u.name === specificName)
+      : data.upstreams;
+
+    if (specificName && toSync.length === 0) {
+      fatal(`Upstream "${specificName}" not found.`);
+    }
+
+    console.log(`\n${BOLD}Syncing ${toSync.length} upstream(s)...${RESET}\n`);
+    let synced = 0;
+
+    for (const upstream of toSync) {
+      let state = null;
+
+      if (upstream.type === 'local') {
+        const resolvedPath = path.resolve(upstream.source);
+        if (!fs.existsSync(resolvedPath)) {
+          console.error(`${RED}✗${RESET} ${upstream.name}: local path not found: ${upstream.source}`);
+          continue;
+        }
+        state = readSquadState(resolvedPath);
+        if (!state) {
+          console.error(`${RED}✗${RESET} ${upstream.name}: no .squad/ or .ai-team/ found at ${upstream.source}`);
+          continue;
+        }
+      } else if (upstream.type === 'export') {
+        const resolvedPath = path.resolve(upstream.source);
+        if (!fs.existsSync(resolvedPath)) {
+          console.error(`${RED}✗${RESET} ${upstream.name}: export file not found: ${upstream.source}`);
+          continue;
+        }
+        state = readExportState(resolvedPath);
+        if (!state) {
+          console.error(`${RED}✗${RESET} ${upstream.name}: failed to read export file`);
+          continue;
+        }
+      } else if (upstream.type === 'git') {
+        // Clone/fetch to temp dir
+        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'squad-upstream-'));
+        try {
+          const ref = upstream.ref || 'main';
+          execSync(
+            `git clone --depth 1 --branch ${ref} --single-branch "${upstream.source}" "${tmpDir}"`,
+            { stdio: 'pipe', timeout: 60000 }
+          );
+          state = readSquadState(tmpDir);
+          if (!state) {
+            console.error(`${RED}✗${RESET} ${upstream.name}: no .squad/ or .ai-team/ found in ${upstream.source}`);
+            continue;
+          }
+        } catch (err) {
+          console.error(`${RED}✗${RESET} ${upstream.name}: git clone failed: ${err.message}`);
+          continue;
+        } finally {
+          try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
+        }
+      }
+
+      if (state) {
+        writeInheritedState(squadDirInfo.path, upstream.name, state);
+        upstream.last_synced = new Date().toISOString();
+        synced++;
+
+        const parts = [];
+        if (state.skills.length > 0) parts.push(`${state.skills.length} skills`);
+        if (state.decisions) parts.push('decisions');
+        if (state.wisdom) parts.push('wisdom');
+        if (state.casting_policy) parts.push('casting policy');
+        if (state.routing) parts.push('routing');
+        const summary = parts.length > 0 ? parts.join(', ') : 'empty';
+
+        console.log(`${GREEN}✓${RESET} ${BOLD}${upstream.name}${RESET}: ${summary}`);
+      }
+    }
+
+    writeUpstreams(data);
+    console.log(`\n${synced}/${toSync.length} upstream(s) synced.`);
+    console.log(`${DIM}Inherited content: ${squadDirInfo.name}/_inherited/${RESET}\n`);
+    process.exit(0);
+  }
+
+  fatal(`Unknown action: ${action}. Usage: squad upstream add|remove|list|sync`);
 }
 
 // --- Export subcommand ---
