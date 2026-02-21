@@ -879,7 +879,7 @@ if (cmd === 'upstream') {
     if (source.endsWith('.json') && fs.existsSync(path.resolve(source))) {
       return 'export';
     }
-    if (source.startsWith('http://') || source.startsWith('https://') || source.endsWith('.git')) {
+    if (source.startsWith('http://') || source.startsWith('https://') || source.startsWith('file://') || source.endsWith('.git')) {
       return 'git';
     }
     if (fs.existsSync(path.resolve(source))) {
