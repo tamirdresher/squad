@@ -113,3 +113,32 @@
 1. **Placement:** Code hasn't migrated to the monorepo packages yet. Putting it in `packages/squad-sdk/src/` would create a split that doesn't match the current build pipeline (`tsc` compiles `src/` to `dist/`). When the monorepo migration happens, `src/resolution.ts` moves with everything else.
 2. **Separation of concerns:** Issue #210 says "repo squad always wins over personal squad" — that's a *policy* decision for the consumer, not for the resolution primitives. Keeping the two functions independent lets CLI/runtime compose them however needed (e.g., try repo first, fall back to global, or merge both).
 **Impact:** Low. When packages split happens, move `src/resolution.ts` into `packages/squad-sdk/src/`. The public API shape stays the same.
+
+### 2026-02-21: Changesets setup — independent versioning for squad-sdk and squad-cli
+**By:** Kobayashi (Git & Release)
+**Date:** 2026-02-21
+**Re:** #208
+**What:** Installed and configured @changesets/cli v2 for independent package versioning across the monorepo.
+**Configuration:**
+- `access`: `"public"` (both packages will be published)
+- `baseBranch`: `"main"` (release branch for changesets)
+- `fixed`: `[]` (empty — no linked releases)
+- `linked`: `[]` (empty — no linked releases)
+- `updateInternalDependencies`: `"patch"` (default, appropriate for SDK→CLI dependency)
+**Why:** Squad is a monorepo with two distinct packages (squad-sdk and squad-cli) with different release cadences and audiences. Independent versioning prevents unnecessary releases and version inflation when only one package changes.
+**Implementation:** `.changeset/config.json` created, npm script `changeset:check` added to `package.json` for CI validation.
+**Next Steps:** Contributors use `npx changeset add` before merge; release workflow runs `changeset publish` to GitHub.
+
+### 2026-02-21: --global flag and status command pattern
+**By:** Fenster (Core Dev)
+**Date:** 2026-02-21
+**Re:** #212, #213
+**What:**
+- `--global` flag on `init` and `upgrade` routes to `resolveGlobalSquadPath()` instead of `process.cwd()`.
+- `squad status` composes both `resolveSquad()` and `resolveGlobalSquadPath()` to show which squad is active and why.
+- All routing logic stays in `src/index.ts` main() — init.ts and upgrade.ts are path-agnostic (they take a `dest` string).
+**Why:**
+1. **Thin CLI contract:** init and upgrade already accept a destination directory. The `--global` flag is a CLI concern, not a runtime concern — so it lives in the CLI routing layer only.
+2. **Composition over fallback:** `squad status` demonstrates the intended consumer pattern from #210/#211: try repo resolution first, then check global path. The resolution primitives stay independent.
+3. **Debugging UX:** Status shows repo resolution, global path, and global squad existence — all the info needed to debug "why isn't my squad loading?" issues.
+**Impact:** Low. Single-file change to `src/index.ts`. No changes to resolution algorithms or init/upgrade internals.

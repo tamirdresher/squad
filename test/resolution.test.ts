@@ -66,6 +66,33 @@ describe('resolveSquad()', () => {
     const result = resolveSquad();
     expect(result === null || typeof result === 'string').toBe(true);
   });
+
+  it('finds .squad/ at root from a deeply nested directory (3+ levels)', () => {
+    scaffold('.git', '.squad', 'a/b/c/d');
+    expect(resolveSquad(join(TMP, 'a', 'b', 'c', 'd'))).toBe(join(TMP, '.squad'));
+  });
+
+  it('finds the nearest .squad/ when multiple exist', () => {
+    scaffold('.git', '.squad', 'packages/.squad', 'packages/app');
+    // Starting from packages/app, the nearest .squad/ is packages/.squad
+    expect(resolveSquad(join(TMP, 'packages', 'app'))).toBe(join(TMP, 'packages', '.squad'));
+  });
+
+  it('finds root .squad/ when no closer one exists', () => {
+    scaffold('.git', '.squad', 'packages/app/src');
+    expect(resolveSquad(join(TMP, 'packages', 'app', 'src'))).toBe(join(TMP, '.squad'));
+  });
+
+  it('follows symlinked .squad/ directory', function () {
+    if (process.platform === 'win32') {
+      // Symlinks on Windows require elevated privileges
+      return;
+    }
+    const { symlinkSync } = require('node:fs') as typeof import('node:fs');
+    scaffold('.git', 'real-squad', 'project/src');
+    symlinkSync(join(TMP, 'real-squad'), join(TMP, 'project', '.squad'));
+    expect(resolveSquad(join(TMP, 'project', 'src'))).toBe(join(TMP, 'project', '.squad'));
+  });
 });
 
 describe('resolveGlobalSquadPath()', () => {
