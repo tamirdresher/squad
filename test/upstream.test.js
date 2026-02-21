@@ -169,8 +169,6 @@ describe('Upstream inheritance (squad upstream)', () => {
   describe('upstream remove', () => {
     it('removes an upstream by name', () => {
       runSquad(['upstream', 'add', upstreamDir, '--name', 'to-remove'], repoDir);
-      // Sync first so inherited content exists
-      runSquad(['upstream', 'sync'], repoDir);
 
       const result = runSquad(['upstream', 'remove', 'to-remove'], repoDir);
       assert.equal(result.exitCode, 0, result.stdout);
@@ -179,9 +177,6 @@ describe('Upstream inheritance (squad upstream)', () => {
       // Verify upstream.json updated
       const data = JSON.parse(fs.readFileSync(path.join(repoDir, '.squad', 'upstream.json'), 'utf8'));
       assert.equal(data.upstreams.length, 0);
-
-      // Verify inherited content removed
-      assert.ok(!fs.existsSync(path.join(repoDir, '.squad', '_inherited', 'to-remove')));
     });
 
     it('fails for nonexistent upstream', () => {
@@ -189,85 +184,48 @@ describe('Upstream inheritance (squad upstream)', () => {
       assert.notEqual(result.exitCode, 0);
       assert.ok(result.stdout.includes('not found'), result.stdout);
     });
-
-    it('cleans up empty _inherited directory', () => {
-      runSquad(['upstream', 'add', upstreamDir, '--name', 'only-one'], repoDir);
-      runSquad(['upstream', 'sync'], repoDir);
-      assert.ok(fs.existsSync(path.join(repoDir, '.squad', '_inherited')));
-
-      runSquad(['upstream', 'remove', 'only-one'], repoDir);
-      assert.ok(!fs.existsSync(path.join(repoDir, '.squad', '_inherited')));
-    });
   });
 
   describe('upstream sync', () => {
-    it('syncs skills from local upstream', () => {
+    it('validates local upstream and reports content', () => {
       runSquad(['upstream', 'add', upstreamDir, '--name', 'org'], repoDir);
       const result = runSquad(['upstream', 'sync'], repoDir);
       assert.equal(result.exitCode, 0, result.stdout);
       assert.ok(result.stdout.includes('synced'), result.stdout);
-
-      // Verify inherited skills
-      const skillPath = path.join(repoDir, '.squad', '_inherited', 'org', 'skills', 'shared-conventions', 'SKILL.md');
-      assert.ok(fs.existsSync(skillPath), 'inherited skill should exist');
-      const skillContent = fs.readFileSync(skillPath, 'utf8');
-      assert.ok(skillContent.includes('shared-conventions'));
+      assert.ok(result.stdout.includes('read live'), 'local should say read live');
+      // Local upstreams should NOT create _inherited/ — they're read live
+      assert.ok(!fs.existsSync(path.join(repoDir, '.squad', '_inherited')),
+        'local upstreams should not create _inherited/');
     });
 
-    it('syncs decisions from local upstream', () => {
+    it('reports skills count for local upstream', () => {
       runSquad(['upstream', 'add', upstreamDir, '--name', 'org'], repoDir);
-      runSquad(['upstream', 'sync'], repoDir);
-
-      const decisionsPath = path.join(repoDir, '.squad', '_inherited', 'org', 'decisions.md');
-      assert.ok(fs.existsSync(decisionsPath), 'inherited decisions should exist');
-      const content = fs.readFileSync(decisionsPath, 'utf8');
-      assert.ok(content.includes('Use TypeScript everywhere'));
+      const result = runSquad(['upstream', 'sync'], repoDir);
+      assert.ok(result.stdout.includes('1 skills'), result.stdout);
     });
 
-    it('syncs wisdom from local upstream', () => {
+    it('reports decisions for local upstream', () => {
       runSquad(['upstream', 'add', upstreamDir, '--name', 'org'], repoDir);
-      runSquad(['upstream', 'sync'], repoDir);
-
-      const wisdomPath = path.join(repoDir, '.squad', '_inherited', 'org', 'identity', 'wisdom.md');
-      assert.ok(fs.existsSync(wisdomPath), 'inherited wisdom should exist');
-      const content = fs.readFileSync(wisdomPath, 'utf8');
-      assert.ok(content.includes('error boundaries'));
+      const result = runSquad(['upstream', 'sync'], repoDir);
+      assert.ok(result.stdout.includes('decisions'), result.stdout);
     });
 
-    it('syncs casting policy from local upstream', () => {
+    it('reports wisdom for local upstream', () => {
       runSquad(['upstream', 'add', upstreamDir, '--name', 'org'], repoDir);
-      runSquad(['upstream', 'sync'], repoDir);
-
-      const policyPath = path.join(repoDir, '.squad', '_inherited', 'org', 'casting', 'policy.json');
-      assert.ok(fs.existsSync(policyPath), 'inherited casting policy should exist');
-      const policy = JSON.parse(fs.readFileSync(policyPath, 'utf8'));
-      assert.ok(Array.isArray(policy.universe_allowlist));
+      const result = runSquad(['upstream', 'sync'], repoDir);
+      assert.ok(result.stdout.includes('wisdom'), result.stdout);
     });
 
-    it('syncs routing from local upstream', () => {
+    it('reports casting policy for local upstream', () => {
       runSquad(['upstream', 'add', upstreamDir, '--name', 'org'], repoDir);
-      runSquad(['upstream', 'sync'], repoDir);
-
-      const routingPath = path.join(repoDir, '.squad', '_inherited', 'org', 'routing.md');
-      assert.ok(fs.existsSync(routingPath), 'inherited routing should exist');
-      const content = fs.readFileSync(routingPath, 'utf8');
-      assert.ok(content.includes('Security'));
+      const result = runSquad(['upstream', 'sync'], repoDir);
+      assert.ok(result.stdout.includes('casting policy'), result.stdout);
     });
 
-    it('writes a manifest marker file', () => {
+    it('reports routing for local upstream', () => {
       runSquad(['upstream', 'add', upstreamDir, '--name', 'org'], repoDir);
-      runSquad(['upstream', 'sync'], repoDir);
-
-      const manifestPath = path.join(repoDir, '.squad', '_inherited', 'org', '_manifest.json');
-      assert.ok(fs.existsSync(manifestPath), 'manifest should exist');
-      const manifest = JSON.parse(fs.readFileSync(manifestPath, 'utf8'));
-      assert.equal(manifest.source_name, 'org');
-      assert.ok(manifest.synced_at);
-      assert.equal(manifest.skills_count, 1);
-      assert.equal(manifest.has_decisions, true);
-      assert.equal(manifest.has_wisdom, true);
-      assert.equal(manifest.has_casting_policy, true);
-      assert.equal(manifest.has_routing, true);
+      const result = runSquad(['upstream', 'sync'], repoDir);
+      assert.ok(result.stdout.includes('routing'), result.stdout);
     });
 
     it('updates last_synced timestamp in upstream.json', () => {
@@ -282,11 +240,9 @@ describe('Upstream inheritance (squad upstream)', () => {
 
     it('syncs a specific upstream by name', () => {
       runSquad(['upstream', 'add', upstreamDir, '--name', 'org'], repoDir);
-
       const result = runSquad(['upstream', 'sync', 'org'], repoDir);
       assert.equal(result.exitCode, 0, result.stdout);
       assert.ok(result.stdout.includes('org'), result.stdout);
-      assert.ok(fs.existsSync(path.join(repoDir, '.squad', '_inherited', 'org')));
     });
 
     it('fails for unknown sync target', () => {
@@ -296,8 +252,7 @@ describe('Upstream inheritance (squad upstream)', () => {
       assert.ok(result.stdout.includes('not found'), result.stdout);
     });
 
-    it('syncs from export JSON file', () => {
-      // Create export file
+    it('validates export JSON file on sync', () => {
       const exportPath = path.join(upstreamDir, 'org-export.json');
       fs.writeFileSync(exportPath, JSON.stringify({
         version: '1.0',
@@ -309,9 +264,7 @@ describe('Upstream inheritance (squad upstream)', () => {
       runSquad(['upstream', 'add', exportPath, '--name', 'org-export'], repoDir);
       const result = runSquad(['upstream', 'sync'], repoDir);
       assert.equal(result.exitCode, 0, result.stdout);
-
-      const skillPath = path.join(repoDir, '.squad', '_inherited', 'org-export', 'skills', 'exported-skill', 'SKILL.md');
-      assert.ok(fs.existsSync(skillPath), 'exported skill should be inherited');
+      assert.ok(result.stdout.includes('read live'), 'export should say read live');
     });
 
     it('fails when no upstreams configured', () => {
@@ -320,20 +273,16 @@ describe('Upstream inheritance (squad upstream)', () => {
       assert.ok(result.stdout.includes('No upstreams configured'), result.stdout);
     });
 
-    it('re-sync overwrites with fresh content', () => {
+    it('upstream changes are visible live without re-sync', () => {
       runSquad(['upstream', 'add', upstreamDir, '--name', 'org'], repoDir);
-      runSquad(['upstream', 'sync'], repoDir);
 
-      // Modify upstream
+      // Modify upstream source directly
       const skillPath = path.join(upstreamDir, '.squad', 'skills', 'shared-conventions', 'SKILL.md');
       fs.writeFileSync(skillPath, '---\nname: shared-conventions\nconfidence: high\n---\n\n# Updated Content\n');
 
-      runSquad(['upstream', 'sync'], repoDir);
-
-      const inheritedSkill = fs.readFileSync(
-        path.join(repoDir, '.squad', '_inherited', 'org', 'skills', 'shared-conventions', 'SKILL.md'), 'utf8'
-      );
-      assert.ok(inheritedSkill.includes('Updated Content'), 'should have fresh content after re-sync');
+      // The upstream source itself should have the new content (coordinator reads live)
+      const liveContent = fs.readFileSync(skillPath, 'utf8');
+      assert.ok(liveContent.includes('Updated Content'), 'source should reflect changes immediately');
     });
   });
 
@@ -359,13 +308,15 @@ describe('Upstream inheritance (squad upstream)', () => {
         assert.equal(result.exitCode, 0, result.stdout);
         assert.ok(result.stdout.includes('2/2'), result.stdout);
 
-        // Both upstreams should have their own _inherited dirs
-        assert.ok(fs.existsSync(path.join(repoDir, '.squad', '_inherited', 'org', 'skills', 'shared-conventions')));
-        assert.ok(fs.existsSync(path.join(repoDir, '.squad', '_inherited', 'team', 'skills', 'team-patterns')));
+        // Both upstreams validated — content readable from source paths
+        // Verify the upstream sources themselves have the expected content
+        assert.ok(fs.existsSync(path.join(upstreamDir, '.squad', 'skills', 'shared-conventions')));
+        assert.ok(fs.existsSync(path.join(teamDir, '.squad', 'skills', 'team-patterns')));
+        assert.ok(fs.existsSync(path.join(upstreamDir, '.squad', 'decisions.md')));
+        assert.ok(fs.existsSync(path.join(teamDir, '.squad', 'decisions.md')));
 
-        // Both decisions visible
-        assert.ok(fs.existsSync(path.join(repoDir, '.squad', '_inherited', 'org', 'decisions.md')));
-        assert.ok(fs.existsSync(path.join(repoDir, '.squad', '_inherited', 'team', 'decisions.md')));
+        // No _inherited/ created for local upstreams
+        assert.ok(!fs.existsSync(path.join(repoDir, '.squad', '_inherited')));
       } finally {
         cleanDir(teamDir);
       }

@@ -103,6 +103,19 @@ function copyRecursive(src, target) {
   }
 }
 
+// Ensure a line exists in .gitignore (create if needed)
+function ensureGitignoreEntry(destDir, entry) {
+  const gitignorePath = path.join(destDir, '.gitignore');
+  let content = '';
+  if (fs.existsSync(gitignorePath)) {
+    content = fs.readFileSync(gitignorePath, 'utf8');
+  }
+  if (!content.includes(entry)) {
+    const nl = content && !content.endsWith('\n') ? '\n' : '';
+    fs.writeFileSync(gitignorePath, content + nl + entry + '\n');
+  }
+}
+
 
 // --- Watch subcommand (Ralph local watchdog) ---
 if (cmd === 'watch') {
@@ -976,62 +989,6 @@ if (cmd === 'upstream') {
     return state;
   }
 
-  // Write inherited state to _inherited/{name}/
-  function writeInheritedState(squadDir, name, state) {
-    const inheritedDir = path.join(squadDir, '_inherited', name);
-    fs.mkdirSync(inheritedDir, { recursive: true });
-
-    // Write skills
-    if (state.skills.length > 0) {
-      const skillsDir = path.join(inheritedDir, 'skills');
-      fs.mkdirSync(skillsDir, { recursive: true });
-      for (const skill of state.skills) {
-        const skillDir = path.join(skillsDir, skill.name);
-        fs.mkdirSync(skillDir, { recursive: true });
-        fs.writeFileSync(path.join(skillDir, 'SKILL.md'), skill.content);
-      }
-    }
-
-    // Write decisions (read-only context)
-    if (state.decisions) {
-      fs.writeFileSync(path.join(inheritedDir, 'decisions.md'), state.decisions);
-    }
-
-    // Write wisdom
-    if (state.wisdom) {
-      fs.mkdirSync(path.join(inheritedDir, 'identity'), { recursive: true });
-      fs.writeFileSync(path.join(inheritedDir, 'identity', 'wisdom.md'), state.wisdom);
-    }
-
-    // Write casting policy
-    if (state.casting_policy) {
-      fs.mkdirSync(path.join(inheritedDir, 'casting'), { recursive: true });
-      fs.writeFileSync(
-        path.join(inheritedDir, 'casting', 'policy.json'),
-        JSON.stringify(state.casting_policy, null, 2) + '\n'
-      );
-    }
-
-    // Write routing
-    if (state.routing) {
-      fs.writeFileSync(path.join(inheritedDir, 'routing.md'), state.routing);
-    }
-
-    // Write manifest marker
-    fs.writeFileSync(
-      path.join(inheritedDir, '_manifest.json'),
-      JSON.stringify({
-        source_name: name,
-        synced_at: new Date().toISOString(),
-        skills_count: state.skills.length,
-        has_decisions: !!state.decisions,
-        has_wisdom: !!state.wisdom,
-        has_casting_policy: !!state.casting_policy,
-        has_routing: !!state.routing
-      }, null, 2) + '\n'
-    );
-  }
-
   if (action === 'add') {
     const source = process.argv[4];
     if (!source) {
@@ -1064,8 +1021,47 @@ if (cmd === 'upstream') {
     data.upstreams.push(entry);
     writeUpstreams(data);
 
+    // For git upstreams, clone immediately so context is available right away
+    if (type === 'git') {
+      const { execSync } = require('child_process');
+      const reposDir = path.join(squadDirInfo.path, '_upstream_repos');
+      const cloneDir = path.join(reposDir, name);
+      fs.mkdirSync(reposDir, { recursive: true });
+
+      // Ensure _upstream_repos/ is gitignored
+      ensureGitignoreEntry(dest, squadDirInfo.name + '/_upstream_repos/');
+
+      try {
+        const ref = entry.ref || 'main';
+        execSync(
+          `git clone --depth 1 --branch ${ref} --single-branch "${source}" "${cloneDir}"`,
+          { stdio: 'pipe', timeout: 60000 }
+        );
+        entry.last_synced = new Date().toISOString();
+        writeUpstreams(data);
+        console.log(`${GREEN}✓${RESET} Cloned upstream repo to ${squadDirInfo.name}/_upstream_repos/${name}`);
+      } catch (err) {
+        console.error(`${YELLOW}⚠${RESET} Clone failed — run "squad upstream sync" to retry: ${err.message}`);
+      }
+    }
+
+    // Validate local/export sources exist
+    if (type === 'local') {
+      const resolvedPath = path.resolve(source);
+      const srcSquadDir = fs.existsSync(path.join(resolvedPath, '.squad'))
+        ? path.join(resolvedPath, '.squad')
+        : fs.existsSync(path.join(resolvedPath, '.ai-team'))
+          ? path.join(resolvedPath, '.ai-team')
+          : null;
+      if (!srcSquadDir) {
+        console.error(`${YELLOW}⚠${RESET} No .squad/ or .ai-team/ found at ${source} — the coordinator will read from it live when available`);
+      }
+    }
+
     console.log(`${GREEN}✓${RESET} Added upstream: ${BOLD}${name}${RESET} (${type}: ${entry.source})`);
-    console.log(`\nRun ${BOLD}squad upstream sync${RESET} to pull inherited content.`);
+    if (type === 'local') {
+      console.log(`${DIM}The coordinator reads from this path live at session start — no sync needed.${RESET}`);
+    }
     process.exit(0);
   }
 
@@ -1083,22 +1079,27 @@ if (cmd === 'upstream') {
     }
     writeUpstreams(data);
 
-    // Remove inherited content
+    // Remove cloned repo cache
+    const repoDir = path.join(squadDirInfo.path, '_upstream_repos', name);
+    if (fs.existsSync(repoDir)) {
+      fs.rmSync(repoDir, { recursive: true, force: true });
+      console.log(`${GREEN}✓${RESET} Removed cached clone for ${BOLD}${name}${RESET}`);
+    }
+
+    // Remove legacy inherited content
     const inheritedDir = path.join(squadDirInfo.path, '_inherited', name);
     if (fs.existsSync(inheritedDir)) {
       fs.rmSync(inheritedDir, { recursive: true, force: true });
-      console.log(`${GREEN}✓${RESET} Removed inherited content for ${BOLD}${name}${RESET}`);
     }
 
-    // Clean up empty _inherited/ dir
-    const parentInherited = path.join(squadDirInfo.path, '_inherited');
-    if (fs.existsSync(parentInherited)) {
-      try {
-        const remaining = fs.readdirSync(parentInherited);
-        if (remaining.length === 0) {
-          fs.rmdirSync(parentInherited);
-        }
-      } catch {}
+    // Clean up empty parent dirs
+    for (const parent of ['_upstream_repos', '_inherited']) {
+      const parentDir = path.join(squadDirInfo.path, parent);
+      if (fs.existsSync(parentDir)) {
+        try {
+          if (fs.readdirSync(parentDir).length === 0) fs.rmdirSync(parentDir);
+        } catch {}
+      }
     }
 
     console.log(`${GREEN}✓${RESET} Removed upstream: ${BOLD}${name}${RESET}`);
@@ -1143,72 +1144,98 @@ if (cmd === 'upstream') {
     let synced = 0;
 
     for (const upstream of toSync) {
-      let state = null;
-
       if (upstream.type === 'local') {
+        // Local paths are read live — just validate
         const resolvedPath = path.resolve(upstream.source);
         if (!fs.existsSync(resolvedPath)) {
           console.error(`${RED}✗${RESET} ${upstream.name}: local path not found: ${upstream.source}`);
           continue;
         }
-        state = readSquadState(resolvedPath);
+        const state = readSquadState(resolvedPath);
         if (!state) {
           console.error(`${RED}✗${RESET} ${upstream.name}: no .squad/ or .ai-team/ found at ${upstream.source}`);
           continue;
         }
-      } else if (upstream.type === 'export') {
-        const resolvedPath = path.resolve(upstream.source);
-        if (!fs.existsSync(resolvedPath)) {
-          console.error(`${RED}✗${RESET} ${upstream.name}: export file not found: ${upstream.source}`);
-          continue;
-        }
-        state = readExportState(resolvedPath);
-        if (!state) {
-          console.error(`${RED}✗${RESET} ${upstream.name}: failed to read export file`);
-          continue;
-        }
-      } else if (upstream.type === 'git') {
-        // Clone/fetch to temp dir
-        const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'squad-upstream-'));
-        try {
-          const ref = upstream.ref || 'main';
-          execSync(
-            `git clone --depth 1 --branch ${ref} --single-branch "${upstream.source}" "${tmpDir}"`,
-            { stdio: 'pipe', timeout: 60000 }
-          );
-          state = readSquadState(tmpDir);
-          if (!state) {
-            console.error(`${RED}✗${RESET} ${upstream.name}: no .squad/ or .ai-team/ found in ${upstream.source}`);
-            continue;
-          }
-        } catch (err) {
-          console.error(`${RED}✗${RESET} ${upstream.name}: git clone failed: ${err.message}`);
-          continue;
-        } finally {
-          try { fs.rmSync(tmpDir, { recursive: true, force: true }); } catch {}
-        }
-      }
-
-      if (state) {
-        writeInheritedState(squadDirInfo.path, upstream.name, state);
-        upstream.last_synced = new Date().toISOString();
-        synced++;
-
         const parts = [];
         if (state.skills.length > 0) parts.push(`${state.skills.length} skills`);
         if (state.decisions) parts.push('decisions');
         if (state.wisdom) parts.push('wisdom');
         if (state.casting_policy) parts.push('casting policy');
         if (state.routing) parts.push('routing');
-        const summary = parts.length > 0 ? parts.join(', ') : 'empty';
+        console.log(`${GREEN}✓${RESET} ${BOLD}${upstream.name}${RESET} (local — read live): ${parts.join(', ') || 'empty'}`);
+        upstream.last_synced = new Date().toISOString();
+        synced++;
 
-        console.log(`${GREEN}✓${RESET} ${BOLD}${upstream.name}${RESET}: ${summary}`);
+      } else if (upstream.type === 'export') {
+        // Export files are read live — just validate
+        const resolvedPath = path.resolve(upstream.source);
+        if (!fs.existsSync(resolvedPath)) {
+          console.error(`${RED}✗${RESET} ${upstream.name}: export file not found: ${upstream.source}`);
+          continue;
+        }
+        const state = readExportState(resolvedPath);
+        if (!state) {
+          console.error(`${RED}✗${RESET} ${upstream.name}: failed to read export file`);
+          continue;
+        }
+        const parts = [];
+        if (state.skills.length > 0) parts.push(`${state.skills.length} skills`);
+        if (state.casting_policy) parts.push('casting policy');
+        console.log(`${GREEN}✓${RESET} ${BOLD}${upstream.name}${RESET} (export — read live): ${parts.join(', ') || 'empty'}`);
+        upstream.last_synced = new Date().toISOString();
+        synced++;
+
+      } else if (upstream.type === 'git') {
+        // Git upstreams: clone or pull into _upstream_repos/{name}
+        const reposDir = path.join(squadDirInfo.path, '_upstream_repos');
+        const cloneDir = path.join(reposDir, upstream.name);
+        fs.mkdirSync(reposDir, { recursive: true });
+
+        ensureGitignoreEntry(dest, squadDirInfo.name + '/_upstream_repos/');
+
+        try {
+          if (fs.existsSync(path.join(cloneDir, '.git'))) {
+            // Pull to update
+            execSync(`git -C "${cloneDir}" pull --ff-only`, { stdio: 'pipe', timeout: 60000 });
+          } else {
+            // Fresh clone
+            if (fs.existsSync(cloneDir)) fs.rmSync(cloneDir, { recursive: true, force: true });
+            const ref = upstream.ref || 'main';
+            execSync(
+              `git clone --depth 1 --branch ${ref} --single-branch "${upstream.source}" "${cloneDir}"`,
+              { stdio: 'pipe', timeout: 60000 }
+            );
+          }
+          const state = readSquadState(cloneDir);
+          if (!state) {
+            console.error(`${RED}✗${RESET} ${upstream.name}: no .squad/ or .ai-team/ found in cloned repo`);
+            continue;
+          }
+          const parts = [];
+          if (state.skills.length > 0) parts.push(`${state.skills.length} skills`);
+          if (state.decisions) parts.push('decisions');
+          if (state.wisdom) parts.push('wisdom');
+          if (state.casting_policy) parts.push('casting policy');
+          if (state.routing) parts.push('routing');
+          console.log(`${GREEN}✓${RESET} ${BOLD}${upstream.name}${RESET} (git — cloned): ${parts.join(', ') || 'empty'}`);
+          upstream.last_synced = new Date().toISOString();
+          synced++;
+        } catch (err) {
+          console.error(`${RED}✗${RESET} ${upstream.name}: git sync failed: ${err.message}`);
+          continue;
+        }
       }
     }
 
     writeUpstreams(data);
     console.log(`\n${synced}/${toSync.length} upstream(s) synced.`);
-    console.log(`${DIM}Inherited content: ${squadDirInfo.name}/_inherited/${RESET}\n`);
+    if (toSync.some(u => u.type === 'local' || u.type === 'export')) {
+      console.log(`${DIM}Local/export upstreams are read live — the coordinator reads directly from the source path.${RESET}`);
+    }
+    if (toSync.some(u => u.type === 'git')) {
+      console.log(`${DIM}Git upstreams cached at: ${squadDirInfo.name}/_upstream_repos/${RESET}`);
+    }
+    console.log();
     process.exit(0);
   }
 
