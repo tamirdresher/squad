@@ -18,6 +18,10 @@ export { loadConfig, loadConfigSync } from './runtime/config.js';
 export type { ConfigLoadResult, ConfigValidationError } from './runtime/config.js';
 export * from './runtime/streaming.js';
 export * from './runtime/cost-tracker.js';
+export * from './runtime/telemetry.js';
+export * from './cli/index.js';
+export * from './marketplace/index.js';
+export * from './build/index.js';
 
 function main(): void {
   const args = process.argv.slice(2);
