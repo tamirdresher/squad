@@ -5,7 +5,7 @@
  * Programmable multi-agent runtime for GitHub Copilot
  */
 
-const VERSION = '0.6.1'; // TODO: use getPackageVersion() when not a barrel export file
+const VERSION = '0.6.2'; // TODO: use getPackageVersion() when not a barrel export file
 
 // Export public API
 export { resolveSquad, resolveGlobalSquadPath, ensureSquadPath } from './resolution.js';

@@ -1,6 +1,6 @@
 {
   "name": "@bradygaster/squad-cli",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Squad CLI — Command-line interface for the Squad multi-agent runtime",
   "type": "module",
   "bin": {
@@ -17,7 +17,7 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@bradygaster/squad-sdk": "0.6.1"
+    "@bradygaster/squad-sdk": "0.6.2"
   },
   "keywords": [
     "copilot",
