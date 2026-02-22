@@ -8,3 +8,4 @@ coverage/
 # Squad: ignore generated logs
 .squad/orchestration-log/
 .squad/log/
+.test-cli-*
