@@ -14,6 +14,8 @@ export interface CommandResult {
   handled: boolean;
   exit?: boolean;
   output?: string;
+  /** When true, the shell should clear its message history. */
+  clear?: boolean;
 }
 
 /**
@@ -77,8 +79,7 @@ function handleHistory(args: string[], context: CommandContext): CommandResult {
 }
 
 function handleClear(): CommandResult {
-  // Clear is handled by the shell (clears terminal)
-  return { handled: true, output: '\x1Bc' }; // ANSI clear screen
+  return { handled: true, clear: true };
 }
 
 function handleHelp(): CommandResult {
@@ -95,7 +96,8 @@ function handleHelp(): CommandResult {
         '/clear — Clear screen',
         '/quit — Exit',
         '',
-        '@Agent message — Direct',
+        'Just type — your squad routes it.',
+        '@Agent message — Direct to one agent.',
       ].join('\n'),
     };
   }
@@ -109,9 +111,9 @@ function handleHelp(): CommandResult {
       '  /clear    — Clear the screen',
       '  /quit     — Exit',
       '',
-      'Talk to agents:',
-      '  @AgentName message',
-      '  AgentName, message',
+      'Talk to your squad:',
+      '  Just type naturally — the coordinator routes it to the right agent.',
+      '  @AgentName message  — Send directly to one agent.',
     ].join('\n'),
   };
 }

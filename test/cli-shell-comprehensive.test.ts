@@ -746,10 +746,10 @@ describe('commands.ts — executeCommand', () => {
   });
 
   describe('/clear', () => {
-    it('returns ANSI clear screen code', () => {
+    it('returns clear flag to reset message history', () => {
       const result = executeCommand('clear', [], context);
       expect(result.handled).toBe(true);
-      expect(result.output).toBe('\x1Bc');
+      expect(result.clear).toBe(true);
     });
   });
 

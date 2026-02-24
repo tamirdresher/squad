@@ -445,5 +445,5 @@ export async function runShell(): Promise<void> {
   try { await lifecycle.shutdown(); } catch (err) { debugLog('Failed to shutdown lifecycle:', err); }
   try { await telemetry.shutdown(); } catch (err) { debugLog('Failed to shutdown telemetry:', err); }
 
-  console.log('👋 Squad out.');
+  console.log('◆ Squad out.');
 }

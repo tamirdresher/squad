@@ -116,3 +116,17 @@
   - `THINKING_PHRASES` export kept as single-element array `['Thinking']` for backward compat
 - 4 pre-existing test failures (2 empty panel, 2 idle→ready text mismatch) — not related
 - PR #364 on branch `squad/340-p2-nice-to-haves`
+
+### 2026-02-23: Product love — first-time user experience polish
+- Walked through complete first-time user journey: `squad init` → REPL launch → welcome → first command
+- Filed 6 issues (#400, #402, #404, #405, #406, #407), closed #406 (ErrorBoundary doesn't exist on disk)
+- Fixed 5 issues in one PR:
+  - **`/clear` was broken** (#400): ANSI escape code was added as message content (no-op in Ink). Added `clear?: boolean` to `CommandResult`, `handleClear()` returns `{ clear: true }`, App.tsx resets `messages` state to `[]`.
+  - **Natural language routing hidden** (#402): Coordinator auto-routing is the killer feature but was invisible. Updated welcome hints to "Just type · @Agent to direct", `/help` explains routing, first-run shows "Or just type naturally", input placeholder changed to "Type anything or @agent..."
+  - **First-run hint breaks on narrow terminals** (#404): Changed from horizontal Box to `flexDirection="column"` with breathing room
+  - **Exit emoji inconsistency** (#405): `👋 Squad out.` → `◆ Squad out.` (matches P2 emoji removal)
+  - **Roster wraps mid-name** (#407): Replaced single dense string with per-agent `<Text>` elements in `<Box flexWrap="wrap">` for clean word-boundary wrapping
+- Files changed: `commands.ts`, `App.tsx`, `InputPrompt.tsx`, `index.ts`, `cli-shell-comprehensive.test.ts`
+- Pattern: `CommandResult.clear` flag for shell-level state resets (vs output strings)
+- 125/125 tests pass, build clean
+- PR #414 on branch `squad/cheritto-product-love`

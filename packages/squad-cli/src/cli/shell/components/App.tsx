@@ -120,6 +120,11 @@ export const App: React.FC<AppProps> = ({ registry, renderer, teamRoot, version,
         return;
       }
 
+      if (result.clear) {
+        setMessages([]);
+        return;
+      }
+
       if (result.output) {
         setMessages(prev => [...prev, {
           role: 'system' as const,
@@ -146,9 +151,7 @@ export const App: React.FC<AppProps> = ({ registry, renderer, teamRoot, version,
     setAgents([...registry.getAll()]);
   }, [registry, renderer, teamRoot, exit, onDispatch]);
 
-  const rosterText = welcome?.agents
-    .map((a, i) => `${a.emoji} ${a.name}${i < (welcome?.agents.length ?? 0) - 1 ? ' · ' : ''}`)
-    .join('') ?? '';
+  const rosterAgents = welcome?.agents ?? [];
 
   const agentCount = welcome?.agents.length ?? 0;
   const activeCount = agents.filter(a => a.status === 'streaming' || a.status === 'working').length;
@@ -180,26 +183,31 @@ export const App: React.FC<AppProps> = ({ registry, renderer, teamRoot, version,
           ) : null}
         </Box>
         {bannerReady && !compact && <Text>{' '}</Text>}
-        {bannerReady && !compact && rosterText ? (
+        {bannerReady && !compact && rosterAgents.length > 0 ? (
           <>
-            <Text dimColor={bannerDim} wrap="wrap">{rosterText}</Text>
+            <Box flexWrap="wrap" gap={1}>
+              {rosterAgents.map((a, i) => (
+                <Text key={a.name} dimColor={bannerDim}>{a.emoji} {a.name}{i < rosterAgents.length - 1 ? ' ·' : ''}</Text>
+              ))}
+            </Box>
             <Text dimColor>  {agentCount} agent{agentCount !== 1 ? 's' : ''} ready · {activeCount} active</Text>
           </>
         ) : bannerReady && compact && agentCount > 0 ? (
           <Text dimColor>{agentCount} agent{agentCount !== 1 ? 's' : ''} · {activeCount} active</Text>
-        ) : bannerReady && !rosterText ? (
+        ) : bannerReady && rosterAgents.length === 0 ? (
           <Text dimColor>{"  Run 'squad init' to get started"}</Text>
         ) : null}
         {bannerReady && !compact && <Text>{' '}</Text>}
         {bannerReady && wide && welcome?.focus ? <Text dimColor>Focus: {welcome.focus}</Text> : null}
-        {bannerReady && <Text dimColor>{compact ? '/help · Ctrl+C exit' : '↑↓ history · @Agent to direct · /help · Ctrl+C exit'}</Text>}
+        {bannerReady && <Text dimColor>{compact ? '/help · Ctrl+C exit' : 'Just type · @Agent to direct · /help · Ctrl+C exit'}</Text>}
       </Box>
 
       {bannerReady && welcome?.isFirstRun ? (
-        <Box paddingX={1} paddingY={1}>
+        <Box flexDirection="column" paddingX={1} paddingY={1}>
           <Text color={noColor ? undefined : 'green'} bold>Your squad is assembled.</Text>
-          <Text> Try: </Text>
-          <Text bold color={noColor ? undefined : 'cyan'}>@{leadAgent} what should we build first?</Text>
+          <Text> </Text>
+          <Text>Try: <Text bold color={noColor ? undefined : 'cyan'}>@{leadAgent} what should we build first?</Text></Text>
+          <Text dimColor>Or just type naturally — your squad figures out the rest.</Text>
         </Box>
       ) : null}
 
