@@ -145,6 +145,7 @@ export async function runShell(): Promise<void> {
   const client = new SquadClient({ cwd: teamRoot });
 
   let shellApi: ShellApi | undefined;
+  let origAddMessage: ((msg: ShellMessage) => void) | undefined;
   const agentSessions = new Map<string, SquadSession>();
   let coordinatorSession: SquadSession | null = null;
 
@@ -584,6 +585,24 @@ export async function runShell(): Promise<void> {
     }
   }
 
+  /** Auto-save session when messages change. */
+  let shellMessages: ShellMessage[] = [];
+  function autoSave(): void {
+    persistedSession.messages = shellMessages;
+    try { saveSession(teamRoot, persistedSession); } catch (err) { debugLog('autoSave failed:', err); }
+  }
+
+  /** Callback for /resume command — replaces current messages with restored session. */
+  function onRestoreSession(session: SessionData): void {
+    persistedSession = session;
+    // Use unwrapped addMessage to avoid per-message autoSave and duplicate pushes
+    for (const msg of session.messages) {
+      origAddMessage?.(msg);
+    }
+    shellMessages = [...session.messages];
+    autoSave();
+  }
+
   const { waitUntilExit } = render(
     React.createElement(ErrorBoundary, null,
       React.createElement(App, {
@@ -591,9 +610,33 @@ export async function runShell(): Promise<void> {
         renderer,
         teamRoot,
         version: pkg.version,
-        onReady: (api: ShellApi) => { shellApi = api; },
+        onReady: (api: ShellApi) => {
+          // Wrap addMessage to auto-save on every message
+          const origAdd = api.addMessage;
+          origAddMessage = origAdd;
+          api.addMessage = (msg: ShellMessage) => {
+            origAdd(msg);
+            shellMessages.push(msg);
+            autoSave();
+          };
+          shellApi = api;
+
+          // Restore messages from resumed session
+          if (recentSession && recentSession.messages.length > 0) {
+            for (const msg of recentSession.messages) {
+              origAdd(msg);
+            }
+            shellMessages = [...recentSession.messages];
+            origAdd({
+              role: 'system',
+              content: `✓ Resumed session ${recentSession.id.slice(0, 8)} (${recentSession.messages.length} messages)`,
+              timestamp: new Date(),
+            });
+          }
+        },
         onDispatch: handleDispatch,
         onCancel: handleCancel,
+        onRestoreSession,
       }),
     ),
     { exitOnCtrlC: false },
@@ -603,6 +646,9 @@ export async function runShell(): Promise<void> {
   process.stderr.write('\r\x1b[K');
 
   await waitUntilExit();
+
+  // Final session save before cleanup
+  autoSave();
 
   // Cleanup: close all sessions and disconnect
   for (const [name, session] of agentSessions) {

@@ -60,6 +60,10 @@
       "types": "./dist/cli/shell/types.d.ts",
       "import": "./dist/cli/shell/types.js"
     },
+    "./shell/session-store": {
+      "types": "./dist/cli/shell/session-store.d.ts",
+      "import": "./dist/cli/shell/session-store.js"
+    },
     "./core/init": {
       "types": "./dist/cli/core/init.d.ts",
       "import": "./dist/cli/core/init.js"

@@ -18,6 +18,7 @@ import type { WelcomeData } from '../lifecycle.js';
 import type { SessionRegistry } from '../sessions.js';
 import type { ShellRenderer } from '../render.js';
 import type { ShellMessage, AgentSession } from '../types.js';
+import type { SessionData } from '../session-store.js';
 import type { ThinkingPhase } from './ThinkingIndicator.js';
 
 /** Methods exposed to the host so StreamBridge can push data into React state. */
@@ -37,11 +38,12 @@ export interface AppProps {
   onReady?: (api: ShellApi) => void;
   onDispatch?: (parsed: ParsedInput) => Promise<void>;
   onCancel?: () => void;
+  onRestoreSession?: (session: SessionData) => void;
 }
 
 const EXIT_WORDS = new Set(['exit', 'quit', 'q']);
 
-export const App: React.FC<AppProps> = ({ registry, renderer, teamRoot, version, onReady, onDispatch, onCancel }) => {
+export const App: React.FC<AppProps> = ({ registry, renderer, teamRoot, version, onReady, onDispatch, onCancel, onRestoreSession }) => {
   const { exit } = useApp();
   const [messages, setMessages] = useState<ShellMessage[]>([]);
   const [agents, setAgents] = useState<AgentSession[]>(registry.getAll());
@@ -137,6 +139,7 @@ export const App: React.FC<AppProps> = ({ registry, renderer, teamRoot, version,
         messageHistory: [...messagesRef.current, userMsg],
         teamRoot,
         version,
+        onRestoreSession,
       });
 
       if (result.exit) {

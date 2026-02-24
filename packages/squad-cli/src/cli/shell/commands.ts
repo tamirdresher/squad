@@ -2,6 +2,7 @@ import { SessionRegistry } from './sessions.js';
 import { ShellRenderer } from './render.js';
 import { getTerminalWidth } from './terminal.js';
 import { BOLD, DIM, RESET } from '../core/output.js';
+import { listSessions, loadSessionById, type SessionData } from './session-store.js';
 import type { ShellMessage } from './types.js';
 
 export interface CommandContext {
@@ -10,6 +11,8 @@ export interface CommandContext {
   messageHistory: ShellMessage[];
   teamRoot: string;
   version?: string;
+  /** Callback to restore a previous session's messages into the shell. */
+  onRestoreSession?: (session: SessionData) => void;
 }
 
 export interface CommandResult {
@@ -42,6 +45,10 @@ export function executeCommand(
       return { handled: true, exit: true };
     case 'agents':
       return handleAgents(context);
+    case 'sessions':
+      return handleSessions(context);
+    case 'resume':
+      return handleResume(args, context);
     case 'version':
       return { handled: true, output: context.version ?? 'unknown' };
     default:
@@ -105,6 +112,8 @@ function handleHelp(args: string[]): CommandResult {
           '/status — Check your team',
           '/history — Recent messages',
           '/agents — List team members',
+          '/sessions — Past sessions',
+          '/resume <id> — Restore session',
           '/clear — Clear screen',
           '/quit — Exit',
           '',
@@ -118,11 +127,13 @@ function handleHelp(args: string[]): CommandResult {
       handled: true,
       output: [
         'Commands:',
-        "  /status   — Check your team & what's happening",
-        '  /history  — See recent messages',
-        '  /agents   — List all team members',
-        '  /clear    — Clear the screen',
-        '  /quit     — Exit',
+        "  /status    — Check your team & what's happening",
+        '  /history   — See recent messages',
+        '  /agents    — List all team members',
+        '  /sessions  — List saved sessions',
+        '  /resume    — Restore a past session',
+        '  /clear     — Clear the screen',
+        '  /quit      — Exit',
         '',
         'Talk to your squad:',
         '  Just type naturally — the coordinator routes it to the right agent.',
@@ -141,7 +152,8 @@ function handleHelp(args: string[]): CommandResult {
       '',
       'Commands:',
       "  /status — Check your team    /history — Recent messages",
-      "  /agents — List team           /quit — Exit",
+      "  /agents — List team           /sessions — Past sessions",
+      "  /quit — Exit                  /resume <id> — Restore",
       '',
       "Type /help full for complete docs.",
     ].join('\n'),
@@ -158,4 +170,40 @@ function handleAgents(context: CommandContext): CommandResult {
     return `  ${icon} ${a.name} (${a.role}) — ${a.status}`;
   });
   return { handled: true, output: `Team Members:\n${lines.join('\n')}` };
+}
+
+function handleSessions(context: CommandContext): CommandResult {
+  const sessions = listSessions(context.teamRoot);
+  if (sessions.length === 0) {
+    return { handled: true, output: 'No saved sessions.' };
+  }
+  const lines = sessions.slice(0, 10).map((s, i) => {
+    const date = new Date(s.lastActiveAt).toLocaleString();
+    return `  ${i + 1}. ${s.id.slice(0, 8)}  ${date}  (${s.messageCount} messages)`;
+  });
+  return {
+    handled: true,
+    output: `${BOLD}Saved Sessions${RESET} (${sessions.length} total)\n${lines.join('\n')}\n\nUse ${DIM}/resume <id-prefix>${RESET} to restore a session.`,
+  };
+}
+
+function handleResume(args: string[], context: CommandContext): CommandResult {
+  if (!args[0]) {
+    return { handled: true, output: 'Usage: /resume <session-id-prefix>' };
+  }
+  const prefix = args[0].toLowerCase();
+  const sessions = listSessions(context.teamRoot);
+  const match = sessions.find(s => s.id.toLowerCase().startsWith(prefix));
+  if (!match) {
+    return { handled: true, output: `No session found matching "${prefix}". Try /sessions to list.` };
+  }
+  const session = loadSessionById(context.teamRoot, match.id);
+  if (!session) {
+    return { handled: true, output: 'Failed to load session data.' };
+  }
+  if (context.onRestoreSession) {
+    context.onRestoreSession(session);
+    return { handled: true, output: `✓ Restored session ${match.id.slice(0, 8)} (${session.messages.length} messages)` };
+  }
+  return { handled: true, output: 'Session restore not available.' };
 }
