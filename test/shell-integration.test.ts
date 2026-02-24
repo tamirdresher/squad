@@ -77,13 +77,13 @@ describe('ShellLifecycle — startup', () => {
 
   it('throws when .squad/ directory does not exist', async () => {
     const lc = makeLifecycle(tmpDir);
-    await expect(lc.initialize()).rejects.toThrow('No .squad/ directory found');
+    await expect(lc.initialize()).rejects.toThrow('No team found');
   });
 
   it('throws when team.md is missing', async () => {
     fs.mkdirSync(path.join(tmpDir, '.squad'), { recursive: true });
     const lc = makeLifecycle(tmpDir);
-    await expect(lc.initialize()).rejects.toThrow('No team.md found');
+    await expect(lc.initialize()).rejects.toThrow('No team manifest found');
   });
 
   it('sets state to error on failure', async () => {

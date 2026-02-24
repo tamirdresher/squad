@@ -11,10 +11,11 @@ All actions in the Squad shell are keyboard-reachable. No mouse is required.
 | `Enter` | Submit message |
 | `↑` / `↓` | Navigate input history |
 | `Backspace` | Delete last character |
+| `Tab` | Autocomplete @agent name or /command |
 | `@AgentName` | Direct message to a specific agent |
 | `/help` | Show available commands |
-| `/status` | Show agent status |
-| `/clear` | Clear message history |
+| `/status` | Show team status and active agents |
+| `/clear` | Clear the screen |
 | `Ctrl+C` | Exit the shell |
 | `exit` | Exit the shell (typed command) |
 
@@ -27,7 +28,7 @@ Squad respects the [NO_COLOR standard](https://no-color.org/). When `NO_COLOR` i
 | Pulsing active dot | Animated green `●◉○◉` | Static `●` |
 | Active agent label | Green `▶ Active` | Bold `[Active]` |
 | Error agent label | Red `✖` | Bold `[Error] ✖` |
-| Thinking spinner | Animated braille `⠋⠙⠹⠸…` with color cycling | Static `...` with `⏳` prefix |
+| Thinking spinner | Animated braille `⠋⠙⠹⠸…` with time-based color shift | Static `...` with text label |
 | Prompt cursor | Cyan `▌` | Bold `▌` |
 | Disabled prompt | Cyan animated spinner | `[working...]` text |
 | Status line colors | Yellow for active agents | No color, same text |
@@ -85,16 +86,16 @@ All error messages shown to the user must include:
 
 Example:
 ```
-🔌 SDK not connected. Check your setup.
-⚠️ Unknown command "foo". Run /help for available commands, or squad doctor to diagnose.
+SDK not connected. Check your setup.
+Hmm, /foo? Type /help for commands.
 ```
 
 ### Error patterns
 
 | Error | Message format |
 |---|---|
-| Unknown command | `⚠️ Unknown command "{cmd}". Run /help … or squad doctor` |
-| SDK not connected | `🔌 SDK not connected. Check your setup.` |
+| Unknown command | `Hmm, /{cmd}? Type /help for commands.` |
+| SDK not connected | `SDK not connected. Check your setup.` |
 | Missing team.md | Include path and `squad init` remediation hint |
 | Charter not found | Include expected path and `squad init` remediation hint |
 
@@ -108,4 +109,4 @@ Example:
 
 - All status changes include text labels (not just visual indicators).
 - Emoji are used alongside text descriptions (e.g., `✅ Active` not just `✅`).
-- The message stream uses a consistent prefix pattern (`❯ you:`, `▸ system:`, `🔧 AgentName:`) that screen readers can announce predictably.
+- The message stream uses a consistent prefix pattern (`❯`, `▸ system:`, `🔧 AgentName:`) that screen readers can announce predictably.

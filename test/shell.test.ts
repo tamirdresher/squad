@@ -114,7 +114,7 @@ describe('Spawn infrastructure', () => {
 
     it('throws for a missing charter', () => {
       expect(() => loadAgentCharter('nobody', FIXTURES)).toThrow(
-        /Charter not found for agent "nobody"/,
+        /No charter found for "nobody"/,
       );
     });
   });
@@ -167,7 +167,7 @@ describe('Coordinator', () => {
         teamRoot: join(FIXTURES, 'nonexistent'),
         teamPath: join(FIXTURES, 'nonexistent', 'team.md'),
       });
-      expect(prompt).toContain('(No team.md found)');
+      expect(prompt).toContain('No team.md found');
     });
 
     it('falls back gracefully when routing.md is missing', () => {
@@ -175,7 +175,7 @@ describe('Coordinator', () => {
         teamRoot: join(FIXTURES, 'nonexistent'),
         routingPath: join(FIXTURES, 'nonexistent', 'routing.md'),
       });
-      expect(prompt).toContain('(No routing.md found)');
+      expect(prompt).toContain('No routing.md found');
     });
   });
 

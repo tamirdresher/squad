@@ -7,5 +7,5 @@ Feature: Error handling
 
   Scenario: Import without file shows error
     When I run "squad import"
-    Then the output contains "Usage:"
+    Then the output contains "squad import"
     And the exit code is 1

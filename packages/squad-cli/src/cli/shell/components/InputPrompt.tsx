@@ -1,11 +1,13 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Box, Text, useInput } from 'ink';
 import { isNoColor, useTerminalWidth } from '../terminal.js';
+import { createCompleter } from '../autocomplete.js';
 
 interface InputPromptProps {
   onSubmit: (value: string) => void;
   prompt?: string;
   disabled?: boolean;
+  agentNames?: string[];
 }
 
 const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', '⠇', '⠏'];
@@ -13,7 +15,8 @@ const SPINNER_FRAMES = ['⠋', '⠙', '⠹', '⠸', '⠼', '⠴', '⠦', '⠧', 
 export const InputPrompt: React.FC<InputPromptProps> = ({ 
   onSubmit, 
   prompt = '> ',
-  disabled = false 
+  disabled = false,
+  agentNames = [],
 }) => {
   const noColor = isNoColor();
   const width = useTerminalWidth();
@@ -33,6 +36,8 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
     }
     wasDisabledRef.current = disabled;
   }, [disabled]);
+
+  const completer = useMemo(() => createCompleter(agentNames), [agentNames]);
 
   // Animate spinner when disabled (processing) — static in NO_COLOR mode
   useEffect(() => {
@@ -89,6 +94,14 @@ export const InputPrompt: React.FC<InputPromptProps> = ({
           setHistoryIndex(newIndex);
           setValue(history[newIndex]);
         }
+      }
+      return;
+    }
+    
+    if (key.tab) {
+      const [matches] = completer(value);
+      if (matches.length === 1) {
+        setValue(matches[0]!);
       }
       return;
     }
