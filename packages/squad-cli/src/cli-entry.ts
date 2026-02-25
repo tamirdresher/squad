@@ -390,13 +390,17 @@ async function main(): Promise<void> {
       // Squad exists, launch shell
       await runShell();
     } else {
-      // No squad found, show helpful message and suggest init
-      console.log(`\n${BOLD}squad${RESET} v${VERSION}`);
+      // First run — no squad found. Welcome the user.
+      console.log(`\n${BOLD}Welcome to Squad${RESET} v${VERSION}`);
       console.log(`Your AI agent team\n`);
-      console.log(`No squad found here. Get started with:`);
-      console.log(`  ${BOLD}squad init${RESET}       Create .squad/ in this repo`);
-      console.log(`  ${BOLD}squad init --global${RESET}  Create personal squad\n`);
-      console.log(`Or run ${BOLD}squad help${RESET} for all commands.\n`);
+      console.log(`Squad adds a team of AI agents to your project. Each agent`);
+      console.log(`has a role — architect, tester, security reviewer — and they`);
+      console.log(`collaborate to help you build, review, and ship code.\n`);
+      console.log(`${BOLD}Get started:${RESET}`);
+      console.log(`  ${BOLD}squad init${RESET}             Set up a squad in this repo`);
+      console.log(`  ${BOLD}squad init --global${RESET}    Create a personal squad\n`);
+      console.log(`${DIM}After init, just run ${BOLD}squad${RESET}${DIM} to start talking to your team.${RESET}`);
+      console.log(`${DIM}Run ${BOLD}squad help${RESET}${DIM} for all commands.${RESET}\n`);
     }
     return;
   }

@@ -451,7 +451,7 @@ export async function runShell(): Promise<void> {
         hasSendAndWait: typeof coordinatorSession.sendAndWait === 'function',
       });
     }
-    shellApi?.setActivityHint('Routing your request...');
+    shellApi?.setActivityHint('Coordinator is thinking...');
 
     let accumulated = '';
     const onDelta = (event: { type: string; [key: string]: unknown }): void => {
@@ -459,7 +459,9 @@ export async function runShell(): Promise<void> {
       const delta = extractDelta(event);
       if (!delta) return;
       accumulated += delta;
-      shellApi?.setStreamingContent({ agentName: 'coordinator', content: accumulated });
+      // Don't push coordinator routing text to streamingContent — it's internal
+      // routing instructions, not user-facing content. Keeping streamingContent
+      // empty lets the ThinkingIndicator stay visible with the "Routing..." hint.
     };
 
     const activeCoordSession = coordinatorSession;
