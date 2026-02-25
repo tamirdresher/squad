@@ -19,6 +19,7 @@ import { SquadClient } from '@bradygaster/squad-sdk/client';
 import type { SquadSession } from '@bradygaster/squad-sdk/client';
 import type { ShellMessage } from './types.js';
 import { initSquadTelemetry, TIMEOUTS } from '@bradygaster/squad-sdk';
+import { enableShellMetrics, recordShellSessionDuration, recordAgentResponseLatency, recordShellError } from './shell-metrics.js';
 import { buildCoordinatorPrompt, parseCoordinatorResponse } from './coordinator.js';
 import { loadAgentCharter, buildAgentPrompt } from './spawn.js';
 import { createSession, saveSession, loadLatestSession, type SessionData } from './session-store.js';
@@ -58,6 +59,14 @@ export {
   formatGuidance,
 } from './error-messages.js';
 export type { ErrorGuidance } from './error-messages.js';
+export {
+  enableShellMetrics,
+  recordShellSessionDuration,
+  recordAgentResponseLatency,
+  recordShellError,
+  isShellTelemetryEnabled,
+  _resetShellMetrics,
+} from './shell-metrics.js';
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../../package.json') as { version: string };
@@ -150,6 +159,12 @@ export async function runShell(): Promise<void> {
   const telemetry = initSquadTelemetry({ serviceName: 'squad-cli', mode: 'cli' });
   if (telemetry.tracing || telemetry.metrics) {
     console.error('🔭 Telemetry active — exporting to ' + process.env['OTEL_EXPORTER_OTLP_ENDPOINT']);
+  }
+
+  // Shell-level observability metrics (opt-in via SQUAD_TELEMETRY=1)
+  const shellMetricsActive = enableShellMetrics();
+  if (shellMetricsActive) {
+    debugLog('shell observability metrics enabled');
   }
 
   // Initialize lifecycle — discover team agents
@@ -327,6 +342,8 @@ export async function runShell(): Promise<void> {
    */
   async function dispatchToAgent(agentName: string, message: string): Promise<void> {
     debugLog('dispatchToAgent:', agentName, message.slice(0, 120));
+    const dispatchStartMs = Date.now();
+    let firstTokenRecorded = false;
     let session = agentSessions.get(agentName);
     if (!session) {
       shellApi?.setActivityHint(`Connecting to ${agentName}...`);
@@ -359,6 +376,10 @@ export async function runShell(): Promise<void> {
       debugLog('agent onDelta fired', agentName, { eventType: event['type'] });
       const delta = extractDelta(event);
       if (!delta) return;
+      if (!firstTokenRecorded) {
+        firstTokenRecorded = true;
+        recordAgentResponseLatency(agentName, Date.now() - dispatchStartMs, 'direct');
+      }
       accumulated += delta;
       shellApi?.setStreamingContent({ agentName, content: accumulated });
       shellApi?.setActivityHint(undefined); // Clear hint once content is flowing
@@ -397,6 +418,7 @@ export async function runShell(): Promise<void> {
     } catch (err) {
       // Evict dead session so next attempt creates a fresh one
       debugLog('dispatchToAgent: evicting dead session for', agentName, err);
+      recordShellError('agent_dispatch', agentName);
       agentSessions.delete(agentName);
       streamBuffers.delete(agentName);
       throw err;
@@ -435,6 +457,8 @@ export async function runShell(): Promise<void> {
    */
   async function dispatchToCoordinator(message: string): Promise<void> {
     debugLog('dispatchToCoordinator: sending message', message.slice(0, 120));
+    const coordStartMs = Date.now();
+    let coordFirstToken = false;
     if (!coordinatorSession) {
       shellApi?.setActivityHint('Connecting to SDK...');
       // Give React a tick to render the connection hint before blocking on SDK
@@ -458,6 +482,10 @@ export async function runShell(): Promise<void> {
       debugLog('coordinator onDelta fired', { eventType: event['type'] });
       const delta = extractDelta(event);
       if (!delta) return;
+      if (!coordFirstToken) {
+        coordFirstToken = true;
+        recordAgentResponseLatency('coordinator', Date.now() - coordStartMs, 'coordinator');
+      }
       accumulated += delta;
       // Don't push coordinator routing text to streamingContent — it's internal
       // routing instructions, not user-facing content. Keeping streamingContent
@@ -484,6 +512,7 @@ export async function runShell(): Promise<void> {
     } catch (err) {
       // Evict dead coordinator session so next attempt creates a fresh one
       debugLog('dispatchToCoordinator: evicting dead coordinator session', err);
+      recordShellError('coordinator_dispatch');
       coordinatorSession = null;
       streamBuffers.delete('coordinator');
       throw err;
@@ -600,6 +629,7 @@ export async function runShell(): Promise<void> {
       }
     } catch (err) {
       debugLog('handleDispatch error:', err);
+      recordShellError('dispatch', err instanceof Error ? err.constructor.name : 'unknown');
       const errorMsg = err instanceof Error ? err.message : String(err);
       const friendly = errorMsg.replace(/^Error:\s*/i, '');
       if (shellApi) {
@@ -674,6 +704,9 @@ export async function runShell(): Promise<void> {
   process.stderr.write('\r\x1b[K');
 
   await waitUntilExit();
+
+  // Record shell session duration before cleanup
+  recordShellSessionDuration(Date.now() - sessionStart);
 
   // Final session save before cleanup
   autoSave();

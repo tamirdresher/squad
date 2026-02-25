@@ -66,3 +66,16 @@
 
 ### 2026-02-24T17-25-08Z : Team consensus on public readiness
 📌 Full team assessment complete. All 7 agents: 🟡 Ready with caveats. Consensus: ship after 3 must-fixes (LICENSE, CI workflow, debug console.logs). No blockers to public source release. See .squad/log/2026-02-24T17-25-08Z-public-readiness-assessment.md and .squad/decisions.md for details.
+
+### Shell Observability Metrics (Issues #508, #520, #526, #530, #531)
+- Created `packages/squad-cli/src/cli/shell/shell-metrics.ts` — 4 metrics under `squad.shell.*` namespace
+  - `squad.shell.session_count` (counter): incremented on shell start, basic retention proxy
+  - `squad.shell.session_duration_ms` (histogram): recorded on shell exit
+  - `squad.shell.agent_response_latency_ms` (histogram): time from dispatch to first visible token, attributed by agent name + dispatch type
+  - `squad.shell.error_count` (counter): errors during agent/coordinator dispatch, attributed by source
+- **Opt-in gated via `SQUAD_TELEMETRY=1`** — stronger than SDK-level gate (which only requires `OTEL_EXPORTER_OTLP_ENDPOINT`). Shell metrics describe user behavior, so explicit consent is required.
+- Uses `getMeter('squad-shell')` from SDK — shares the same MeterProvider and OTLP/gRPC pipeline to Aspire
+- Wired into `runShell()` in `index.ts`: session count on start, duration on exit, latency in `dispatchToAgent`/`dispatchToCoordinator` (measured at first `message_delta`), errors in catch blocks
+- Added subpath export `./shell/shell-metrics` to CLI package.json
+- 18 new tests in `test/shell-metrics.test.ts` covering all metrics, opt-in gating, no-op behavior when disabled, and reset
+- All 2943 tests pass (only pre-existing Docker/Aspire integration test skipped due to no Docker in env)

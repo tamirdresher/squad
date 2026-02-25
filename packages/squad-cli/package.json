@@ -68,6 +68,10 @@
       "types": "./dist/cli/shell/error-messages.d.ts",
       "import": "./dist/cli/shell/error-messages.js"
     },
+    "./shell/shell-metrics": {
+      "types": "./dist/cli/shell/shell-metrics.d.ts",
+      "import": "./dist/cli/shell/shell-metrics.js"
+    },
     "./core/init": {
       "types": "./dist/cli/core/init.d.ts",
       "import": "./dist/cli/core/init.js"

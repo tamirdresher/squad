@@ -33,6 +33,7 @@ import { BOLD, RESET, DIM, RED } from './cli/core/output.js';
 import { runInit } from './cli/core/init.js';
 import { resolveSquad, resolveGlobalSquadPath } from '@bradygaster/squad-sdk';
 import { runShell } from './cli/shell/index.js';
+import { loadWelcomeData } from './cli/shell/lifecycle.js';
 
 // Keep VERSION in index.ts (public API); import it here via re-export
 import { VERSION } from '@bradygaster/squad-sdk';
@@ -370,12 +371,56 @@ async function main(): Promise<void> {
     console.log(`\nFlags:`);
     console.log(`  ${BOLD}--version, -v${RESET}  Print version`);
     console.log(`  ${BOLD}--help, -h${RESET}     Show this help`);
+    console.log(`  ${BOLD}--preview${RESET}      Show team summary without launching shell`);
     console.log(`  ${BOLD}--global${RESET}       Use personal squad path`);
     console.log(`  ${BOLD}--timeout <s>${RESET}   Set REPL inactivity timeout (seconds, default: 600)`);
     console.log(`\nInstallation:`);
     console.log(`  npm i --save-dev @bradygaster/squad-cli`);
     console.log(`\nInsider channel:`);
     console.log(`  npm i --save-dev @bradygaster/squad-cli@insider\n`);
+    return;
+  }
+
+  // --preview / --dry-run — show team summary without launching the interactive shell
+  if (cmd === '--preview' || cmd === '--dry-run' || (!cmd && args.includes('--preview')) || (cmd === 'shell' && args.includes('--preview'))) {
+    const squadDir = resolveSquad(process.cwd());
+    const globalPath = resolveGlobalSquadPath();
+    const globalSquadDir = path.join(globalPath, '.squad');
+    const teamRoot = squadDir ? path.dirname(squadDir) : fs.existsSync(globalSquadDir) ? globalPath : null;
+
+    if (!teamRoot) {
+      console.log(`${RED}✗${RESET} No squad found. Run 'squad init' first.`);
+      process.exit(1);
+    }
+
+    const data = loadWelcomeData(teamRoot);
+    if (!data) {
+      console.log(`${RED}✗${RESET} Could not read team configuration.`);
+      process.exit(1);
+    }
+
+    console.log(`\n${BOLD}Squad Preview${RESET}`);
+    console.log(`${'─'.repeat(40)}`);
+    console.log(`  Team:   ${data.projectName}`);
+    console.log(`  Agents: ${data.agents.length}`);
+    if (data.description) console.log(`  About:  ${data.description}`);
+    if (data.focus) console.log(`  Focus:  ${data.focus}`);
+
+    console.log(`\n${BOLD}Agents${RESET}`);
+    for (const a of data.agents) {
+      console.log(`  ${a.emoji} ${BOLD}${a.name}${RESET} — ${a.role}`);
+    }
+
+    console.log(`\n${BOLD}Shell Commands${RESET}`);
+    console.log(`  /status    — Check your team & what's happening`);
+    console.log(`  /history   — See recent messages`);
+    console.log(`  /agents    — List all team members`);
+    console.log(`  /sessions  — List saved sessions`);
+    console.log(`  /resume    — Restore a past session`);
+    console.log(`  /clear     — Clear the screen`);
+    console.log(`  /quit      — Exit`);
+
+    console.log(`\n${DIM}Run 'squad' to start the interactive shell.${RESET}\n`);
     return;
   }
 
