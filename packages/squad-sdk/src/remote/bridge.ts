@@ -227,6 +227,17 @@ export class RemoteBridge {
 
       // If passthrough is set, forward raw JSON-RPC to copilot
       if (this.passthroughWrite) {
+        // Intercept session/new to inject correct cwd
+        try {
+          const msg = JSON.parse(raw);
+          if (msg.method === 'session/new' && msg.params) {
+            msg.params.cwd = this.config.squadDir
+              ? this.config.squadDir.replace(/[/\\]\.(?:squad|ai-team)$/, '')
+              : process.cwd();
+            this.passthroughWrite(JSON.stringify(msg));
+            return;
+          }
+        } catch { /* not JSON, forward as-is */ }
         this.passthroughWrite(raw);
         return;
       }

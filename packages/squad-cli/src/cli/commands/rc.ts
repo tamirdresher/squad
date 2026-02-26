@@ -156,12 +156,19 @@ export async function runRC(cwd: string, options: RCOptions): Promise<void> {
   console.log(`  ${GREEN}✓${RESET} Bridge running on port ${BOLD}${actualPort}${RESET}`);
   console.log(`  ${DIM}Local:${RESET}   ${localUrl}\n`);
 
-  // Spawn copilot --acp --stdio as transparent relay (dumb pipe)
-  // PWA client drives ACP protocol: initialize → session/new → session/prompt
-  console.log(`  ${DIM}Spawning copilot --acp --stdio...${RESET}`);
+  // Spawn copilot --acp as transparent relay (dumb pipe)
+  // Copilot needs ~20s to load MCP servers before accepting ACP requests
+  // The native exe is used directly for reliable stdio piping on Windows
+  const copilotExePath = path.join(
+    'C:', 'ProgramData', 'global-npm', 'node_modules', '@github', 'copilot',
+    'node_modules', '@github', 'copilot-win32-x64', 'copilot.exe'
+  );
+  const copilotCmd = fs.existsSync(copilotExePath) ? copilotExePath : 'copilot';
+
+  console.log(`  ${DIM}Spawning copilot --acp (MCP servers loading ~15-20s)...${RESET}`);
   let copilotProc: ReturnType<typeof spawnChild> | null = null;
   try {
-    copilotProc = spawnChild('copilot', ['--acp', '--stdio'], {
+    copilotProc = spawnChild(copilotCmd, ['--acp'], {
       cwd,
       stdio: ['pipe', 'pipe', 'pipe'],
     });
@@ -175,24 +182,30 @@ export async function runRC(cwd: string, options: RCOptions): Promise<void> {
     });
     copilotProc.stderr?.on('data', (d: Buffer) => {
       const text = d.toString().trim();
-      if (text) console.log(`  ${DIM}[copilot] ${text}${RESET}`);
+      if (text && !text.includes('[mcp server') && !text.includes('npm ')) {
+        console.log(`  ${DIM}[copilot] ${text}${RESET}`);
+      }
     });
 
     // copilot stdout → all WebSocket clients (raw JSON-RPC)
     const rl = createRL({ input: copilotProc.stdout!, terminal: false });
     rl.on('line', (line) => {
-      if (line.trim()) bridge.passthroughFromAgent(line);
+      if (line.trim()) {
+        console.log(`  ${GREEN}→${RESET} ${DIM}ACP out: ${line.substring(0, 100)}${RESET}`);
+        bridge.passthroughFromAgent(line);
+      }
     });
 
     // WebSocket → copilot stdin (raw JSON-RPC)
     bridge.setPassthrough((msg) => {
       if (copilotProc?.stdin?.writable) {
+        console.log(`  ${CYAN}←${RESET} ${DIM}ACP in: ${msg.substring(0, 100)}${RESET}`);
         copilotProc.stdin.write(msg.endsWith('\n') ? msg : msg + '\n');
       }
     });
 
     copilotReady = true;
-    console.log(`  ${GREEN}✓${RESET} Copilot ACP passthrough active (dumb pipe)\n`);
+    console.log(`  ${GREEN}✓${RESET} Copilot ACP passthrough active\n`);
   } catch (err) {
     console.log(`  ${YELLOW}⚠${RESET} Copilot not available: ${(err as Error).message}\n`);
   }

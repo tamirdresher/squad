@@ -27,7 +27,7 @@
   const agentList = $('#agent-list');
 
   // ─── ACP JSON-RPC Helpers ────────────────────────────────
-  function sendRequest(method, params) {
+  function sendRequest(method, params, timeoutMs) {
     return new Promise((resolve, reject) => {
       const id = ++requestId;
       pendingRequests[id] = { resolve, reject };
@@ -35,13 +35,16 @@
       if (ws && ws.readyState === WebSocket.OPEN) {
         ws.send(msg);
       }
-      // Timeout
-      setTimeout(() => {
-        if (pendingRequests[id]) {
-          delete pendingRequests[id];
-          reject(new Error(`Request ${method} timed out`));
-        }
-      }, 30000);
+      // Timeout — longer for initialize
+      const timeout = timeoutMs !== undefined ? timeoutMs : (method === 'initialize' ? 60000 : 120000);
+      if (timeout > 0) {
+        setTimeout(() => {
+          if (pendingRequests[id]) {
+            delete pendingRequests[id];
+            reject(new Error(`Request ${method} timed out`));
+          }
+        }, timeout);
+      }
     });
   }
 
@@ -53,9 +56,11 @@
   }
 
   // ─── ACP Session Lifecycle ───────────────────────────────
-  async function initializeACP() {
-    setStatus('connecting', 'Initializing ACP...');
-    addSystemMessage('Initializing Copilot session...');
+  async function initializeACP(attempt) {
+    attempt = attempt || 1;
+    const maxAttempts = 5;
+    setStatus('connecting', attempt === 1 ? 'Waiting for Copilot...' : `Retry ${attempt}/${maxAttempts}...`);
+    if (attempt === 1) addSystemMessage('⏳ Waiting for Copilot to load MCP servers (~15-20s)...');
 
     try {
       const result = await sendRequest('initialize', {
@@ -64,7 +69,7 @@
         clientInfo: { name: 'squad-rc', title: 'Squad Remote Control', version: '1.0.0' },
       });
 
-      addSystemMessage('ACP initialized. Creating session...');
+      addSystemMessage('✅ Connected to Copilot ' + (result.agentInfo?.version || '') + '. Creating session...');
 
       const sessionResult = await sendRequest('session/new', {
         cwd: '.',
@@ -73,12 +78,18 @@
 
       sessionId = sessionResult.sessionId;
       acpReady = true;
-      setStatus('online', 'Connected');
-      addSystemMessage('Session ready! Type a message to chat with Copilot.');
+      setStatus('online', 'Ready');
+      addSystemMessage('🚀 Session ready! Type a message to chat with Copilot.');
     } catch (err) {
-      setStatus('offline', 'ACP Error');
-      addSystemMessage('❌ ACP initialization failed: ' + err.message);
-      acpReady = false;
+      if (attempt < maxAttempts) {
+        const delay = 5000;
+        addSystemMessage(`⏳ Copilot not ready yet, retrying in ${delay/1000}s... (${attempt}/${maxAttempts})`);
+        setTimeout(() => initializeACP(attempt + 1), delay);
+      } else {
+        setStatus('offline', 'Failed');
+        addSystemMessage('❌ Could not connect to Copilot after ' + maxAttempts + ' attempts: ' + err.message);
+        acpReady = false;
+      }
     }
   }
 
@@ -103,8 +114,8 @@
     ws.onopen = () => {
       connected = true;
       reconnectAttempts = 0;
-      // Start ACP handshake
-      initializeACP();
+      // Start ACP handshake after short delay for bridge to be ready
+      setTimeout(() => initializeACP(1), 1000);
     };
 
     ws.onclose = () => {
