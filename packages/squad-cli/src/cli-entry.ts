@@ -62,6 +62,9 @@ async function main(): Promise<void> {
     console.log(`             Usage: import <file> [--force]`);
     console.log(`  ${BOLD}scrub-emails${RESET}  Remove email addresses from Squad state files`);
     console.log(`             Usage: scrub-emails [directory] (default: .ai-team/)`);
+    console.log(`  ${BOLD}rc${RESET}         Start Remote Control bridge for phone/browser access`);
+    console.log(`             Usage: rc [--tunnel] [--port <n>] [--path <dir>]`);
+    console.log(`             Alias: remote-control`);
     console.log(`  ${BOLD}help${RESET}       Show this help message`);
     console.log(`\nFlags:`);
     console.log(`  ${BOLD}--version, -v${RESET}  Print version`);
@@ -219,6 +222,15 @@ async function main(): Promise<void> {
     console.log(`  ${DIM}Global squad:      ${globalExists ? globalSquadDir : 'not initialized'}${RESET}`);
     console.log();
 
+    return;
+  }
+
+  if (cmd === 'rc' || cmd === 'remote-control') {
+    const { runRC } = await import('./cli/commands/rc.js');
+    const hasTunnel = args.includes('--tunnel');
+    const portIdx = args.indexOf('--port');
+    const port = (portIdx !== -1 && args[portIdx + 1]) ? parseInt(args[portIdx + 1]!, 10) : 0;
+    await runRC(process.cwd(), { tunnel: hasTunnel, port });
     return;
   }
 

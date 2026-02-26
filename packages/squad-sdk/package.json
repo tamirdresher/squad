@@ -139,7 +139,8 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@github/copilot-sdk": "^0.1.25"
+    "@github/copilot-sdk": "^0.1.25",
+    "ws": "^8.19.0"
   },
   "peerDependencies": {
     "@opentelemetry/api": "^1.9.0"
@@ -162,6 +163,7 @@
   "devDependencies": {
     "@opentelemetry/api": "^1.9.0",
     "@types/node": "^22.0.0",
+    "@types/ws": "^8.18.1",
     "typescript": "^5.7.0"
   },
   "keywords": [
