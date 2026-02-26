@@ -22,6 +22,58 @@
   const statusEl = $('#status-indicator');
   const statusText = $('#status-text');
   const permOverlay = $('#permission-overlay');
+  const dashboard = $('#dashboard');
+  let currentView = 'terminal'; // 'dashboard' or 'terminal'
+
+  // ─── Dashboard ───────────────────────────────────────────
+  async function loadSessions() {
+    try {
+      const resp = await fetch('/api/sessions');
+      const data = await resp.json();
+      renderDashboard(data.sessions || []);
+    } catch (err) {
+      dashboard.innerHTML = '<div style="padding:12px;color:var(--red)">Failed to load sessions: ' + err.message + '</div>';
+    }
+  }
+
+  function renderDashboard(sessions) {
+    if (sessions.length === 0) {
+      dashboard.innerHTML = '<div style="padding:12px;color:var(--text-dim)">No active Squad RC sessions found.</div>';
+      return;
+    }
+    dashboard.innerHTML = sessions.map(s => `
+      <div class="session-card" onclick="openSession('${escapeHtml(s.url)}')">
+        <span class="status-dot ${s.online ? 'online' : 'offline'}"></span>
+        <div class="info">
+          <div class="repo">📦 ${escapeHtml(s.repo)}</div>
+          <div class="branch">🌿 ${escapeHtml(s.branch)}</div>
+          <div class="machine">💻 ${escapeHtml(s.machine)} ${s.online ? '' : '(offline)'}</div>
+        </div>
+        <span class="arrow">→</span>
+      </div>
+    `).join('');
+  }
+
+  window.openSession = (url) => {
+    window.location.href = url;
+  };
+
+  window.toggleView = () => {
+    if (currentView === 'terminal') {
+      currentView = 'dashboard';
+      terminal.classList.add('hidden');
+      $('#input-area').classList.add('hidden');
+      dashboard.classList.remove('hidden');
+      $('#btn-sessions').textContent = 'Terminal';
+      loadSessions();
+    } else {
+      currentView = 'terminal';
+      dashboard.classList.add('hidden');
+      terminal.classList.remove('hidden');
+      $('#input-area').classList.remove('hidden');
+      $('#btn-sessions').textContent = 'Sessions';
+    }
+  };
 
   // ─── Terminal Output ─────────────────────────────────────
   function write(html, cls) {

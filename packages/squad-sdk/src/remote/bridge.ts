@@ -8,6 +8,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
+import { execSync } from 'node:child_process';
 import {
   RC_PROTOCOL_VERSION,
   serializeEvent,
@@ -44,6 +45,12 @@ export class RemoteBridge {
     this.state = 'starting';
 
     this.server = http.createServer((req, res) => {
+      // Sessions API — runs devtunnel list
+      if (req.url === '/api/sessions') {
+        this.handleSessionsAPI(res);
+        return;
+      }
+
       if (this.staticHandler) {
         this.staticHandler(req, res);
       } else {
@@ -177,6 +184,44 @@ export class RemoteBridge {
 
   sendError(message: string, agentName?: string): void {
     this.broadcast({ type: 'error', message, agentName });
+  }
+
+  // ─── Sessions API ───────────────────────────────────────────
+
+  private handleSessionsAPI(res: http.ServerResponse): void {
+    try {
+      const output = execSync('devtunnel list --labels squad --json', {
+        encoding: 'utf-8',
+        timeout: 10000,
+        stdio: ['pipe', 'pipe', 'pipe'],
+      });
+      const data = JSON.parse(output);
+      const sessions = (data.tunnels || []).map((t: any) => {
+        const labels = t.labels || [];
+        const id = t.tunnelId?.replace(/\.\w+$/, '') || t.tunnelId;
+        // Labels format: [squad, repo-name, branch-name, machine-hostname]
+        return {
+          id,
+          tunnelId: t.tunnelId,
+          repo: labels[1] || 'unknown',
+          branch: labels[2]?.replace(/_/g, '/') || 'unknown',
+          machine: labels[3] || 'unknown',
+          online: (t.hostConnections || 0) > 0,
+          port: 3456,
+          expiration: t.tunnelExpiration,
+          // Construct the URL — extract cluster from tunnelId (e.g., "abc.euw" → euw)
+          url: `https://${id}-3456.${t.tunnelId?.split('.').pop() || 'euw'}.devtunnels.ms`,
+        };
+      });
+      res.writeHead(200, {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+      });
+      res.end(JSON.stringify({ sessions }));
+    } catch (err) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ sessions: [], error: (err as Error).message }));
+    }
   }
 
   // ─── Passthrough (ACP dumb pipe) ────────────────────────────
