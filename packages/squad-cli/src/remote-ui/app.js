@@ -24,22 +24,34 @@
   const agentList = $('#agent-list');
 
   // ─── WebSocket Connection ────────────────────────────────
+  let reconnectAttempts = 0;
+
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
     const url = `${proto}//${location.host}`;
 
     setStatus('connecting', 'Connecting...');
-    ws = new WebSocket(url);
+    addSystemMessage('Connecting to Squad bridge...');
+
+    try {
+      ws = new WebSocket(url);
+    } catch (err) {
+      setStatus('offline', 'WS Error');
+      addSystemMessage('WebSocket error: ' + (err.message || err));
+      scheduleReconnect();
+      return;
+    }
 
     ws.onopen = () => {
       connected = true;
+      reconnectAttempts = 0;
       setStatus('online', 'Connected');
     };
 
     ws.onclose = () => {
       connected = false;
       setStatus('offline', 'Disconnected');
-      setTimeout(connect, 3000);
+      scheduleReconnect();
     };
 
     ws.onerror = () => {
@@ -278,6 +290,22 @@
   function setStatus(state, text) {
     statusBadge.className = `badge ${state}`;
     statusText.textContent = text;
+  }
+
+  function scheduleReconnect() {
+    reconnectAttempts++;
+    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
+    setTimeout(connect, delay);
+  }
+
+  function addSystemMessage(text) {
+    renderMessage({
+      id: 'sys-' + Date.now(),
+      role: 'system',
+      content: text,
+      timestamp: new Date().toISOString(),
+    });
+    scrollToBottom();
   }
 
   function scrollToBottom() {
