@@ -234,6 +234,15 @@ async function main(): Promise<void> {
     return;
   }
 
+  if (cmd === 'start') {
+    const { runStart } = await import('./cli/commands/start.js');
+    const hasTunnel = args.includes('--tunnel');
+    const portIdx = args.indexOf('--port');
+    const port = (portIdx !== -1 && args[portIdx + 1]) ? parseInt(args[portIdx + 1]!, 10) : 0;
+    await runStart(process.cwd(), { tunnel: hasTunnel, port });
+    return;
+  }
+
   // Unknown command
   fatal(`Unknown command: ${cmd}\n       Run 'squad help' for usage information.`);
 }
