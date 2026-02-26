@@ -206,18 +206,20 @@ export class RemoteBridge {
       const sessions = (data.tunnels || []).map((t: any) => {
         const labels = t.labels || [];
         const id = t.tunnelId?.replace(/\.\w+$/, '') || t.tunnelId;
-        // Labels format: [squad, repo-name, branch-name, machine-hostname]
+        const cluster = t.tunnelId?.split('.').pop() || 'euw';
+        // Labels format: [squad, repo-name, branch-name, machine-hostname, port-NNNN]
+        const portLabel = labels.find((l: string) => l.startsWith('port-'));
+        const port = portLabel ? parseInt(portLabel.replace('port-', ''), 10) : 3456;
         return {
           id,
           tunnelId: t.tunnelId,
           repo: labels[1] || 'unknown',
-          branch: labels[2]?.replace(/_/g, '/') || 'unknown',
+          branch: (labels[2] || 'unknown').replace(/_/g, '/'),
           machine: labels[3] || 'unknown',
           online: (t.hostConnections || 0) > 0,
-          port: 3456,
+          port,
           expiration: t.tunnelExpiration,
-          // Construct the URL — extract cluster from tunnelId (e.g., "abc.euw" → euw)
-          url: `https://${id}-3456.${t.tunnelId?.split('.').pop() || 'euw'}.devtunnels.ms`,
+          url: `https://${id}-${port}.${cluster}.devtunnels.ms`,
         };
       });
       res.writeHead(200, {
