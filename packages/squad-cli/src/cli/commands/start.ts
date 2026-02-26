@@ -32,6 +32,7 @@ export interface StartOptions {
   tunnel: boolean;
   port: number;
   copilotArgs?: string[];
+  command?: string;
 }
 
 export async function runStart(cwd: string, options: StartOptions): Promise<void> {
@@ -96,7 +97,8 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
     'C:', 'ProgramData', 'global-npm', 'node_modules', '@github', 'copilot',
     'node_modules', '@github', 'copilot-win32-x64', 'copilot.exe'
   );
-  const copilotCmd = fs.existsSync(copilotExePath) ? copilotExePath : 'copilot';
+  const defaultCmd = fs.existsSync(copilotExePath) ? copilotExePath : 'copilot';
+  const copilotCmd = options.command || defaultCmd;
 
   const cols = process.stdout.columns || 120;
   const rows = process.stdout.rows || 30;

@@ -487,6 +487,14 @@
     permOverlay.classList.add('hidden');
   };
 
+  // ─── Mobile Key Bar ───────────────────────────────────────
+  window.sendKey = (key) => {
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ type: 'pty_input', data: key }));
+    }
+    if (xterm) xterm.focus();
+  };
+
   // ─── Send Prompt ─────────────────────────────────────────
   let ptyMode = false;
 

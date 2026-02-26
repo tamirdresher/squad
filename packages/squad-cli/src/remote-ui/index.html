@@ -31,6 +31,18 @@
     <main id="terminal" class="hidden"></main>
 
     <footer id="input-area">
+      <div id="key-bar">
+        <button onclick="sendKey('\x1b[A')">↑</button>
+        <button onclick="sendKey('\x1b[B')">↓</button>
+        <button onclick="sendKey('\x1b[C')">→</button>
+        <button onclick="sendKey('\x1b[D')">←</button>
+        <button onclick="sendKey('\t')">Tab</button>
+        <button onclick="sendKey('\r')">Enter</button>
+        <button onclick="sendKey('\x1b')">Esc</button>
+        <button onclick="sendKey('\x03')">Ctrl+C</button>
+        <button onclick="sendKey(' ')">Space</button>
+        <button onclick="sendKey('\x7f')">⌫</button>
+      </div>
       <form id="input-form">
         <span class="prompt">&gt;</span>
         <input type="text" id="input" placeholder="Send a message..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">

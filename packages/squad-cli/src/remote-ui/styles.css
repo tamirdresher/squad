@@ -168,11 +168,32 @@ header {
 
 /* Input area */
 #input-area {
-  padding: 6px 12px;
+  padding: 4px 8px 6px;
   background: var(--bg-tool);
   border-top: 1px solid var(--border);
   flex-shrink: 0;
 }
+#key-bar {
+  display: flex;
+  gap: 4px;
+  padding: 4px 0;
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+#key-bar button {
+  background: var(--bg);
+  border: 1px solid var(--border);
+  color: var(--text);
+  font-family: var(--font);
+  font-size: 13px;
+  padding: 6px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  flex-shrink: 0;
+  min-width: 36px;
+  -webkit-tap-highlight-color: transparent;
+}
+#key-bar button:active { background: var(--blue); color: #000; }
 #input-form {
   display: flex;
   align-items: center;

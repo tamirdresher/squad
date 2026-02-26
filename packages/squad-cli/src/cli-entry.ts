@@ -240,9 +240,11 @@ async function main(): Promise<void> {
     const portIdx = args.indexOf('--port');
     const port = (portIdx !== -1 && args[portIdx + 1]) ? parseInt(args[portIdx + 1]!, 10) : 0;
     // Collect all remaining args to pass through to copilot
-    const squadFlags = ['start', '--tunnel', '--port', port.toString()].filter(Boolean);
+    const cmdIdx = args.indexOf('--command');
+    const customCmd = (cmdIdx !== -1 && args[cmdIdx + 1]) ? args[cmdIdx + 1] : undefined;
+    const squadFlags = ['start', '--tunnel', '--port', port.toString(), '--command', customCmd || ''].filter(Boolean);
     const copilotArgs = args.slice(1).filter(a => !squadFlags.includes(a));
-    await runStart(process.cwd(), { tunnel: hasTunnel, port, copilotArgs });
+    await runStart(process.cwd(), { tunnel: hasTunnel, port, copilotArgs, command: customCmd });
     return;
   }
 
