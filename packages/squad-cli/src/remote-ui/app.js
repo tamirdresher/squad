@@ -246,10 +246,20 @@
   // ─── Permission Dialog ───────────────────────────────────
   function showPermission(msg) {
     const p = msg.params || {};
+    // Extract readable info from the permission request
+    const toolCall = p.toolCall || {};
+    const title = toolCall.title || p.tool || 'Tool action';
+    const kind = toolCall.kind || 'unknown';
+    const kindIcons = { read: '📖', edit: '✏️', execute: '▶️', delete: '🗑️' };
+    const icon = kindIcons[kind] || '🔧';
+    // For shell commands, show just the first line
+    const command = toolCall.rawInput?.command || toolCall.rawInput?.commands?.[0] || '';
+    const shortCmd = command.split('\n')[0].substring(0, 100) + (command.length > 100 ? '...' : '');
+
     permOverlay.classList.remove('hidden');
     permOverlay.innerHTML = `<div class="perm-dialog">
-      <h3>🔐 Permission Request</h3>
-      <p>${escapeHtml(p.tool || 'Tool')}: ${escapeHtml(p.description || JSON.stringify(p))}</p>
+      <h3>${icon} ${escapeHtml(title)}</h3>
+      <p>${escapeHtml(shortCmd || JSON.stringify(p).substring(0, 200))}</p>
       <div class="perm-actions">
         <button class="btn-deny" onclick="handlePerm(${msg.id}, false)">Deny</button>
         <button class="btn-approve" onclick="handlePerm(${msg.id}, true)">Approve</button>
