@@ -17,6 +17,7 @@ import {
   getMachineId,
   getGitInfo,
 } from './rc-tunnel.js';
+import { CopilotBridge } from './copilot-bridge.js';
 
 const BOLD = '\x1b[1m';
 const RESET = '\x1b[0m';
@@ -66,6 +67,74 @@ export async function runRC(cwd: string, options: RCOptions): Promise<void> {
     }
   }
 
+  // Check Copilot ACP compatibility
+  console.log(`  ${DIM}Checking Copilot ACP compatibility...${RESET}`);
+  const compat = await CopilotBridge.checkCompatibility();
+  if (compat.compatible) {
+    console.log(`  ${GREEN}✓${RESET} ${compat.message}`);
+  } else {
+    console.log(`  ${YELLOW}⚠${RESET} ${compat.message}`);
+    console.log(`  ${DIM}Responses will be simulated until Copilot ACP is available.${RESET}`);
+  }
+
+  // Start Copilot ACP bridge
+  let copilotReady = false;
+  let responseBuffer = '';
+  const copilot = new CopilotBridge({
+    cwd,
+    agent: squadDir ? 'squad' : undefined,
+  });
+
+  if (compat.compatible) {
+    console.log(`  ${DIM}Starting Copilot ACP bridge...${RESET}`);
+
+  try {
+    // Wire Copilot notifications → RemoteBridge
+    copilot.onMessage((line) => {
+      try {
+        const msg = JSON.parse(line);
+
+        // session/update notifications contain streaming content
+        if (msg.method === 'session/update' && msg.params) {
+          const update = msg.params;
+
+          if (update.sessionUpdate === 'agent_message_chunk' && update.content?.text) {
+            responseBuffer += update.content.text;
+            bridge.sendDelta('rc-session', 'Copilot', update.content.text);
+          }
+
+          if (update.sessionUpdate === 'tool_call') {
+            bridge.sendToolCall('Copilot', update.name || 'unknown', update.input || {}, 'running');
+          }
+
+          if (update.sessionUpdate === 'tool_call_update') {
+            const status = update.status === 'completed' ? 'completed' : update.status === 'errored' ? 'error' : 'running';
+            bridge.sendToolCall('Copilot', update.name || 'unknown', {}, status as any);
+          }
+        }
+
+        // session/prompt response = end of turn
+        if (msg.result?.stopReason) {
+          if (responseBuffer.trim()) {
+            bridge.addMessage('agent', responseBuffer.trim(), 'Copilot');
+          }
+          responseBuffer = '';
+          bridge.updateAgentStatus('Copilot', 'idle');
+        }
+      } catch {
+        // Forward raw for debugging
+      }
+    });
+
+    await copilot.start();
+    copilotReady = true;
+    console.log(`  ${GREEN}✓${RESET} Copilot ACP bridge connected\n`);
+  } catch (err) {
+    console.log(`  ${YELLOW}⚠${RESET} Copilot ACP failed: ${(err as Error).message}`);
+    console.log(`  ${DIM}Falling back to simulated responses.${RESET}\n`);
+  }
+  } // end if (compat.compatible)
+
   // Create bridge config
   const config: RemoteBridgeConfig = {
     port: options.port || 0,
@@ -76,48 +145,35 @@ export async function runRC(cwd: string, options: RCOptions): Promise<void> {
     squadDir,
     onPrompt: async (text) => {
       console.log(`  ${CYAN}←${RESET} ${DIM}Remote prompt:${RESET} ${text}`);
-      // Add user message to history
       bridge.addMessage('user', text);
 
-      // Route to an agent and stream response
-      const agent = agents.length > 0 ? agents[0] : { name: 'Assistant', role: 'General' };
-      bridge.updateAgentStatus(agent.name, 'streaming');
-
-      // Simulate streaming response (Phase 2: replace with real Copilot SDK)
-      const response = `I received your message: "${text}"\n\nI'm ${agent.name} (${agent.role}). The Squad RC bridge is working! In the full version, this response would come from the Copilot SDK through the Squad coordinator, routed to the appropriate agent based on your request.`;
-      const words = response.split(' ');
-      for (let i = 0; i < words.length; i++) {
-        const chunk = (i > 0 ? ' ' : '') + words[i];
-        bridge.sendDelta('rc-session', agent.name, chunk);
-        await new Promise(r => setTimeout(r, 50));
+      if (copilotReady && copilot.isRunning()) {
+        bridge.updateAgentStatus('Copilot', 'streaming');
+        responseBuffer = '';
+        copilot.sendPrompt(text);
+      } else {
+        // Fallback: simulated response
+        const agent = agents.length > 0 ? agents[0] : { name: 'Assistant', role: 'General' };
+        bridge.addMessage('agent', `[Copilot not connected] Echo: ${text}`, agent.name);
       }
-
-      bridge.addMessage('agent', response, agent.name);
-      bridge.updateAgentStatus(agent.name, 'idle');
     },
     onDirectMessage: async (agentName, text) => {
       console.log(`  ${CYAN}←${RESET} ${DIM}Remote @${agentName}:${RESET} ${text}`);
       bridge.addMessage('user', `@${agentName} ${text}`);
 
-      const agent = agents.find(a => a.name.toLowerCase() === agentName.toLowerCase());
-      const name = agent?.name || agentName;
-      const role = agent?.role || 'Agent';
-      bridge.updateAgentStatus(name, 'streaming');
-
-      const response = `Roger that! I'm ${name} (${role}). You asked: "${text}"\n\nIn the full version, this would be handled directly by my agent charter and Copilot SDK session.`;
-      const words = response.split(' ');
-      for (let i = 0; i < words.length; i++) {
-        bridge.sendDelta('rc-session', name, (i > 0 ? ' ' : '') + words[i]);
-        await new Promise(r => setTimeout(r, 50));
+      if (copilotReady && copilot.isRunning()) {
+        bridge.updateAgentStatus('Copilot', 'streaming');
+        responseBuffer = '';
+        copilot.sendPrompt(`@${agentName} ${text}`);
+      } else {
+        bridge.addMessage('agent', `[Copilot not connected] Echo: @${agentName} ${text}`, agentName);
       }
-
-      bridge.addMessage('agent', response, name);
-      bridge.updateAgentStatus(name, 'idle');
     },
     onCommand: (name) => {
       console.log(`  ${CYAN}←${RESET} ${DIM}Remote /${name}${RESET}`);
       if (name === 'status') {
-        bridge.addMessage('system', `Squad RC | Repo: ${repo} | Branch: ${branch} | Agents: ${agents.length} | Connections: ${bridge.getConnectionCount()}`);
+        const copilotStatus = copilotReady ? 'connected' : 'disconnected';
+        bridge.addMessage('system', `Squad RC | Repo: ${repo} | Branch: ${branch} | Agents: ${agents.length} | Copilot: ${copilotStatus} | Connections: ${bridge.getConnectionCount()}`);
       } else if (name === 'agents') {
         const list = agents.map(a => `• ${a.name} (${a.role})`).join('\n');
         bridge.addMessage('system', `Team Roster:\n${list || 'No agents loaded'}`);
@@ -170,8 +226,11 @@ export async function runRC(cwd: string, options: RCOptions): Promise<void> {
   const localUrl = `http://localhost:${actualPort}`;
 
   // Initialize agent roster in bridge
-  if (agents.length > 0) {
-    bridge.updateAgents(agents.map(a => ({ name: a.name, role: a.role, status: 'idle' as const })));
+  const allAgents = copilotReady
+    ? [{ name: 'Copilot', role: 'AI Assistant', status: 'idle' as const }, ...agents.map(a => ({ name: a.name, role: a.role, status: 'idle' as const }))]
+    : agents.map(a => ({ name: a.name, role: a.role, status: 'idle' as const }));
+  if (allAgents.length > 0) {
+    bridge.updateAgents(allAgents);
   }
 
   console.log(`  ${GREEN}✓${RESET} Bridge running on port ${BOLD}${actualPort}${RESET}`);
@@ -217,6 +276,7 @@ export async function runRC(cwd: string, options: RCOptions): Promise<void> {
   // Clean shutdown
   const cleanup = async () => {
     console.log(`\n  ${DIM}Shutting down...${RESET}`);
+    copilot.stop();
     destroyTunnel();
     await bridge.stop();
     console.log(`  ${GREEN}✓${RESET} Stopped.\n`);
