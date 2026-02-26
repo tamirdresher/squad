@@ -31,6 +31,7 @@ const YELLOW = '\x1b[33m';
 export interface StartOptions {
   tunnel: boolean;
   port: number;
+  copilotArgs?: string[];
 }
 
 export async function runStart(cwd: string, options: StartOptions): Promise<void> {
@@ -100,7 +101,12 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
   const cols = process.stdout.columns || 120;
   const rows = process.stdout.rows || 30;
 
-  const pty = nodePty.spawn(copilotCmd, [], {
+  const copilotExtraArgs = options.copilotArgs || [];
+  if (copilotExtraArgs.length > 0) {
+    console.log(`  ${DIM}Copilot flags:${RESET} ${copilotExtraArgs.join(' ')}\n`);
+  }
+
+  const pty = nodePty.spawn(copilotCmd, copilotExtraArgs, {
     name: 'xterm-256color',
     cols,
     rows,

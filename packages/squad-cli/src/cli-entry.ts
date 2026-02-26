@@ -239,7 +239,10 @@ async function main(): Promise<void> {
     const hasTunnel = args.includes('--tunnel');
     const portIdx = args.indexOf('--port');
     const port = (portIdx !== -1 && args[portIdx + 1]) ? parseInt(args[portIdx + 1]!, 10) : 0;
-    await runStart(process.cwd(), { tunnel: hasTunnel, port });
+    // Collect all remaining args to pass through to copilot
+    const squadFlags = ['start', '--tunnel', '--port', port.toString()].filter(Boolean);
+    const copilotArgs = args.slice(1).filter(a => !squadFlags.includes(a));
+    await runStart(process.cwd(), { tunnel: hasTunnel, port, copilotArgs });
     return;
   }
 
