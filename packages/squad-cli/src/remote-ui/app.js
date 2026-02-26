@@ -304,7 +304,18 @@
       return;
     }
 
-    // JSON-RPC response
+    // PTY data — raw terminal output
+    if (msg.type === 'pty') {
+      if (!ptyMode) {
+        ptyMode = true;
+        setStatus('online', 'PTY Mirror');
+        terminal.innerHTML = ''; // Clear init messages
+      }
+      appendTerminalData(msg.data);
+      return;
+    }
+
+    // JSON-RPC response (ACP mode fallback)
     if (msg.id !== undefined && (msg.result !== undefined || msg.error !== undefined)) {
       const p = pendingRequests[msg.id];
       if (p) {
@@ -315,7 +326,7 @@
       return;
     }
 
-    // session/update notification
+    // session/update notification (ACP mode fallback)
     if (msg.method === 'session/update' && msg.params) {
       const u = msg.params.update || msg.params;
       if (u.sessionUpdate === 'agent_message_chunk' && u.content?.text) {
@@ -326,11 +337,50 @@
       return;
     }
 
-    // Permission request
+    // Permission request (ACP mode)
     if (msg.method === 'session/request_permission') {
       showPermission(msg);
       return;
     }
+  }
+
+  // ─── PTY Terminal Rendering ──────────────────────────────
+  function appendTerminalData(data) {
+    // Strip some ANSI sequences that don't render well in HTML
+    // but keep colors and basic formatting
+    const html = ansiToHtml(data);
+    terminal.innerHTML += html;
+    if (!replaying) scrollToBottom();
+  }
+
+  function ansiToHtml(text) {
+    // Convert ANSI escape codes to HTML spans
+    let html = escapeHtml(text);
+
+    // Color codes → spans
+    const colorMap = {
+      '30': '#6e7681', '31': '#f85149', '32': '#3fb950', '33': '#d29922',
+      '34': '#58a6ff', '35': '#bc8cff', '36': '#39c5cf', '37': '#c9d1d9',
+      '90': '#6e7681', '91': '#f85149', '92': '#3fb950', '93': '#d29922',
+      '94': '#58a6ff', '95': '#bc8cff', '96': '#39c5cf', '97': '#f0f6fc',
+    };
+
+    // Replace \x1b[Xm patterns
+    html = html.replace(/\x1b\[(\d+)m/g, (_, code) => {
+      if (code === '0') return '</span>';
+      if (code === '1') return '<span style="font-weight:bold">';
+      if (code === '2') return '<span style="opacity:0.6">';
+      if (code === '4') return '<span style="text-decoration:underline">';
+      if (colorMap[code]) return `<span style="color:${colorMap[code]}">`;
+      return '';
+    });
+
+    // Clean up escape sequences we don't handle
+    html = html.replace(/\x1b\[[0-9;]*[A-Za-z]/g, '');
+    // Clean \r
+    html = html.replace(/\r/g, '');
+
+    return html;
   }
 
   // ─── Permission Dialog ───────────────────────────────────
@@ -364,12 +414,25 @@
   };
 
   // ─── Send Prompt ─────────────────────────────────────────
+  let ptyMode = false;
+
   formEl.addEventListener('submit', async (e) => {
     e.preventDefault();
     const text = inputEl.value.trim();
-    if (!text || !acpReady || !sessionId) return;
-    writeUserInput(text);
+    if (!text) return;
     inputEl.value = '';
+
+    if (ptyMode) {
+      // Send as PTY keystroke input
+      if (ws?.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'pty_input', data: text + '\r' }));
+      }
+      return;
+    }
+
+    // ACP mode
+    if (!acpReady || !sessionId) return;
+    writeUserInput(text);
     try {
       await sendRequest('session/prompt', {
         sessionId, prompt: [{ type: 'text', text }],
