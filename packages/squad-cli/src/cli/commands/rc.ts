@@ -48,6 +48,24 @@ export async function runRC(cwd: string, options: RCOptions): Promise<void> {
   console.log(`  ${DIM}Machine:${RESET} ${machine}`);
   console.log(`  ${DIM}Squad:${RESET}   ${squadDir || 'not found'}\n`);
 
+  // Load team roster if squad dir exists
+  const agents: Array<{name: string; role: string}> = [];
+  if (squadDir) {
+    try {
+      const teamMd = fs.readFileSync(path.join(squadDir, 'team.md'), 'utf-8');
+      const memberLines = teamMd.split('\n').filter(l => l.startsWith('|') && l.includes('Active'));
+      for (const line of memberLines) {
+        const cols = line.split('|').map(c => c.trim()).filter(Boolean);
+        if (cols.length >= 2 && cols[0] !== 'Name') {
+          agents.push({ name: cols[0], role: cols[1] });
+        }
+      }
+      console.log(`  ${GREEN}✓${RESET} Loaded ${agents.length} agents from team.md\n`);
+    } catch {
+      console.log(`  ${YELLOW}⚠${RESET} Could not read team.md\n`);
+    }
+  }
+
   // Create bridge config
   const config: RemoteBridgeConfig = {
     port: options.port || 0,
@@ -56,14 +74,56 @@ export async function runRC(cwd: string, options: RCOptions): Promise<void> {
     branch,
     machine,
     squadDir,
-    onPrompt: (text) => {
+    onPrompt: async (text) => {
       console.log(`  ${CYAN}←${RESET} ${DIM}Remote prompt:${RESET} ${text}`);
+      // Add user message to history
+      bridge.addMessage('user', text);
+
+      // Route to an agent and stream response
+      const agent = agents.length > 0 ? agents[0] : { name: 'Assistant', role: 'General' };
+      bridge.updateAgentStatus(agent.name, 'streaming');
+
+      // Simulate streaming response (Phase 2: replace with real Copilot SDK)
+      const response = `I received your message: "${text}"\n\nI'm ${agent.name} (${agent.role}). The Squad RC bridge is working! In the full version, this response would come from the Copilot SDK through the Squad coordinator, routed to the appropriate agent based on your request.`;
+      const words = response.split(' ');
+      for (let i = 0; i < words.length; i++) {
+        const chunk = (i > 0 ? ' ' : '') + words[i];
+        bridge.sendDelta('rc-session', agent.name, chunk);
+        await new Promise(r => setTimeout(r, 50));
+      }
+
+      bridge.addMessage('agent', response, agent.name);
+      bridge.updateAgentStatus(agent.name, 'idle');
     },
-    onDirectMessage: (agent, text) => {
-      console.log(`  ${CYAN}←${RESET} ${DIM}Remote @${agent}:${RESET} ${text}`);
+    onDirectMessage: async (agentName, text) => {
+      console.log(`  ${CYAN}←${RESET} ${DIM}Remote @${agentName}:${RESET} ${text}`);
+      bridge.addMessage('user', `@${agentName} ${text}`);
+
+      const agent = agents.find(a => a.name.toLowerCase() === agentName.toLowerCase());
+      const name = agent?.name || agentName;
+      const role = agent?.role || 'Agent';
+      bridge.updateAgentStatus(name, 'streaming');
+
+      const response = `Roger that! I'm ${name} (${role}). You asked: "${text}"\n\nIn the full version, this would be handled directly by my agent charter and Copilot SDK session.`;
+      const words = response.split(' ');
+      for (let i = 0; i < words.length; i++) {
+        bridge.sendDelta('rc-session', name, (i > 0 ? ' ' : '') + words[i]);
+        await new Promise(r => setTimeout(r, 50));
+      }
+
+      bridge.addMessage('agent', response, name);
+      bridge.updateAgentStatus(name, 'idle');
     },
     onCommand: (name) => {
       console.log(`  ${CYAN}←${RESET} ${DIM}Remote /${name}${RESET}`);
+      if (name === 'status') {
+        bridge.addMessage('system', `Squad RC | Repo: ${repo} | Branch: ${branch} | Agents: ${agents.length} | Connections: ${bridge.getConnectionCount()}`);
+      } else if (name === 'agents') {
+        const list = agents.map(a => `• ${a.name} (${a.role})`).join('\n');
+        bridge.addMessage('system', `Team Roster:\n${list || 'No agents loaded'}`);
+      } else {
+        bridge.addMessage('system', `Unknown command: /${name}`);
+      }
     },
   };
 
@@ -108,6 +168,11 @@ export async function runRC(cwd: string, options: RCOptions): Promise<void> {
 
   const actualPort = await bridge.start();
   const localUrl = `http://localhost:${actualPort}`;
+
+  // Initialize agent roster in bridge
+  if (agents.length > 0) {
+    bridge.updateAgents(agents.map(a => ({ name: a.name, role: a.role, status: 'idle' as const })));
+  }
 
   console.log(`  ${GREEN}✓${RESET} Bridge running on port ${BOLD}${actualPort}${RESET}`);
   console.log(`  ${DIM}Local:${RESET}   ${localUrl}\n`);
