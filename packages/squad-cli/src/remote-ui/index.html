@@ -7,6 +7,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Squad RC</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/css/xterm.min.css">
   <link rel="stylesheet" href="/styles.css">
 </head>
 <body>
@@ -23,8 +24,11 @@
       <div style="padding:12px;color:var(--text-dim);font-size:12px">Loading sessions...</div>
     </div>
 
-    <!-- Terminal view -->
-    <main id="terminal"></main>
+    <!-- Terminal view (xterm.js) -->
+    <div id="terminal-container"></div>
+
+    <!-- Legacy terminal (ACP mode fallback) -->
+    <main id="terminal" class="hidden"></main>
 
     <footer id="input-area">
       <form id="input-form">
@@ -34,6 +38,8 @@
     </footer>
   </div>
   <div id="permission-overlay" class="hidden"></div>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/xterm@5.5.0/lib/xterm.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@xterm/addon-fit@0.10.0/lib/addon-fit.min.js"></script>
   <script src="/app.js"></script>
 </body>
 </html>

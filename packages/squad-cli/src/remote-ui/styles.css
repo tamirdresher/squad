@@ -49,7 +49,7 @@ header {
 #status-indicator.connecting { color: var(--yellow); }
 #status-text { color: var(--text-dim); }
 
-/* Terminal area */
+/* Terminal area (legacy) */
 #terminal {
   flex: 1;
   overflow-y: auto;
@@ -58,6 +58,16 @@ header {
   word-wrap: break-word;
   line-height: 1.5;
   scroll-behavior: smooth;
+}
+
+/* xterm.js container */
+#terminal-container {
+  flex: 1;
+  overflow: hidden;
+}
+#terminal-container .xterm {
+  height: 100%;
+  padding: 4px;
 }
 
 /* System messages */

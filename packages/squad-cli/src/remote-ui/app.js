@@ -23,7 +23,61 @@
   const statusText = $('#status-text');
   const permOverlay = $('#permission-overlay');
   const dashboard = $('#dashboard');
+  const termContainer = $('#terminal-container');
   let currentView = 'terminal'; // 'dashboard' or 'terminal'
+
+  // ─── xterm.js Terminal ───────────────────────────────────
+  let xterm = null;
+  let fitAddon = null;
+
+  function initXterm() {
+    if (xterm) return;
+    xterm = new Terminal({
+      theme: {
+        background: '#0d1117',
+        foreground: '#c9d1d9',
+        cursor: '#3fb950',
+        selectionBackground: '#264f78',
+        black: '#0d1117',
+        red: '#f85149',
+        green: '#3fb950',
+        yellow: '#d29922',
+        blue: '#58a6ff',
+        magenta: '#bc8cff',
+        cyan: '#39c5cf',
+        white: '#c9d1d9',
+        brightBlack: '#6e7681',
+        brightRed: '#f85149',
+        brightGreen: '#3fb950',
+        brightYellow: '#d29922',
+        brightBlue: '#58a6ff',
+        brightMagenta: '#bc8cff',
+        brightCyan: '#39c5cf',
+        brightWhite: '#f0f6fc',
+      },
+      fontFamily: "'Cascadia Code', 'SF Mono', 'Fira Code', 'Menlo', monospace",
+      fontSize: 13,
+      scrollback: 5000,
+      cursorBlink: true,
+    });
+
+    fitAddon = new FitAddon.FitAddon();
+    xterm.loadAddon(fitAddon);
+    xterm.open(termContainer);
+    fitAddon.fit();
+
+    // Handle resize
+    window.addEventListener('resize', () => {
+      if (fitAddon) fitAddon.fit();
+    });
+
+    // Keyboard input → send to bridge → PTY
+    xterm.onData((data) => {
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify({ type: 'pty_input', data }));
+      }
+    });
+  }
 
   // ─── Dashboard ───────────────────────────────────────────
   let showOffline = false;
@@ -100,6 +154,7 @@
     if (currentView === 'terminal') {
       currentView = 'dashboard';
       terminal.classList.add('hidden');
+      termContainer.classList.add('hidden');
       $('#input-area').classList.add('hidden');
       dashboard.classList.remove('hidden');
       $('#btn-sessions').textContent = 'Terminal';
@@ -107,8 +162,14 @@
     } else {
       currentView = 'terminal';
       dashboard.classList.add('hidden');
-      terminal.classList.remove('hidden');
-      $('#input-area').classList.remove('hidden');
+      if (ptyMode) {
+        termContainer.classList.remove('hidden');
+        if (fitAddon) fitAddon.fit();
+        if (xterm) xterm.focus();
+      } else {
+        terminal.classList.remove('hidden');
+        $('#input-area').classList.remove('hidden');
+      }
       $('#btn-sessions').textContent = 'Sessions';
     }
   };
@@ -304,14 +365,17 @@
       return;
     }
 
-    // PTY data — raw terminal output
+    // PTY data — raw terminal output → xterm.js
     if (msg.type === 'pty') {
       if (!ptyMode) {
         ptyMode = true;
         setStatus('online', 'PTY Mirror');
-        terminal.innerHTML = ''; // Clear init messages
+        terminal.classList.add('hidden');
+        $('#input-area').classList.add('hidden');
+        termContainer.classList.remove('hidden');
+        initXterm();
       }
-      appendTerminalData(msg.data);
+      xterm.write(msg.data);
       return;
     }
 
@@ -423,10 +487,8 @@
     inputEl.value = '';
 
     if (ptyMode) {
-      // Send as PTY keystroke input
-      if (ws?.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({ type: 'pty_input', data: text + '\r' }));
-      }
+      // xterm.js handles input directly — focus it
+      if (xterm) xterm.focus();
       return;
     }
 
