@@ -1,266 +1,266 @@
 /**
- * Squad Remote Control — PWA Client (ACP Protocol)
- * Drives the ACP lifecycle: initialize → session/new → session/prompt
- * Bridge relays raw JSON-RPC to/from copilot --acp --stdio
+ * Squad Remote Control — Terminal-Style PWA (ACP Protocol)
+ * Raw terminal rendering matching Copilot CLI output
  */
-
 (function () {
   'use strict';
 
-  // ─── State ───────────────────────────────────────────────
   let ws = null;
   let connected = false;
   let sessionId = null;
   let requestId = 0;
   let pendingRequests = {};
   let acpReady = false;
+  let streamingEl = null;
+  let replaying = false;
+  let toolCalls = {};
 
-  // ─── DOM refs ────────────────────────────────────────────
   const $ = (sel) => document.querySelector(sel);
-  const messagesEl = $('#messages');
+  const terminal = $('#terminal');
   const inputEl = $('#input');
   const formEl = $('#input-form');
-  const statusBadge = $('#status-badge');
+  const statusEl = $('#status-indicator');
   const statusText = $('#status-text');
-  const sessionInfo = $('#session-info');
-  const agentSidebar = $('#agent-sidebar');
-  const agentList = $('#agent-list');
+  const permOverlay = $('#permission-overlay');
 
-  // ─── ACP JSON-RPC Helpers ────────────────────────────────
+  // ─── Terminal Output ─────────────────────────────────────
+  function write(html, cls) {
+    const div = document.createElement('div');
+    if (cls) div.className = cls;
+    div.innerHTML = html;
+    terminal.appendChild(div);
+    if (!replaying) scrollToBottom();
+  }
+
+  function writeSys(text) { write(escapeHtml(text), 'sys'); }
+
+  function writeUserInput(text) {
+    write(escapeHtml(text), 'user-input');
+  }
+
+  function startStreaming() {
+    streamingEl = document.createElement('div');
+    streamingEl.className = 'agent-text';
+    streamingEl.innerHTML = '<span class="cursor"></span>';
+    terminal.appendChild(streamingEl);
+  }
+
+  function appendStreaming(text) {
+    if (!streamingEl) startStreaming();
+    // Remove cursor, append text, re-add cursor
+    const cursor = streamingEl.querySelector('.cursor');
+    if (cursor) cursor.remove();
+    streamingEl.innerHTML += escapeHtml(text);
+    const c = document.createElement('span');
+    c.className = 'cursor';
+    streamingEl.appendChild(c);
+    if (!replaying) scrollToBottom();
+  }
+
+  function endStreaming() {
+    if (streamingEl) {
+      const cursor = streamingEl.querySelector('.cursor');
+      if (cursor) cursor.remove();
+      // Render markdown-ish formatting
+      streamingEl.innerHTML = formatText(streamingEl.textContent || '');
+      streamingEl = null;
+    }
+  }
+
+  // ─── Tool Call Rendering ─────────────────────────────────
+  function renderToolCall(update) {
+    const id = update.id || update.toolCallId || ('tc-' + Date.now());
+    const name = update.name || 'tool';
+    const icons = { read: '📖', edit: '✏️', write: '✏️', shell: '▶️', search: '🔍', think: '💭', fetch: '🌐' };
+    const guessKind = name.includes('read') ? 'read' : name.includes('edit') || name.includes('write') ? 'edit' :
+      name.includes('shell') || name.includes('exec') || name.includes('run') ? 'shell' :
+      name.includes('search') || name.includes('grep') || name.includes('glob') ? 'search' :
+      name.includes('think') || name.includes('reason') ? 'think' : 'other';
+    const icon = icons[guessKind] || '⚙️';
+
+    const el = document.createElement('div');
+    el.className = 'tool-call';
+    el.id = 'tool-' + id;
+    el.dataset.toolId = id;
+
+    const inputStr = update.input ? (typeof update.input === 'string' ? update.input : JSON.stringify(update.input)) : '';
+    const shortInput = inputStr.length > 80 ? inputStr.substring(0, 80) + '...' : inputStr;
+
+    el.innerHTML = `<span class="tool-icon">${icon}</span><span class="tool-name">${escapeHtml(name)}</span> ${escapeHtml(shortInput)}<span class="tool-status in_progress">⟳</span><div class="tool-body"></div>`;
+    el.addEventListener('click', () => el.classList.toggle('expanded'));
+
+    terminal.appendChild(el);
+    toolCalls[id] = el;
+    if (!replaying) scrollToBottom();
+  }
+
+  function updateToolCall(update) {
+    const id = update.id || update.toolCallId;
+    const el = toolCalls[id];
+    if (!el) return;
+
+    if (update.status) {
+      el.classList.remove('completed', 'failed');
+      if (update.status === 'completed') el.classList.add('completed');
+      if (update.status === 'failed' || update.status === 'errored') el.classList.add('failed');
+
+      const badge = el.querySelector('.tool-status');
+      if (badge) {
+        badge.className = 'tool-status ' + update.status;
+        badge.textContent = update.status === 'completed' ? '✓' : update.status === 'failed' || update.status === 'errored' ? '✗' : '⟳';
+      }
+    }
+
+    if (update.content) {
+      const body = el.querySelector('.tool-body');
+      if (body) {
+        for (const item of (Array.isArray(update.content) ? update.content : [update.content])) {
+          if (item.type === 'diff' && item.diff) {
+            let diffHtml = `<div class="diff"><div class="diff-header">${escapeHtml(item.path || '')}</div>`;
+            if (item.diff.before) diffHtml += `<div class="diff-del">${escapeHtml(item.diff.before)}</div>`;
+            if (item.diff.after) diffHtml += `<div class="diff-add">${escapeHtml(item.diff.after)}</div>`;
+            diffHtml += '</div>';
+            body.innerHTML += diffHtml;
+          } else if (item.type === 'text' && item.text) {
+            body.innerHTML += `<div class="code-block">${escapeHtml(item.text)}</div>`;
+          } else if (typeof item === 'string') {
+            body.innerHTML += `<div class="code-block">${escapeHtml(item)}</div>`;
+          }
+        }
+        el.classList.add('expanded');
+      }
+    }
+  }
+
+  // ─── ACP JSON-RPC ────────────────────────────────────────
   function sendRequest(method, params, timeoutMs) {
     return new Promise((resolve, reject) => {
       const id = ++requestId;
       pendingRequests[id] = { resolve, reject };
       const msg = JSON.stringify({ jsonrpc: '2.0', id, method, params });
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(msg);
-      }
-      // Timeout — longer for initialize
+      if (ws && ws.readyState === WebSocket.OPEN) ws.send(msg);
       const timeout = timeoutMs !== undefined ? timeoutMs : (method === 'initialize' ? 60000 : 120000);
       if (timeout > 0) {
         setTimeout(() => {
-          if (pendingRequests[id]) {
-            delete pendingRequests[id];
-            reject(new Error(`Request ${method} timed out`));
-          }
+          if (pendingRequests[id]) { delete pendingRequests[id]; reject(new Error(`${method} timed out`)); }
         }, timeout);
       }
     });
   }
 
-  function sendNotification(method, params) {
-    const msg = JSON.stringify({ jsonrpc: '2.0', method, params });
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(msg);
-    }
-  }
-
-  // ─── ACP Session Lifecycle ───────────────────────────────
+  // ─── ACP Initialize ─────────────────────────────────────
   async function initializeACP(attempt) {
     attempt = attempt || 1;
-    const maxAttempts = 5;
-    setStatus('connecting', attempt === 1 ? 'Waiting for Copilot...' : `Retry ${attempt}/${maxAttempts}...`);
-    if (attempt === 1) addSystemMessage('⏳ Waiting for Copilot to load MCP servers (~15-20s)...');
+    setStatus('connecting', attempt === 1 ? 'Initializing...' : `Retry ${attempt}/5...`);
+    if (attempt === 1) writeSys('Waiting for Copilot to load (~15-20s)...');
 
     try {
       const result = await sendRequest('initialize', {
-        protocolVersion: 1,
-        clientCapabilities: {},
-        clientInfo: { name: 'squad-rc', title: 'Squad Remote Control', version: '1.0.0' },
+        protocolVersion: 1, clientCapabilities: {},
+        clientInfo: { name: 'squad-rc', title: 'Squad RC', version: '1.0.0' },
       });
-
-      addSystemMessage('✅ Connected to Copilot ' + (result.agentInfo?.version || '') + '. Creating session...');
-
-      const sessionResult = await sendRequest('session/new', {
-        cwd: '.',
-        mcpServers: [],
-      });
-
+      writeSys('Connected to Copilot ' + (result.agentInfo?.version || ''));
+      const sessionResult = await sendRequest('session/new', { cwd: '.', mcpServers: [] });
       sessionId = sessionResult.sessionId;
       acpReady = true;
       setStatus('online', 'Ready');
-      addSystemMessage('🚀 Session ready! Type a message to chat with Copilot.');
+      writeSys('Session ready. Type a message below.');
     } catch (err) {
-      if (attempt < maxAttempts) {
-        const delay = 5000;
-        addSystemMessage(`⏳ Copilot not ready yet, retrying in ${delay/1000}s... (${attempt}/${maxAttempts})`);
-        setTimeout(() => initializeACP(attempt + 1), delay);
+      if (attempt < 5) {
+        writeSys('Not ready, retrying in 5s... (' + attempt + '/5)');
+        setTimeout(() => initializeACP(attempt + 1), 5000);
       } else {
         setStatus('offline', 'Failed');
-        addSystemMessage('❌ Could not connect to Copilot after ' + maxAttempts + ' attempts: ' + err.message);
-        acpReady = false;
+        writeSys('Failed to connect: ' + err.message);
       }
     }
   }
 
-  // ─── WebSocket Connection ────────────────────────────────
-  let reconnectAttempts = 0;
-
+  // ─── WebSocket ───────────────────────────────────────────
   function connect() {
     const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const url = `${proto}//${location.host}`;
-
+    ws = new WebSocket(`${proto}//${location.host}`);
     setStatus('connecting', 'Connecting...');
-
-    try {
-      ws = new WebSocket(url);
-    } catch (err) {
-      setStatus('offline', 'WS Error');
-      addSystemMessage('WebSocket error: ' + (err.message || err));
-      scheduleReconnect();
-      return;
-    }
 
     ws.onopen = () => {
       connected = true;
-      reconnectAttempts = 0;
-      // Start ACP handshake after short delay for bridge to be ready
       setTimeout(() => initializeACP(1), 1000);
     };
-
     ws.onclose = () => {
-      connected = false;
-      acpReady = false;
-      sessionId = null;
+      connected = false; acpReady = false; sessionId = null;
       setStatus('offline', 'Disconnected');
-      scheduleReconnect();
+      setTimeout(connect, 3000);
     };
-
-    ws.onerror = () => {
-      connected = false;
-      setStatus('offline', 'Error');
-    };
-
+    ws.onerror = () => setStatus('offline', 'Error');
     ws.onmessage = (e) => {
       try {
         const msg = JSON.parse(e.data);
-        handleACPMessage(msg);
-      } catch { /* ignore malformed */ }
+        handleMessage(msg);
+      } catch {}
     };
   }
 
-  // ─── ACP Message Handler ─────────────────────────────────
-  function handleACPMessage(msg) {
-    // Response to a request we sent (has id + result/error)
+  // ─── Message Handler ─────────────────────────────────────
+  function handleMessage(msg) {
+    // Replay events from bridge recording
+    if (msg.type === '_replay') {
+      replaying = true;
+      try { handleMessage(JSON.parse(msg.data)); } catch {}
+      return;
+    }
+    if (msg.type === '_replay_done') {
+      replaying = false;
+      scrollToBottom();
+      return;
+    }
+
+    // JSON-RPC response
     if (msg.id !== undefined && (msg.result !== undefined || msg.error !== undefined)) {
-      const pending = pendingRequests[msg.id];
-      if (pending) {
+      const p = pendingRequests[msg.id];
+      if (p) {
         delete pendingRequests[msg.id];
-        if (msg.error) {
-          pending.reject(new Error(msg.error.message || JSON.stringify(msg.error)));
-        } else {
-          pending.resolve(msg.result);
-        }
+        msg.error ? p.reject(new Error(msg.error.message || 'Error')) : p.resolve(msg.result);
       }
-      // Check for prompt completion (stopReason in result)
-      if (msg.result && msg.result.stopReason) {
-        flushStreaming();
-      }
+      if (msg.result?.stopReason) endStreaming();
       return;
     }
 
-    // Notification from agent (session/update)
+    // session/update notification
     if (msg.method === 'session/update' && msg.params) {
-      handleSessionUpdate(msg.params.update || msg.params);
-      return;
-    }
-
-    // Permission request from agent
-    if (msg.method === 'session/request_permission' && msg.id !== undefined) {
-      handlePermissionRequest(msg);
-      return;
-    }
-  }
-
-  // ─── Session Updates (streaming) ─────────────────────────
-  let streamingContent = '';
-  let streamingEl = null;
-
-  function handleSessionUpdate(update) {
-    if (!update) return;
-
-    const type = update.sessionUpdate;
-
-    if (type === 'agent_message_chunk' && update.content) {
-      const text = update.content.text || '';
-      streamingContent += text;
-
-      if (!streamingEl) {
-        streamingEl = document.createElement('div');
-        streamingEl.className = 'msg agent';
-        streamingEl.innerHTML = `
-          <div class="msg-header">
-            <span class="msg-agent">Copilot</span>
-            <span class="msg-time">now</span>
-          </div>
-          <div class="msg-content"></div>
-          <span class="streaming-indicator"></span>
-        `;
-        messagesEl.appendChild(streamingEl);
+      const u = msg.params.update || msg.params;
+      if (u.sessionUpdate === 'agent_message_chunk' && u.content?.text) {
+        appendStreaming(u.content.text);
       }
-      const contentEl = streamingEl.querySelector('.msg-content');
-      if (contentEl) contentEl.textContent = streamingContent;
-      scrollToBottom();
+      if (u.sessionUpdate === 'tool_call') renderToolCall(u);
+      if (u.sessionUpdate === 'tool_call_update') updateToolCall(u);
+      return;
     }
 
-    if (type === 'tool_call') {
-      const el = document.createElement('div');
-      el.className = 'tool-call running';
-      el.textContent = `🔧 ${update.name || 'tool'}(${JSON.stringify(update.input || {}).slice(0, 80)})`;
-      messagesEl.appendChild(el);
-      scrollToBottom();
-    }
-
-    if (type === 'tool_call_update') {
-      // Could update existing tool call status
+    // Permission request
+    if (msg.method === 'session/request_permission') {
+      showPermission(msg);
+      return;
     }
   }
 
-  function flushStreaming() {
-    if (streamingContent && streamingEl) {
-      // Remove streaming indicator
-      const indicator = streamingEl.querySelector('.streaming-indicator');
-      if (indicator) indicator.remove();
-      // Update timestamp
-      const timeEl = streamingEl.querySelector('.msg-time');
-      if (timeEl) timeEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      // Format content
-      const contentEl = streamingEl.querySelector('.msg-content');
-      if (contentEl) contentEl.innerHTML = formatContent(streamingContent);
-    }
-    streamingContent = '';
-    streamingEl = null;
-  }
-
-  // ─── Permission Handling ─────────────────────────────────
-  function handlePermissionRequest(msg) {
-    const params = msg.params || {};
-    const dialog = document.createElement('div');
-    dialog.className = 'permission-dialog';
-    dialog.id = `perm-${msg.id}`;
-    dialog.innerHTML = `
+  // ─── Permission Dialog ───────────────────────────────────
+  function showPermission(msg) {
+    const p = msg.params || {};
+    permOverlay.classList.remove('hidden');
+    permOverlay.innerHTML = `<div class="perm-dialog">
       <h3>🔐 Permission Request</h3>
-      <p><strong>${escapeHtml(params.tool || 'Tool')}</strong>: ${escapeHtml(params.description || JSON.stringify(params))}</p>
-      <div class="permission-actions">
-        <button class="btn-deny" onclick="respondPermission(${msg.id}, false)">Deny</button>
-        <button class="btn-approve" onclick="respondPermission(${msg.id}, true)">Approve</button>
+      <p>${escapeHtml(p.tool || 'Tool')}: ${escapeHtml(p.description || JSON.stringify(p))}</p>
+      <div class="perm-actions">
+        <button class="btn-deny" onclick="handlePerm(${msg.id}, false)">Deny</button>
+        <button class="btn-approve" onclick="handlePerm(${msg.id}, true)">Approve</button>
       </div>
-    `;
-    document.body.appendChild(dialog);
+    </div>`;
   }
-
-  window.respondPermission = (id, approved) => {
-    // Send JSON-RPC response to the permission request
-    const response = JSON.stringify({
-      jsonrpc: '2.0',
-      id: id,
-      result: { outcome: approved ? 'approved' : 'denied' },
-    });
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(response);
+  window.handlePerm = (id, approved) => {
+    if (ws?.readyState === WebSocket.OPEN) {
+      ws.send(JSON.stringify({ jsonrpc: '2.0', id, result: { outcome: approved ? 'approved' : 'denied' } }));
     }
-    const el = $(`#perm-${id}`);
-    if (el) el.remove();
+    permOverlay.classList.add('hidden');
   };
 
   // ─── Send Prompt ─────────────────────────────────────────
@@ -268,103 +268,38 @@
     e.preventDefault();
     const text = inputEl.value.trim();
     if (!text || !acpReady || !sessionId) return;
-
-    // Show user message
-    renderMessage({ role: 'user', content: text });
+    writeUserInput(text);
     inputEl.value = '';
-    inputEl.focus();
-    scrollToBottom();
-
-    // Reset streaming state
-    streamingContent = '';
-    streamingEl = null;
-
-    // Send ACP prompt
     try {
       await sendRequest('session/prompt', {
-        sessionId: sessionId,
-        prompt: [{ type: 'text', text }],
+        sessionId, prompt: [{ type: 'text', text }],
       }, 0);
-      // Response arrives via session/update notifications + final result
     } catch (err) {
-      flushStreaming();
-      addSystemMessage('❌ ' + err.message);
+      endStreaming();
+      writeSys('Error: ' + err.message);
     }
   });
-
-  // ─── Agent Sidebar ───────────────────────────────────────
-  $('#btn-agents').addEventListener('click', () => {
-    agentSidebar.classList.toggle('visible');
-    agentSidebar.classList.toggle('hidden');
-  });
-  $('#btn-close-sidebar').addEventListener('click', () => {
-    agentSidebar.classList.remove('visible');
-    agentSidebar.classList.add('hidden');
-  });
-
-  // ─── Render Functions ────────────────────────────────────
-  function renderMessage(msg) {
-    const el = document.createElement('div');
-    el.className = `msg ${msg.role}`;
-
-    if (msg.role === 'system') {
-      el.innerHTML = `<div class="msg-content">${escapeHtml(msg.content)}</div>`;
-    } else {
-      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const name = msg.role === 'user' ? 'You' : (msg.agentName || 'Copilot');
-      el.innerHTML = `
-        <div class="msg-header">
-          <span class="msg-agent">${escapeHtml(name)}</span>
-          <span class="msg-time">${time}</span>
-        </div>
-        <div class="msg-content">${formatContent(msg.content)}</div>
-      `;
-    }
-    messagesEl.appendChild(el);
-  }
 
   // ─── Helpers ─────────────────────────────────────────────
   function setStatus(state, text) {
-    statusBadge.className = `badge ${state}`;
+    statusEl.className = state;
     statusText.textContent = text;
   }
-
-  function scheduleReconnect() {
-    reconnectAttempts++;
-    const delay = Math.min(1000 * Math.pow(2, reconnectAttempts), 30000);
-    setTimeout(connect, delay);
-  }
-
-  function addSystemMessage(text) {
-    renderMessage({ role: 'system', content: text });
-    scrollToBottom();
-  }
-
   function scrollToBottom() {
-    requestAnimationFrame(() => {
-      messagesEl.scrollTop = messagesEl.scrollHeight;
-    });
+    requestAnimationFrame(() => { terminal.scrollTop = terminal.scrollHeight; });
   }
-
-  function escapeHtml(str) {
-    const div = document.createElement('div');
-    div.textContent = str || '';
-    return div.innerHTML;
+  function escapeHtml(s) {
+    const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML;
   }
-
-  function formatContent(text) {
+  function formatText(text) {
     return escapeHtml(text)
-      .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
-      .replace(/`([^`]+)`/g, '<code>$1</code>');
+      .replace(/```(\w*)\n([\s\S]*?)```/g, '<div class="code-block">$2</div>')
+      .replace(/`([^`]+)`/g, '<code style="background:var(--bg-tool);padding:1px 4px;border-radius:3px">$1</code>')
+      .replace(/\*\*([^*]+)\*\*/g, '<strong style="color:var(--text-bright)">$1</strong>')
+      .replace(/\n/g, '<br>');
   }
-
-  // ─── Keepalive ───────────────────────────────────────────
-  setInterval(() => {
-    if (connected) {
-      // JSON-RPC ping (no-op notification)
-    }
-  }, 30000);
 
   // ─── Start ───────────────────────────────────────────────
+  writeSys('Squad Remote Control');
   connect();
 })();

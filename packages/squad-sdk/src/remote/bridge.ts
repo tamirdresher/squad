@@ -28,6 +28,7 @@ export class RemoteBridge {
   private state: ConnectionState = 'stopped';
   private messageIdCounter = 0;
   private staticHandler?: (req: http.IncomingMessage, res: http.ServerResponse) => void;
+  private acpEventLog: string[] = []; // Records all ACP events for replay
 
   constructor(private config: RemoteBridgeConfig) {}
 
@@ -188,8 +189,15 @@ export class RemoteBridge {
     this.passthroughWrite = writer;
   }
 
-  /** Forward a raw message from the agent (copilot stdout) to all clients */
+  /** Forward a raw message from the agent (copilot stdout) to all clients + record */
   passthroughFromAgent(line: string): void {
+    // Record for replay to late-joining clients
+    this.acpEventLog.push(line);
+    // Cap at 2000 events
+    if (this.acpEventLog.length > 2000) {
+      this.acpEventLog = this.acpEventLog.slice(-2000);
+    }
+
     for (const [, { ws }] of this.connections) {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(line);
@@ -208,18 +216,26 @@ export class RemoteBridge {
     };
     this.connections.set(connId, { ws, info });
 
-    // Send initial state
-    this.send(ws, {
-      type: 'status',
-      version: RC_PROTOCOL_VERSION,
-      repo: this.config.repo,
-      branch: this.config.branch,
-      machine: this.config.machine,
-      squadDir: this.config.squadDir,
-      connectedAt: new Date().toISOString(),
-    });
-    this.send(ws, { type: 'history', messages: this.messages });
-    this.send(ws, { type: 'agents', agents: this.agents });
+    // Replay recorded ACP events to late-joining client
+    if (this.passthroughWrite && this.acpEventLog.length > 0) {
+      for (const event of this.acpEventLog) {
+        this.send(ws, { type: '_replay', data: event } as any);
+      }
+      this.send(ws, { type: '_replay_done' } as any);
+    } else {
+      // Non-passthrough mode: send our protocol state
+      this.send(ws, {
+        type: 'status',
+        version: RC_PROTOCOL_VERSION,
+        repo: this.config.repo,
+        branch: this.config.branch,
+        machine: this.config.machine,
+        squadDir: this.config.squadDir,
+        connectedAt: new Date().toISOString(),
+      });
+      this.send(ws, { type: 'history', messages: this.messages });
+      this.send(ws, { type: 'agents', agents: this.agents });
+    }
 
     // Handle incoming messages
     ws.on('message', (data) => {
@@ -227,6 +243,9 @@ export class RemoteBridge {
 
       // If passthrough is set, forward raw JSON-RPC to copilot
       if (this.passthroughWrite) {
+        // Record user messages for replay too
+        this.acpEventLog.push('__USER__' + raw);
+
         // Intercept session/new to inject correct cwd
         try {
           const msg = JSON.parse(raw);

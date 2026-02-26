@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <meta name="theme-color" content="#1a1a2e">
+  <meta name="theme-color" content="#0d1117">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <title>Squad RC</title>
@@ -11,46 +11,19 @@
 </head>
 <body>
   <div id="app">
-    <!-- Header -->
     <header id="header">
-      <div class="header-left">
-        <button id="btn-agents" class="icon-btn" title="Agents">👥</button>
-        <h1>Squad RC</h1>
-      </div>
-      <div class="header-right">
-        <span id="status-badge" class="badge offline">●</span>
-        <span id="status-text" class="status-text">Connecting...</span>
-      </div>
+      <span id="status-indicator">●</span>
+      <span id="status-text">Connecting...</span>
     </header>
-
-    <!-- Session info bar -->
-    <div id="session-info" class="session-info hidden">
-      <span id="info-repo" class="info-tag"></span>
-      <span id="info-branch" class="info-tag"></span>
-      <span id="info-machine" class="info-tag"></span>
-    </div>
-
-    <!-- Agent sidebar -->
-    <aside id="agent-sidebar" class="sidebar hidden">
-      <div class="sidebar-header">
-        <h2>Agents</h2>
-        <button id="btn-close-sidebar" class="icon-btn">✕</button>
-      </div>
-      <ul id="agent-list"></ul>
-    </aside>
-
-    <!-- Messages -->
-    <main id="messages" class="messages"></main>
-
-    <!-- Input -->
+    <main id="terminal"></main>
     <footer id="input-area">
       <form id="input-form">
-        <input type="text" id="input" placeholder="Message your squad..." autocomplete="off" autocorrect="off" autocapitalize="off">
-        <button type="submit" id="btn-send">↑</button>
+        <span class="prompt">&gt;</span>
+        <input type="text" id="input" placeholder="Send a message..." autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
       </form>
     </footer>
   </div>
-
+  <div id="permission-overlay" class="hidden"></div>
   <script src="/app.js"></script>
 </body>
 </html>
