@@ -148,12 +148,15 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
     pty.resize(process.stdout.columns || 120, process.stdout.rows || 30);
   });
 
-  // Remote input → PTY (phone sends keystrokes)
+  // Remote input → PTY (phone sends keystrokes + resize)
   bridge.setPassthrough((msg) => {
     try {
       const parsed = JSON.parse(msg);
       if (parsed.type === 'pty_input') {
         pty.write(parsed.data);
+      }
+      if (parsed.type === 'pty_resize') {
+        pty.resize(parsed.cols, parsed.rows);
       }
     } catch {
       // Raw text — treat as typed input + enter

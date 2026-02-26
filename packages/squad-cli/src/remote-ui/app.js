@@ -66,10 +66,20 @@
     xterm.open(termContainer);
     fitAddon.fit();
 
+    // Send terminal size to PTY so copilot renders correctly
+    function sendResize() {
+      if (ws && ws.readyState === WebSocket.OPEN && xterm) {
+        ws.send(JSON.stringify({ type: 'pty_resize', cols: xterm.cols, rows: xterm.rows }));
+      }
+    }
+
     // Handle resize
     window.addEventListener('resize', () => {
-      if (fitAddon) fitAddon.fit();
+      if (fitAddon) { fitAddon.fit(); sendResize(); }
     });
+
+    // Send initial size
+    setTimeout(sendResize, 500);
 
     // Keyboard input → send to bridge → PTY
     xterm.onData((data) => {
