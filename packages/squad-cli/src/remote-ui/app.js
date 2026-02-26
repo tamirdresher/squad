@@ -1,5 +1,7 @@
 /**
- * Squad Remote Control — PWA Client
+ * Squad Remote Control — PWA Client (ACP Protocol)
+ * Drives the ACP lifecycle: initialize → session/new → session/prompt
+ * Bridge relays raw JSON-RPC to/from copilot --acp --stdio
  */
 
 (function () {
@@ -8,9 +10,10 @@
   // ─── State ───────────────────────────────────────────────
   let ws = null;
   let connected = false;
-  let agents = [];
-  let streamingBuffers = {};
-  let pendingPermissions = {};
+  let sessionId = null;
+  let requestId = 0;
+  let pendingRequests = {};
+  let acpReady = false;
 
   // ─── DOM refs ────────────────────────────────────────────
   const $ = (sel) => document.querySelector(sel);
@@ -23,6 +26,62 @@
   const agentSidebar = $('#agent-sidebar');
   const agentList = $('#agent-list');
 
+  // ─── ACP JSON-RPC Helpers ────────────────────────────────
+  function sendRequest(method, params) {
+    return new Promise((resolve, reject) => {
+      const id = ++requestId;
+      pendingRequests[id] = { resolve, reject };
+      const msg = JSON.stringify({ jsonrpc: '2.0', id, method, params });
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        ws.send(msg);
+      }
+      // Timeout
+      setTimeout(() => {
+        if (pendingRequests[id]) {
+          delete pendingRequests[id];
+          reject(new Error(`Request ${method} timed out`));
+        }
+      }, 30000);
+    });
+  }
+
+  function sendNotification(method, params) {
+    const msg = JSON.stringify({ jsonrpc: '2.0', method, params });
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(msg);
+    }
+  }
+
+  // ─── ACP Session Lifecycle ───────────────────────────────
+  async function initializeACP() {
+    setStatus('connecting', 'Initializing ACP...');
+    addSystemMessage('Initializing Copilot session...');
+
+    try {
+      const result = await sendRequest('initialize', {
+        protocolVersion: 1,
+        clientCapabilities: {},
+        clientInfo: { name: 'squad-rc', title: 'Squad Remote Control', version: '1.0.0' },
+      });
+
+      addSystemMessage('ACP initialized. Creating session...');
+
+      const sessionResult = await sendRequest('session/new', {
+        cwd: '.',
+        mcpServers: [],
+      });
+
+      sessionId = sessionResult.sessionId;
+      acpReady = true;
+      setStatus('online', 'Connected');
+      addSystemMessage('Session ready! Type a message to chat with Copilot.');
+    } catch (err) {
+      setStatus('offline', 'ACP Error');
+      addSystemMessage('❌ ACP initialization failed: ' + err.message);
+      acpReady = false;
+    }
+  }
+
   // ─── WebSocket Connection ────────────────────────────────
   let reconnectAttempts = 0;
 
@@ -31,7 +90,6 @@
     const url = `${proto}//${location.host}`;
 
     setStatus('connecting', 'Connecting...');
-    addSystemMessage('Connecting to Squad bridge...');
 
     try {
       ws = new WebSocket(url);
@@ -45,11 +103,14 @@
     ws.onopen = () => {
       connected = true;
       reconnectAttempts = 0;
-      setStatus('online', 'Connected');
+      // Start ACP handshake
+      initializeACP();
     };
 
     ws.onclose = () => {
       connected = false;
+      acpReady = false;
+      sessionId = null;
       setStatus('offline', 'Disconnected');
       scheduleReconnect();
     };
@@ -61,99 +122,174 @@
 
     ws.onmessage = (e) => {
       try {
-        const event = JSON.parse(e.data);
-        handleEvent(event);
+        const msg = JSON.parse(e.data);
+        handleACPMessage(msg);
       } catch { /* ignore malformed */ }
     };
   }
 
-  // ─── Event Handlers ──────────────────────────────────────
-  function handleEvent(event) {
-    switch (event.type) {
-      case 'status':
-        showSessionInfo(event);
-        break;
+  // ─── ACP Message Handler ─────────────────────────────────
+  function handleACPMessage(msg) {
+    // Response to a request we sent (has id + result/error)
+    if (msg.id !== undefined && (msg.result !== undefined || msg.error !== undefined)) {
+      const pending = pendingRequests[msg.id];
+      if (pending) {
+        delete pendingRequests[msg.id];
+        if (msg.error) {
+          pending.reject(new Error(msg.error.message || JSON.stringify(msg.error)));
+        } else {
+          pending.resolve(msg.result);
+        }
+      }
+      // Check for prompt completion (stopReason in result)
+      if (msg.result && msg.result.stopReason) {
+        flushStreaming();
+      }
+      return;
+    }
 
-      case 'history':
-        messagesEl.innerHTML = '';
-        (event.messages || []).forEach((msg) => renderMessage(msg));
-        scrollToBottom();
-        break;
+    // Notification from agent (session/update)
+    if (msg.method === 'session/update' && msg.params) {
+      handleSessionUpdate(msg.params.update || msg.params);
+      return;
+    }
 
-      case 'delta':
-        handleDelta(event);
-        break;
-
-      case 'complete':
-        clearStreaming(event.message.agentName);
-        renderMessage(event.message);
-        scrollToBottom();
-        break;
-
-      case 'agents':
-        agents = event.agents || [];
-        renderAgents();
-        break;
-
-      case 'tool_call':
-        renderToolCall(event);
-        break;
-
-      case 'permission':
-        showPermissionDialog(event);
-        break;
-
-      case 'usage':
-        // Could show in a metrics panel
-        break;
-
-      case 'error':
-        renderMessage({
-          id: 'err-' + Date.now(),
-          role: 'system',
-          content: `❌ ${event.agentName ? event.agentName + ': ' : ''}${event.message}`,
-          timestamp: new Date().toISOString(),
-        });
-        scrollToBottom();
-        break;
-
-      case 'pong':
-        break;
+    // Permission request from agent
+    if (msg.method === 'session/request_permission' && msg.id !== undefined) {
+      handlePermissionRequest(msg);
+      return;
     }
   }
 
-  // ─── Streaming ───────────────────────────────────────────
-  function handleDelta(event) {
-    const key = event.agentName || event.sessionId;
-    if (!streamingBuffers[key]) {
-      streamingBuffers[key] = '';
-      // Create streaming message element
+  // ─── Session Updates (streaming) ─────────────────────────
+  let streamingContent = '';
+  let streamingEl = null;
+
+  function handleSessionUpdate(update) {
+    if (!update) return;
+
+    const type = update.sessionUpdate;
+
+    if (type === 'agent_message_chunk' && update.content) {
+      const text = update.content.text || '';
+      streamingContent += text;
+
+      if (!streamingEl) {
+        streamingEl = document.createElement('div');
+        streamingEl.className = 'msg agent';
+        streamingEl.innerHTML = `
+          <div class="msg-header">
+            <span class="msg-agent">Copilot</span>
+            <span class="msg-time">now</span>
+          </div>
+          <div class="msg-content"></div>
+          <span class="streaming-indicator"></span>
+        `;
+        messagesEl.appendChild(streamingEl);
+      }
+      const contentEl = streamingEl.querySelector('.msg-content');
+      if (contentEl) contentEl.textContent = streamingContent;
+      scrollToBottom();
+    }
+
+    if (type === 'tool_call') {
       const el = document.createElement('div');
-      el.className = 'msg agent';
-      el.id = `streaming-${key}`;
-      el.innerHTML = `
-        <div class="msg-header">
-          <span class="msg-agent">${escapeHtml(event.agentName || 'Agent')}</span>
-          <span class="msg-time">now</span>
-        </div>
-        <div class="msg-content"></div>
-        <span class="streaming-indicator"></span>
-      `;
+      el.className = 'tool-call running';
+      el.textContent = `🔧 ${update.name || 'tool'}(${JSON.stringify(update.input || {}).slice(0, 80)})`;
       messagesEl.appendChild(el);
+      scrollToBottom();
     }
 
-    streamingBuffers[key] += event.content;
-    const el = $(`#streaming-${key} .msg-content`);
-    if (el) el.textContent = streamingBuffers[key];
-    scrollToBottom();
+    if (type === 'tool_call_update') {
+      // Could update existing tool call status
+    }
   }
 
-  function clearStreaming(agentName) {
-    const key = agentName || '';
-    delete streamingBuffers[key];
-    const el = $(`#streaming-${key}`);
-    if (el) el.remove();
+  function flushStreaming() {
+    if (streamingContent && streamingEl) {
+      // Remove streaming indicator
+      const indicator = streamingEl.querySelector('.streaming-indicator');
+      if (indicator) indicator.remove();
+      // Update timestamp
+      const timeEl = streamingEl.querySelector('.msg-time');
+      if (timeEl) timeEl.textContent = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      // Format content
+      const contentEl = streamingEl.querySelector('.msg-content');
+      if (contentEl) contentEl.innerHTML = formatContent(streamingContent);
+    }
+    streamingContent = '';
+    streamingEl = null;
   }
+
+  // ─── Permission Handling ─────────────────────────────────
+  function handlePermissionRequest(msg) {
+    const params = msg.params || {};
+    const dialog = document.createElement('div');
+    dialog.className = 'permission-dialog';
+    dialog.id = `perm-${msg.id}`;
+    dialog.innerHTML = `
+      <h3>🔐 Permission Request</h3>
+      <p><strong>${escapeHtml(params.tool || 'Tool')}</strong>: ${escapeHtml(params.description || JSON.stringify(params))}</p>
+      <div class="permission-actions">
+        <button class="btn-deny" onclick="respondPermission(${msg.id}, false)">Deny</button>
+        <button class="btn-approve" onclick="respondPermission(${msg.id}, true)">Approve</button>
+      </div>
+    `;
+    document.body.appendChild(dialog);
+  }
+
+  window.respondPermission = (id, approved) => {
+    // Send JSON-RPC response to the permission request
+    const response = JSON.stringify({
+      jsonrpc: '2.0',
+      id: id,
+      result: { outcome: approved ? 'approved' : 'denied' },
+    });
+    if (ws && ws.readyState === WebSocket.OPEN) {
+      ws.send(response);
+    }
+    const el = $(`#perm-${id}`);
+    if (el) el.remove();
+  };
+
+  // ─── Send Prompt ─────────────────────────────────────────
+  formEl.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const text = inputEl.value.trim();
+    if (!text || !acpReady || !sessionId) return;
+
+    // Show user message
+    renderMessage({ role: 'user', content: text });
+    inputEl.value = '';
+    inputEl.focus();
+    scrollToBottom();
+
+    // Reset streaming state
+    streamingContent = '';
+    streamingEl = null;
+
+    // Send ACP prompt
+    try {
+      await sendRequest('session/prompt', {
+        sessionId: sessionId,
+        prompt: [{ type: 'text', text }],
+      }, 0);
+      // Response arrives via session/update notifications + final result
+    } catch (err) {
+      flushStreaming();
+      addSystemMessage('❌ ' + err.message);
+    }
+  });
+
+  // ─── Agent Sidebar ───────────────────────────────────────
+  $('#btn-agents').addEventListener('click', () => {
+    agentSidebar.classList.toggle('visible');
+    agentSidebar.classList.toggle('hidden');
+  });
+  $('#btn-close-sidebar').addEventListener('click', () => {
+    agentSidebar.classList.remove('visible');
+    agentSidebar.classList.add('hidden');
+  });
 
   // ─── Render Functions ────────────────────────────────────
   function renderMessage(msg) {
@@ -163,128 +299,18 @@
     if (msg.role === 'system') {
       el.innerHTML = `<div class="msg-content">${escapeHtml(msg.content)}</div>`;
     } else {
-      const time = new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-      const header = msg.role === 'agent'
-        ? `<span class="msg-agent">${escapeHtml(msg.agentName || 'Agent')}</span>`
-        : `<span class="msg-agent">You</span>`;
-
+      const time = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+      const name = msg.role === 'user' ? 'You' : (msg.agentName || 'Copilot');
       el.innerHTML = `
         <div class="msg-header">
-          ${header}
+          <span class="msg-agent">${escapeHtml(name)}</span>
           <span class="msg-time">${time}</span>
         </div>
         <div class="msg-content">${formatContent(msg.content)}</div>
       `;
     }
-
     messagesEl.appendChild(el);
   }
-
-  function renderAgents() {
-    agentList.innerHTML = agents.map((a) => `
-      <li data-agent="${escapeHtml(a.name)}" onclick="insertAgent('${escapeHtml(a.name)}')">
-        <span class="agent-status ${a.status}"></span>
-        <div>
-          <div class="agent-name">${escapeHtml(a.name)}</div>
-          <div class="agent-role">${escapeHtml(a.role || '')}</div>
-        </div>
-      </li>
-    `).join('');
-  }
-
-  function renderToolCall(event) {
-    const el = document.createElement('div');
-    el.className = `tool-call ${event.status}`;
-    el.textContent = `🔧 ${event.agentName}: ${event.tool}(${JSON.stringify(event.args).slice(0, 80)})`;
-    messagesEl.appendChild(el);
-    scrollToBottom();
-  }
-
-  function showSessionInfo(info) {
-    sessionInfo.classList.remove('hidden');
-    $('#info-repo').textContent = `📦 ${info.repo}`;
-    $('#info-branch').textContent = `🌿 ${info.branch}`;
-    $('#info-machine').textContent = `💻 ${info.machine}`;
-  }
-
-  // ─── Permission Dialog ───────────────────────────────────
-  function showPermissionDialog(event) {
-    pendingPermissions[event.id] = event;
-    const dialog = document.createElement('div');
-    dialog.className = 'permission-dialog';
-    dialog.id = `perm-${event.id}`;
-    dialog.innerHTML = `
-      <h3>🔐 Permission Request</h3>
-      <p><strong>${escapeHtml(event.agentName)}</strong> wants to: ${escapeHtml(event.description)}</p>
-      <div class="permission-actions">
-        <button class="btn-deny" onclick="respondPermission('${event.id}', false)">Deny</button>
-        <button class="btn-approve" onclick="respondPermission('${event.id}', true)">Approve</button>
-      </div>
-    `;
-    document.body.appendChild(dialog);
-  }
-
-  // ─── Send Functions ──────────────────────────────────────
-  function send(obj) {
-    if (ws && ws.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(obj));
-    }
-  }
-
-  formEl.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const text = inputEl.value.trim();
-    if (!text) return;
-
-    // Parse input
-    if (text.startsWith('/')) {
-      const parts = text.slice(1).split(/\s+/);
-      send({ type: 'command', name: parts[0], args: parts.slice(1) });
-    } else if (text.startsWith('@')) {
-      const match = text.match(/^@(\S+)\s+(.*)/s);
-      if (match) {
-        send({ type: 'direct', agentName: match[1], text: match[2] });
-      }
-    } else {
-      send({ type: 'prompt', text });
-    }
-
-    // Show user message locally
-    renderMessage({
-      id: 'local-' + Date.now(),
-      role: 'user',
-      content: text,
-      timestamp: new Date().toISOString(),
-    });
-    scrollToBottom();
-
-    inputEl.value = '';
-    inputEl.focus();
-  });
-
-  // ─── Global functions (called from onclick) ──────────────
-  window.insertAgent = (name) => {
-    inputEl.value = `@${name} `;
-    inputEl.focus();
-    agentSidebar.classList.remove('visible');
-  };
-
-  window.respondPermission = (id, approved) => {
-    send({ type: 'permission_response', id, approved });
-    const el = $(`#perm-${id}`);
-    if (el) el.remove();
-    delete pendingPermissions[id];
-  };
-
-  // ─── Sidebar toggle ─────────────────────────────────────
-  $('#btn-agents').addEventListener('click', () => {
-    agentSidebar.classList.toggle('visible');
-    agentSidebar.classList.toggle('hidden');
-  });
-  $('#btn-close-sidebar').addEventListener('click', () => {
-    agentSidebar.classList.remove('visible');
-    agentSidebar.classList.add('hidden');
-  });
 
   // ─── Helpers ─────────────────────────────────────────────
   function setStatus(state, text) {
@@ -299,12 +325,7 @@
   }
 
   function addSystemMessage(text) {
-    renderMessage({
-      id: 'sys-' + Date.now(),
-      role: 'system',
-      content: text,
-      timestamp: new Date().toISOString(),
-    });
+    renderMessage({ role: 'system', content: text });
     scrollToBottom();
   }
 
@@ -321,7 +342,6 @@
   }
 
   function formatContent(text) {
-    // Simple code block detection
     return escapeHtml(text)
       .replace(/```(\w*)\n([\s\S]*?)```/g, '<pre><code>$2</code></pre>')
       .replace(/`([^`]+)`/g, '<code>$1</code>');
@@ -329,7 +349,9 @@
 
   // ─── Keepalive ───────────────────────────────────────────
   setInterval(() => {
-    if (connected) send({ type: 'ping' });
+    if (connected) {
+      // JSON-RPC ping (no-op notification)
+    }
   }, 30000);
 
   // ─── Start ───────────────────────────────────────────────
