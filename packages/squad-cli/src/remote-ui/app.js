@@ -172,13 +172,14 @@
     } else {
       currentView = 'terminal';
       dashboard.classList.add('hidden');
+      $('#input-area').classList.remove('hidden');
       if (ptyMode) {
         termContainer.classList.remove('hidden');
+        $('#input-form').classList.add('hidden');
         if (fitAddon) fitAddon.fit();
         if (xterm) xterm.focus();
       } else {
         terminal.classList.remove('hidden');
-        $('#input-area').classList.remove('hidden');
       }
       $('#btn-sessions').textContent = 'Sessions';
     }
@@ -381,7 +382,8 @@
         ptyMode = true;
         setStatus('online', 'PTY Mirror');
         terminal.classList.add('hidden');
-        $('#input-area').classList.add('hidden');
+        // Hide text input form but keep key bar visible
+        $('#input-form').classList.add('hidden');
         termContainer.classList.remove('hidden');
         initXterm();
       }
