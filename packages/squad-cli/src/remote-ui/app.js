@@ -26,6 +26,8 @@
   let currentView = 'terminal'; // 'dashboard' or 'terminal'
 
   // ─── Dashboard ───────────────────────────────────────────
+  let showOffline = false;
+
   async function loadSessions() {
     try {
       const resp = await fetch('/api/sessions');
@@ -37,25 +39,61 @@
   }
 
   function renderDashboard(sessions) {
-    if (sessions.length === 0) {
-      dashboard.innerHTML = '<div style="padding:12px;color:var(--text-dim)">No active Squad RC sessions found.</div>';
-      return;
-    }
-    dashboard.innerHTML = sessions.map(s => `
-      <div class="session-card" onclick="openSession('${escapeHtml(s.url)}')">
-        <span class="status-dot ${s.online ? 'online' : 'offline'}"></span>
-        <div class="info">
-          <div class="repo">📦 ${escapeHtml(s.repo)}</div>
-          <div class="branch">🌿 ${escapeHtml(s.branch)}</div>
-          <div class="machine">💻 ${escapeHtml(s.machine)} ${s.online ? '' : '(offline)'}</div>
+    const filtered = showOffline ? sessions : sessions.filter(s => s.online);
+    const offlineCount = sessions.filter(s => !s.online).length;
+    const onlineCount = sessions.filter(s => s.online).length;
+
+    let html = `<div style="padding:8px 4px;display:flex;align-items:center;gap:8px">
+      <span style="color:var(--text-dim);font-size:12px">${onlineCount} online${offlineCount > 0 ? ', ' + offlineCount + ' offline' : ''}</span>
+      <span style="flex:1"></span>
+      <button onclick="toggleOffline()" style="background:none;border:1px solid var(--border);color:var(--text-dim);font-family:var(--font);font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer">${showOffline ? 'Hide offline' : 'Show offline'}</button>
+      ${offlineCount > 0 ? '<button onclick="cleanOffline()" style="background:none;border:1px solid var(--red);color:var(--red);font-family:var(--font);font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer">Clean offline</button>' : ''}
+      <button onclick="loadSessions()" style="background:none;border:1px solid var(--border);color:var(--text-dim);font-family:var(--font);font-size:11px;padding:3px 8px;border-radius:4px;cursor:pointer">↻</button>
+    </div>`;
+
+    if (filtered.length === 0) {
+      html += '<div style="padding:20px 12px;color:var(--text-dim);text-align:center">' +
+        (sessions.length === 0 ? 'No Squad RC sessions found.' : 'No online sessions. Tap "Show offline" to see stale ones.') +
+        '</div>';
+    } else {
+      html += filtered.map(s => `
+        <div class="session-card" ${s.online ? 'onclick="openSession(\'' + escapeHtml(s.url) + '\')"' : ''}>
+          <span class="status-dot ${s.online ? 'online' : 'offline'}"></span>
+          <div class="info">
+            <div class="repo">📦 ${escapeHtml(s.repo)}</div>
+            <div class="branch">🌿 ${escapeHtml(s.branch)}</div>
+            <div class="machine">💻 ${escapeHtml(s.machine)}</div>
+          </div>
+          ${s.online ? '<span class="arrow">→</span>' :
+            '<button onclick="event.stopPropagation();deleteSession(\'' + escapeHtml(s.id) + '\')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px" title="Remove">✕</button>'}
         </div>
-        <span class="arrow">→</span>
-      </div>
-    `).join('');
+      `).join('');
+    }
+    dashboard.innerHTML = html;
   }
 
   window.openSession = (url) => {
     window.location.href = url;
+  };
+
+  window.toggleOffline = () => {
+    showOffline = !showOffline;
+    loadSessions();
+  };
+
+  window.cleanOffline = async () => {
+    const resp = await fetch('/api/sessions');
+    const data = await resp.json();
+    const offline = (data.sessions || []).filter(s => !s.online);
+    for (const s of offline) {
+      await fetch('/api/sessions/' + s.id, { method: 'DELETE' });
+    }
+    loadSessions();
+  };
+
+  window.deleteSession = async (id) => {
+    await fetch('/api/sessions/' + id, { method: 'DELETE' });
+    loadSessions();
   };
 
   window.toggleView = () => {

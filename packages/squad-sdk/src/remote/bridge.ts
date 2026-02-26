@@ -46,8 +46,15 @@ export class RemoteBridge {
 
     this.server = http.createServer((req, res) => {
       // Sessions API — runs devtunnel list
-      if (req.url === '/api/sessions') {
+      if (req.url === '/api/sessions' && req.method === 'GET') {
         this.handleSessionsAPI(res);
+        return;
+      }
+
+      // Delete session API
+      if (req.url?.startsWith('/api/sessions/') && req.method === 'DELETE') {
+        const tunnelId = req.url.replace('/api/sessions/', '');
+        this.handleDeleteSession(tunnelId, res);
         return;
       }
 
@@ -221,6 +228,18 @@ export class RemoteBridge {
     } catch (err) {
       res.writeHead(200, { 'Content-Type': 'application/json' });
       res.end(JSON.stringify({ sessions: [], error: (err as Error).message }));
+    }
+  }
+
+  private handleDeleteSession(tunnelId: string, res: http.ServerResponse): void {
+    try {
+      const cleanId = tunnelId.replace(/\.\w+$/, '');
+      execSync(`devtunnel delete ${cleanId} --force`, { encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] });
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ deleted: true, tunnelId: cleanId }));
+    } catch (err) {
+      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.end(JSON.stringify({ deleted: false, error: (err as Error).message }));
     }
   }
 
