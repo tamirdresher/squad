@@ -35,31 +35,34 @@ export function isDevtunnelAvailable(): boolean {
 
 /** Create a devtunnel with squad labels and host it */
 export async function createTunnel(port: number, labels: TunnelLabels): Promise<TunnelInfo> {
-  const labelArgs = ['squad', labels.repo, labels.branch, labels.machine]
-    .map((l) => l.replace(/[^a-zA-Z0-9._-]/g, '_'))
+  const sanitize = (l: string) => l.replace(/[^a-zA-Z0-9._-]/g, '_').substring(0, 50);
+  const labelFlags = ['squad', sanitize(labels.repo), sanitize(labels.branch), sanitize(labels.machine)]
+    .map((l) => `--labels ${l}`)
     .join(' ');
 
   // Create tunnel with labels
   const createOutput = execSync(
-    `devtunnel create --labels ${labelArgs} --expiration 1d --json`,
+    `devtunnel create ${labelFlags} --expiration 1d --json`,
     { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
   );
   const createResult = JSON.parse(createOutput);
   const tunnelId = createResult.tunnelId || createResult.tunnel?.tunnelId;
+  // Strip cluster suffix for commands (e.g., "abc.euw" → "abc")
+  const tunnelIdClean = tunnelId?.split('.')[0];
 
-  if (!tunnelId) {
+  if (!tunnelIdClean) {
     throw new Error('Failed to create devtunnel: no tunnelId returned');
   }
-  currentTunnelId = tunnelId;
+  currentTunnelId = tunnelIdClean;
 
   // Add port
   execSync(
-    `devtunnel port create ${tunnelId} -p ${port} --protocol https`,
+    `devtunnel port create ${tunnelIdClean} -p ${port} --protocol http`,
     { stdio: 'pipe' }
   );
 
   // Host in background
-  hostProcess = spawn('devtunnel', ['host', tunnelId], {
+  hostProcess = spawn('devtunnel', ['host', tunnelIdClean], {
     stdio: 'pipe',
     detached: false,
   });
@@ -95,7 +98,7 @@ export async function createTunnel(port: number, labels: TunnelLabels): Promise<
     });
   });
 
-  return { tunnelId, url, port };
+  return { tunnelId: tunnelIdClean, url, port };
 }
 
 /** Clean up the tunnel */
