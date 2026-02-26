@@ -178,6 +178,25 @@ export class RemoteBridge {
     this.broadcast({ type: 'error', message, agentName });
   }
 
+  // ─── Passthrough (ACP dumb pipe) ────────────────────────────
+
+  private passthroughWrite: ((msg: string) => void) | null = null;
+
+  /** Set a passthrough pipe — raw WebSocket messages go to this writer,
+   *  and call passthroughFromAgent() to send agent responses back */
+  setPassthrough(writer: (msg: string) => void): void {
+    this.passthroughWrite = writer;
+  }
+
+  /** Forward a raw message from the agent (copilot stdout) to all clients */
+  passthroughFromAgent(line: string): void {
+    for (const [, { ws }] of this.connections) {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(line);
+      }
+    }
+  }
+
   // ─── Internal ──────────────────────────────────────────────
 
   private handleConnection(ws: WebSocket, req: http.IncomingMessage): void {
@@ -204,7 +223,16 @@ export class RemoteBridge {
 
     // Handle incoming messages
     ws.on('message', (data) => {
-      const cmd = parseCommand(data.toString());
+      const raw = data.toString();
+
+      // If passthrough is set, forward raw JSON-RPC to copilot
+      if (this.passthroughWrite) {
+        this.passthroughWrite(raw);
+        return;
+      }
+
+      // Otherwise use our protocol
+      const cmd = parseCommand(raw);
       if (cmd) this.handleClientCommand(cmd);
     });
 
