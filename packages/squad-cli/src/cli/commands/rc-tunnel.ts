@@ -35,7 +35,11 @@ export function isDevtunnelAvailable(): boolean {
 
 /** Create a devtunnel with squad labels and host it */
 export async function createTunnel(port: number, labels: TunnelLabels): Promise<TunnelInfo> {
-  const sanitize = (l: string) => l.replace(/[^\w-=]/g, '_').substring(0, 50);
+  // Devtunnel labels only allow: letters, digits, underscore, hyphen, equals [a-zA-Z0-9_-=]
+  const sanitize = (l: string) => {
+    const clean = l.replace(/[^a-zA-Z0-9_\-=]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').substring(0, 50);
+    return clean || 'unknown';
+  };
   const labelFlags = ['squad', sanitize(labels.repo), sanitize(labels.branch), sanitize(labels.machine), `port-${port}`]
     .map((l) => `--labels ${l}`)
     .join(' ');
