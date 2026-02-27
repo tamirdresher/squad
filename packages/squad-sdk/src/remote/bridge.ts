@@ -8,7 +8,7 @@
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'node:http';
 import { randomUUID } from 'node:crypto';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import {
   RC_PROTOCOL_VERSION,
   serializeEvent,
@@ -30,6 +30,7 @@ export class RemoteBridge {
   private messageIdCounter = 0;
   private staticHandler?: (req: http.IncomingMessage, res: http.ServerResponse) => void;
   private acpEventLog: string[] = []; // Records all ACP events for replay
+  private wsRateLimit = new Map<WebSocket, { count: number; resetTime: number }>();
 
   constructor(private config: RemoteBridgeConfig) {}
 
@@ -61,12 +62,12 @@ export class RemoteBridge {
       if (this.staticHandler) {
         this.staticHandler(req, res);
       } else {
-        res.writeHead(200, { 'Content-Type': 'text/plain' });
+        res.writeHead(200, { 'Content-Type': 'text/plain', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY' });
         res.end('Squad Remote Control Bridge');
       }
     });
 
-    this.wss = new WebSocketServer({ server: this.server });
+    this.wss = new WebSocketServer({ server: this.server, maxPayload: 1048576 });
     this.wss.on('connection', (ws, req) => this.handleConnection(ws, req));
 
     return new Promise((resolve, reject) => {
@@ -224,11 +225,13 @@ export class RemoteBridge {
       });
       res.writeHead(200, {
         'Content-Type': 'application/json',
-        'Access-Control-Allow-Origin': '*',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'DENY',
+        'Content-Security-Policy': "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net",
       });
       res.end(JSON.stringify({ sessions }));
     } catch (err) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.writeHead(200, { 'Content-Type': 'application/json', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY' });
       res.end(JSON.stringify({ sessions: [], error: (err as Error).message }));
     }
   }
@@ -236,11 +239,16 @@ export class RemoteBridge {
   private handleDeleteSession(tunnelId: string, res: http.ServerResponse): void {
     try {
       const cleanId = tunnelId.replace(/\.\w+$/, '');
-      execSync(`devtunnel delete ${cleanId} --force`, { encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] });
-      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      if (!/^[a-zA-Z0-9._-]+$/.test(cleanId)) {
+        res.writeHead(400, { 'Content-Type': 'application/json', 'X-Content-Type-Options': 'nosniff' });
+        res.end(JSON.stringify({ deleted: false, error: 'Invalid tunnel ID' }));
+        return;
+      }
+      execFileSync('devtunnel', ['delete', cleanId, '--force'], { encoding: 'utf-8', timeout: 10000, stdio: ['pipe', 'pipe', 'pipe'] });
+      res.writeHead(200, { 'Content-Type': 'application/json', 'X-Content-Type-Options': 'nosniff' });
       res.end(JSON.stringify({ deleted: true, tunnelId: cleanId }));
     } catch (err) {
-      res.writeHead(200, { 'Content-Type': 'application/json' });
+      res.writeHead(200, { 'Content-Type': 'application/json', 'X-Content-Type-Options': 'nosniff' });
       res.end(JSON.stringify({ deleted: false, error: (err as Error).message }));
     }
   }
@@ -305,6 +313,18 @@ export class RemoteBridge {
 
     // Handle incoming messages
     ws.on('message', (data) => {
+      // Rate limiting: 100 messages per second
+      const now = Date.now();
+      let rate = this.wsRateLimit.get(ws);
+      if (!rate || now > rate.resetTime) {
+        rate = { count: 0, resetTime: now + 1000 };
+        this.wsRateLimit.set(ws, rate);
+      }
+      if (++rate.count > 100) {
+        ws.close(1008, 'Rate limit exceeded');
+        return;
+      }
+
       const raw = data.toString();
 
       // If passthrough is set, forward raw JSON-RPC to copilot
@@ -334,10 +354,12 @@ export class RemoteBridge {
 
     ws.on('close', () => {
       this.connections.delete(connId);
+      this.wsRateLimit.delete(ws);
     });
 
     ws.on('error', () => {
       this.connections.delete(connId);
+      this.wsRateLimit.delete(ws);
     });
   }
 

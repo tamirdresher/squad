@@ -59,13 +59,23 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
   // PWA static files
   bridge.setStaticHandler((req, res) => {
     const uiDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../remote-ui');
-    let filePath = path.join(uiDir, req.url === '/' ? 'index.html' : req.url || 'index.html');
+    const rawUrl = decodeURIComponent(req.url || '/');
+    if (rawUrl.includes('..')) { res.writeHead(400); res.end(); return; }
+    const filePath = path.resolve(uiDir, rawUrl === '/' ? 'index.html' : rawUrl.replace(/^\//, ''));
     if (!filePath.startsWith(uiDir)) { res.writeHead(403); res.end(); return; }
-    if (!fs.existsSync(filePath)) filePath = path.join(uiDir, 'index.html');
-    const ext = path.extname(filePath);
+    const servePath = fs.existsSync(filePath) ? filePath : path.join(uiDir, 'index.html');
+    const ext = path.extname(servePath);
     const mimes: Record<string, string> = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json' };
-    res.writeHead(200, { 'Content-Type': mimes[ext] || 'application/octet-stream' });
-    fs.createReadStream(filePath).pipe(res);
+    const headers: Record<string, string> = {
+      'Content-Type': mimes[ext] || 'application/octet-stream',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'DENY',
+    };
+    if (ext === '.html') {
+      headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net";
+    }
+    res.writeHead(200, headers);
+    fs.createReadStream(servePath).pipe(res);
   });
 
   const actualPort = await bridge.start();
@@ -164,7 +174,9 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
         pty.write(parsed.data);
       }
       if (parsed.type === 'pty_resize') {
-        pty.resize(parsed.cols, parsed.rows);
+        const cols = Math.max(1, Math.min(500, parseInt(parsed.cols, 10) || 80));
+        const rows = Math.max(1, Math.min(200, parseInt(parsed.rows, 10) || 24));
+        pty.resize(cols, rows);
       }
     } catch {
       // Raw text — treat as typed input + enter

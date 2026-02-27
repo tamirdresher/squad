@@ -14,6 +14,7 @@
   let streamingEl = null;
   let replaying = false;
   let toolCalls = {};
+  let reconnectDelay = 1000;
 
   const $ = (sel) => document.querySelector(sel);
   const terminal = $('#terminal');
@@ -346,12 +347,14 @@
 
     ws.onopen = () => {
       connected = true;
+      reconnectDelay = 1000;
       setTimeout(() => initializeACP(1), 1000);
     };
     ws.onclose = () => {
       connected = false; acpReady = false; sessionId = null;
       setStatus('offline', 'Disconnected');
-      setTimeout(connect, 3000);
+      reconnectDelay = Math.min(reconnectDelay * 2, 30000);
+      setTimeout(connect, reconnectDelay);
     };
     ws.onerror = () => setStatus('offline', 'Error');
     ws.onmessage = (e) => {
@@ -534,7 +537,7 @@
     requestAnimationFrame(() => { terminal.scrollTop = terminal.scrollHeight; });
   }
   function escapeHtml(s) {
-    const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML;
+    const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML.replace(/'/g, '&#39;');
   }
   function formatText(text) {
     return escapeHtml(text)
