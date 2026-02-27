@@ -72,7 +72,7 @@ describe('RemoteBridge', () => {
 
   it('accepts WebSocket connections', async () => {
     const port = await bridge.start();
-    const ws = new WebSocket(`ws://localhost:${port}`);
+    const ws = new WebSocket(`ws://localhost:${port}/?token=${(bridge as any).getSessionToken()}`);
     await new Promise<void>((resolve) => ws.on('open', resolve));
     expect(bridge.getConnectionCount()).toBe(1);
     ws.close();
@@ -82,7 +82,7 @@ describe('RemoteBridge', () => {
 
   it('sends initial state on connect', async () => {
     const port = await bridge.start();
-    const ws = new WebSocket(`ws://localhost:${port}`);
+    const ws = new WebSocket(`ws://localhost:${port}/?token=${(bridge as any).getSessionToken()}`);
     const messages: any[] = [];
     ws.on('message', (data) => messages.push(JSON.parse(data.toString())));
     await new Promise<void>((resolve) => ws.on('open', resolve));
@@ -95,8 +95,8 @@ describe('RemoteBridge', () => {
 
   it('broadcasts messages to all clients', async () => {
     const port = await bridge.start();
-    const ws1 = new WebSocket(`ws://localhost:${port}`);
-    const ws2 = new WebSocket(`ws://localhost:${port}`);
+    const ws1 = new WebSocket(`ws://localhost:${port}/?token=${(bridge as any).getSessionToken()}`);
+    const ws2 = new WebSocket(`ws://localhost:${port}/?token=${(bridge as any).getSessionToken()}`);
     await Promise.all([
       new Promise<void>(r => ws1.on('open', r)),
       new Promise<void>(r => ws2.on('open', r)),
@@ -144,7 +144,7 @@ describe('RemoteBridge', () => {
 
   it('sends streaming deltas', async () => {
     const port = await bridge.start();
-    const ws = new WebSocket(`ws://localhost:${port}`);
+    const ws = new WebSocket(`ws://localhost:${port}/?token=${(bridge as any).getSessionToken()}`);
     const messages: any[] = [];
     ws.on('message', d => messages.push(JSON.parse(d.toString())));
     await new Promise<void>(r => ws.on('open', r));
@@ -163,7 +163,7 @@ describe('RemoteBridge', () => {
 
   it('updates agent roster', async () => {
     const port = await bridge.start();
-    const ws = new WebSocket(`ws://localhost:${port}`);
+    const ws = new WebSocket(`ws://localhost:${port}/?token=${(bridge as any).getSessionToken()}`);
     const messages: any[] = [];
     ws.on('message', d => messages.push(JSON.parse(d.toString())));
     await new Promise<void>(r => ws.on('open', r));
@@ -188,7 +188,7 @@ describe('RemoteBridge', () => {
 
     bridge.setPassthrough((msg) => received.push(msg));
 
-    const ws = new WebSocket(`ws://localhost:${port}`);
+    const ws = new WebSocket(`ws://localhost:${port}/?token=${(bridge as any).getSessionToken()}`);
     await new Promise<void>(r => ws.on('open', r));
     await new Promise(r => setTimeout(r, 200));
 
@@ -210,7 +210,7 @@ describe('RemoteBridge', () => {
     bridge.passthroughFromAgent('{"type":"pty","data":"world"}');
 
     // New client should get replay
-    const ws = new WebSocket(`ws://localhost:${port}`);
+    const ws = new WebSocket(`ws://localhost:${port}/?token=${(bridge as any).getSessionToken()}`);
     const messages: any[] = [];
     ws.on('message', d => messages.push(JSON.parse(d.toString())));
     await new Promise<void>(r => ws.on('open', r));
@@ -225,7 +225,7 @@ describe('RemoteBridge', () => {
 
   it('handles ping/pong', async () => {
     const port = await bridge.start();
-    const ws = new WebSocket(`ws://localhost:${port}`);
+    const ws = new WebSocket(`ws://localhost:${port}/?token=${(bridge as any).getSessionToken()}`);
     const messages: any[] = [];
     ws.on('message', d => messages.push(JSON.parse(d.toString())));
     await new Promise<void>(r => ws.on('open', r));
@@ -263,7 +263,7 @@ describe('RemoteBridge', () => {
     const forwarded: string[] = [];
     bridge.setPassthrough((msg) => forwarded.push(msg));
 
-    const ws = new WebSocket(`ws://localhost:${port}`);
+    const ws = new WebSocket(`ws://localhost:${port}/?token=${(bridge as any).getSessionToken()}`);
     await new Promise<void>(r => ws.on('open', r));
     await new Promise(r => setTimeout(r, 200));
 
