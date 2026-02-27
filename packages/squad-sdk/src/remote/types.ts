@@ -23,6 +23,8 @@ export interface RemoteBridgeConfig {
   onCommand?: (name: string, args?: string[]) => void | Promise<void>;
   /** Callback when a remote user responds to a permission request */
   onPermissionResponse?: (id: string, approved: boolean) => void | Promise<void>;
+  /** Whether to enable replay buffer for late-joining clients (default: false) */
+  enableReplay?: boolean;
 }
 
 export interface RemoteConnection {

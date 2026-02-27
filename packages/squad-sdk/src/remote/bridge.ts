@@ -35,8 +35,9 @@ export class RemoteBridge {
   private acpEventLog: string[] = []; // Records all ACP events for replay
   private wsRateLimit = new Map<WebSocket, { count: number; resetTime: number }>();
   private sessionToken: string = randomUUID();
-  private auditLogPath: string = path.join(os.tmpdir(), `squad-audit-${Date.now()}.log`);
-  private auditLog = fs.createWriteStream(this.auditLogPath, { flags: 'a' });
+  private auditLogDir: string = path.join(os.homedir(), '.cli-tunnel', 'audit');
+  private auditLogPath: string = path.join(this.auditLogDir, `squad-audit-${Date.now()}.jsonl`);
+  private auditLog = (() => { fs.mkdirSync(this.auditLogDir, { recursive: true }); return fs.createWriteStream(this.auditLogPath, { flags: 'a' }); })();
 
   constructor(private config: RemoteBridgeConfig) {}
 
@@ -267,7 +268,7 @@ export class RemoteBridge {
         'Content-Type': 'application/json',
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
-        'Content-Security-Policy': "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net",
+        'Content-Security-Policy': "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; connect-src 'self' ws://localhost:* wss://*.devtunnels.ms; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net",
       });
       res.end(JSON.stringify({ sessions }));
     } catch (err) {
@@ -295,10 +296,14 @@ export class RemoteBridge {
 
   /** Redact secrets from text before replay */
   private redactSecrets(text: string): string {
-    return text.replace(
-      /(?:token|secret|key|password|credential|authorization|api_key|private_key|access_key)[\s:="']+\S{8,}/gi,
-      '[REDACTED]'
-    );
+    return text
+      .replace(/(?:token|secret|key|password|credential|authorization|api_key|private_key|access_key)[\s:="']+\S{8,}/gi, '[REDACTED]')
+      .replace(/sk-[A-Za-z0-9]{20,}/g, '[REDACTED-OPENAI]')
+      .replace(/ghp_[A-Za-z0-9]{36,}/g, '[REDACTED-GITHUB]')
+      .replace(/AKIA[0-9A-Z]{16}/g, '[REDACTED-AWS]')
+      .replace(/DefaultEndpointsProtocol=https?;AccountName=[^;]+;AccountKey=[^;]+;EndpointSuffix=[^\s"']*/gi, '[REDACTED-AZURE-CONN]')
+      .replace(/(?:mongodb|postgres|mysql|redis):\/\/[^\s"']+/gi, '[REDACTED-DB-URL]')
+      .replace(/Bearer\s+[A-Za-z0-9\-._~+\/]+=*/g, '[REDACTED-BEARER]');
   }
 
   // ─── Passthrough (ACP dumb pipe) ────────────────────────────
@@ -313,11 +318,13 @@ export class RemoteBridge {
 
   /** Forward a raw message from the agent (copilot stdout) to all clients + record */
   passthroughFromAgent(line: string): void {
-    // Record for replay to late-joining clients
-    this.acpEventLog.push(line);
-    // Cap at 2000 events
-    if (this.acpEventLog.length > 2000) {
-      this.acpEventLog = this.acpEventLog.slice(-2000);
+    // Record for replay to late-joining clients (only if enabled)
+    if (this.config.enableReplay) {
+      this.acpEventLog.push(line);
+      // Cap at 2000 events
+      if (this.acpEventLog.length > 2000) {
+        this.acpEventLog = this.acpEventLog.slice(-2000);
+      }
     }
 
     for (const [, { ws }] of this.connections) {
@@ -344,7 +351,7 @@ export class RemoteBridge {
     this.connections.set(connId, { ws, info });
 
     // Replay recorded ACP events to late-joining client (with secrets redacted)
-    if (this.passthroughWrite && this.acpEventLog.length > 0) {
+    if (this.config.enableReplay && this.passthroughWrite && this.acpEventLog.length > 0) {
       for (const event of this.acpEventLog) {
         this.send(ws, { type: '_replay', data: this.redactSecrets(event) } as any);
       }
@@ -382,14 +389,16 @@ export class RemoteBridge {
 
       // If passthrough is set, forward raw JSON-RPC to copilot
       if (this.passthroughWrite) {
-        // Record user messages for replay too
-        this.acpEventLog.push('__USER__' + raw);
+        // Record user messages for replay too (only if enabled)
+        if (this.config.enableReplay) {
+          this.acpEventLog.push('__USER__' + raw);
+        }
 
         // CRITICAL-4: Audit log remote PTY input
         try {
           const parsed = JSON.parse(raw);
           if (parsed.type === 'pty_input') {
-            this.auditLog.write(`${new Date().toISOString()} [${info.remoteAddress}] ${JSON.stringify(parsed.data)}\n`);
+            this.auditLog.write(JSON.stringify({ ts: new Date().toISOString(), addr: info.remoteAddress, type: 'pty_input', data: parsed.data }) + '\n');
           }
 
           // CRITICAL-5: ACP JSON-RPC method allowlist
@@ -404,7 +413,7 @@ export class RemoteBridge {
           }
         } catch {
           // Log non-JSON input
-          this.auditLog.write(`${new Date().toISOString()} [${info.remoteAddress}] [RAW] ${JSON.stringify(raw)}\n`);
+          this.auditLog.write(JSON.stringify({ ts: new Date().toISOString(), addr: info.remoteAddress, type: 'raw', data: raw }) + '\n');
         }
 
         // Intercept session/new to inject correct cwd

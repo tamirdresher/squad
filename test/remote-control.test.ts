@@ -202,6 +202,7 @@ describe('RemoteBridge', () => {
   });
 
   it('records and replays ACP events', async () => {
+    bridge = new RemoteBridge({ ...config, enableReplay: true });
     const port = await bridge.start();
     bridge.setPassthrough(() => {}); // Enable passthrough mode
 
