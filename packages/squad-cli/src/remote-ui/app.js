@@ -340,11 +340,29 @@
   }
 
   // ─── WebSocket ───────────────────────────────────────────
-  function connect() {
-    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+  async function connect() {
     const tokenParam = new URLSearchParams(window.location.search).get('token');
-    const wsUrl = tokenParam ? `${proto}//${location.host}?token=${encodeURIComponent(tokenParam)}` : `${proto}//${location.host}`;
-    ws = new WebSocket(wsUrl);
+    if (!tokenParam) { setStatus('offline', 'No credentials'); return; }
+
+    const proto = location.protocol === 'https:' ? 'wss:' : 'ws:';
+
+    // F-02: Try ticket-based auth first
+    try {
+      const resp = await fetch('/api/auth/ticket', {
+        method: 'POST',
+        headers: { 'Authorization': 'Bearer ' + tokenParam }
+      });
+      if (resp.ok) {
+        const { ticket } = await resp.json();
+        ws = new WebSocket(`${proto}//${location.host}?ticket=${encodeURIComponent(ticket)}`);
+      } else {
+        // Fallback to token-in-URL (backward compat)
+        ws = new WebSocket(`${proto}//${location.host}?token=${encodeURIComponent(tokenParam)}`);
+      }
+    } catch {
+      // Fallback to token-in-URL
+      ws = new WebSocket(`${proto}//${location.host}?token=${encodeURIComponent(tokenParam)}`);
+    }
     setStatus('connecting', 'Connecting...');
 
     ws.onopen = () => {

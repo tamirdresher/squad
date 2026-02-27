@@ -94,6 +94,7 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
       } catch {}
       console.log(`${DIM}Scan QR or open URL on phone. Starting copilot...${RESET}\n`);
       console.log(`  ${DIM}Audit log:${RESET} ${bridge.getAuditLogPath()}`);
+      console.log(`  ${DIM}Session expires:${RESET} ${new Date(bridge.getSessionExpiry()).toLocaleTimeString()}`);
     } catch (err) {
       console.log(`${YELLOW}⚠${RESET} Tunnel failed: ${(err as Error).message}`);
     }
@@ -120,11 +121,28 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
     console.log(`  ${DIM}Copilot flags:${RESET} ${copilotExtraArgs.join(' ')}\n`);
   }
 
-  // Security: filter sensitive environment variables
+  // F-07: Security — allowlist safe environment variables for PTY
+  const SAFE_ENV_VARS = new Set([
+    'PATH', 'HOME', 'USERPROFILE', 'SHELL', 'TERM', 'LANG', 'LC_ALL', 'LC_CTYPE',
+    'USER', 'LOGNAME', 'EDITOR', 'VISUAL', 'COLORTERM', 'TERM_PROGRAM',
+    'HOSTNAME', 'COMPUTERNAME', 'PWD', 'OLDPWD', 'SHLVL', 'TMPDIR', 'TMP', 'TEMP',
+    'XDG_RUNTIME_DIR', 'XDG_DATA_HOME', 'XDG_CONFIG_HOME', 'XDG_CACHE_HOME',
+    'DISPLAY', 'WAYLAND_DISPLAY', 'DBUS_SESSION_BUS_ADDRESS',
+    'PROGRAMFILES', 'PROGRAMFILES(X86)', 'SYSTEMROOT', 'WINDIR', 'COMSPEC',
+    'APPDATA', 'LOCALAPPDATA', 'PROGRAMDATA',
+    'NODE_PATH', 'NODE_ENV', 'NODE_OPTIONS',
+    'GOPATH', 'GOROOT', 'CARGO_HOME', 'RUSTUP_HOME',
+    'JAVA_HOME', 'MAVEN_HOME', 'GRADLE_HOME',
+    'PYTHONPATH', 'VIRTUAL_ENV', 'CONDA_DEFAULT_ENV',
+    'KUBECONFIG', 'DOCKER_HOST', 'DOCKER_CONFIG',
+    'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL',
+    'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy',
+    'SSH_AUTH_SOCK', 'GPG_TTY',
+  ]);
+
   const safeEnv: Record<string, string> = {};
-  const sensitivePatterns = /token|secret|key|password|credential|api_key|private|auth|bearer|database_url|connection_string|db_pass|cert|signing/i;
   for (const [k, v] of Object.entries(process.env)) {
-    if (!sensitivePatterns.test(k) && v !== undefined) {
+    if (SAFE_ENV_VARS.has(k) && v !== undefined) {
       safeEnv[k] = v;
     }
   }

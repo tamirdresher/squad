@@ -35,6 +35,9 @@ export class RemoteBridge {
   private acpEventLog: string[] = []; // Records all ACP events for replay
   private wsRateLimit = new Map<WebSocket, { count: number; resetTime: number }>();
   private sessionToken: string = randomUUID();
+  private tickets = new Map<string, { expires: number }>(); // F-02: one-time WS tickets
+  private readonly SESSION_TTL = 24 * 60 * 60 * 1000; // F-18: 24-hour session TTL
+  private readonly sessionCreatedAt = Date.now();
   private auditLogDir: string = path.join(os.homedir(), '.cli-tunnel', 'audit');
   private auditLogPath: string = path.join(this.auditLogDir, `squad-audit-${Date.now()}.jsonl`);
   private auditLog = (() => { fs.mkdirSync(this.auditLogDir, { recursive: true }); return fs.createWriteStream(this.auditLogPath, { flags: 'a' }); })();
@@ -56,6 +59,11 @@ export class RemoteBridge {
     return this.auditLogPath;
   }
 
+  /** Get the session expiry timestamp */
+  getSessionExpiry(): number {
+    return this.sessionCreatedAt + this.SESSION_TTL;
+  }
+
   /** Start the HTTP + WebSocket server */
   async start(): Promise<number> {
     if (this.state === 'running') return this.getPort();
@@ -63,6 +71,24 @@ export class RemoteBridge {
     this.state = 'starting';
 
     this.server = http.createServer((req, res) => {
+      // F-18: Session expiry check for API routes
+      if (req.url?.startsWith('/api/') && Date.now() - this.sessionCreatedAt > this.SESSION_TTL) {
+        res.writeHead(401, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ error: 'Session expired' }));
+        return;
+      }
+
+      // F-02: Ticket endpoint — exchange session token for one-time WS ticket
+      if (req.url === '/api/auth/ticket' && req.method === 'POST') {
+        const auth = req.headers.authorization?.replace('Bearer ', '');
+        if (auth !== this.sessionToken) { res.writeHead(401); res.end(); return; }
+        const ticket = randomUUID();
+        this.tickets.set(ticket, { expires: Date.now() + 60000 });
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ ticket, expires: Date.now() + 60000 }));
+        return;
+      }
+
       // F-01: Session token check for all API routes
       if (req.url?.startsWith('/api/')) {
         const reqUrl = new URL(req.url, `http://${req.headers.host}`);
@@ -99,7 +125,17 @@ export class RemoteBridge {
       server: this.server,
       maxPayload: 1048576,
       verifyClient: (info: { req: http.IncomingMessage }) => {
+        // F-18: Session expiry
+        if (Date.now() - this.sessionCreatedAt > this.SESSION_TTL) return false;
         const url = new URL(info.req.url!, `http://${info.req.headers.host}`);
+        // F-02: Accept one-time ticket
+        const ticket = url.searchParams.get('ticket');
+        if (ticket && this.tickets.has(ticket)) {
+          const t = this.tickets.get(ticket)!;
+          this.tickets.delete(ticket); // Single use
+          return t.expires > Date.now();
+        }
+        // Backward compat: accept token
         if (url.searchParams.get('token') !== this.sessionToken) return false;
         // Validate origin if present
         const origin = info.req.headers.origin;
