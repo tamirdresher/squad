@@ -7,6 +7,9 @@
 
 import { WebSocketServer, WebSocket } from 'ws';
 import http from 'node:http';
+import fs from 'node:fs';
+import os from 'node:os';
+import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { execSync, execFileSync } from 'node:child_process';
 import {
@@ -31,12 +34,25 @@ export class RemoteBridge {
   private staticHandler?: (req: http.IncomingMessage, res: http.ServerResponse) => void;
   private acpEventLog: string[] = []; // Records all ACP events for replay
   private wsRateLimit = new Map<WebSocket, { count: number; resetTime: number }>();
+  private sessionToken: string = randomUUID();
+  private auditLogPath: string = path.join(os.tmpdir(), `squad-audit-${Date.now()}.log`);
+  private auditLog = fs.createWriteStream(this.auditLogPath, { flags: 'a' });
 
   constructor(private config: RemoteBridgeConfig) {}
 
   /** Set a handler to serve static PWA files */
   setStaticHandler(handler: (req: http.IncomingMessage, res: http.ServerResponse) => void): void {
     this.staticHandler = handler;
+  }
+
+  /** Get the session token for WebSocket authentication */
+  getSessionToken(): string {
+    return this.sessionToken;
+  }
+
+  /** Get the audit log file path */
+  getAuditLogPath(): string {
+    return this.auditLogPath;
   }
 
   /** Start the HTTP + WebSocket server */
@@ -67,7 +83,14 @@ export class RemoteBridge {
       }
     });
 
-    this.wss = new WebSocketServer({ server: this.server, maxPayload: 1048576 });
+    this.wss = new WebSocketServer({
+      server: this.server,
+      maxPayload: 1048576,
+      verifyClient: (info: { req: http.IncomingMessage }) => {
+        const url = new URL(info.req.url!, `http://${info.req.headers.host}`);
+        return url.searchParams.get('token') === this.sessionToken;
+      },
+    });
     this.wss.on('connection', (ws, req) => this.handleConnection(ws, req));
 
     return new Promise((resolve, reject) => {
@@ -253,6 +276,11 @@ export class RemoteBridge {
     }
   }
 
+  /** Redact secrets from text before replay */
+  private redactSecrets(text: string): string {
+    return text.replace(/(?:token|secret|key|password|credential|authorization)[\s:="']+[^\s"']{8,}/gi, '$& [REDACTED]');
+  }
+
   // ─── Passthrough (ACP dumb pipe) ────────────────────────────
 
   private passthroughWrite: ((msg: string) => void) | null = null;
@@ -290,10 +318,10 @@ export class RemoteBridge {
     };
     this.connections.set(connId, { ws, info });
 
-    // Replay recorded ACP events to late-joining client
+    // Replay recorded ACP events to late-joining client (with secrets redacted)
     if (this.passthroughWrite && this.acpEventLog.length > 0) {
       for (const event of this.acpEventLog) {
-        this.send(ws, { type: '_replay', data: event } as any);
+        this.send(ws, { type: '_replay', data: this.redactSecrets(event) } as any);
       }
       this.send(ws, { type: '_replay_done' } as any);
     } else {
@@ -331,6 +359,25 @@ export class RemoteBridge {
       if (this.passthroughWrite) {
         // Record user messages for replay too
         this.acpEventLog.push('__USER__' + raw);
+
+        // CRITICAL-4: Audit log remote PTY input
+        try {
+          const parsed = JSON.parse(raw);
+          if (parsed.type === 'pty_input') {
+            this.auditLog.write(`${new Date().toISOString()} [${info.remoteAddress}] ${JSON.stringify(parsed.data)}\n`);
+          }
+
+          // CRITICAL-5: ACP JSON-RPC method allowlist
+          const ALLOWED_ACP_METHODS = new Set([
+            'initialize', 'session/new', 'session/prompt', 'session/cancel', 'session/load',
+          ]);
+          if (parsed.method && !ALLOWED_ACP_METHODS.has(parsed.method)) {
+            // Not an allowed method and not a response — drop it
+            if (parsed.result === undefined && parsed.error === undefined) {
+              return;
+            }
+          }
+        } catch { /* not JSON, forward as-is */ }
 
         // Intercept session/new to inject correct cwd
         try {

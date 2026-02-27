@@ -84,14 +84,16 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
   if (options.tunnel && isDevtunnelAvailable()) {
     try {
       const tunnel = await createTunnel(actualPort, { repo, branch, machine });
-      tunnelUrl = tunnel.url;
-      console.log(`${GREEN}✓${RESET} Remote: ${BOLD}${tunnelUrl}${RESET}`);
+      const tunnelUrlWithToken = `${tunnel.url}?token=${bridge.getSessionToken()}`;
+      tunnelUrl = tunnelUrlWithToken;
+      console.log(`${GREEN}✓${RESET} Remote: ${BOLD}${tunnelUrlWithToken}${RESET}`);
       try {
         // @ts-ignore
         const qrcode = (await import('qrcode-terminal')) as any;
-        qrcode.default.generate(tunnelUrl, { small: true }, (code: string) => { console.log(code); });
+        qrcode.default.generate(tunnelUrlWithToken, { small: true }, (code: string) => { console.log(code); });
       } catch {}
       console.log(`${DIM}Scan QR or open URL on phone. Starting copilot...${RESET}\n`);
+      console.log(`  ${DIM}Audit log:${RESET} ${bridge.getAuditLogPath()}`);
     } catch (err) {
       console.log(`${YELLOW}⚠${RESET} Tunnel failed: ${(err as Error).message}`);
     }
@@ -118,12 +120,21 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
     console.log(`  ${DIM}Copilot flags:${RESET} ${copilotExtraArgs.join(' ')}\n`);
   }
 
+  // Security: filter sensitive environment variables
+  const safeEnv: Record<string, string> = {};
+  const sensitivePatterns = /token|secret|key|password|credential|api_key|private/i;
+  for (const [k, v] of Object.entries(process.env)) {
+    if (!sensitivePatterns.test(k) && v !== undefined) {
+      safeEnv[k] = v;
+    }
+  }
+
   const pty = nodePty.spawn(copilotCmd, copilotExtraArgs, {
     name: 'xterm-256color',
     cols,
     rows,
     cwd,
-    env: process.env as Record<string, string>,
+    env: safeEnv,
   });
 
   // Terminal output buffer for remote clients
