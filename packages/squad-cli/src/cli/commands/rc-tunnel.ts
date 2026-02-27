@@ -5,7 +5,7 @@
  * for discovery from the PWA dashboard.
  */
 
-import { execSync, spawn, type ChildProcess } from 'node:child_process';
+import { execSync, execFileSync, spawn, type ChildProcess } from 'node:child_process';
 import os from 'node:os';
 
 export interface TunnelInfo {
@@ -26,7 +26,7 @@ let currentTunnelId: string | null = null;
 /** Check if devtunnel CLI is available */
 export function isDevtunnelAvailable(): boolean {
   try {
-    execSync('devtunnel --version', { stdio: 'pipe' });
+    execFileSync('devtunnel', ['--version'], { stdio: 'pipe' });
     return true;
   } catch {
     return false;
@@ -40,13 +40,12 @@ export async function createTunnel(port: number, labels: TunnelLabels): Promise<
     const clean = l.replace(/[^a-zA-Z0-9_\-=]/g, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').substring(0, 50);
     return clean || 'unknown';
   };
-  const labelFlags = ['squad', sanitize(labels.repo), sanitize(labels.branch), sanitize(labels.machine), `port-${port}`]
-    .map((l) => `--labels ${l}`)
-    .join(' ');
+  const labelValues = ['squad', sanitize(labels.repo), sanitize(labels.branch), sanitize(labels.machine), `port-${port}`];
+  const labelArgs = labelValues.flatMap((l) => ['--labels', l]);
 
   // Create tunnel with labels
-  const createOutput = execSync(
-    `devtunnel create ${labelFlags} --expiration 1d --json`,
+  const createOutput = execFileSync(
+    'devtunnel', ['create', ...labelArgs, '--expiration', '1d', '--json'],
     { encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }
   );
   const createResult = JSON.parse(createOutput);
@@ -60,8 +59,8 @@ export async function createTunnel(port: number, labels: TunnelLabels): Promise<
   currentTunnelId = tunnelIdClean;
 
   // Add port
-  execSync(
-    `devtunnel port create ${tunnelIdClean} -p ${port} --protocol http`,
+  execFileSync(
+    'devtunnel', ['port', 'create', tunnelIdClean, '-p', String(port), '--protocol', 'http'],
     { stdio: 'pipe' }
   );
 
@@ -114,7 +113,7 @@ export function destroyTunnel(): void {
 
   if (currentTunnelId) {
     try {
-      execSync(`devtunnel delete ${currentTunnelId} -y`, { stdio: 'pipe' });
+      execFileSync('devtunnel', ['delete', currentTunnelId, '-y'], { stdio: 'pipe' });
     } catch {
       // Best effort cleanup
     }

@@ -62,6 +62,17 @@ export class RemoteBridge {
     this.state = 'starting';
 
     this.server = http.createServer((req, res) => {
+      // F-01: Session token check for all API routes
+      if (req.url?.startsWith('/api/')) {
+        const reqUrl = new URL(req.url, `http://${req.headers.host}`);
+        const authToken = req.headers.authorization?.replace('Bearer ', '') || reqUrl.searchParams.get('token');
+        if (authToken !== this.sessionToken) {
+          res.writeHead(401, { 'Content-Type': 'application/json' });
+          res.end(JSON.stringify({ error: 'Unauthorized' }));
+          return;
+        }
+      }
+
       // Sessions API — runs devtunnel list
       if (req.url === '/api/sessions' && req.method === 'GET') {
         this.handleSessionsAPI(res);
@@ -88,13 +99,19 @@ export class RemoteBridge {
       maxPayload: 1048576,
       verifyClient: (info: { req: http.IncomingMessage }) => {
         const url = new URL(info.req.url!, `http://${info.req.headers.host}`);
-        return url.searchParams.get('token') === this.sessionToken;
+        if (url.searchParams.get('token') !== this.sessionToken) return false;
+        // Validate origin if present
+        const origin = info.req.headers.origin;
+        if (origin && !origin.includes('devtunnels.ms') && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
+          return false;
+        }
+        return true;
       },
     });
     this.wss.on('connection', (ws, req) => this.handleConnection(ws, req));
 
     return new Promise((resolve, reject) => {
-      this.server!.listen(this.config.port, () => {
+      this.server!.listen(this.config.port, '127.0.0.1', () => {
         this.state = 'running';
         resolve(this.getPort());
       });
@@ -221,7 +238,7 @@ export class RemoteBridge {
 
   private handleSessionsAPI(res: http.ServerResponse): void {
     try {
-      const output = execSync('devtunnel list --labels squad --json', {
+      const output = execFileSync('devtunnel', ['list', '--labels', 'squad', '--json'], {
         encoding: 'utf-8',
         timeout: 10000,
         stdio: ['pipe', 'pipe', 'pipe'],
@@ -278,7 +295,10 @@ export class RemoteBridge {
 
   /** Redact secrets from text before replay */
   private redactSecrets(text: string): string {
-    return text.replace(/(?:token|secret|key|password|credential|authorization)[\s:="']+[^\s"']{8,}/gi, '$& [REDACTED]');
+    return text.replace(
+      /(?:token|secret|key|password|credential|authorization|api_key|private_key|access_key)[\s:="']+\S{8,}/gi,
+      '[REDACTED]'
+    );
   }
 
   // ─── Passthrough (ACP dumb pipe) ────────────────────────────
@@ -310,6 +330,11 @@ export class RemoteBridge {
   // ─── Internal ──────────────────────────────────────────────
 
   private handleConnection(ws: WebSocket, req: http.IncomingMessage): void {
+    // F-10: Connection cap
+    if (this.connections.size >= 5) {
+      ws.close(1013, 'Max connections reached');
+      return;
+    }
     const connId = randomUUID();
     const info: RemoteConnection = {
       id: connId,
@@ -377,7 +402,10 @@ export class RemoteBridge {
               return;
             }
           }
-        } catch { /* not JSON, forward as-is */ }
+        } catch {
+          // Log non-JSON input
+          this.auditLog.write(`${new Date().toISOString()} [${info.remoteAddress}] [RAW] ${JSON.stringify(raw)}\n`);
+        }
 
         // Intercept session/new to inject correct cwd
         try {

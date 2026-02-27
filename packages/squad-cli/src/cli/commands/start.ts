@@ -122,7 +122,7 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
 
   // Security: filter sensitive environment variables
   const safeEnv: Record<string, string> = {};
-  const sensitivePatterns = /token|secret|key|password|credential|api_key|private/i;
+  const sensitivePatterns = /token|secret|key|password|credential|api_key|private|auth|bearer|database_url|connection_string|db_pass|cert|signing/i;
   for (const [k, v] of Object.entries(process.env)) {
     if (!sensitivePatterns.test(k) && v !== undefined) {
       safeEnv[k] = v;
@@ -190,8 +190,15 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
         pty.resize(cols, rows);
       }
     } catch {
-      // Raw text — treat as typed input + enter
-      pty.write(msg + '\r');
+      // Log non-JSON input
+      const auditPath = bridge?.getAuditLogPath();
+      if (auditPath) {
+        fs.appendFileSync(auditPath, `${new Date().toISOString()} [remote] [RAW] ${JSON.stringify(msg)}\n`);
+      }
+      // Only write if it looks like text input (not binary/control sequences longer than 100 chars)
+      if (msg.length <= 100) {
+        pty.write(msg + '\r');
+      }
     }
   });
 

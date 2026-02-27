@@ -99,7 +99,7 @@
       const data = await resp.json();
       renderDashboard(data.sessions || []);
     } catch (err) {
-      dashboard.innerHTML = '<div style="padding:12px;color:var(--red)">Failed to load sessions: ' + err.message + '</div>';
+      dashboard.innerHTML = '<div style="padding:12px;color:var(--red)">' + escapeHtml('Failed to load sessions: ' + err.message) + '</div>';
     }
   }
 
@@ -482,10 +482,12 @@
       <h3>${icon} ${escapeHtml(title)}</h3>
       <p>${escapeHtml(shortCmd || JSON.stringify(p).substring(0, 200))}</p>
       <div class="perm-actions">
-        <button class="btn-deny" onclick="handlePerm(${msg.id}, false)">Deny</button>
-        <button class="btn-approve" onclick="handlePerm(${msg.id}, true)">Approve</button>
+        <button class="btn-deny">Deny</button>
+        <button class="btn-approve">Approve</button>
       </div>
     </div>`;
+    permOverlay.querySelector('.btn-deny').addEventListener('click', () => window.handlePerm(msg.id, false));
+    permOverlay.querySelector('.btn-approve').addEventListener('click', () => window.handlePerm(msg.id, true));
   }
   window.handlePerm = (id, approved) => {
     if (ws?.readyState === WebSocket.OPEN) {
