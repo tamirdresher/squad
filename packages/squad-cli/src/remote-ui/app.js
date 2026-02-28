@@ -529,6 +529,28 @@
     if (xterm) xterm.focus();
   };
 
+  // Event delegation for key-bar buttons (no inline onclick)
+  var keyBar = document.getElementById('key-bar');
+  if (keyBar) {
+    var keyMap = {
+      '\\x1b[A': '\x1b[A', '\\x1b[B': '\x1b[B', '\\x1b[C': '\x1b[C', '\\x1b[D': '\x1b[D',
+      '\\t': '\t', '\\r': '\r', '\\x1b': '\x1b', '\\x03': '\x03', ' ': ' ', '\\x7f': '\x7f',
+    };
+    keyBar.addEventListener('click', function(e) {
+      var btn = e.target;
+      if (btn && btn.tagName === 'BUTTON' && btn.dataset.key) {
+        var key = keyMap[btn.dataset.key] || btn.dataset.key;
+        window.sendKey(key);
+      }
+    });
+  }
+
+  // Event listener for btn-sessions (no inline onclick)
+  var btnSessions = document.getElementById('btn-sessions');
+  if (btnSessions) {
+    btnSessions.addEventListener('click', function() { window.toggleView(); });
+  }
+
   // ─── Send Prompt ─────────────────────────────────────────
   let ptyMode = false;
 
@@ -566,7 +588,7 @@
     requestAnimationFrame(() => { terminal.scrollTop = terminal.scrollHeight; });
   }
   function escapeHtml(s) {
-    const d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML.replace(/'/g, '&#39;');
+    var d = document.createElement('div'); d.textContent = s || ''; return d.innerHTML.replace(/'/g, '&#39;').replace(/"/g, '&quot;');
   }
   function formatText(text) {
     return escapeHtml(text)

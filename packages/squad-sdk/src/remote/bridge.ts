@@ -34,9 +34,11 @@ export class RemoteBridge {
   private staticHandler?: (req: http.IncomingMessage, res: http.ServerResponse) => void;
   private acpEventLog: string[] = []; // Records all ACP events for replay
   private wsRateLimit = new Map<WebSocket, { count: number; resetTime: number }>();
+  private ipConnections = new Map<string, number>();
+  private httpRateLimits = new Map<string, { count: number; resetAt: number }>();
   private sessionToken: string = randomUUID();
   private tickets = new Map<string, { expires: number }>(); // F-02: one-time WS tickets
-  private readonly SESSION_TTL = 24 * 60 * 60 * 1000; // F-18: 24-hour session TTL
+  private readonly SESSION_TTL = 4 * 60 * 60 * 1000; // F-18: 4-hour session TTL
   private readonly sessionCreatedAt = Date.now();
   private auditLogDir: string = path.join(os.homedir(), '.cli-tunnel', 'audit');
   private auditLogPath: string = path.join(this.auditLogDir, `squad-audit-${Date.now()}.jsonl`);
@@ -89,6 +91,20 @@ export class RemoteBridge {
     this.state = 'starting';
 
     this.server = http.createServer((req, res) => {
+      // Rate limiting: 30 requests/minute per IP
+      const clientIp = req.socket.remoteAddress || 'unknown';
+      const now = Date.now();
+      let rl = this.httpRateLimits.get(clientIp);
+      if (!rl || now > rl.resetAt) {
+        rl = { count: 0, resetAt: now + 60000 };
+        this.httpRateLimits.set(clientIp, rl);
+      }
+      if (++rl.count > 30) {
+        res.writeHead(429, { 'Content-Type': 'text/plain' });
+        res.end('Too Many Requests');
+        return;
+      }
+
       // F-18: Session expiry check for API routes
       if (req.url?.startsWith('/api/') && Date.now() - this.sessionCreatedAt > this.SESSION_TTL) {
         res.writeHead(401, { 'Content-Type': 'application/json' });
@@ -134,7 +150,7 @@ export class RemoteBridge {
       if (this.staticHandler) {
         this.staticHandler(req, res);
       } else {
-        res.writeHead(200, { 'Content-Type': 'text/plain', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store' });
+        res.writeHead(200, { 'Content-Type': 'text/plain', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains', 'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store' });
         res.end('Squad Remote Control Bridge');
       }
     });
@@ -146,17 +162,7 @@ export class RemoteBridge {
         // F-18: Session expiry
         if (Date.now() - this.sessionCreatedAt > this.SESSION_TTL) return false;
         const url = new URL(info.req.url!, `http://${info.req.headers.host}`);
-        // F-02: Accept one-time ticket
-        const ticket = url.searchParams.get('ticket');
-        if (ticket && this.tickets.has(ticket)) {
-          const t = this.tickets.get(ticket)!;
-          this.tickets.delete(ticket); // Single use
-          return t.expires > Date.now();
-        }
-        // Backward compat: accept token
-        if (url.searchParams.get('token') !== this.sessionToken) return false;
-        // Validate origin if present
-        // #28: Proper origin validation using URL parsing
+        // #28: Origin validation — reject cross-origin before auth
         const origin = info.req.headers.origin;
         if (origin) {
           try {
@@ -167,6 +173,15 @@ export class RemoteBridge {
             }
           } catch { return false; }
         }
+        // F-02: Accept one-time ticket
+        const ticket = url.searchParams.get('ticket');
+        if (ticket && this.tickets.has(ticket)) {
+          const t = this.tickets.get(ticket)!;
+          this.tickets.delete(ticket); // Single use
+          return t.expires > Date.now();
+        }
+        // Backward compat: accept token
+        if (url.searchParams.get('token') !== this.sessionToken) return false;
         return true;
       },
     });
@@ -329,13 +344,14 @@ export class RemoteBridge {
         'Content-Type': 'application/json',
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
+        'Strict-Transport-Security': 'max-age=31536000; includeSubDomains',
         'Referrer-Policy': 'no-referrer',
         'Cache-Control': 'no-store',
         'Content-Security-Policy': "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; connect-src 'self' ws://localhost:* wss://*.devtunnels.ms; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net",
       });
       res.end(JSON.stringify({ sessions }));
     } catch (err) {
-      res.writeHead(200, { 'Content-Type': 'application/json', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store' });
+      res.writeHead(200, { 'Content-Type': 'application/json', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Strict-Transport-Security': 'max-age=31536000; includeSubDomains', 'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify({ sessions: [], error: (err as Error).message }));
     }
   }
@@ -366,7 +382,15 @@ export class RemoteBridge {
       .replace(/AKIA[0-9A-Z]{16}/g, '[REDACTED-AWS]')
       .replace(/DefaultEndpointsProtocol=https?;AccountName=[^;]+;AccountKey=[^;]+;EndpointSuffix=[^\s"']*/gi, '[REDACTED-AZURE-CONN]')
       .replace(/(?:mongodb|postgres|mysql|redis):\/\/[^\s"']+/gi, '[REDACTED-DB-URL]')
-      .replace(/Bearer\s+[A-Za-z0-9\-._~+\/]+=*/g, '[REDACTED-BEARER]');
+      .replace(/Bearer\s+[A-Za-z0-9\-._~+\/]+=*/g, '[REDACTED-BEARER]')
+      // JWT tokens
+      .replace(/eyJ[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}\.[a-zA-Z0-9_-]{10,}/g, '[REDACTED-JWT]')
+      // Slack tokens
+      .replace(/xox[bpras]-[a-zA-Z0-9-]{10,}/g, '[REDACTED-SLACK]')
+      // npm tokens
+      .replace(/npm_[a-zA-Z0-9]{20,}/g, '[REDACTED-NPM]')
+      // PEM private keys
+      .replace(/-----BEGIN [A-Z ]+ PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+ PRIVATE KEY-----/g, '[REDACTED-PEM]');
   }
 
   // ─── Passthrough (ACP dumb pipe) ────────────────────────────
@@ -405,6 +429,15 @@ export class RemoteBridge {
       ws.close(1013, 'Max connections reached');
       return;
     }
+    // Per-IP connection limit (max 2)
+    const clientIp = req.socket.remoteAddress || 'unknown';
+    const ipCount = this.ipConnections.get(clientIp) || 0;
+    if (ipCount >= 2) {
+      ws.close(1013, 'Per-IP connection limit reached');
+      return;
+    }
+    this.ipConnections.set(clientIp, ipCount + 1);
+
     const connId = randomUUID();
     const info: RemoteConnection = {
       id: connId,
@@ -412,6 +445,19 @@ export class RemoteBridge {
       remoteAddress: req.socket.remoteAddress || 'unknown',
     };
     this.connections.set(connId, { ws, info });
+
+    // Ping/pong heartbeat (30s interval)
+    let isAlive = true;
+    ws.on('pong', () => { isAlive = true; });
+    const pingInterval = setInterval(() => {
+      if (!isAlive) {
+        clearInterval(pingInterval);
+        ws.terminate();
+        return;
+      }
+      isAlive = false;
+      ws.ping();
+    }, 30000);
 
     // Replay recorded ACP events to late-joining client (with secrets redacted)
     if (this.config.enableReplay && this.passthroughWrite && this.acpEventLog.length > 0) {
@@ -505,11 +551,19 @@ export class RemoteBridge {
     ws.on('close', () => {
       this.connections.delete(connId);
       this.wsRateLimit.delete(ws);
+      clearInterval(pingInterval);
+      const count = this.ipConnections.get(clientIp) || 1;
+      if (count <= 1) this.ipConnections.delete(clientIp);
+      else this.ipConnections.set(clientIp, count - 1);
     });
 
     ws.on('error', () => {
       this.connections.delete(connId);
       this.wsRateLimit.delete(ws);
+      clearInterval(pingInterval);
+      const count = this.ipConnections.get(clientIp) || 1;
+      if (count <= 1) this.ipConnections.delete(clientIp);
+      else this.ipConnections.set(clientIp, count - 1);
     });
   }
 

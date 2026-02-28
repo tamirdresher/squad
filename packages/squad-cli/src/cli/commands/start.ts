@@ -131,28 +131,18 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
     console.log(`  ${DIM}Copilot flags:${RESET} ${copilotExtraArgs.join(' ')}\n`);
   }
 
-  // F-07: Security — allowlist safe environment variables for PTY
-  const SAFE_ENV_VARS = new Set([
-    'PATH', 'HOME', 'USERPROFILE', 'SHELL', 'TERM', 'LANG', 'LC_ALL', 'LC_CTYPE',
-    'USER', 'LOGNAME', 'EDITOR', 'VISUAL', 'COLORTERM', 'TERM_PROGRAM',
-    'HOSTNAME', 'COMPUTERNAME', 'PWD', 'OLDPWD', 'SHLVL', 'TMPDIR', 'TMP', 'TEMP',
-    'XDG_RUNTIME_DIR', 'XDG_DATA_HOME', 'XDG_CONFIG_HOME', 'XDG_CACHE_HOME',
-    'DISPLAY', 'WAYLAND_DISPLAY', 'DBUS_SESSION_BUS_ADDRESS',
-    'PROGRAMFILES', 'PROGRAMFILES(X86)', 'SYSTEMROOT', 'WINDIR', 'COMSPEC',
-    'APPDATA', 'LOCALAPPDATA', 'PROGRAMDATA',
-    'NODE_PATH', 'NODE_ENV', 'NODE_OPTIONS',
-    'GOPATH', 'GOROOT', 'CARGO_HOME', 'RUSTUP_HOME',
-    'JAVA_HOME', 'MAVEN_HOME', 'GRADLE_HOME',
-    'PYTHONPATH', 'VIRTUAL_ENV', 'CONDA_DEFAULT_ENV',
-    'KUBECONFIG', 'DOCKER_HOST', 'DOCKER_CONFIG',
-    'GIT_AUTHOR_NAME', 'GIT_AUTHOR_EMAIL', 'GIT_COMMITTER_NAME', 'GIT_COMMITTER_EMAIL',
-    'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy',
+  // F-07: Security — blocklist dangerous environment variables for PTY
+  const DANGEROUS_VARS = new Set(['NODE_OPTIONS', 'NODE_REPL_HISTORY', 'NODE_EXTRA_CA_CERTS',
+    'NODE_PATH', 'NODE_REDIRECT_WARNINGS', 'NODE_PENDING_DEPRECATION',
+    'UV_THREADPOOL_SIZE', 'LD_PRELOAD', 'DYLD_INSERT_LIBRARIES',
     'SSH_AUTH_SOCK', 'GPG_TTY',
-  ]);
+    'PYTHONPATH', 'BASH_ENV', 'BASH_FUNC', 'JAVA_TOOL_OPTIONS', 'JAVA_OPTIONS', '_JAVA_OPTIONS',
+    'PROMPT_COMMAND', 'ENV', 'ZDOTDIR', 'PERL5OPT', 'RUBYOPT']);
+  const sensitivePattern = /token|secret|key|password|credential|authorization|api_key|private_key|access_key|connection_string|db_pass|signing|kubeconfig|docker_host|docker_config/i;
 
   const safeEnv: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) {
-    if (SAFE_ENV_VARS.has(k) && v !== undefined) {
+    if (v !== undefined && !DANGEROUS_VARS.has(k) && !sensitivePattern.test(k)) {
       safeEnv[k] = v;
     }
   }
