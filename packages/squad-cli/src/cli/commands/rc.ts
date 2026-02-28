@@ -113,7 +113,16 @@ export async function runRC(cwd: string, options: RCOptions): Promise<void> {
       '../../remote-ui'
     );
 
-    let filePath = path.join(uiDir, req.url === '/' ? 'index.html' : req.url || 'index.html');
+    // #18: Guard against malformed URI encoding
+    let decodedUrl: string;
+    try {
+      decodedUrl = decodeURIComponent(req.url || '/');
+    } catch {
+      res.writeHead(400); res.end(); return;
+    }
+    if (decodedUrl.includes('..')) { res.writeHead(400); res.end(); return; }
+
+    let filePath = path.join(uiDir, decodedUrl === '/' ? 'index.html' : decodedUrl.replace(/^\//, ''));
 
     // Security: prevent directory traversal
     if (!filePath.startsWith(uiDir)) {
@@ -122,10 +131,14 @@ export async function runRC(cwd: string, options: RCOptions): Promise<void> {
       return;
     }
 
-    if (!fs.existsSync(filePath)) {
-      // SPA fallback
-      filePath = path.join(uiDir, 'index.html');
-    }
+    // #2: EISDIR guard — check if path is a directory before createReadStream
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat.isDirectory()) {
+        filePath = path.join(filePath, 'index.html');
+        if (!fs.existsSync(filePath)) { res.writeHead(404); res.end(); return; }
+      }
+    } catch { res.writeHead(404); res.end(); return; }
 
     const ext = path.extname(filePath);
     const mimeTypes: Record<string, string> = {
@@ -138,8 +151,17 @@ export async function runRC(cwd: string, options: RCOptions): Promise<void> {
       '.ico': 'image/x-icon',
     };
 
-    res.writeHead(200, { 'Content-Type': mimeTypes[ext] || 'application/octet-stream' });
-    fs.createReadStream(filePath).pipe(res);
+    res.writeHead(200, {
+      'Content-Type': mimeTypes[ext] || 'application/octet-stream',
+      'X-Frame-Options': 'DENY',
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'no-referrer',
+      'Cache-Control': 'no-store',
+    });
+    // #8: Handle createReadStream errors
+    const stream = fs.createReadStream(filePath);
+    stream.on('error', () => { if (!res.headersSent) { res.writeHead(500); } res.end(); });
+    stream.pipe(res);
   });
 
   const actualPort = await bridge.start();

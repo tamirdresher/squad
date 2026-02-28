@@ -40,9 +40,27 @@ export class RemoteBridge {
   private readonly sessionCreatedAt = Date.now();
   private auditLogDir: string = path.join(os.homedir(), '.cli-tunnel', 'audit');
   private auditLogPath: string = path.join(this.auditLogDir, `squad-audit-${Date.now()}.jsonl`);
-  private auditLog = (() => { fs.mkdirSync(this.auditLogDir, { recursive: true }); return fs.createWriteStream(this.auditLogPath, { flags: 'a' }); })();
+  private auditLog = (() => { fs.mkdirSync(this.auditLogDir, { recursive: true, mode: 0o700 }); return fs.createWriteStream(this.auditLogPath, { flags: 'a' }); })();
 
-  constructor(private config: RemoteBridgeConfig) {}
+  constructor(private config: RemoteBridgeConfig) {
+    this.auditLog.on('error', (err) => { console.error('Audit log error:', err.message); });
+    // #30: Ticket GC — clean expired tickets every 30s
+    setInterval(() => {
+      const now = Date.now();
+      for (const [id, t] of this.tickets) {
+        if (t.expires < now) this.tickets.delete(id);
+      }
+    }, 30000);
+    // #10: Session TTL enforcement — periodically close expired connections
+    setInterval(() => {
+      if (Date.now() - this.sessionCreatedAt > this.SESSION_TTL) {
+        for (const [id, { ws }] of this.connections) {
+          ws.close(1000, 'Session expired');
+          this.connections.delete(id);
+        }
+      }
+    }, 60000);
+  }
 
   /** Set a handler to serve static PWA files */
   setStaticHandler(handler: (req: http.IncomingMessage, res: http.ServerResponse) => void): void {
@@ -116,7 +134,7 @@ export class RemoteBridge {
       if (this.staticHandler) {
         this.staticHandler(req, res);
       } else {
-        res.writeHead(200, { 'Content-Type': 'text/plain', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY' });
+        res.writeHead(200, { 'Content-Type': 'text/plain', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store' });
         res.end('Squad Remote Control Bridge');
       }
     });
@@ -138,9 +156,16 @@ export class RemoteBridge {
         // Backward compat: accept token
         if (url.searchParams.get('token') !== this.sessionToken) return false;
         // Validate origin if present
+        // #28: Proper origin validation using URL parsing
         const origin = info.req.headers.origin;
-        if (origin && !origin.includes('devtunnels.ms') && !origin.includes('localhost') && !origin.includes('127.0.0.1')) {
-          return false;
+        if (origin) {
+          try {
+            const originUrl = new URL(origin);
+            const host = originUrl.hostname;
+            if (host !== 'localhost' && host !== '127.0.0.1' && !host.endsWith('.devtunnels.ms')) {
+              return false;
+            }
+          } catch { return false; }
         }
         return true;
       },
@@ -304,11 +329,13 @@ export class RemoteBridge {
         'Content-Type': 'application/json',
         'X-Content-Type-Options': 'nosniff',
         'X-Frame-Options': 'DENY',
+        'Referrer-Policy': 'no-referrer',
+        'Cache-Control': 'no-store',
         'Content-Security-Policy': "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; connect-src 'self' ws://localhost:* wss://*.devtunnels.ms; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net",
       });
       res.end(JSON.stringify({ sessions }));
     } catch (err) {
-      res.writeHead(200, { 'Content-Type': 'application/json', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY' });
+      res.writeHead(200, { 'Content-Type': 'application/json', 'X-Content-Type-Options': 'nosniff', 'X-Frame-Options': 'DENY', 'Referrer-Policy': 'no-referrer', 'Cache-Control': 'no-store' });
       res.end(JSON.stringify({ sessions: [], error: (err as Error).message }));
     }
   }
@@ -434,7 +461,7 @@ export class RemoteBridge {
         try {
           const parsed = JSON.parse(raw);
           if (parsed.type === 'pty_input') {
-            this.auditLog.write(JSON.stringify({ ts: new Date().toISOString(), addr: info.remoteAddress, type: 'pty_input', data: parsed.data }) + '\n');
+            this.auditLog.write(JSON.stringify({ ts: new Date().toISOString(), addr: info.remoteAddress, type: 'pty_input', data: this.redactSecrets(JSON.stringify(parsed.data)) }) + '\n');
           }
 
           // CRITICAL-5: ACP JSON-RPC method allowlist

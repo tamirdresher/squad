@@ -122,7 +122,7 @@
         '</div>';
     } else {
       html += filtered.map(s => `
-        <div class="session-card" ${s.online ? 'onclick="openSession(\'' + escapeHtml(s.url) + '\')"' : ''}>
+        <div class="session-card" ${s.online ? 'data-session-url="' + escapeHtml(s.url) + '"' : ''}>
           <span class="status-dot ${s.online ? 'online' : 'offline'}"></span>
           <div class="info">
             <div class="repo">📦 ${escapeHtml(s.repo)}</div>
@@ -130,11 +130,18 @@
             <div class="machine">💻 ${escapeHtml(s.machine)}</div>
           </div>
           ${s.online ? '<span class="arrow">→</span>' :
-            '<button onclick="event.stopPropagation();deleteSession(\'' + escapeHtml(s.id) + '\')" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px" title="Remove">✕</button>'}
+            '<button data-delete-id="' + escapeHtml(s.id) + '" style="background:none;border:none;color:var(--red);cursor:pointer;font-size:14px" title="Remove">✕</button>'}
         </div>
       `).join('');
     }
     dashboard.innerHTML = html;
+    // #16: XSS fix — use event delegation instead of inline onclick
+    dashboard.querySelectorAll('.session-card[data-session-url]').forEach(function(card) {
+      card.addEventListener('click', function() { openSession(card.dataset.sessionUrl); });
+    });
+    dashboard.querySelectorAll('[data-delete-id]').forEach(function(btn) {
+      btn.addEventListener('click', function(e) { e.stopPropagation(); deleteSession(btn.dataset.deleteId); });
+    });
   }
 
   window.openSession = (url) => {
