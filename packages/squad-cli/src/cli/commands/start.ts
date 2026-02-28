@@ -59,10 +59,18 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
   // PWA static files
   bridge.setStaticHandler((req, res) => {
     const uiDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../remote-ui');
-    const rawUrl = decodeURIComponent(req.url || '/');
-    if (rawUrl.includes('..')) { res.writeHead(400); res.end(); return; }
-    const filePath = path.resolve(uiDir, rawUrl === '/' ? 'index.html' : rawUrl.replace(/^\//, ''));
+    let decodedUrl: string;
+    try { decodedUrl = decodeURIComponent(req.url || '/'); } catch { res.writeHead(400); res.end(); return; }
+    if (decodedUrl.includes('..')) { res.writeHead(400); res.end(); return; }
+    let filePath = path.resolve(uiDir, decodedUrl === '/' ? 'index.html' : decodedUrl.replace(/^\//, ''));
     if (!filePath.startsWith(uiDir)) { res.writeHead(403); res.end(); return; }
+    try {
+      const stat = fs.statSync(filePath);
+      if (stat.isDirectory()) {
+        filePath = path.join(filePath, 'index.html');
+        if (!fs.existsSync(filePath)) { res.writeHead(404); res.end(); return; }
+      }
+    } catch { res.writeHead(404); res.end(); return; }
     const servePath = fs.existsSync(filePath) ? filePath : path.join(uiDir, 'index.html');
     const ext = path.extname(servePath);
     const mimes: Record<string, string> = { '.html': 'text/html', '.js': 'application/javascript', '.css': 'text/css', '.json': 'application/json' };
@@ -75,7 +83,9 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
       headers['Content-Security-Policy'] = "default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://cdn.jsdelivr.net 'unsafe-inline'; connect-src 'self' ws: wss:; img-src 'self' data:; font-src 'self' https://cdn.jsdelivr.net";
     }
     res.writeHead(200, headers);
-    fs.createReadStream(servePath).pipe(res);
+    const stream = fs.createReadStream(servePath);
+    stream.on('error', () => { if (!res.headersSent) { res.writeHead(500); } res.end(); });
+    stream.pipe(res);
   });
 
   const actualPort = await bridge.start();
@@ -203,19 +213,17 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
         pty.write(parsed.data);
       }
       if (parsed.type === 'pty_resize') {
-        const cols = Math.max(1, Math.min(500, parseInt(parsed.cols, 10) || 80));
-        const rows = Math.max(1, Math.min(200, parseInt(parsed.rows, 10) || 24));
-        pty.resize(cols, rows);
+        const cols = Number(parsed.cols);
+        const rows = Number(parsed.rows);
+        if (Number.isFinite(cols) && Number.isFinite(rows)) {
+          pty.resize(Math.max(1, Math.min(500, cols)), Math.max(1, Math.min(200, rows)));
+        }
       }
     } catch {
-      // Log non-JSON input
+      // Only log, do NOT write raw input to PTY
       const auditPath = bridge?.getAuditLogPath();
       if (auditPath) {
         fs.appendFileSync(auditPath, `${new Date().toISOString()} [remote] [RAW] ${JSON.stringify(msg)}\n`);
-      }
-      // Only write if it looks like text input (not binary/control sequences longer than 100 chars)
-      if (msg.length <= 100) {
-        pty.write(msg + '\r');
       }
     }
   });

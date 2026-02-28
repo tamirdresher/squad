@@ -489,7 +489,10 @@ export class RemoteBridge {
             this.passthroughWrite(JSON.stringify(msg));
             return;
           }
-        } catch { /* not JSON, forward as-is */ }
+        } catch {
+          // Only log, do NOT write raw input to PTY
+          return;
+        }
         this.passthroughWrite(raw);
         return;
       }
