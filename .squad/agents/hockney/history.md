@@ -806,3 +806,14 @@ All labeled squad:hockney for routing. Each issue includes: what's missing, why 
 - All 30 tests pass (25 existing + 5 new). Test patterns match existing style: structural source verification, logic simulation, and process.emitWarning interception.
 📌 Team update (2026-03-01T05:57:23): Nap feature complete — dual sync/async export pattern, 38 comprehensive tests, all 3229 tests pass. Issue #635 closed, PR #636 merged. — decided by Fenster, Hockney
 
+### Concurrent connect() dedup tests (2026-03-02)
+**Status:** Complete — 4 tests (1 updated, 3 new) in `test/adapter-client.test.ts`, all 32 tests passing.
+- **Context:** Fenster fixed a race condition in `packages/squad-sdk/src/adapter/client.ts` where `connect()` threw "Connection already in progress" on concurrent calls. New behavior stores in-flight `connectPromise` and returns it to concurrent callers (promise dedup pattern).
+- **Tests added:**
+  1. `should deduplicate concurrent connect calls` — two concurrent `connect()` calls both resolve; `start()` called only once.
+  2. `should handle concurrent createSession calls that trigger auto-connect` — two concurrent `createSession()` with `autoStart: true` both succeed; connection established once.
+  3. `should propagate connect failure to concurrent callers` — when `start()` rejects, both concurrent callers receive the rejection.
+  4. `should start fresh connect after failed concurrent connect` — after failure, `connectPromise` is cleared; new `connect()` starts fresh and succeeds.
+- **Pattern:** `Promise.all` / `Promise.allSettled` for concurrent call testing. Slow `start()` via `mockImplementation(() => new Promise(...))` to force overlap window.
+- **Key file:** `packages/squad-sdk/src/adapter/client.ts` — `connectPromise` field + IIFE async pattern with `finally` cleanup.
+

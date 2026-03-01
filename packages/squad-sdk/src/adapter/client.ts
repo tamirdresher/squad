@@ -256,6 +256,7 @@ export interface SquadClientOptions {
 export class SquadClient {
   private client: CopilotClient;
   private state: SquadConnectionState = "disconnected";
+  private connectPromise: Promise<void> | null = null;
   private reconnectAttempts: number = 0;
   private reconnectTimer: NodeJS.Timeout | null = null;
   private options: Required<Omit<SquadClientOptions, "cliUrl" | "githubToken" | "useLoggedInUser" | "cliPath" | "cliArgs">> & {
@@ -333,20 +334,22 @@ export class SquadClient {
    * @throws Error if connection fails or protocol version is incompatible
    */
   async connect(): Promise<void> {
+    if (this.state === "connected") {
+      return;
+    }
+
+    // Dedup: if a connection is already in progress, piggyback on it
+    if (this.state === "connecting" && this.connectPromise) {
+      return this.connectPromise;
+    }
+
     const span = tracer.startSpan('squad.client.connect');
     span.setAttribute('connection.transport', this.options.useStdio ? 'stdio' : 'tcp');
-    try {
-      if (this.state === "connected") {
-        return;
-      }
 
-      if (this.state === "connecting") {
-        throw new Error("Connection already in progress");
-      }
+    this.state = "connecting";
+    this.manualDisconnect = false;
 
-      this.state = "connecting";
-      this.manualDisconnect = false;
-
+    this.connectPromise = (async () => {
       const startTime = Date.now();
 
       try {
@@ -363,17 +366,19 @@ export class SquadClient {
         }
       } catch (error) {
         this.state = "error";
-        throw new Error(
+        const wrapped = new Error(
           `Failed to connect to Copilot CLI: ${error instanceof Error ? error.message : String(error)}`
         );
+        span.setStatus({ code: SpanStatusCode.ERROR, message: wrapped.message });
+        span.recordException(wrapped);
+        throw wrapped;
+      } finally {
+        this.connectPromise = null;
+        span.end();
       }
-    } catch (err) {
-      span.setStatus({ code: SpanStatusCode.ERROR, message: err instanceof Error ? err.message : String(err) });
-      span.recordException(err instanceof Error ? err : new Error(String(err)));
-      throw err;
-    } finally {
-      span.end();
-    }
+    })();
+
+    return this.connectPromise;
   }
 
   /**
@@ -399,6 +404,7 @@ export class SquadClient {
       const errors = await this.client.stop();
       this.state = "disconnected";
       this.reconnectAttempts = 0;
+      this.connectPromise = null;
 
       return errors;
     } catch (err) {
@@ -425,6 +431,7 @@ export class SquadClient {
     await this.client.forceStop();
     this.state = "disconnected";
     this.reconnectAttempts = 0;
+    this.connectPromise = null;
   }
 
   /**

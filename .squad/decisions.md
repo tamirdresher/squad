@@ -434,3 +434,10 @@ Scribe and Ralph are always injected if missing from the proposal. Casting state
 **Why:** After `squad init`, team.md exists but is empty. Coordinator received a "route to agents" prompt with no agents listed, causing silent generic AI behavior. Users never got told to cast their team.
 **Convention:** Post-init message references "Copilot session" (works in VS Code, github.com, and Copilot CLI). The `/init` slash command provides same guidance inside REPL.
 **Impact:** All agents — if you modify the `## Members` table format in team.md templates, update `hasRosterEntries()` to match.
+
+### 2026-03-02: Connection promise dedup in SquadClient
+**By:** Fenster (Core Dev)
+**Date:** 2026-03-02
+**What:** `SquadClient.connect()` now uses a promise dedup pattern — concurrent callers share the same in-flight `connectPromise` instead of throwing "Connection already in progress".
+**Why:** Eager warm-up and auto-cast both call `createSession()` → `connect()` at REPL startup, racing on the connection. The throw crashed auto-cast every time.
+**Impact:** `packages/squad-sdk/src/adapter/client.ts` only. No API surface change.

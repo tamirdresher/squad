@@ -89,20 +89,85 @@ describe('SquadClient — Connection Lifecycle', () => {
     expect(client.getState()).toBe('connected');
   });
 
-  it('should throw when connecting while connection in progress', async () => {
+  it('should deduplicate concurrent connect calls', async () => {
     const client = new SquadClient();
     
-    // Make start() slow
+    // Make start() slow so both calls overlap
     const MockedCopilotClient = CopilotClient as unknown as ReturnType<typeof vi.fn>;
     const instance = MockedCopilotClient.mock.results[0].value;
     instance.start.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 100)));
 
-    const connectPromise = client.connect();
-    
-    // Try to connect again while first is in progress
-    await expect(client.connect()).rejects.toThrow('Connection already in progress');
-    
-    await connectPromise;
+    // Fire two concurrent connect calls — second should wait, not throw
+    const [result1, result2] = await Promise.all([
+      client.connect(),
+      client.connect(),
+    ]);
+
+    expect(result1).toBeUndefined();
+    expect(result2).toBeUndefined();
+    expect(client.getState()).toBe('connected');
+    // start() should only be called once — the second call piggybacked
+    expect(instance.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('should handle concurrent createSession calls that trigger auto-connect', async () => {
+    const client = new SquadClient({ autoStart: true });
+    const MockedCopilotClient = CopilotClient as unknown as ReturnType<typeof vi.fn>;
+    const instance = MockedCopilotClient.mock.results[0].value;
+    instance.start.mockImplementation(() => new Promise(resolve => setTimeout(resolve, 50)));
+
+    // Both createSession calls should succeed — second waits for connect
+    const [session1, session2] = await Promise.all([
+      client.createSession({ model: 'claude-sonnet-4.5' }),
+      client.createSession({ model: 'claude-sonnet-4.5' }),
+    ]);
+
+    expect(session1.sessionId).toBe('session-1');
+    expect(session2.sessionId).toBe('session-1');
+    expect(client.isConnected()).toBe(true);
+    expect(instance.start).toHaveBeenCalledTimes(1);
+  });
+
+  it('should propagate connect failure to concurrent callers', async () => {
+    const client = new SquadClient();
+    const MockedCopilotClient = CopilotClient as unknown as ReturnType<typeof vi.fn>;
+    const instance = MockedCopilotClient.mock.results[0].value;
+    instance.start.mockImplementation(
+      () => new Promise((_, reject) => setTimeout(() => reject(new Error('server down')), 50))
+    );
+
+    const results = await Promise.allSettled([
+      client.connect(),
+      client.connect(),
+    ]);
+
+    expect(results[0].status).toBe('rejected');
+    expect(results[1].status).toBe('rejected');
+    expect((results[0] as PromiseRejectedResult).reason.message).toContain('server down');
+    expect((results[1] as PromiseRejectedResult).reason.message).toContain('server down');
+    expect(client.getState()).toBe('error');
+  });
+
+  it('should start fresh connect after failed concurrent connect', async () => {
+    const client = new SquadClient();
+    const MockedCopilotClient = CopilotClient as unknown as ReturnType<typeof vi.fn>;
+    const instance = MockedCopilotClient.mock.results[0].value;
+
+    // First connect attempt fails
+    instance.start.mockImplementationOnce(
+      () => new Promise((_, reject) => setTimeout(() => reject(new Error('server down')), 50))
+    );
+
+    await Promise.allSettled([client.connect(), client.connect()]);
+    expect(client.getState()).toBe('error');
+
+    // Restore start to succeed
+    instance.start.mockResolvedValue(undefined);
+
+    // New connect should start fresh (connectPromise was cleared on failure)
+    await client.connect();
+    expect(client.getState()).toBe('connected');
+    expect(instance.start).toHaveBeenCalledTimes(2); // 1 failed + 1 fresh
   });
 
   it('should disconnect gracefully', async () => {

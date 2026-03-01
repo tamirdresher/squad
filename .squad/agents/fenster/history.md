@@ -703,3 +703,19 @@ The upstream.ts command was fully implemented but never wired into cli-entry.ts.
 **Files modified:** `packages/squad-cli/src/cli/shell/index.ts`
 **Verified:** Build clean (SDK + CLI), 3240/3245 tests pass (4 pre-existing timing failures unrelated to changes).
 **Ref:** `docs/proposals/reliable-init-flow.md` (Keaton's proposal), `squad/640-auto-cast-polish` branch.
+
+### Connection promise dedup in SquadClient (2026-03-02)
+
+**Task:** Fix race condition where concurrent `connect()` calls (eager warm-up + auto-cast) crash with "Connection already in progress" during `squad init "..."` with empty roster.
+
+**Root cause:** `connect()` threw when `state === "connecting"` instead of letting callers share the in-flight connection promise.
+
+**Fix:** Added `connectPromise: Promise<void> | null` field to `SquadClient`. When `connect()` is called and a connection is already in progress, it returns the existing promise instead of throwing. The promise is cleared on completion (success or failure), and also cleared in `disconnect()` / `forceDisconnect()`.
+
+**Key decisions:**
+- Promise dedup pattern: store the connection promise, return it to concurrent callers
+- Span lifecycle: error status set inside the IIFE before `span.end()`, not in an outer catch after end
+- `connectPromise` cleared in `disconnect()` and `forceDisconnect()` for clean state reset
+
+**Files modified:** `packages/squad-sdk/src/adapter/client.ts`
+**Verified:** Build clean (SDK + CLI).
