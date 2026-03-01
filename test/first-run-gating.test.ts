@@ -618,8 +618,8 @@ describe('Banner simplification (#626, #627)', () => {
   it('Usage line uses middle-dot separators (U+00B7)', async () => {
     const source = await readAppSource();
 
-    // Find the usage/hint line — the one with @Agent and /help
-    const usageLine = source.match(/<Text[^>]*>[^<]*@Agent[^<]*<\/Text>/);
+    // Find the usage/hint line — the one with @Agent and /help (may contain nested <Text bold> elements)
+    const usageLine = source.match(/<Text dimColor>.*@Agent.*<\/Text>/);
     expect(usageLine).not.toBeNull();
 
     const lineText = usageLine![0];
@@ -634,8 +634,8 @@ describe('Banner simplification (#626, #627)', () => {
   it('Usage line is concise — starts with "Type naturally"', async () => {
     const source = await readAppSource();
 
-    // Find the usage line containing @Agent
-    const usageLine = source.match(/<Text[^>]*>[^<]*@Agent[^<]*<\/Text>/);
+    // Find the usage line containing @Agent (may contain nested <Text bold> elements)
+    const usageLine = source.match(/<Text dimColor>.*@Agent.*<\/Text>/);
     expect(usageLine).not.toBeNull();
 
     const lineText = usageLine![0];

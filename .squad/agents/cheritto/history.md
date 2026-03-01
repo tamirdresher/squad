@@ -196,3 +196,40 @@
 - Build clean (tsc passes for both squad-sdk and squad-cli).
 📌 Team update (2026-03-01T05:57:23): Nap feature complete — dual sync/async export pattern, 38 comprehensive tests, all 3229 tests pass. Issue #635 closed, PR #636 merged. — decided by Fenster, Hockney
 
+
+### 📌 Team update (2026-03-01T20-24-57Z): CLI UI Polish PRD finalized — 20 issues created, team routing established
+- **Status:** Completed — Parallel spawn of Redfoot (Design), Marquez (UX), Cheritto (TUI), Kovash (REPL), Keaton (Lead) for image review synthesis
+- **Outcome:** Pragmatic alpha-first strategy adopted — fix P0 blockers + P1 quick wins, defer grand redesign to post-alpha
+- **PRD location:** docs/prd-cli-ui-polish.md (authoritative reference for alpha-1 release)
+- **Issues created:** GitHub #662–681 (20 discrete issues with priorities P0/P1/P2/P3, effort estimates, team routing)
+- **Key decisions merged:**
+  - Fenster: Cast confirmation required for freeform REPL casts
+  - Kovash: ShellApi.setProcessing() exposed to prevent spinner bugs in async paths
+  - Brady: Alpha shipment acceptable, experimental banner required, rotating spinner messages (every ~3s)
+- **Timeline:** P0 (1-2 days) → P1 (2-3 days) → P2 (1 week) — alpha ship when P0+P1 complete
+- **Session log:** .squad/log/2026-03-01T20-13-00Z-ui-polish-prd.md
+- **Decision files merged to decisions.md:** keaton-prd-ui-polish.md, fenster-cast-confirmation-ux.md, kovash-processing-spinner.md, copilot directives
+
+### P1/P2 TUI Batch — Separator consolidation, empty space fix, info hierarchy, whitespace (#655, #670, #671, #677)
+- **Branch:** `squad/cheritto-p1-tui-fixes`
+- **Issues:** #655 (empty space above content), #670 (information hierarchy), #671 (whitespace breathing room), #677 (separator consolidation)
+- **Fix #677 — Separator component:**
+  - Created `Separator.tsx` — shared horizontal rule component using `detectTerminal()` + `boxChars()` internally
+  - Accepts optional `width`, `marginTop`, `marginBottom` props
+  - Replaced all inline `<Text dimColor>{box.h.repeat(sepWidth)}</Text>` in App.tsx, AgentPanel.tsx, MessageStream.tsx
+  - Removed `detectTerminal`, `boxChars` imports and `caps`, `box`, `sepWidth` variables from all three consumer files
+- **Fix #655 — Empty space above content:**
+  - Removed `flexGrow={1}` from MessageStream's outer `<Box>` — this was causing the empty expanding box that pushed InputPrompt to the bottom of the viewport
+  - Since MessageStream receives `messages={[]}` (all completed messages go through Static), flexGrow created dead space
+- **Fix #670 — Information hierarchy:**
+  - Header usage line: `@Agent` and `/help` now wrapped in `<Text bold>` within the dimColor parent
+  - First-run element: "Try:" now bold (was normal weight)
+  - AgentPanel empty state: split into two lines — "No agents active." (dim) + "Send a message" (bold) + "/help" (bold)
+- **Fix #671 — Whitespace breathing room:**
+  - Header wrapper in Static block gets `marginBottom={1}` — breathing room before first message
+  - All turn separators upgraded to `<Separator marginTop={1} />` — blank line before separator
+  - AgentPanel bottom separator upgraded from `marginTop={0}` to `marginTop={1}`
+- **Test update:** Updated `first-run-gating.test.ts` — regex for usage line updated to handle nested `<Text bold>` elements within dimColor parent
+- **Files changed:** `Separator.tsx` (new), `App.tsx`, `AgentPanel.tsx`, `MessageStream.tsx`, `first-run-gating.test.ts`
+- Build clean (tsc --noEmit), 293/293 shell tests pass.
+- **Pattern:** `Separator` component is the canonical way to render horizontal rules — no more inline box char repetition.

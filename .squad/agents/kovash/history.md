@@ -114,3 +114,16 @@
 - **Pattern:** When adding new async dispatch paths to the shell, always ensure `setProcessing(true/false)` brackets the async work. The `ShellApi.setProcessing` method now makes this possible from index.ts without coupling to React state.
 
 
+
+### 📌 Team update (2026-03-01T20-24-57Z): CLI UI Polish PRD finalized — 20 issues created, team routing established
+- **Status:** Completed — Parallel spawn of Redfoot (Design), Marquez (UX), Cheritto (TUI), Kovash (REPL), Keaton (Lead) for image review synthesis
+- **Outcome:** Pragmatic alpha-first strategy adopted — fix P0 blockers + P1 quick wins, defer grand redesign to post-alpha
+- **PRD location:** docs/prd-cli-ui-polish.md (authoritative reference for alpha-1 release)
+- **Issues created:** GitHub #662–681 (20 discrete issues with priorities P0/P1/P2/P3, effort estimates, team routing)
+- **Key decisions merged:**
+  - Fenster: Cast confirmation required for freeform REPL casts
+  - Kovash: ShellApi.setProcessing() exposed to prevent spinner bugs in async paths
+  - Brady: Alpha shipment acceptable, experimental banner required, rotating spinner messages (every ~3s)
+- **Timeline:** P0 (1-2 days) → P1 (2-3 days) → P2 (1 week) — alpha ship when P0+P1 complete
+- **Session log:** .squad/log/2026-03-01T20-13-00Z-ui-polish-prd.md
+- **Decision files merged to decisions.md:** keaton-prd-ui-polish.md, fenster-cast-confirmation-ux.md, kovash-processing-spinner.md, copilot directives

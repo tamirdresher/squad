@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Box, Text } from 'ink';
 import { getRoleEmoji } from '../lifecycle.js';
-import { isNoColor, useTerminalWidth, detectTerminal, boxChars } from '../terminal.js';
+import { isNoColor, useTerminalWidth } from '../terminal.js';
+import { Separator } from './Separator.js';
 import { useMessageFade } from '../useAnimation.js';
 import { ThinkingIndicator } from './ThinkingIndicator.js';
 import type { ThinkingPhase } from './ThinkingIndicator.js';
@@ -30,7 +31,7 @@ export function renderMarkdownInline(text: string): React.ReactNode {
       parts.push(<Text key={key++} color="yellow">{match[4]}</Text>);
     } else if (match[5]) {
       // Italic: *text*
-      parts.push(<Text key={key++} dimColor>{match[6]}</Text>);
+      parts.push(<Text key={key++} color="gray">{match[6]}</Text>);
     }
     lastIndex = match.index + match[0].length;
   }
@@ -59,6 +60,62 @@ export function formatDuration(start: Date, end: Date): string {
   const ms = end.getTime() - start.getTime();
   if (ms < 1000) return `${ms}ms`;
   return `${(ms / 1000).toFixed(1)}s`;
+}
+
+/** Truncate table columns to fit within maxWidth. */
+function truncateTableColumns(tableLines: string[], maxWidth: number): string[] {
+  const parsed = tableLines.map(line => {
+    const trimmed = line.trim();
+    const inner = trimmed.slice(1, -1);
+    return inner.split('|').map(c => c.trim());
+  });
+  const numCols = Math.max(...parsed.map(r => r.length));
+  if (numCols === 0) return tableLines;
+
+  const overhead = numCols + 1 + numCols * 2;
+  const available = Math.max(maxWidth - overhead, numCols * 3);
+  const colWidth = Math.max(3, Math.floor(available / numCols));
+
+  return parsed.map(cells => {
+    const truncated = cells.map(cell => {
+      if (/^[-:]+$/.test(cell)) return '-'.repeat(colWidth);
+      if (cell.length <= colWidth) return cell.padEnd(colWidth);
+      return cell.slice(0, colWidth - 1) + '\u2026';
+    });
+    while (truncated.length < numCols) truncated.push(' '.repeat(colWidth));
+    return '| ' + truncated.join(' | ') + ' |';
+  });
+}
+
+/**
+ * Reformat markdown tables that exceed maxWidth by truncating columns.
+ * Table rows are detected as consecutive lines starting and ending with |.
+ */
+export function wrapTableContent(content: string, maxWidth: number): string {
+  const lines = content.split('\n');
+  const result: string[] = [];
+  let i = 0;
+
+  while (i < lines.length) {
+    const line = lines[i]!;
+    if (line.trimStart().startsWith('|') && line.trimEnd().endsWith('|')) {
+      const tableLines: string[] = [];
+      while (i < lines.length && lines[i]!.trimStart().startsWith('|') && lines[i]!.trimEnd().endsWith('|')) {
+        tableLines.push(lines[i]!);
+        i++;
+      }
+      const maxLineLen = Math.max(...tableLines.map(l => l.length));
+      if (maxLineLen <= maxWidth) {
+        result.push(...tableLines);
+      } else {
+        result.push(...truncateTableColumns(tableLines, maxWidth));
+      }
+    } else {
+      result.push(line);
+      i++;
+    }
+  }
+  return result.join('\n');
 }
 
 export const MessageStream: React.FC<MessageStreamProps> = ({
@@ -121,12 +178,9 @@ export const MessageStream: React.FC<MessageStreamProps> = ({
   const noColor = isNoColor();
   const width = useTerminalWidth();
   const contentWidth = Math.min(width, 80);
-  const sepWidth = contentWidth - 2;
-  const caps = detectTerminal();
-  const box = boxChars(caps);
 
   return (
-    <Box flexDirection="column" flexGrow={1} marginTop={1} width={contentWidth}>
+    <Box flexDirection="column" marginTop={1} width={contentWidth}>
       {visible.map((msg, i) => {
         const isNewTurn = msg.role === 'user' && i > 0;
         const agentRole = msg.agentName ? roleMap.get(msg.agentName) : undefined;
@@ -136,7 +190,7 @@ export const MessageStream: React.FC<MessageStreamProps> = ({
 
         return (
           <React.Fragment key={i}>
-            {isNewTurn && <Text dimColor>{box.h.repeat(sepWidth)}</Text>}
+            {isNewTurn && <Separator marginTop={1} />}
             <Box gap={1}>
               {msg.role === 'user' ? (
                 <>
@@ -145,13 +199,13 @@ export const MessageStream: React.FC<MessageStreamProps> = ({
                 </>
               ) : msg.role === 'system' ? (
                 <>
-                  <Text dimColor wrap="wrap">{msg.content}</Text>
+                  <Text color="gray" wrap="wrap">{msg.content}</Text>
                 </>
               ) : (
                 <>
                   <Text color={noColor ? undefined : 'green'} bold dimColor={isFading}>{emoji ? `${emoji} ` : ''}{(msg.agentName === 'coordinator' ? 'Squad' : msg.agentName) ?? 'agent'}:</Text>
-                  <Text wrap="wrap" dimColor={isFading}>{renderMarkdownInline(msg.content)}</Text>
-                  {duration && <Text dimColor>({duration})</Text>}
+                  <Text wrap="wrap" dimColor={isFading}>{renderMarkdownInline(wrapTableContent(msg.content, contentWidth))}</Text>
+                  {duration && <Text color="gray">({duration})</Text>}
                 </>
               )}
             </Box>
@@ -171,7 +225,7 @@ export const MessageStream: React.FC<MessageStreamProps> = ({
                     : ''}
                   {agentName === 'coordinator' ? 'Squad' : agentName}:
                 </Text>
-                <Text wrap="wrap">{renderMarkdownInline(content)}</Text>
+                <Text wrap="wrap">{renderMarkdownInline(wrapTableContent(content, contentWidth))}</Text>
                 <Text color={noColor ? undefined : 'cyan'}>▌</Text>
               </Box>
             ) : null
@@ -183,7 +237,7 @@ export const MessageStream: React.FC<MessageStreamProps> = ({
       {agentActivities && agentActivities.size > 0 && (
         <Box flexDirection="column">
           {Array.from(agentActivities.entries()).map(([name, activity]) => (
-            <Text key={name} dimColor>▸ {name} is {activity}</Text>
+            <Text key={name} color="gray">▸ {name} is {activity}</Text>
           ))}
         </Box>
       )}

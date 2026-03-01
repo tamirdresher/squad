@@ -464,6 +464,14 @@ export class SquadClient {
         recordSessionCreated();
         return result;
       } catch (error) {
+        const msg = error instanceof Error ? error.message : String(error);
+        if (msg.includes('onPermissionRequest')) {
+          throw new Error(
+            'Session creation failed: an onPermissionRequest handler is required. ' +
+            'Pass { onPermissionRequest: () => ({ kind: "approved" }) } in your session config ' +
+            'to approve all permissions, or provide a custom handler.'
+          );
+        }
         recordSessionError();
         if (this.shouldAttemptReconnect(error)) {
           await this.attemptReconnection();

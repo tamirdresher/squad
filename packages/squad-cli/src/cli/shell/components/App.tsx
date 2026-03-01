@@ -13,7 +13,8 @@ import { InputPrompt } from './InputPrompt.js';
 import { parseInput, type ParsedInput } from '../router.js';
 import { executeCommand } from '../commands.js';
 import { loadWelcomeData, getRoleEmoji } from '../lifecycle.js';
-import { isNoColor, useTerminalWidth, detectTerminal, boxChars } from '../terminal.js';
+import { isNoColor, useTerminalWidth } from '../terminal.js';
+import { Separator } from './Separator.js';
 import type { WelcomeData } from '../lifecycle.js';
 import type { SessionRegistry } from '../sessions.js';
 import type { ShellRenderer } from '../render.js';
@@ -282,16 +283,13 @@ export const App: React.FC<AppProps> = ({ registry, renderer, teamRoot, version,
     [archivedMessages, messages],
   );
   const roleMap = useMemo(() => new Map((agents ?? []).map(a => [a.name, a.role])), [agents]);
-  const caps = detectTerminal();
-  const box = boxChars(caps);
-  const sepWidth = Math.min(width, 80) - 2;
 
   // Memoize the header box — rendered once into Static scroll buffer at the top.
   const headerElement = useMemo(() => (
     <Box flexDirection="column" borderStyle="round" borderColor={noColor ? undefined : 'cyan'} paddingX={1}>
       <Text bold color={noColor ? undefined : 'cyan'}>{'  ___  ___  _   _  _   ___\n / __|/ _ \\| | | |/_\\ |   \\\n \\__ \\ (_) | |_| / _ \\| |) |\n |___/\\__\\_\\\\___/_/ \\_\\___/'}</Text>
       <Text>{' '}</Text>
-      <Text dimColor>v{version} · Type naturally · @Agent to direct · /help</Text>
+      <Text dimColor>v{version} · Type naturally · <Text bold>@Agent</Text> to direct · <Text bold>/help</Text></Text>
       <Text color={noColor ? undefined : 'yellow'} dimColor>⚠️  Experimental preview — file issues at github.com/bradygaster/squad-pr</Text>
     </Box>
   ), [noColor, version]);
@@ -304,7 +302,7 @@ export const App: React.FC<AppProps> = ({ registry, renderer, teamRoot, version,
           <>
             <Text color={noColor ? undefined : 'green'} bold>Your squad is assembled.</Text>
             <Text> </Text>
-            <Text>Try: <Text bold color={noColor ? undefined : 'cyan'}>What should we build first?</Text></Text>
+            <Text bold>Try: <Text bold color={noColor ? undefined : 'cyan'}>What should we build first?</Text></Text>
             <Text dimColor>Squad automatically routes your message to the best agent.</Text>
             <Text dimColor>Or use <Text bold>@{leadAgent}</Text> to message an agent directly.</Text>
           </>
@@ -334,7 +332,7 @@ export const App: React.FC<AppProps> = ({ registry, renderer, teamRoot, version,
         {(item) => {
           if (item.kind === 'header') {
             return (
-              <Box key={item.key} flexDirection="column">
+              <Box key={item.key} flexDirection="column" marginBottom={1}>
                 {headerElement}
                 {firstRunElement}
               </Box>
@@ -355,7 +353,7 @@ export const App: React.FC<AppProps> = ({ registry, renderer, teamRoot, version,
           }
           return (
             <Box key={item.key} flexDirection="column" width={contentWidth}>
-              {isNewTurn && <Text dimColor>{box.h.repeat(sepWidth)}</Text>}
+              {isNewTurn && <Separator marginTop={1} />}
               <Box gap={1} paddingLeft={msg.role === 'user' ? 0 : 2}>
                 {msg.role === 'user' ? (
                   <Box flexDirection="column">

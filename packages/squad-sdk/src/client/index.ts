@@ -26,6 +26,9 @@ export type {
   SquadClientEventType,
   SquadClientEvent,
   SquadClientEventHandler,
+  SquadPermissionHandler,
+  SquadPermissionRequest,
+  SquadPermissionRequestResult,
 } from '../adapter/types.js';
 
 // Session status type for pool management

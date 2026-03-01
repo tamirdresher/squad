@@ -441,3 +441,78 @@ Scribe and Ralph are always injected if missing from the proposal. Casting state
 **What:** `SquadClient.connect()` now uses a promise dedup pattern — concurrent callers share the same in-flight `connectPromise` instead of throwing "Connection already in progress".
 **Why:** Eager warm-up and auto-cast both call `createSession()` → `connect()` at REPL startup, racing on the connection. The throw crashed auto-cast every time.
 **Impact:** `packages/squad-sdk/src/adapter/client.ts` only. No API surface change.
+
+### 2026-03-01: CLI UI Polish PRD — Alpha Shipment Over Perfection
+**By:** Keaton (Lead)  
+**Date:** 2026-03-01  
+**Context:** Team image review identified 20+ UX issues ranging from P0 blockers to P3 future polish
+
+**What:** CLI UI polish follows pragmatic alpha shipment strategy: fix P0 blockers + P1 quick wins, defer grand redesign to post-alpha. 20 discrete issues created with clear priority tiers (P0/P1/P2/P3).
+
+**Why:** Brady confirmed "alpha-level shipment acceptable — no grand redesign today." Team converged on 3 P0 blockers (blank screens, static spinner, missing alpha banner) that would embarrass us vs. 15+ polish items that can iterate post-ship.
+
+**Trade-off:** Shipping with known layout quirks (input positioning, responsive tables) rather than blocking on 1-2 week TUI refactor. Users expect alpha rough edges IF we warn them upfront.
+
+**Priority Rationale:**
+- **P0 (must fix):** User-facing broken states — blank screens, no feedback, looks crashed
+- **P1 (quick wins):** Accessibility (contrast), usability (copy clarity), visual hierarchy — high ROI, low effort
+- **P2 (next sprint):** Layout architecture, responsive design — important but alpha-acceptable if missing
+- **P3 (future):** Fixed bottom input, alt screen buffer, creative spinner — delightful but not blockers
+
+**Architectural Implications:**
+1. **Quick win discovered:** App.tsx overrides ThinkingIndicator's native rotation with static hints (~5 line fix)
+2. **Debt acknowledged:** 3 separate separator implementations need consolidation (P2 work)
+3. **Layout strategy:** Ink's layout model fights bottom-anchored input. Alt screen buffer is the real solution (P3 deferred).
+4. **Issue granularity:** 20 discrete issues vs. 1 monolithic "fix UI" epic — enables parallel work by Cheritto (11 issues), Kovash (4), Redfoot (2), Fenster (1), Marquez (1 review)
+
+**Success Gate:** "Brady says it doesn't embarrass us" — qualitative gate appropriate for alpha software. Quantitative gates: zero blank screens >500ms, contrast ≥4.5:1, spinner rotates every 3s.
+
+**Impact:**
+- **Team routing:** Clear ownership — Cheritto (TUI), Kovash (shell), Redfoot (design), Marquez (UX review)
+- **Timeline transparency:** P0 (1-2 days) → P1 (2-3 days) → P2 (1 week) — alpha ship when P0+P1 done
+- **Expectation management:** Out of Scope section explicitly lists grand redesign, advanced features, WCAG audit — prevents scope creep
+
+### 2026-03-01: Cast confirmation required for freeform REPL casts
+**By:** Fenster (Core Dev)  
+**Date:** 2026-03-01  
+**Context:** P2 from Keaton's reliable-init-flow proposal
+
+**What:** When a user types a freeform message in the REPL and the roster is empty, the cast proposal is shown and the user must confirm (y/yes) before team files are created. Auto-cast from .init-prompt and /init "prompt" skip confirmation since the user explicitly provided the prompt.
+
+**Why:** Prevents garbage casts from vague or accidental first messages (e.g., "hello", "what can you do?"). Matches the squad.agent.md Init Mode pattern where confirmation is required before creating team files.
+
+**Pattern:** pendingCastConfirmation state in shell/index.ts. handleDispatch intercepts y/n at the top before normal routing. inalizeCast() is the shared helper for both auto-confirmed and user-confirmed paths.
+
+### 2026-03-01: Expose setProcessing on ShellApi
+**By:** Kovash (REPL Expert)  
+**Date:** 2026-03-01  
+**Context:** Init auto-cast path bypassed App.tsx handleSubmit, so processing state was never set — spinner invisible during team casting.
+
+**What:** ShellApi now exposes setProcessing(processing: boolean) so that any code path in index.ts that triggers async work outside of handleSubmit can properly bracket it with processing state. This enables ThinkingIndicator and InputPrompt spinner without duplicating React state management.
+
+**Rule:** Any new async dispatch path in index.ts that bypasses handleSubmit **must** call shellApi.setProcessing(true) before the async work and shellApi.setProcessing(false) in a inally block covering all exit paths.
+
+**Files Changed:**
+- packages/squad-cli/src/cli/shell/components/App.tsx — added setProcessing to ShellApi interface + wired in onReady
+- packages/squad-cli/src/cli/shell/index.ts — added setProcessing calls in handleInitCast (entry, pendingCastConfirmation return, finally block)
+
+### 2026-03-01T20:13:16Z: User directives — UI polish and shipping priorities
+**By:** Brady (via Copilot)  
+**Date:** 2026-03-01
+
+**What:**
+1. Text box preference: bottom-aligned, squared off (like Copilot CLI / Claude CLI) — future work, not today
+2. Alpha-level shipment acceptable for now — no grand UI redesign today
+3. CLI must show "experimental, please file issues" banner
+4. Spinner/wait messages should rotate every ~3 seconds — use codebase facts, project trivia, vulnerability info, or creative "-ing" words. Never just spin silently.
+5. Use wait time to inform or entertain users
+
+**Why:** User request — captured for team memory and crash recovery
+
+### 2026-03-01T20:16:00Z: User directive — CLI timeout too low
+**By:** Brady (via Copilot)  
+**Date:** 2026-03-01
+
+**What:** The CLI timeout is set too low — Brady tried using Squad CLI in this repo and it didn't work well. Timeout needs to be increased. Not urgent but should be captured as a CLI improvement opportunity.
+
+**Why:** User request — captured for team memory and PRD inclusion

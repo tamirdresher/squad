@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Box, Text } from 'ink';
 import { getRoleEmoji } from '../lifecycle.js';
-import { isNoColor, useTerminalWidth, detectTerminal, boxChars } from '../terminal.js';
+import { isNoColor, useTerminalWidth } from '../terminal.js';
+import { Separator } from './Separator.js';
 import { useCompletionFlash } from '../useAnimation.js';
 import { getStatusTag } from '../agent-status.js';
 import type { AgentSession } from '../types.js';
@@ -47,8 +48,6 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({ agents, streamingContent
   const noColor = isNoColor();
   const width = useTerminalWidth();
   const compact = width <= 60;
-  const caps = detectTerminal();
-  const box = boxChars(caps);
 
   // Tick every second to update elapsed times
   const [, setTick] = useState(0);
@@ -65,13 +64,13 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({ agents, streamingContent
   if (agents.length === 0) {
     return (
       <Box flexDirection="column" paddingX={1} marginTop={1}>
-        <Text dimColor>No agents active. Send a message to start. /help for commands.</Text>
+        <Text dimColor>No agents active.</Text>
+        <Text><Text bold>Send a message</Text><Text dimColor> to start. </Text><Text bold>/help</Text><Text dimColor> for commands.</Text></Text>
       </Box>
     );
   }
 
   const activeAgents = agents.filter(a => a.status === 'streaming' || a.status === 'working');
-  const sepWidth = Math.min(width, 80) - 2;
 
   // Compact layout (≤60 cols): single-line per agent, no detail
   if (compact) {
@@ -97,9 +96,7 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({ agents, streamingContent
             </Box>
           );
         })}
-        <Box marginTop={0}>
-          <Text dimColor>{box.h.repeat(sepWidth)}</Text>
-        </Box>
+        <Separator marginTop={1} />
       </Box>
     );
   }
@@ -166,9 +163,7 @@ export const AgentPanel: React.FC<AgentPanelProps> = ({ agents, streamingContent
       )}
 
       {/* Separator between panel and message stream */}
-      <Box marginTop={0}>
-        <Text dimColor>{box.h.repeat(sepWidth)}</Text>
-      </Box>
+      <Separator marginTop={1} />
     </Box>
   );
 };

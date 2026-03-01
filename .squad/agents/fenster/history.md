@@ -587,6 +587,20 @@ The upstream.ts command was fully implemented but never wired into cli-entry.ts.
 ✅ **TODO comments in generated workflow templates** — Not code issues
 - Lines in `upgrade.ts` and `workflows.ts` are template strings inserted into GitHub Actions YAML files
 - These are intentional placeholders for users to fill in (build commands, release commands, etc.)
+
+### Permission handler wiring (Issue #651)
+**Task:** Wire `onPermissionRequest` handler into all CLI shell session creation calls. External user (arjendev) reported a raw SDK error because the handler was defined in adapter types but never passed when creating sessions.
+
+**Root cause:** `SquadSessionConfig.onPermissionRequest` was typed but not set in any of the 4 `client.createSession()` calls in `shell/index.ts`.
+
+**Fix:**
+- Added `approveAllPermissions` handler in `shell/index.ts` — CLI runs locally with full user trust, so all permissions are approved
+- Wired it into all 4 `createSession` calls: eager coordinator warm-up, agent dispatch, coordinator fallback, init mode cast
+- Exported `SquadPermissionHandler`, `SquadPermissionRequest`, `SquadPermissionRequestResult` types from `@bradygaster/squad-sdk/client`
+- Added clear error guidance in `adapter/client.ts` — catches the raw SDK permission error and wraps it with actionable instructions
+
+**Files modified:** `packages/squad-cli/src/cli/shell/index.ts`, `packages/squad-sdk/src/adapter/client.ts`, `packages/squad-sdk/src/client/index.ts`
+**Verified:** All 3276 tests pass (6 pre-existing flaky repl-ux timeouts unrelated).
 - Correctly documented as templates, not actual code TODOs
 
 ✅ **Console.log statements are intentional** — All are user-facing status/output
@@ -719,3 +733,16 @@ The upstream.ts command was fully implemented but never wired into cli-entry.ts.
 
 **Files modified:** `packages/squad-sdk/src/adapter/client.ts`
 **Verified:** Build clean (SDK + CLI).
+
+### 📌 Team update (2026-03-01T20-24-57Z): CLI UI Polish PRD finalized — 20 issues created, team routing established
+- **Status:** Completed — Parallel spawn of Redfoot (Design), Marquez (UX), Cheritto (TUI), Kovash (REPL), Keaton (Lead) for image review synthesis
+- **Outcome:** Pragmatic alpha-first strategy adopted — fix P0 blockers + P1 quick wins, defer grand redesign to post-alpha
+- **PRD location:** docs/prd-cli-ui-polish.md (authoritative reference for alpha-1 release)
+- **Issues created:** GitHub #662–681 (20 discrete issues with priorities P0/P1/P2/P3, effort estimates, team routing)
+- **Key decisions merged:**
+  - Fenster: Cast confirmation required for freeform REPL casts
+  - Kovash: ShellApi.setProcessing() exposed to prevent spinner bugs in async paths
+  - Brady: Alpha shipment acceptable, experimental banner required, rotating spinner messages (every ~3s)
+- **Timeline:** P0 (1-2 days) → P1 (2-3 days) → P2 (1 week) — alpha ship when P0+P1 complete
+- **Session log:** .squad/log/2026-03-01T20-13-00Z-ui-polish-prd.md
+- **Decision files merged to decisions.md:** keaton-prd-ui-polish.md, fenster-cast-confirmation-ux.md, kovash-processing-spinner.md, copilot directives

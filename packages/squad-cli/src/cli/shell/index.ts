@@ -19,6 +19,7 @@ import { StreamBridge } from './stream-bridge.js';
 import { ShellLifecycle, loadWelcomeData } from './lifecycle.js';
 import { SquadClient } from '@bradygaster/squad-sdk/client';
 import type { SquadSession } from '@bradygaster/squad-sdk/client';
+import type { SquadPermissionHandler } from '@bradygaster/squad-sdk/client';
 import type { ShellMessage } from './types.js';
 import { initSquadTelemetry, TIMEOUTS, StreamingPipeline, recordAgentSpawn, recordAgentDuration, recordAgentError, recordAgentDestroy, RuntimeEventBus } from '@bradygaster/squad-sdk';
 import type { UsageEvent } from '@bradygaster/squad-sdk';
@@ -74,6 +75,12 @@ export {
 
 const require = createRequire(import.meta.url);
 const pkg = require('../../../package.json') as { version: string };
+
+/**
+ * Approve all permission requests. CLI runs locally with user trust,
+ * so no interactive confirmation is needed.
+ */
+const approveAllPermissions: SquadPermissionHandler = () => ({ kind: 'approved' });
 
 /** Debug logger — writes to stderr only when SQUAD_DEBUG=1. */
 function debugLog(...args: unknown[]): void {
@@ -215,6 +222,7 @@ export async function runShell(): Promise<void> {
         streaming: true,
         systemMessage: { mode: 'append', content: systemPrompt },
         workingDirectory: teamRoot,
+        onPermissionRequest: approveAllPermissions,
       });
       debugLog('eager warm-up: coordinator session ready');
     } catch (err) {
@@ -361,6 +369,7 @@ export async function runShell(): Promise<void> {
         streaming: true,
         systemMessage: { mode: 'append', content: systemPrompt },
         workingDirectory: teamRoot,
+        onPermissionRequest: approveAllPermissions,
       });
       agentSessions.set(agentName, session);
     }
@@ -540,6 +549,7 @@ export async function runShell(): Promise<void> {
         streaming: true,
         systemMessage: { mode: 'append', content: systemPrompt },
         workingDirectory: teamRoot,
+        onPermissionRequest: approveAllPermissions,
       });
       debugLog('coordinator session created:', {
         sessionId: coordinatorSession.sessionId,
@@ -818,6 +828,7 @@ export async function runShell(): Promise<void> {
         streaming: true,
         systemMessage: { mode: 'append', content: initSysPrompt },
         workingDirectory: teamRoot,
+        onPermissionRequest: approveAllPermissions,
       });
       activeInitSession = initSession;
       debugLog('handleInitCast: init session created');

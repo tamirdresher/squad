@@ -7,6 +7,23 @@
 
 ## Learnings
 
+### 📌 PRD: CLI UI Polish (2026-03-01T03:15:00Z): 20-issue roadmap from team image review
+- **Status:** Completed — comprehensive PRD written based on 5-agent visual review (Redfoot, Marquez, Cheritto, Kovash, Brady)
+- **Context:** Team analyzed 15 REPL screenshots, identified P0 blockers (blank screens, no spinner rotation, missing alpha banner), P1 friction (low contrast, verbose copy, weak hierarchy), P2 polish (layout, separators, tables), P3 future (fixed bottom input, alt screen buffer)
+- **PRD structure:** Overview, Goals, User Problems (image-referenced), Requirements (P0/P1/P2/P3 tiered), Technical Notes, Out of Scope, Success Metrics, Issue Breakdown (20 discrete issues with assignees)
+- **Key decisions:**
+  - P0 alpha blockers: dynamic spinner rotation (~5 line fix in App.tsx), alpha banner, blank screen prevention (never >500ms), timeout verification
+  - P1 quick wins: contrast ≥4.5:1, semantic color system, copy tightening, information hierarchy, whitespace
+  - P2 layout work: MessageStream refactor, input anchoring, responsive tables, separator consolidation, agent panel persistence
+  - P3 deferred: fixed bottom input (requires alt screen buffer), creative spinner phrases, terminal adaptivity
+  - Alpha shipment acceptable — no grand redesign today
+- **Issue routing:** Cheritto owns 11/20 (all TUI/Ink work), Kovash owns 4/20 (shell/REPL), Redfoot owns 2/20 (color/contrast), Marquez reviews copy (1 issue), Fenster verifies timeout (1 issue)
+- **Quick wins identified:** Spinner fix (5 lines), contrast (30min), separators (15min), table headers (30min)
+- **Architectural insight:** Layout is 80% there, needs 1-2 days focused work. Three separate separator implementations need consolidation. Ink's layout model fights bottom-anchored input (alt screen buffer would solve, deferred to P3).
+- **Success gate:** "Brady says it doesn't embarrass us"
+- **Timeline:** P0 (1-2 days) → P1 (2-3 days) → P2 (1 week) → Alpha ship with P0+P1 complete
+- **Files:** `docs/prd-cli-ui-polish.md` (PRD), `packages/squad-cli/src/ui/App.tsx` (spinner override), `packages/squad-cli/src/ui/components/ThinkingIndicator.tsx` (has rotation logic), `packages/squad-cli/src/ui/components/MessageStream.tsx` (layout issues)
+
 ### 📌 Architecture analysis (2026-02-28T23:23:00Z): Init/onboarding flow audit — Brady's request
 - **Status:** Completed — comprehensive analysis of all 7 init entry paths across PRs #637–#640
 - **Key findings:**
@@ -685,3 +702,16 @@ Keaton's split plan produced definitive SDK/CLI mapping with clean DAG (CLI → 
 - Target: 11 fixed + 34 closed = 45 → 0 open issues
 
 **Next:** Wave 1 execution (keaton dogfood + hockney UX fixes)
+
+### 📌 Team update (2026-03-01T20-24-57Z): CLI UI Polish PRD finalized — 20 issues created, team routing established
+- **Status:** Completed — Parallel spawn of Redfoot (Design), Marquez (UX), Cheritto (TUI), Kovash (REPL), Keaton (Lead) for image review synthesis
+- **Outcome:** Pragmatic alpha-first strategy adopted — fix P0 blockers + P1 quick wins, defer grand redesign to post-alpha
+- **PRD location:** docs/prd-cli-ui-polish.md (authoritative reference for alpha-1 release)
+- **Issues created:** GitHub #662–681 (20 discrete issues with priorities P0/P1/P2/P3, effort estimates, team routing)
+- **Key decisions merged:**
+  - Fenster: Cast confirmation required for freeform REPL casts
+  - Kovash: ShellApi.setProcessing() exposed to prevent spinner bugs in async paths
+  - Brady: Alpha shipment acceptable, experimental banner required, rotating spinner messages (every ~3s)
+- **Timeline:** P0 (1-2 days) → P1 (2-3 days) → P2 (1 week) — alpha ship when P0+P1 complete
+- **Session log:** .squad/log/2026-03-01T20-13-00Z-ui-polish-prd.md
+- **Decision files merged to decisions.md:** keaton-prd-ui-polish.md, fenster-cast-confirmation-ux.md, kovash-processing-spinner.md, copilot directives
