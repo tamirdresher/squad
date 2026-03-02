@@ -373,9 +373,28 @@ export class RemoteBridge {
     }
   }
 
+  /** Strip ANSI escape codes and Unicode invisible characters */
+  private stripInvisible(text: string): string {
+    return text
+      // ESC CSI sequences
+      .replace(/\x1b\[[0-9;?<>=!]*[A-Za-z@]/g, '')
+      // ESC OSC sequences
+      .replace(/\x1b\][^\x07\x1b]*(?:\x07|\x1b\\)?/g, '')
+      // C1 control codes
+      .replace(/[\x80-\x9F]/g, '')
+      // Zero-width characters
+      .replace(/[\u200B\u200C\u200D\uFEFF\u00AD\u2060]/g, '')
+      // Braille blank
+      .replace(/[\u2800]/g, '')
+      // Combining marks
+      .replace(/[\u0300-\u036F]/g, '');
+  }
+
   /** Redact secrets from text before replay */
   private redactSecrets(text: string): string {
-    return text
+    // Strip invisible chars and normalize before pattern matching
+    const cleaned = this.stripInvisible(text).normalize('NFKC');
+    return cleaned
       .replace(/(?:token|secret|key|password|credential|authorization|api_key|private_key|access_key)[\s:="']+\S{8,}/gi, '[REDACTED]')
       .replace(/sk-[A-Za-z0-9]{20,}/g, '[REDACTED-OPENAI]')
       .replace(/ghp_[A-Za-z0-9]{36,}/g, '[REDACTED-GITHUB]')
@@ -390,7 +409,19 @@ export class RemoteBridge {
       // npm tokens
       .replace(/npm_[a-zA-Z0-9]{20,}/g, '[REDACTED-NPM]')
       // PEM private keys
-      .replace(/-----BEGIN [A-Z ]+ PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+ PRIVATE KEY-----/g, '[REDACTED-PEM]');
+      .replace(/-----BEGIN [A-Z ]+ PRIVATE KEY-----[\s\S]*?-----END [A-Z ]+ PRIVATE KEY-----/g, '[REDACTED-PEM]')
+      // GitLab personal access tokens
+      .replace(/glpat-[a-zA-Z0-9_-]{20,}/g, '[REDACTED-GITLAB]')
+      // HashiCorp Vault tokens
+      .replace(/hvs\.[a-zA-Z0-9_-]{20,}/g, '[REDACTED-VAULT]')
+      // GitHub fine-grained PATs
+      .replace(/github_pat_[a-zA-Z0-9_]{20,}/g, '[REDACTED-GITHUB-FG]')
+      // Databricks tokens
+      .replace(/dapi[a-f0-9]{32}/g, '[REDACTED-DATABRICKS]')
+      // HuggingFace tokens
+      .replace(/hf_[a-zA-Z]{34}/g, '[REDACTED-HUGGINGFACE]')
+      // Credentials in URLs
+      .replace(/https?:\/\/[^:]+:[^@]+@[^\s"']+/g, '[REDACTED-CRED-URL]');
   }
 
   // ─── Passthrough (ACP dumb pipe) ────────────────────────────
@@ -446,7 +477,7 @@ export class RemoteBridge {
     };
     this.connections.set(connId, { ws, info });
 
-    // Ping/pong heartbeat (30s interval)
+    // Ping/pong heartbeat (120s interval)
     let isAlive = true;
     ws.on('pong', () => { isAlive = true; });
     const pingInterval = setInterval(() => {
@@ -457,7 +488,7 @@ export class RemoteBridge {
       }
       isAlive = false;
       ws.ping();
-    }, 30000);
+    }, 120000);
 
     // Replay recorded ACP events to late-joining client (with secrets redacted)
     if (this.config.enableReplay && this.passthroughWrite && this.acpEventLog.length > 0) {
