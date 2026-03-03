@@ -79,3 +79,10 @@ All shell dispatch calls must use awaitStreamedResponse() to wait for full strea
 - No special networking needed (outbound HTTPS to Copilot API works by default)
 - SDK Consideration: SquadClientWithPool defaults to `maxConcurrent: 5` — index.ts must override to handle 8+ sessions
 - SDK Limitation: Session creation is sequential (Copilot SDK constraint), but usage can be parallel after creation
+
+## 📌 Team Update (2026-03-03T00:00:50Z)
+
+**Session:** RPS Sample Complete — Verbal, Fenster, Kujan, McManus collaboration
+
+Multi-agent build of Rock-Paper-Scissors game with 10 AI strategies, Docker infrastructure, and full documentation. Fenster (Coordinator) identified and resolved 3 integration bugs (ID mismatch, move parsing, history semantics). Sample ready for use.
+

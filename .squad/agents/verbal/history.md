@@ -42,3 +42,10 @@
 - Creative agents: Echo (copycat), Rebel (contrarian — intentionally loses), Poker (bluffer with fake tells)
 - Scorekeeper prompt: entertaining commentary + mental leaderboard tracking + personality-driven announcements
 - Design principle: prompts are code. Precision over prose. Each must be robust against LLM drift.
+
+## 📌 Team Update (2026-03-03T00:00:50Z)
+
+**Session:** RPS Sample Complete — Verbal, Fenster, Kujan, McManus collaboration
+
+Multi-agent build of Rock-Paper-Scissors game with 10 AI strategies, Docker infrastructure, and full documentation. Fenster (Coordinator) identified and resolved 3 integration bugs (ID mismatch, move parsing, history semantics). Sample ready for use.
+

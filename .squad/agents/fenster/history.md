@@ -408,3 +408,10 @@
 - Robust move parsing: search all occurrences, take last one — handles reasoning-then-answer LLM patterns
 - Match pairing cycling: pre-compute all [i,j] pairs, cycle through them to avoid immediate rematches
 - Scorekeeper as streaming agent: commentary adds narrative to the arena, StreamingPipeline makes it feel live
+
+## 📌 Team Update (2026-03-03T00:00:50Z)
+
+**Session:** RPS Sample Complete — Verbal, Fenster, Kujan, McManus collaboration
+
+Multi-agent build of Rock-Paper-Scissors game with 10 AI strategies, Docker infrastructure, and full documentation. Fenster (Coordinator) identified and resolved 3 integration bugs (ID mismatch, move parsing, history semantics). Sample ready for use.
+
