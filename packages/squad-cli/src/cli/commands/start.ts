@@ -52,6 +52,7 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
     port: options.port || 0,
     maxHistory: 500,
     repo, branch, machine, squadDir,
+    enableReplay: true,
   };
 
   bridge = new RemoteBridge(config);
@@ -60,7 +61,10 @@ export async function runStart(cwd: string, options: StartOptions): Promise<void
   bridge.setStaticHandler((req, res) => {
     const uiDir = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../remote-ui');
     let decodedUrl: string;
-    try { decodedUrl = decodeURIComponent(req.url || '/'); } catch { res.writeHead(400); res.end(); return; }
+    try {
+      const parsed = new URL(req.url || '/', `http://${req.headers.host}`);
+      decodedUrl = decodeURIComponent(parsed.pathname);
+    } catch { res.writeHead(400); res.end(); return; }
     if (decodedUrl.includes('..')) { res.writeHead(400); res.end(); return; }
     let filePath = path.resolve(uiDir, decodedUrl === '/' ? 'index.html' : decodedUrl.replace(/^\//, ''));
     if (!filePath.startsWith(uiDir)) { res.writeHead(403); res.end(); return; }

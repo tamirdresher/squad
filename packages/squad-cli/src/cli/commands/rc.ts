@@ -116,7 +116,8 @@ export async function runRC(cwd: string, options: RCOptions): Promise<void> {
     // #18: Guard against malformed URI encoding
     let decodedUrl: string;
     try {
-      decodedUrl = decodeURIComponent(req.url || '/');
+      const parsed = new URL(req.url || '/', `http://${req.headers.host}`);
+      decodedUrl = decodeURIComponent(parsed.pathname);
     } catch {
       res.writeHead(400); res.end(); return;
     }
