@@ -205,12 +205,14 @@ The more projects you connect, the richer these reviews become. Your Lead builds
 
 You join an open-source project. New repo, unfamiliar code. But your agents already know *you*.
 
+For projects you don't own — OSS contributions, client work, temporary collaborations — use **consult mode**. Your team consults invisibly, and the project never knows Squad was there:
+
 ```bash
 cd ~/projects/new-oss-contribution
-squad init
+squad consult
 ```
 
-Your personal squad connects. The agents don't know the codebase yet — they'll learn it. But they already know your preferences:
+Your personal squad is copied into the project's `.squad/` directory, hidden via `.git/info/exclude`. The agents don't know the codebase yet — they'll learn it. But they already know your preferences:
 
 - How you like code structured
 - What testing patterns you follow
@@ -223,7 +225,15 @@ Your personal squad connects. The agents don't know the codebase yet — they'll
 
 Your agents explore the repo with your familiar voice. They ask the questions you'd ask. The codebase is new — but your relationship with your team isn't.
 
+When you're done, extract the generic learnings back to your personal squad and clean up:
+
+```bash
+squad extract --clean
+```
+
 It's not a cold start. It's your team meeting a new project.
+
+> 📖 **Full guide:** [Consult Mode](../features/consult-mode.md) — invisible consulting, learning extraction, license handling.
 
 ---
 
@@ -279,11 +289,11 @@ What works well today:
 - Shared team identity across projects
 - Skills that accumulate and carry over
 - Consistent agent behavior everywhere you work
+- **Consult mode** — bring your team to projects you don't own, invisibly ([docs](../features/consult-mode.md))
 
 What's still rough:
 - No sync mechanism between machines yet — `~/.squad/` is local to your machine
 - Project keys aren't used for anything yet (that `null` in config.json)
-- The resolution system is simple — no conflict handling if team identity diverges
 - No UI for browsing your global skills or agent histories (it's files for now)
 
 We're building in the open. If something feels off, [open an issue](https://github.com/bradygaster/squad/issues). If something feels right, we want to hear about that too.

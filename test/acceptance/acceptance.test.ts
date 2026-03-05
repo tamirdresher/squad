@@ -39,3 +39,7 @@ runFeature(join(featuresDir, 'doctor-extended.feature'), registry);
 runFeature(join(featuresDir, 'help-comprehensive.feature'), registry);
 runFeature(join(featuresDir, 'error-paths.feature'), registry);
 runFeature(join(featuresDir, 'exit-codes.feature'), registry);
+
+// Consult and extract command tests
+runFeature(join(featuresDir, 'consult-command.feature'), registry);
+runFeature(join(featuresDir, 'extract-command.feature'), registry);
