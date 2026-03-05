@@ -161,15 +161,8 @@
     "node": ">=20"
   },
   "dependencies": {
-    "@github/copilot-sdk": "^0.1.29"
-  },
-  "peerDependencies": {
+    "@github/copilot-sdk": "^0.1.29",
     "@opentelemetry/api": "^1.9.0"
-  },
-  "peerDependenciesMeta": {
-    "@opentelemetry/api": {
-      "optional": true
-    }
   },
   "optionalDependencies": {
     "@opentelemetry/exporter-metrics-otlp-grpc": "^0.57.2",
@@ -183,7 +176,6 @@
     "ws": "^8.18.0"
   },
   "devDependencies": {
-    "@opentelemetry/api": "^1.9.0",
     "@types/node": "^22.0.0",
     "@types/ws": "^8.5.13",
     "typescript": "^5.7.0"
