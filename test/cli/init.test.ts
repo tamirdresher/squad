@@ -95,7 +95,7 @@ describe('CLI: init command', () => {
     expect(content).toContain('.squad/orchestration-log/** merge=union');
   });
 
-  it('should append to .gitignore with log exclusions', async () => {
+  it('should append to .gitignore with runtime state exclusions', async () => {
     await runInit(TEST_ROOT);
     
     const gitignorePath = join(TEST_ROOT, '.gitignore');
@@ -104,6 +104,8 @@ describe('CLI: init command', () => {
     const content = await readFile(gitignorePath, 'utf-8');
     expect(content).toContain('.squad/orchestration-log/');
     expect(content).toContain('.squad/log/');
+    expect(content).toContain('.squad/decisions/inbox/');
+    expect(content).toContain('.squad/sessions/');
   });
 
   it('should copy templates to .squad/templates/', async () => {

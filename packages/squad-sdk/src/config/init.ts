@@ -754,13 +754,17 @@ ${projectDescription ? `- **Description:** ${projectDescription}\n` : ''}- **Cre
   }
   
   // -------------------------------------------------------------------------
-  // Create .gitignore entries for logs
+  // Create .gitignore entries for runtime state (logs, inbox, sessions)
+  // These paths are written during normal squad operation but must never
+  // reach protected branches — the squad-main-guard workflow rejects them.
   // -------------------------------------------------------------------------
   
   const gitignorePath = join(teamRoot, '.gitignore');
   const ignoreEntries = [
     '.squad/orchestration-log/',
     '.squad/log/',
+    '.squad/decisions/inbox/',
+    '.squad/sessions/',
   ];
   
   let existingIgnore = '';
@@ -771,7 +775,7 @@ ${projectDescription ? `- **Description:** ${projectDescription}\n` : ''}- **Cre
   const missingIgnore = ignoreEntries.filter(entry => !existingIgnore.includes(entry));
   if (missingIgnore.length > 0) {
     const block = (existingIgnore && !existingIgnore.endsWith('\n') ? '\n' : '')
-      + '# Squad: ignore generated logs\n'
+      + '# Squad: ignore runtime state (logs, inbox, sessions)\n'
       + missingIgnore.join('\n') + '\n';
     await appendFile(gitignorePath, block);
     createdFiles.push(toRelativePath(gitignorePath));

@@ -735,7 +735,7 @@ prompt: |
   3. DECISION INBOX: Merge .squad/decisions/inbox/ → decisions.md, delete inbox files. Deduplicate.
   4. CROSS-AGENT: Append team updates to affected agents' history.md.
   5. DECISIONS ARCHIVE: If decisions.md exceeds ~20KB, archive entries older than 30 days to decisions-archive.md.
-  6. GIT COMMIT: git add .squad/ && commit (write msg to temp file, use -F). Skip if nothing staged.
+  6. GIT COMMIT: Stage with `git add .squad/`, then unstage runtime state that must not reach protected branches: `git reset HEAD -- .squad/orchestration-log/ .squad/log/ .squad/decisions/inbox/ .squad/sessions/ 2>/dev/null`. Commit remaining staged changes (write msg to temp file, use -F). Skip if nothing staged after reset.
   7. HISTORY SUMMARIZATION: If any history.md >12KB, summarize old entries to ## Core Context.
 
   Never speak to user. ⚠️ End with plain text summary after all tool calls.
