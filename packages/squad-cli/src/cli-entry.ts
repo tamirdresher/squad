@@ -43,11 +43,14 @@ async function main(): Promise<void> {
     console.log(`             Overwrites: squad.agent.md, templates dir (.squad/templates/)`);
     console.log(`             Never touches: .squad/ or .ai-team/ (your team state)`);
     console.log(`             Flags: --global (upgrade personal squad), --migrate-directory (rename .ai-team/ → .squad/)`);
-    console.log(``  ${BOLD}upstream${RESET}   Manage upstream squad inheritance``);
+    console.log(`  ${BOLD}upstream${RESET}   Manage upstream squad inheritance`);
     console.log(`  ${BOLD}status${RESET}     Show which squad is active and why`);
     console.log(`  ${BOLD}triage${RESET}     Scan for work and categorize issues`);
     console.log(`             Usage: triage [--interval <minutes>]`);
     console.log(`             Default: checks every 10 minutes (Ctrl+C to stop)`);
+    console.log(`  ${BOLD}watch${RESET}      Persistent Ralph — poll for work between sessions`);
+    console.log(`             Usage: watch [--interval <minutes>]`);
+    console.log(`             Default: checks every 10 minutes, runs until Ctrl+C`);
     console.log(`  ${BOLD}loop${RESET}       Continuous work loop (Ralph mode)`);
     console.log(`             Usage: loop [--filter <label>] [--interval <minutes>]`);
     console.log(`             Default: checks every 10 minutes (Ctrl+C to stop)`);
@@ -127,7 +130,10 @@ async function main(): Promise<void> {
   }
 
   if (cmd === 'triage' || cmd === 'watch') {
-    console.log('🕵️ Squad triage — scanning for work... (full implementation pending)');
+    const { runWatch } = await import('./cli/commands/watch.js');
+    const intervalIdx = args.indexOf('--interval');
+    const interval = (intervalIdx !== -1 && args[intervalIdx + 1]) ? parseInt(args[intervalIdx + 1]!, 10) : 10;
+    await runWatch(process.cwd(), interval);
     return;
   }
 
