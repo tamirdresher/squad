@@ -10,6 +10,18 @@
 
 process.env.NODE_NO_WARNINGS = '1';
 
+// Suppress ExperimentalWarning (e.g. node:sqlite) from leaking to terminal.
+// process.env.NODE_NO_WARNINGS only works when set BEFORE process starts;
+// this runtime hook catches warnings emitted during dynamic imports below.
+const _origEmit = process.emit;
+// @ts-expect-error — narrowing emit signature for warning suppression
+process.emit = function (evt: string, ...args: unknown[]) {
+  if (evt === 'warning' && (args[0] as { name?: string })?.name === 'ExperimentalWarning') {
+    return false;
+  }
+  return _origEmit.apply(this, [evt, ...args] as Parameters<typeof _origEmit>);
+};
+
 // Pre-flight: detect missing node:sqlite before the Copilot SDK tries to use it.
 // The @github/copilot SDK lazily imports node:sqlite for session storage.
 // Node.js <22.5.0 and some 22.x builds don't include the builtin. (#214)
