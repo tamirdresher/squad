@@ -120,7 +120,7 @@ Squad prefers MCP tools when available, falling back to `az` CLI when not.
 To explicitly check which platform Squad detects:
 
 ```typescript
-import { detectPlatform } from '@bradygaster/squad/platform';
+import { detectPlatform } from '@bradygaster/squad-sdk';
 
 const platform = detectPlatform('/path/to/repo');
 // Returns 'github', 'azure-devops', or 'planner'
