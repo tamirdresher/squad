@@ -1,68 +1,68 @@
 ---
-updated_at: 2026-03-03T00:00:00Z
-focus_area: Migration to Public Repo + SDK Samples
-issues_open: []
-issues_closed_prd: 30
-tests_passing: 2944
-prd_location: .squad/identity/prd-next-waves.md
-current_phase: Migration v0.6.0 + SDK Samples
-process: All work through PRs with squad member review before merge
+updated_at: 2026-03-08T00:00:00Z
+focus_area: Post-v0.8.24 Stabilization
+version: v0.8.24
+branch: main
+tests_passing: 3931
+tests_todo: 46
+tests_skipped: 5
+test_files: 149
+team_size: 19 active agents + Scribe + Ralph + @copilot
+team_identity: Apollo 13 / NASA Mission Control
+process: All work through PRs. Branch naming squad/{issue-number}-{slug}. Never commit to main directly.
 ---
 
 # What We're Focused On
 
-**Status:** Migration planning complete. Target: public repo v0.6.0 (clean minor bump from v0.5.4). On `migration` branch. Two new SDK samples shipped (knock-knock, rock-paper-scissors). Banana gate still active for git operations.
+**Status:** v0.8.24 shipped to npm. Build clean (0 errors). Tests stable (3,931 passing, ~89s runtime). One pre-existing test failure in aspire-integration.test.ts (requires Docker). Post-release stabilization in progress. External contributor Tamir shipping major features across multiple branches.
 
-## Public Readiness Assessment (2026-02-24)
+## Current State
 
-Full team fan-out: Keaton, Fenster, Hockney, McManus, Rabin, Baer, Edie all assessed their domains.
+**Version:** v0.8.24 (released, on npm)
+- **Packages:** @bradygaster/squad-sdk, @bradygaster/squad-cli
+- **Branch:** main
+- **Build:** ✅ clean (0 errors)
+- **Tests:** 3,931 passed, 46 todo, 5 skipped, 149 test files (~89s)
+  - Only failure: aspire-integration.test.ts (needs Docker, pre-existing)
 
-**Consensus: 🟡 READY WITH CAVEATS** — unanimous.
+**Stack:**
+- TypeScript (strict mode, ESM-only)
+- Node.js ≥20
+- @github/copilot-sdk
+- Vitest (test runner)
+- esbuild (bundler)
 
-### Must-Fix Blockers (ALL RESOLVED ✅)
-1. ✅ **LICENSE file** — MIT LICENSE created at repo root
-2. ✅ **CI workflow broken** — Fixed `squad-ci.yml` to use `npm ci` → `npm run build` → `npm test` (vitest)
-3. ✅ **Debug console.logs** — 3 debug logs in coordinator/index.ts replaced with OTel spans
+**Team:** Apollo 13 / NASA Mission Control
+- 19 active agents (Flight, FIDO, GNC, RETRO, CONTROL, PAO, Network, Booster, SURGEON, TELMU, EECOM, GUIDO, CAPCOM, FAO, INCO, Procedures, FLIGHT_DYNAMICS, Experiments, Trajectory)
+- Scribe (orchestration historian)
+- Ralph (autonomous triage watchdog)
+- @copilot (coding agent)
 
-### Experimental Messaging (DONE ✅)
-- ⚠️ banners added to all CLI docs (installation.md, shell.md, vscode.md)
-- README Status section changed from "Production" to "Experimental alpha"
-- Broken CONTRIBUTING link fixed
+## Recent Major Features (v0.8.24)
 
-### Should-Fix (Post-Ship Polish)
-- Add `homepage` and `bugs` fields to package.json
-- Document alpha→v1.0 breaking change policy in README
-- Close #324 (dogfood testing)
+- **Azure DevOps platform adapter** — Full enterprise support for ADO alongside GitHub
+- **CommunicationAdapter** — Platform-agnostic agent-human communication abstraction
+- **SubSquads** — Renamed from workstreams, clearer mental model for nested teams
+- **Secret guardrails** — Hook-based enforcement (zero-worry guarantee)
+- **ESM runtime patch** — Node 24+ compatibility fix
+- **Contributors Guide page** — Recognition and onboarding for external contributors
+- **Team rebirth** — The Usual Suspects → Apollo 13 / NASA Mission Control
 
-### Post-M1 Backlog
-- Add `noUncheckedIndexedAccess` to tsconfig
-- Tighten ~26 `any` types in SDK
-- Add architecture overview doc
-- One real Copilot SDK integration test
-- `npm audit fix` for dev-dependency ReDoS warnings
+## Active Work in Progress (Tamir's Branches)
 
-## Waves A–D: COMPLETE
+- **`remote-control`** — PTY mirror + devtunnel for phone access (36 commits, security-hardened)
+- **`hierarchical-squad-inheritance`** — Upstream inheritance for inherited squads (6 commits)
+- **`ralph-watch`** — Persistent local watchdog polling (5 commits)
+- **`project-type-detection`** — Non-npm project support (2 commits)
+- **`prevent-git-checkout-data-loss`** — Safety guard for branch switches (2 commits)
 
-All 30 PRD-referenced issues are closed.
+## Key Recent Fixes (Post v0.8.24)
 
-### Open Issue: #324 — Dogfood CLI with real repos (P0)
-- Status: OPEN — remaining blocker for full confidence
-- Assignees: Keaton, Waingro
-
-### Next Steps
-1. **Ship public alpha** — All blockers resolved, experimental messaging in place
-2. **Complete #324 dogfood** — Test against real repos
-3. **Plan Wave E** — Based on dogfood + public feedback
+- Wired `upstream` + `watch`/`triage` commands in cli-entry.ts (recurring unwired command bug)
+- Made tests name-agnostic (resilient to team rebirths)
+- Dynamic blog discovery in docs-build tests (no longer hardcoded)
+- Cleared KNOWN_UNWIRED set (all commands now wired)
 
 ## Process
 
-All work flows through PRs with squad member review before merge.
-
----
-
-## Archive: Earlier Phases
-
-Epic #323 — CLI Quality & UX (Phases 1–3: Testing Wave → Improvement → Breathtaking)
-- Phase 1: 7 P0 blockers fixed (#365–#371)
-- Phase 2: 6 Wave D items shipped (#488–#493)
-- Phase 3: Wave A–C polish delivered (30 issues closed)
+All work through PRs. Branch naming: `squad/{issue-number}-{slug}`. Never commit to main directly. Squad member review before merge.
