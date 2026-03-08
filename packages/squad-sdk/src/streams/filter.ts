@@ -1,39 +1,42 @@
 /**
- * Workstream-Aware Issue Filtering
+ * SubSquad-Aware Issue Filtering
  *
- * Filters GitHub issues to only those matching a workstream's labelFilter.
- * Intended to scope work to the active workstream during triage.
+ * Filters GitHub issues to only those matching a SubSquad's labelFilter.
+ * Intended to scope work to the active SubSquad during triage.
  *
  * @module streams/filter
  */
 
-import type { ResolvedWorkstream } from './types.js';
+import type { ResolvedSubSquad } from './types.js';
 
 /** Minimal issue shape for filtering. */
-export interface WorkstreamIssue {
+export interface SubSquadIssue {
   number: number;
   title: string;
   labels: Array<{ name: string }>;
 }
 
-/** @deprecated Use WorkstreamIssue instead */
-export type StreamIssue = WorkstreamIssue;
+/** @deprecated Use SubSquadIssue instead */
+export type WorkstreamIssue = SubSquadIssue;
+
+/** @deprecated Use SubSquadIssue instead */
+export type StreamIssue = SubSquadIssue;
 
 /**
- * Filter issues to only those matching the workstream's label filter.
+ * Filter issues to only those matching the SubSquad's label filter.
  *
- * Matching is case-insensitive. If the workstream has no labelFilter,
+ * Matching is case-insensitive. If the SubSquad has no labelFilter,
  * all issues are returned (passthrough).
  *
  * @param issues - Array of issues to filter
- * @param workstream - The resolved workstream to filter by
- * @returns Filtered array of issues matching the workstream's label
+ * @param subsquad - The resolved SubSquad to filter by
+ * @returns Filtered array of issues matching the SubSquad's label
  */
-export function filterIssuesByWorkstream(
-  issues: WorkstreamIssue[],
-  workstream: ResolvedWorkstream,
-): WorkstreamIssue[] {
-  const filter = workstream.definition.labelFilter;
+export function filterIssuesBySubSquad(
+  issues: SubSquadIssue[],
+  subsquad: ResolvedSubSquad,
+): SubSquadIssue[] {
+  const filter = subsquad.definition.labelFilter;
   if (!filter) {
     return issues;
   }
@@ -44,5 +47,8 @@ export function filterIssuesByWorkstream(
   );
 }
 
-/** @deprecated Use filterIssuesByWorkstream instead */
-export const filterIssuesByStream = filterIssuesByWorkstream;
+/** @deprecated Use filterIssuesBySubSquad instead */
+export const filterIssuesByWorkstream = filterIssuesBySubSquad;
+
+/** @deprecated Use filterIssuesBySubSquad instead */
+export const filterIssuesByStream = filterIssuesBySubSquad;

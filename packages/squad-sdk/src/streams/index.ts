@@ -1,5 +1,5 @@
 /**
- * Workstreams module — barrel exports.
+ * SubSquads module — barrel exports.
  *
  * @module streams
  */

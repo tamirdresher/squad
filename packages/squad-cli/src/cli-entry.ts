@@ -174,8 +174,9 @@ async function main(): Promise<void> {
     console.log(`             Flags: --status, --check`);
     console.log(`  ${BOLD}extract${RESET}    Extract learnings from consult mode session`);
     console.log(`             Flags: --dry-run, --clean, --yes, --accept-risks`);
-    console.log(`  ${BOLD}workstreams${RESET} Manage Squad Workstreams (multi-Codespace scaling)`);
-    console.log(`             Usage: workstreams <list|status|activate <name>>`);
+    console.log(`  ${BOLD}subsquads${RESET}  Manage Squad SubSquads (multi-Codespace scaling)`);
+    console.log(`             Usage: subsquads <list|status|activate <name>>`);
+    console.log(`             Aliases: workstreams, streams (deprecated)`);
     console.log(`  ${BOLD}link${RESET}       Link project to a remote team root`);
     console.log(`             Usage: link <team-repo-path>`);
     console.log(`  ${BOLD}build${RESET}      Compile squad.config.ts into .squad/ markdown`);
@@ -397,9 +398,9 @@ async function main(): Promise<void> {
     return;
   }
 
-  if (cmd === 'workstreams' || cmd === 'streams') {
-    const { runWorkstreams } = await import('./cli/commands/streams.js');
-    await runWorkstreams(process.cwd(), args.slice(1));
+  if (cmd === 'subsquads' || cmd === 'workstreams' || cmd === 'streams') {
+    const { runSubSquads } = await import('./cli/commands/streams.js');
+    await runSubSquads(process.cwd(), args.slice(1));
     return;
   }
 

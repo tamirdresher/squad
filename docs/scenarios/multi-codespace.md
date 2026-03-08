@@ -1,24 +1,24 @@
-# Multi-Codespace Setup with Squad Workstreams
+# Multi-Codespace Setup with Squad SubSquads
 
 > End-to-end walkthrough of running multiple Squad instances across Codespaces.
 
 ## Background: The Tetris Experiment
 
-We validated Squad Workstreams by building a multiplayer Tetris game using 3 Codespaces, each running a separate workstream:
+We validated Squad SubSquads by building a multiplayer Tetris game using 3 Codespaces, each running a separate SubSquad:
 
-| Codespace | Workstream | Label | Focus |
+| Codespace | SubSquad | Label | Focus |
 |-----------|--------|-------|-------|
 | CS-1 | `ui-team` | `team:ui` | React game board, piece rendering, animations |
 | CS-2 | `backend-team` | `team:backend` | WebSocket server, game state, matchmaking |
 | CS-3 | `infra-team` | `team:infra` | CI/CD, Docker, deployment |
 
-All three Codespaces shared the same repository. Each Squad instance only picked up issues matching its workstream's label.
+All three Codespaces shared the same repository. Each Squad instance only picked up issues matching its SubSquad's label.
 
 ## Setup Steps
 
-### 1. Create the workstreams config
+### 1. Create the SubSquads config
 
-In your repository, create `.squad/workstreams.json`:
+In your repository, create `.squad/streams.json`:
 
 ```json
 {
@@ -67,7 +67,7 @@ In `.devcontainer/devcontainer.json`, set the `SQUAD_TEAM` env var. For multiple
 
 ```bash
 export SQUAD_TEAM=ui-team
-squad  # launches with workstream context
+squad  # launches with SubSquad context
 ```
 
 ### 3. Label your issues
@@ -82,7 +82,7 @@ gh issue create --title "Add Docker compose for dev" --label "team:infra"
 
 ### 4. Launch Squad in each Codespace
 
-Each Codespace runs `squad` normally. The workstream context is detected automatically:
+Each Codespace runs `squad` normally. The SubSquad context is detected automatically:
 
 ```bash
 # In Codespace 1 (SQUAD_TEAM=ui-team)
@@ -96,32 +96,32 @@ squad
 # → Agents only modify files in src/server, src/shared
 ```
 
-### 5. Monitor across workstreams
+### 5. Monitor across SubSquads
 
-Use the CLI from any Codespace to see all workstreams:
+Use the CLI from any Codespace to see all SubSquads:
 
 ```bash
-squad workstreams status
+squad subsquads status
 ```
 
-<!-- Screenshot: workstreams status output showing PRs per workstream -->
+<!-- Screenshot: SubSquads status output showing PRs per SubSquad -->
 <!-- TODO: Add screenshot placeholder -->
 
 ## What Worked
 
-- **Clear separation**: Each workstream had well-defined boundaries, minimizing merge conflicts
+- **Clear separation**: Each SubSquad had well-defined boundaries, minimizing merge conflicts
 - **Parallel velocity**: 3x throughput vs. single-squad mode for independent work
 - **Label-based routing**: Simple, uses existing GitHub infrastructure
 
 ## What Didn't Work (Yet)
 
-- **Cross-workstream dependencies**: When the UI team needed a backend API change, manual coordination was required
+- **Cross-SubSquad dependencies**: When the UI team needed a backend API change, manual coordination was required
 - **Shared files**: `package.json`, `tsconfig.json`, and other root files caused occasional conflicts
-- **No meta-coordinator**: No automated way to coordinate across workstreams (future work)
+- **No meta-coordinator**: No automated way to coordinate across SubSquads (future work)
 
 ## Lessons Learned
 
-1. **Keep workstreams independent** — design folder boundaries to minimize shared files
-2. **Use branch-per-issue** — direct commits across workstreams cause merge hell
-3. **Label everything** — unlabeled issues get lost between workstreams
-4. **Start with 2 workstreams** — add more once the team finds its rhythm
+1. **Keep SubSquads independent** — design folder boundaries to minimize shared files
+2. **Use branch-per-issue** — direct commits across SubSquads cause merge hell
+3. **Label everything** — unlabeled issues get lost between SubSquads
+4. **Start with 2 SubSquads** — add more once the team finds its rhythm

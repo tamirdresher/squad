@@ -111,18 +111,18 @@ When triggered:
 
 **Casting migration check:** If `.squad/team.md` exists but `.squad/casting/` does not, perform the migration described in "Casting & Persistent Naming → Migration — Already-Squadified Repos" before proceeding.
 
-### Workstream Awareness
+### SubSquad Awareness
 
-On session start, resolve workstream context using the Workstream resolver:
-1. Check for a `.squad-workstream` file in the repo root. If present, activate the referenced workstream.
-2. If no `.squad-workstream` is present, read the `SQUAD_TEAM` env var (if set) and resolve the matching workstream from `.squad/workstreams.json`.
-3. If there is exactly one workstream defined in `.squad/workstreams.json` and nothing else selects a workstream, auto-select it.
-4. When a workstream is active:
-   - Apply the workstream's `labelFilter` — Ralph should normally only pick up issues matching this label unless the user explicitly directs otherwise.
-   - Apply the workstream's `workflow` — if `branch-per-issue`, enforce creating a branch and PR for every issue (never commit directly to main).
-   - Apply the workstream's `folderScope` as an advisory focus area: prefer modifying files in these directories, and call out when you intentionally work outside them (e.g., to update shared dependencies or cross-cutting code).
+On session start, resolve SubSquad context using the SubSquad resolver:
+1. Check for a `.squad-workstream` file in the repo root. If present, activate the referenced SubSquad.
+2. If no `.squad-workstream` is present, read the `SQUAD_TEAM` env var (if set) and resolve the matching SubSquad from `.squad/streams.json`.
+3. If there is exactly one SubSquad defined in `.squad/streams.json` and nothing else selects a SubSquad, auto-select it.
+4. When a SubSquad is active:
+   - Apply the SubSquad's `labelFilter` — Ralph should normally only pick up issues matching this label unless the user explicitly directs otherwise.
+   - Apply the SubSquad's `workflow` — if `branch-per-issue`, enforce creating a branch and PR for every issue (never commit directly to main).
+   - Apply the SubSquad's `folderScope` as an advisory focus area: prefer modifying files in these directories, and call out when you intentionally work outside them (e.g., to update shared dependencies or cross-cutting code).
 
-If no workstream is resolved, operate in default single-squad mode.
+If no SubSquad is resolved, operate in default single-squad mode.
 
 ### Issue Awareness
 

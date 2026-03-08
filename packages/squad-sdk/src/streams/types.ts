@@ -1,15 +1,15 @@
 /**
- * Workstream Types — Type definitions for Squad Workstreams.
+ * SubSquad Types — Type definitions for Squad SubSquads.
  *
- * Workstreams enable horizontal scaling by allowing multiple Squad instances
+ * SubSquads enable horizontal scaling by allowing multiple Squad instances
  * (e.g., in different Codespaces) to each handle a scoped subset of work.
  *
  * @module streams/types
  */
 
-/** Definition of a single workstream (team partition). */
-export interface WorkstreamDefinition {
-  /** Workstream name, e.g., "ui-team", "backend-team" */
+/** Definition of a single SubSquad (team partition). */
+export interface SubSquadDefinition {
+  /** SubSquad name, e.g., "ui-team", "backend-team" */
   name: string;
   /** GitHub label to filter issues by, e.g., "team:ui" */
   labelFilter: string;
@@ -17,33 +17,42 @@ export interface WorkstreamDefinition {
   folderScope?: string[];
   /** Workflow mode. Default: branch-per-issue */
   workflow?: 'branch-per-issue' | 'direct';
-  /** Human-readable description of this workstream's purpose */
+  /** Human-readable description of this SubSquad's purpose */
   description?: string;
 }
 
-/** @deprecated Use WorkstreamDefinition instead */
-export type StreamDefinition = WorkstreamDefinition;
+/** @deprecated Use SubSquadDefinition instead */
+export type WorkstreamDefinition = SubSquadDefinition;
 
-/** Top-level workstreams configuration (stored in .squad/workstreams.json). */
-export interface WorkstreamConfig {
-  /** All configured workstreams */
-  workstreams: WorkstreamDefinition[];
-  /** Default workflow for workstreams that don't specify one */
+/** @deprecated Use SubSquadDefinition instead */
+export type StreamDefinition = SubSquadDefinition;
+
+/** Top-level SubSquads configuration (stored in .squad/streams.json). */
+export interface SubSquadConfig {
+  /** All configured SubSquads */
+  workstreams: SubSquadDefinition[];
+  /** Default workflow for SubSquads that don't specify one */
   defaultWorkflow: 'branch-per-issue' | 'direct';
 }
 
-/** @deprecated Use WorkstreamConfig instead */
-export type StreamConfig = WorkstreamConfig;
+/** @deprecated Use SubSquadConfig instead */
+export type WorkstreamConfig = SubSquadConfig;
 
-/** A resolved workstream with provenance information. */
-export interface ResolvedWorkstream {
-  /** Workstream name */
+/** @deprecated Use SubSquadConfig instead */
+export type StreamConfig = SubSquadConfig;
+
+/** A resolved SubSquad with provenance information. */
+export interface ResolvedSubSquad {
+  /** SubSquad name */
   name: string;
-  /** Full workstream definition */
-  definition: WorkstreamDefinition;
-  /** How this workstream was resolved */
+  /** Full SubSquad definition */
+  definition: SubSquadDefinition;
+  /** How this SubSquad was resolved */
   source: 'env' | 'file' | 'config';
 }
 
-/** @deprecated Use ResolvedWorkstream instead */
-export type ResolvedStream = ResolvedWorkstream;
+/** @deprecated Use ResolvedSubSquad instead */
+export type ResolvedWorkstream = ResolvedSubSquad;
+
+/** @deprecated Use ResolvedSubSquad instead */
+export type ResolvedStream = ResolvedSubSquad;

@@ -4380,7 +4380,7 @@ The merge base is `d405871`. Since then:
 - **main** got 21 non-merge commits (mostly release work, docs updates, guard cleanups)
 - **dev** got extensive squad-sdk planning work (session logs, decisions, orchestration logs)
 
-The branches effectively represent two different workstreams that happened in parallel:
+The branches effectively represent two different SubSquads that happened in parallel:
 - **main**: Release management (v0.5.x), guard cleanup, archive notices
 - **dev**: Squad-SDK planning, CLI migration logs, PRD work
 

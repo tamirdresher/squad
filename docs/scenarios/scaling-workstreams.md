@@ -1,4 +1,4 @@
-# Scaling with Workstreams
+# Scaling with SubSquads
 
 > Partition your repo's work across multiple Squad instances for horizontal scaling.
 
@@ -10,9 +10,9 @@ A single Squad instance handles all issues in a repo. For large projects, this c
 - No workflow enforcement (agents commit directly to main)
 - No way to monitor multiple teams centrally
 
-## The Solution: Workstreams
+## The Solution: SubSquads
 
-Workstreams partition a repo's issues into labeled subsets. Each Codespace (or machine) runs one workstream, scoped to its slice of work.
+SubSquads partition a repo's issues into labeled subsets. Each Codespace (or machine) runs one SubSquad, scoped to its slice of work.
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -26,15 +26,15 @@ Workstreams partition a repo's issues into labeled subsets. Each Codespace (or m
 │  └─────────────┘ └─────────────┘ └───────────┘ │
 │                                                 │
 │  Each Squad instance only picks up issues       │
-│  matching its workstream label.                 │
+│  matching its SubSquad label.                 │
 └─────────────────────────────────────────────────┘
 ```
 
 ## Quick Start
 
-### 1. Define workstreams
+### 1. Define SubSquads
 
-Create `.squad/workstreams.json`:
+Create `.squad/streams.json`:
 
 ```json
 {
@@ -64,21 +64,21 @@ Create `.squad/workstreams.json`:
 
 ### 2. Label your issues
 
-Each issue gets a `team:*` label matching a workstream. Ralph will only pick up issues matching the active workstream's label.
+Each issue gets a `team:*` label matching a SubSquad. Ralph will only pick up issues matching the active SubSquad's label.
 
-### 3. Activate a workstream
+### 3. Activate a SubSquad
 
 **Option A — Environment variable (Codespaces):**
 Set `SQUAD_TEAM=bridge` in the Codespace's environment. Squad auto-detects it on session start.
 
 **Option B — CLI activation (local):**
 ```bash
-squad workstreams activate bridge
+squad subsquads activate bridge
 ```
 This writes a `.squad-workstream` file (gitignored — local to your machine).
 
-**Option C — Single workstream auto-select:**
-If `workstreams.json` defines only one workstream, it's auto-selected.
+**Option C — Single SubSquad auto-select:**
+If `streams.json` defines only one SubSquad, it's auto-selected.
 
 ### 4. Run Squad normally
 
@@ -92,18 +92,21 @@ Ralph will only scan for issues with the `team:bridge` label. Agents will only p
 ## CLI Commands
 
 ```bash
-# List configured workstreams
+# List configured SubSquads
+squad subsquads list
+
+# Show activity per SubSquad (branches, PRs)
+squad subsquads status
+
+# Activate a SubSquad for this machine
+squad subsquads activate engine
+
+# Deprecated aliases (still work)
 squad workstreams list
-
-# Show activity per workstream (branches, PRs)
-squad workstreams status
-
-# Activate a workstream for this machine
-squad workstreams activate engine
-
-# Backward compat alias
 squad streams list
 ```
+
+> **Note:** `squad workstreams` and `squad streams` are deprecated aliases for `squad subsquads`.
 
 ## Key Design Decisions
 
@@ -113,30 +116,30 @@ squad streams list
 
 ### Workflow Enforcement
 
-Each workstream specifies a `workflow` (default: `branch-per-issue`). When active, agents:
+Each SubSquad specifies a `workflow` (default: `branch-per-issue`). When active, agents:
 - Create a branch for every issue (`squad/{issue-number}-{slug}`)
 - Open a PR when work is ready
 - Never commit directly to main
 
-### Single-Machine Multi-Workstream
+### Single-Machine Multi-SubSquad
 
-You don't need multiple Codespaces to test. Use `squad workstreams activate` to switch between workstreams sequentially on a single machine.
+You don't need multiple Codespaces to test. Use `squad subsquads activate` to switch between SubSquads sequentially on a single machine.
 
 ## Resolution Chain
 
-Squad resolves the active workstream in this order:
+Squad resolves the active SubSquad in this order:
 
 1. `SQUAD_TEAM` environment variable
-2. `.squad-workstream` file (written by `squad workstreams activate`)
-3. Auto-select if exactly one workstream is defined
-4. No workstream → single-squad mode (backward compatible)
+2. `.squad-workstream` file (written by `squad subsquads activate`)
+3. Auto-select if exactly one SubSquad is defined
+4. No SubSquad → single-squad mode (backward compatible)
 
 ## Monitoring
 
-Use `squad workstreams status` to see all workstreams' activity:
+Use `squad subsquads status` to see all SubSquads' activity:
 
 ```
-Configured Workstreams
+Configured SubSquads
 
   Default workflow: branch-per-issue
 
@@ -155,11 +158,11 @@ Configured Workstreams
        Workflow: branch-per-issue
        Folders: infra/, scripts/, .github/
 
-  Active workstream resolved via: env
+  Active SubSquad resolved via: env
 ```
 
 ## See Also
 
 - [Multi-Codespace Setup](multi-codespace.md) — Walkthrough of the Tetris experiment
-- [Workstreams PRD](../specs/streams-prd.md) — Full specification
-- [Workstreams Feature Guide](../features/streams.md) — API reference
+- [SubSquads PRD](../specs/streams-prd.md) — Full specification
+- [SubSquads Feature Guide](../features/streams.md) — API reference

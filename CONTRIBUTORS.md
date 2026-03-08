@@ -101,7 +101,7 @@ These community members shaped Squad through issues, discussions, and feedback. 
 | [@tomasherceg](https://github.com/tomasherceg) | #184 (Multi-PR commit isolation), #237 (CLI wiring bug) — worktree improvements and bug reports |
 | [@csharpfritz](https://github.com/csharpfritz) | #205 (Per-member model configuration) — model selection feature (shipped!) |
 | [@johnwc](https://github.com/johnwc) | #176 (Different repo support) — multi-repo workflows |
-| [@tamirdresher](https://github.com/tamirdresher) | #200 (Squad Workstreams PRD), #237 (CLI wiring bug) — horizontal scaling concept and bug reports |
+| [@tamirdresher](https://github.com/tamirdresher) | #200 (Squad SubSquads PRD), #237 (CLI wiring bug) — horizontal scaling concept and bug reports |
 | [@marchermans](https://github.com/marchermans) | #247 (Installation failure) — install bug report |
 | [@dkirby-ms](https://github.com/dkirby-ms) | #239 (Terminal flickering bug) — UX bug report |
 | [@EirikHaughom](https://github.com/EirikHaughom) | #223 (Model & reasoning configuration) — model config improvements |

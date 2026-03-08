@@ -1,14 +1,14 @@
 ---
-title: "Workstreams — Scaling Squad Across Multiple Codespaces"
+title: "SubSquads — Scaling Squad Across Multiple Codespaces"
 date: 2026-03-05
 author: "Tamir Dresher (Community Contributor)"
 wave: null
-tags: [squad, workstreams, scaling, codespaces, horizontal-scaling, multi-instance, community]
+tags: [squad, subsquads, scaling, codespaces, horizontal-scaling, multi-instance, community]
 status: draft
-hero: "Squad Workstreams lets you partition a repo's work across multiple Codespaces — each running its own scoped Squad instance. One repo, multiple AI teams, zero conflicts."
+hero: "Squad SubSquads lets you partition a repo's work across multiple Codespaces — each running its own scoped Squad instance. One repo, multiple AI teams, zero conflicts."
 ---
 
-# Workstreams — Scaling Squad Across Multiple Codespaces
+# SubSquads — Scaling Squad Across Multiple Codespaces
 
 > Blog post #23 — A community contribution: horizontal scaling for Squad.
 
@@ -16,11 +16,11 @@ hero: "Squad Workstreams lets you partition a repo's work across multiple Codesp
 
 We were building a multiplayer Tetris game with Squad. One team, 30 issues — UI, backend, cloud infra. Squad handled it fine at first, but as the issue count grew, a single Squad instance became a bottleneck. Agents stepped on each other in shared packages, there was no workflow enforcement, and we had no way to scope each Codespace to its slice of work.
 
-So we built Workstreams.
+So we built SubSquads.
 
-## What Are Workstreams?
+## What Are SubSquads?
 
-Workstreams partition your repo's issues into labeled subsets. Each Codespace (or machine) runs one workstream, scoped to matching issues only.
+SubSquads partition your repo's issues into labeled subsets. Each Codespace (or machine) runs one SubSquad, scoped to matching issues only.
 
 ```
 ┌─────────────────────────────────────────────────┐
@@ -33,13 +33,13 @@ Workstreams partition your repo's issues into labeled subsets. Each Codespace (o
 │  └─────────────┘ └─────────────┘ └───────────┘ │
 │                                                 │
 │  Ralph only picks up issues matching            │
-│  the active workstream's label.                 │
+│  the active SubSquad's label.                   │
 └─────────────────────────────────────────────────┘
 ```
 
 ## How It Works
 
-**1. Define workstreams** in `.squad/workstreams.json`:
+**1. Define SubSquads** in `.squad/streams.json`:
 
 ```json
 {
@@ -61,14 +61,14 @@ Workstreams partition your repo's issues into labeled subsets. Each Codespace (o
 }
 ```
 
-**2. Activate a workstream:**
+**2. Activate a SubSquad:**
 
 ```bash
 # Via environment variable (ideal for Codespaces)
 export SQUAD_TEAM=bridge
 
 # Or via CLI (local machines)
-squad workstreams activate bridge
+squad subsquads activate bridge
 ```
 
 **3. Run Squad normally.** Ralph will only pick up issues labeled `team:bridge`. Agents enforce branch+PR workflow. `folderScope` guides where agents focus (advisory, not enforced — shared code is still accessible).
@@ -77,7 +77,7 @@ squad workstreams activate bridge
 
 We validated this with [tamirdresher/squad-tetris](https://github.com/tamirdresher/squad-tetris) — 3 Codespaces, 30 issues, Star Trek TNG crew names:
 
-| Codespace | Workstream | Squad Members | Focus |
+| Codespace | SubSquad | Squad Members | Focus |
 |-----------|-----------|---------------|-------|
 | CS-1 | `ui` | Riker, Troi | React game board, animations |
 | CS-2 | `backend` | Geordi, Worf | WebSocket server, game state |
@@ -88,32 +88,32 @@ We validated this with [tamirdresher/squad-tetris](https://github.com/tamirdresh
 ## CLI Commands
 
 ```bash
-squad workstreams list       # Show all configured workstreams
-squad workstreams status     # Activity per workstream (branches, PRs)
-squad workstreams activate X # Activate a workstream for this machine
+squad subsquads list       # Show all configured SubSquads
+squad subsquads status     # Activity per SubSquad (branches, PRs)
+squad subsquads activate X # Activate a SubSquad for this machine
 ```
 
 ## Resolution Chain
 
-Squad resolves the active workstream in priority order:
+Squad resolves the active SubSquad in priority order:
 
 1. `SQUAD_TEAM` environment variable
 2. `.squad-workstream` file (written by `activate`, gitignored)
-3. Auto-select if exactly one workstream is defined
-4. No workstream → single-squad mode (backward compatible)
+3. Auto-select if exactly one SubSquad is defined
+4. No SubSquad → single-squad mode (backward compatible)
 
 ## Key Design Decisions
 
 - **folderScope is advisory** — agents prefer these directories but can modify shared code when needed
 - **Workflow enforcement** — `branch-per-issue` means every issue gets a branch and PR, never direct commits to main
-- **Backward compatible** — repos without `workstreams.json` work exactly as before
-- **Single-machine testing** — use `squad workstreams activate` to switch workstreams sequentially without needing multiple Codespaces
+- **Backward compatible** — repos without `streams.json` work exactly as before
+- **Single-machine testing** — use `squad subsquads activate` to switch SubSquads sequentially without needing multiple Codespaces
 
 ## What's Next
 
-We're looking at cross-workstream coordination — a central dashboard showing all workstreams' activity, conflict detection for shared files, and auto-merge coordination. See the [PRD](https://github.com/bradygaster/squad/issues/200) for the full roadmap.
+We're looking at cross-SubSquad coordination — a central dashboard showing all SubSquads' activity, conflict detection for shared files, and auto-merge coordination. See the [PRD](https://github.com/bradygaster/squad/issues/200) for the full roadmap.
 
-Also: we haven't settled on the name yet! "Workstreams" is the working title, but we're considering alternatives like "Lanes", "Teams", or "Streams". If you have an opinion, let us know in the [discussion](https://github.com/bradygaster/squad/issues/200).
+The community decided on the name "SubSquads" — each partition is a SubSquad of the main Squad.
 
 ## Try It
 
@@ -124,10 +124,10 @@ npm install -g @bradygaster/squad-cli
 # Init in your repo
 squad init
 
-# Create workstreams.json and label your issues
+# Create streams.json and label your issues
 # Then activate and go
-squad workstreams activate frontend
+squad subsquads activate frontend
 squad start
 ```
 
-Full docs: [Scaling with Workstreams](../scenarios/scaling-workstreams.md) | [Multi-Codespace Setup](../scenarios/multi-codespace.md) | [Workstreams PRD](../specs/streams-prd.md)
+Full docs: [Scaling with SubSquads](../scenarios/scaling-workstreams.md) | [Multi-Codespace Setup](../scenarios/multi-codespace.md) | [SubSquads PRD](../specs/streams-prd.md)

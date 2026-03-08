@@ -1,26 +1,26 @@
 /**
- * Workstream Resolver — Resolves which workstream is active.
+ * SubSquad Resolver — Resolves which SubSquad is active.
  *
  * Resolution order:
- *   1. SQUAD_TEAM env var → look up in workstreams config
- *   2. .squad-workstream file (gitignored) → contains workstream name
- *   3. If exactly one workstream is defined in the config, auto-select that workstream
- *   4. null (no active workstream — single-squad mode / no workstreams)
+ *   1. SQUAD_TEAM env var → look up in SubSquads config
+ *   2. .squad-workstream file (gitignored) → contains SubSquad name
+ *   3. If exactly one SubSquad is defined in the config, auto-select that SubSquad
+ *   4. null (no active SubSquad — single-squad mode / no SubSquads)
  *
  * @module streams/resolver
  */
 
 import { existsSync, readFileSync } from 'fs';
 import { join } from 'path';
-import type { WorkstreamConfig, WorkstreamDefinition, ResolvedWorkstream } from './types.js';
+import type { SubSquadConfig, SubSquadDefinition, ResolvedSubSquad } from './types.js';
 
 /**
- * Load workstreams configuration from .squad/workstreams.json.
+ * Load SubSquads configuration from .squad/workstreams.json.
  *
  * @param squadRoot - Root directory of the project (where .squad/ lives)
- * @returns Parsed WorkstreamConfig or null if not found / invalid
+ * @returns Parsed SubSquadConfig or null if not found / invalid
  */
-export function loadWorkstreamsConfig(squadRoot: string): WorkstreamConfig | null {
+export function loadSubSquadsConfig(squadRoot: string): SubSquadConfig | null {
   const configPath = join(squadRoot, '.squad', 'workstreams.json');
   if (!existsSync(configPath)) {
     return null;
@@ -52,7 +52,7 @@ export function loadWorkstreamsConfig(squadRoot: string): WorkstreamConfig | nul
       return null;
     }
 
-    const workstreams: WorkstreamDefinition[] = workstreamsRaw
+    const workstreams: SubSquadDefinition[] = workstreamsRaw
       .filter(entry => entry && typeof entry === 'object')
       .map(entry => {
         const e = entry as {
@@ -86,9 +86,9 @@ export function loadWorkstreamsConfig(squadRoot: string): WorkstreamConfig | nul
           normalized.description = e.description;
         }
 
-        return normalized as unknown as WorkstreamDefinition;
+        return normalized as unknown as SubSquadDefinition;
       })
-      .filter((s): s is WorkstreamDefinition => s !== null);
+      .filter((s): s is SubSquadDefinition => s !== null);
 
     if (workstreams.length === 0) {
       return null;
@@ -100,35 +100,38 @@ export function loadWorkstreamsConfig(squadRoot: string): WorkstreamConfig | nul
   }
 }
 
-/** @deprecated Use loadWorkstreamsConfig instead */
-export const loadStreamsConfig = loadWorkstreamsConfig;
+/** @deprecated Use loadSubSquadsConfig instead */
+export const loadWorkstreamsConfig = loadSubSquadsConfig;
+
+/** @deprecated Use loadSubSquadsConfig instead */
+export const loadStreamsConfig = loadSubSquadsConfig;
 
 /**
- * Find a workstream definition by name in a config.
+ * Find a SubSquad definition by name in a config.
  */
-function findWorkstream(config: WorkstreamConfig, name: string): WorkstreamDefinition | undefined {
+function findSubSquad(config: SubSquadConfig, name: string): SubSquadDefinition | undefined {
   return config.workstreams.find(s => s.name === name);
 }
 
 /**
- * Resolve which workstream is active for the current environment.
+ * Resolve which SubSquad is active for the current environment.
  *
  * @param squadRoot - Root directory of the project
- * @returns ResolvedWorkstream or null if no workstream is active
+ * @returns ResolvedSubSquad or null if no SubSquad is active
  */
-export function resolveWorkstream(squadRoot: string): ResolvedWorkstream | null {
-  const config = loadWorkstreamsConfig(squadRoot);
+export function resolveSubSquad(squadRoot: string): ResolvedSubSquad | null {
+  const config = loadSubSquadsConfig(squadRoot);
 
   // 1. SQUAD_TEAM env var
   const envTeam = process.env.SQUAD_TEAM;
   if (envTeam) {
     if (config) {
-      const def = findWorkstream(config, envTeam);
+      const def = findSubSquad(config, envTeam);
       if (def) {
         return { name: envTeam, definition: def, source: 'env' };
       }
     }
-    // Env var set but no matching workstream config — synthesize a minimal definition
+    // Env var set but no matching SubSquad config — synthesize a minimal definition
     return {
       name: envTeam,
       definition: {
@@ -143,20 +146,20 @@ export function resolveWorkstream(squadRoot: string): ResolvedWorkstream | null 
   const workstreamFilePath = join(squadRoot, '.squad-workstream');
   if (existsSync(workstreamFilePath)) {
     try {
-      const workstreamName = readFileSync(workstreamFilePath, 'utf-8').trim();
-      if (workstreamName) {
+      const subsquadName = readFileSync(workstreamFilePath, 'utf-8').trim();
+      if (subsquadName) {
         if (config) {
-          const def = findWorkstream(config, workstreamName);
+          const def = findSubSquad(config, subsquadName);
           if (def) {
-            return { name: workstreamName, definition: def, source: 'file' };
+            return { name: subsquadName, definition: def, source: 'file' };
           }
         }
         // File exists but no config — synthesize
         return {
-          name: workstreamName,
+          name: subsquadName,
           definition: {
-            name: workstreamName,
-            labelFilter: `team:${workstreamName}`,
+            name: subsquadName,
+            labelFilter: `team:${subsquadName}`,
           },
           source: 'file',
         };
@@ -166,28 +169,34 @@ export function resolveWorkstream(squadRoot: string): ResolvedWorkstream | null 
     }
   }
 
-  // 3. If exactly one workstream is defined, auto-select it
+  // 3. If exactly one SubSquad is defined, auto-select it
   if (config && config.workstreams.length === 1) {
     const def = config.workstreams[0]!;
     return { name: def.name, definition: def, source: 'config' };
   }
 
-  // 4. No workstream detected
+  // 4. No SubSquad detected
   return null;
 }
 
-/** @deprecated Use resolveWorkstream instead */
-export const resolveStream = resolveWorkstream;
+/** @deprecated Use resolveSubSquad instead */
+export const resolveWorkstream = resolveSubSquad;
+
+/** @deprecated Use resolveSubSquad instead */
+export const resolveStream = resolveSubSquad;
 
 /**
- * Get the GitHub label filter string for a resolved workstream.
+ * Get the GitHub label filter string for a resolved SubSquad.
  *
- * @param workstream - The resolved workstream
+ * @param subsquad - The resolved SubSquad
  * @returns Label filter string (e.g., "team:ui")
  */
-export function getWorkstreamLabelFilter(workstream: ResolvedWorkstream): string {
-  return workstream.definition.labelFilter;
+export function getSubSquadLabelFilter(subsquad: ResolvedSubSquad): string {
+  return subsquad.definition.labelFilter;
 }
 
-/** @deprecated Use getWorkstreamLabelFilter instead */
-export const getStreamLabelFilter = getWorkstreamLabelFilter;
+/** @deprecated Use getSubSquadLabelFilter instead */
+export const getWorkstreamLabelFilter = getSubSquadLabelFilter;
+
+/** @deprecated Use getSubSquadLabelFilter instead */
+export const getStreamLabelFilter = getSubSquadLabelFilter;

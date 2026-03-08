@@ -15,7 +15,7 @@ import { existsSync, cpSync, statSync, mkdirSync, writeFileSync, readFileSync, r
 import { execFileSync } from 'node:child_process';
 import { MODELS } from '../runtime/constants.js';
 import type { SquadConfig, ModelSelectionConfig, RoutingConfig } from '../runtime/config.js';
-import type { WorkstreamDefinition } from '../streams/types.js';
+import type { SubSquadDefinition } from '../streams/types.js';
 
 // ============================================================================
 // Template Resolution
@@ -111,8 +111,8 @@ export interface InitOptions {
   prompt?: string;
   /** If true, disable extraction from consult sessions (read-only consultations) */
   extractionDisabled?: boolean;
-  /** Optional workstream definitions — generates .squad/workstreams.json when provided */
-  streams?: WorkstreamDefinition[];
+  /** Optional SubSquad definitions — generates .squad/workstreams.json when provided */
+  streams?: SubSquadDefinition[];
 }
 
 /**
@@ -971,20 +971,20 @@ ${projectDescription ? `- **Description:** ${projectDescription}\n` : ''}- **Cre
   }
   
   // -------------------------------------------------------------------------
-  // Generate .squad/workstreams.json (when streams provided)
+  // Generate .squad/workstreams.json (when SubSquads provided)
   // -------------------------------------------------------------------------
 
   if (options.streams && options.streams.length > 0) {
-    const workstreamsConfig = {
+    const subsquadsConfig = {
       workstreams: options.streams,
       defaultWorkflow: 'branch-per-issue',
     };
     const workstreamsPath = join(squadDir, 'workstreams.json');
-    await writeIfNotExists(workstreamsPath, JSON.stringify(workstreamsConfig, null, 2) + '\n');
+    await writeIfNotExists(workstreamsPath, JSON.stringify(subsquadsConfig, null, 2) + '\n');
   }
 
   // -------------------------------------------------------------------------
-  // Add .squad-workstream to .gitignore
+  // Add .squad-workstream to .gitignore (SubSquad activation file)
   // -------------------------------------------------------------------------
 
   {
@@ -995,7 +995,7 @@ ${projectDescription ? `- **Description:** ${projectDescription}\n` : ''}- **Cre
     }
     if (!currentIgnore.includes(workstreamIgnoreEntry)) {
       const block = (currentIgnore && !currentIgnore.endsWith('\n') ? '\n' : '')
-        + '# Squad: workstream activation file (local to this machine)\n'
+        + '# Squad: SubSquad activation file (local to this machine)\n'
         + workstreamIgnoreEntry + '\n';
       await appendFile(gitignorePath, block);
       createdFiles.push(toRelativePath(gitignorePath));
