@@ -357,15 +357,29 @@ mark[data-pagefind-highlight] {
   animation-delay: calc(800ms + var(--delay, 0) * 150ms);
 }
 
+/* Scroll reveal */
+.reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1), transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.reveal.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
 @media (prefers-reduced-motion: reduce) {
   .animate-fade-up,
   .animate-fade-up-scale,
   .animate-fade-in,
   .animate-slide-in-right,
-  .agent-line {
+  .agent-line,
+  .reveal {
     opacity: 1;
     animation: none;
     transform: none;
+    transition: none;
   }
   .animate-float-slow,
   .animate-float-slow-reverse,

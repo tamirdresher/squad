@@ -18,8 +18,6 @@ const base = import.meta.env.BASE_URL;
       <div class="absolute -bottom-1/4 -right-1/4 w-[50%] h-[50%] rounded-full bg-accent-300/10 dark:bg-accent-600/8 blur-[100px] animate-float-slow-reverse"></div>
       <div class="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[40%] h-[40%] rounded-full bg-navy-400/8 dark:bg-navy-400/5 blur-[80px] animate-pulse-subtle"></div>
     </div>
-    <!-- Grid pattern overlay -->
-    <div class="absolute inset-0 bg-[linear-gradient(rgba(36,54,94,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(36,54,94,0.04)_1px,transparent_1px)] dark:bg-[linear-gradient(rgba(36,54,94,0.08)_1px,transparent_1px),linear-gradient(90deg,rgba(36,54,94,0.08)_1px,transparent_1px)] bg-[size:60px_60px]"></div>
 
     <div class="relative w-full max-w-7xl mx-auto px-4 py-16 sm:py-20 sm:px-6 lg:px-8 lg:py-24">
       <div class="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
@@ -67,9 +65,9 @@ const base = import.meta.env.BASE_URL;
           </div>
 
           <!-- Quick install snippet -->
-          <div class="animate-fade-up delay-600 hidden sm:flex items-center gap-3 bg-surface-900/90 dark:bg-surface-800/90 backdrop-blur-sm rounded-xl px-5 py-3 max-w-md mx-auto lg:mx-0 border border-surface-700/50">
-            <code class="text-sm font-mono text-surface-300 flex-1 truncate">npm i -g @bradygaster/squad-cli</code>
-            <button id="copy-install" class="text-surface-500 hover:text-white transition-colors shrink-0" aria-label="Copy install command">
+          <div class="animate-fade-up delay-600 hidden sm:flex items-center gap-3 bg-surface-100 dark:bg-surface-800/90 backdrop-blur-sm rounded-xl px-5 py-3 max-w-md mx-auto lg:mx-0 border border-surface-200 dark:border-surface-700/50">
+            <code class="text-sm font-mono text-surface-700 dark:text-surface-300 flex-1 truncate">npm i -g @bradygaster/squad-cli</code>
+            <button id="copy-install" class="text-surface-400 hover:text-surface-900 dark:text-surface-500 dark:hover:text-white transition-colors shrink-0" aria-label="Copy install command">
               <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M8 16H6a2 2 0 01-2-2V6a2 2 0 012-2h8a2 2 0 012 2v2m-6 12h8a2 2 0 002-2v-8a2 2 0 00-2-2h-8a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
@@ -150,32 +148,32 @@ const base = import.meta.env.BASE_URL;
     </div>
   </section>
 
-  <!-- Social proof / stats -->
-  <section class="relative border-y border-surface-200 dark:border-surface-800 bg-white/50 dark:bg-surface-900/50 backdrop-blur-sm">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 sm:py-10">
-      <div class="grid grid-cols-2 lg:grid-cols-4 gap-6 sm:gap-8">
-        <div class="text-center">
-          <div class="text-3xl sm:text-4xl font-bold text-surface-900 dark:text-white mb-1">19+</div>
-          <div class="text-sm text-surface-500 dark:text-surface-400">Specialized Agents</div>
+  <!-- Trust strip -->
+  <section class="relative border-y border-surface-200/60 dark:border-surface-800/60 bg-surface-50/80 dark:bg-surface-900/30 backdrop-blur-sm">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-5">
+      <div class="flex flex-wrap items-center justify-center gap-x-8 gap-y-2 text-lg">
+        <div class="flex items-center gap-2 text-surface-600 dark:text-surface-300">
+          <span class="w-1.5 h-1.5 rounded-full bg-squad-500"></span>
+          <span>19+ specialized agents</span>
         </div>
-        <div class="text-center">
-          <div class="text-3xl sm:text-4xl font-bold text-surface-900 dark:text-white mb-1">5</div>
-          <div class="text-sm text-surface-500 dark:text-surface-400">Parallel Workstreams</div>
+        <div class="flex items-center gap-2 text-surface-600 dark:text-surface-300">
+          <span class="w-1.5 h-1.5 rounded-full bg-accent-500"></span>
+          <span>Parallel execution</span>
         </div>
-        <div class="text-center">
-          <div class="text-3xl sm:text-4xl font-bold text-surface-900 dark:text-white mb-1">&lt;60s</div>
-          <div class="text-sm text-surface-500 dark:text-surface-400">Setup Time</div>
+        <div class="flex items-center gap-2 text-surface-600 dark:text-surface-300">
+          <span class="w-1.5 h-1.5 rounded-full bg-navy-500"></span>
+          <span>Setup in seconds</span>
         </div>
-        <div class="text-center">
-          <div class="text-3xl sm:text-4xl font-bold text-surface-900 dark:text-white mb-1">MIT</div>
-          <div class="text-sm text-surface-500 dark:text-surface-400">Open Source</div>
+        <div class="flex items-center gap-2 text-surface-600 dark:text-surface-300">
+          <span class="w-1.5 h-1.5 rounded-full bg-green-500"></span>
+          <span>MIT open source</span>
         </div>
       </div>
     </div>
   </section>
 
   <!-- Features Grid -->
-  <section class="py-20 sm:py-28 relative">
+  <section class="py-20 sm:py-28 relative reveal">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-16">
         <p class="text-squad-600 dark:text-squad-400 font-semibold text-sm tracking-wide uppercase mb-3">Why Squad?</p>
@@ -186,10 +184,14 @@ const base = import.meta.env.BASE_URL;
       </div>
 
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-        <div class="group relative p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 hover:border-squad-300/50 dark:hover:border-squad-600/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-squad-500/5">
-          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-squad-500 to-squad-600 flex items-center justify-center mb-5 text-white text-lg shadow-lg shadow-squad-500/20">🚀</div>
-          <h3 class="text-lg font-semibold text-surface-900 dark:text-white mb-2">Parallel AI Teamwork</h3>
-          <p class="text-surface-600 dark:text-surface-400 text-sm leading-relaxed">Give a task to the team and multiple agents fan out simultaneously. No waiting in line — results land in minutes.</p>
+        <div class="group relative p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 hover:border-squad-300/50 dark:hover:border-squad-600/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-squad-500/5 md:col-span-2 lg:col-span-2">
+          <div class="md:flex md:items-start md:gap-5">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-squad-500 to-squad-600 flex items-center justify-center mb-4 md:mb-0 text-white text-lg shadow-lg shadow-squad-500/20 shrink-0">🚀</div>
+            <div>
+              <h3 class="text-lg font-semibold text-surface-900 dark:text-white mb-2">Parallel AI Teamwork</h3>
+              <p class="text-surface-600 dark:text-surface-400 text-sm leading-relaxed">Give a task to the team and multiple agents fan out simultaneously. No waiting in line — results land in minutes.</p>
+            </div>
+          </div>
         </div>
 
         <div class="group relative p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 hover:border-accent-300/50 dark:hover:border-accent-600/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-accent-500/5">
@@ -204,10 +206,14 @@ const base = import.meta.env.BASE_URL;
           <p class="text-surface-600 dark:text-surface-400 text-sm leading-relaxed">Squad lives in your repo as <code class="bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded text-xs font-mono">.squad/</code>. Commit it, share it, clone it. Your team travels with your code.</p>
         </div>
 
-        <div class="group relative p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 hover:border-navy-300/50 dark:hover:border-navy-600/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-navy-500/5">
-          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-navy-600 to-navy-700 flex items-center justify-center mb-5 text-white text-lg shadow-lg shadow-navy-500/20">🛡️</div>
-          <h3 class="text-lg font-semibold text-surface-900 dark:text-white mb-2">Built-in Governance</h3>
-          <p class="text-surface-600 dark:text-surface-400 text-sm leading-relaxed">File-write guards, PII scrubbing, reviewer lockout — rules enforced in code, not suggestions in prompts.</p>
+        <div class="group relative p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 hover:border-navy-300/50 dark:hover:border-navy-600/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-navy-500/5 md:col-span-2 lg:col-span-2">
+          <div class="md:flex md:items-start md:gap-5">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-navy-600 to-navy-700 flex items-center justify-center mb-4 md:mb-0 text-white text-lg shadow-lg shadow-navy-500/20 shrink-0">🛡️</div>
+            <div>
+              <h3 class="text-lg font-semibold text-surface-900 dark:text-white mb-2">Built-in Governance</h3>
+              <p class="text-surface-600 dark:text-surface-400 text-sm leading-relaxed">File-write guards, PII scrubbing, reviewer lockout — rules enforced in code, not suggestions in prompts.</p>
+            </div>
+          </div>
         </div>
 
         <div class="group relative p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 hover:border-accent-300/50 dark:hover:border-accent-600/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-accent-500/5">
@@ -216,55 +222,65 @@ const base = import.meta.env.BASE_URL;
           <p class="text-surface-600 dark:text-surface-400 text-sm leading-relaxed">Define your team in TypeScript with <code class="bg-surface-100 dark:bg-surface-800 px-1.5 py-0.5 rounded text-xs font-mono">squad.config.ts</code>. Typed, testable, version-controlled.</p>
         </div>
 
-        <div class="group relative p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 hover:border-squad-300/50 dark:hover:border-squad-600/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-squad-500/5">
-          <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-squad-500 to-squad-600 flex items-center justify-center mb-5 text-white text-lg shadow-lg shadow-squad-500/20">🔌</div>
-          <h3 class="text-lg font-semibold text-surface-900 dark:text-white mb-2">Extensible</h3>
-          <p class="text-surface-600 dark:text-surface-400 text-sm leading-relaxed">Plugins, marketplace, MCP integration, custom hooks — extend Squad to fit your workflow.</p>
+        <div class="group relative p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 hover:border-squad-300/50 dark:hover:border-squad-600/30 transition-all duration-300 hover:-translate-y-1 hover:shadow-xl hover:shadow-squad-500/5 lg:col-span-2">
+          <div class="lg:flex lg:items-start lg:gap-5">
+            <div class="w-11 h-11 rounded-xl bg-gradient-to-br from-squad-500 to-squad-600 flex items-center justify-center mb-4 lg:mb-0 text-white text-lg shadow-lg shadow-squad-500/20 shrink-0">🔌</div>
+            <div>
+              <h3 class="text-lg font-semibold text-surface-900 dark:text-white mb-2">Extensible</h3>
+              <p class="text-surface-600 dark:text-surface-400 text-sm leading-relaxed">Plugins, marketplace, MCP integration, custom hooks — extend Squad to fit your workflow.</p>
+            </div>
+          </div>
         </div>
       </div>
     </div>
   </section>
 
   <!-- How it works -->
-  <section class="py-20 sm:py-28 bg-surface-50 dark:bg-surface-900/30 border-y border-surface-200/50 dark:border-surface-800/50">
+  <section class="py-20 sm:py-28 bg-surface-50 dark:bg-surface-900/30 border-y border-surface-200/50 dark:border-surface-800/50 reveal">
     <div class="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-16">
         <p class="text-squad-600 dark:text-squad-400 font-semibold text-sm tracking-wide uppercase mb-3">How it works</p>
         <h2 class="text-3xl sm:text-4xl font-bold text-surface-900 dark:text-white">Three commands to a full team</h2>
       </div>
 
-      <div class="grid sm:grid-cols-3 gap-8 sm:gap-6">
-        <div class="relative text-center">
+      <div class="flex flex-col sm:flex-row sm:items-stretch gap-8 sm:gap-4">
+        <div class="flex-1 relative text-center flex flex-col items-center">
           <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-squad-600 text-white font-bold text-lg mb-5 shadow-lg shadow-squad-600/25">1</div>
           <h3 class="font-semibold text-surface-900 dark:text-white mb-2">Install</h3>
-          <p class="text-sm text-surface-600 dark:text-surface-400 mb-4">One global install, zero config files required.</p>
-          <code class="text-xs font-mono bg-surface-900 dark:bg-surface-800 text-green-400 px-3 py-1.5 rounded-lg">npm i -g @bradygaster/squad-cli</code>
+          <p class="text-sm text-surface-600 dark:text-surface-400 mb-4 flex-1">One global install, zero config files required.</p>
+          <code class="text-sm font-mono bg-surface-100 dark:bg-surface-800 text-surface-700 dark:text-green-400 px-3 py-1.5 rounded-lg border border-surface-200 dark:border-transparent">npm i -g @bradygaster/squad-cli</code>
         </div>
-        <div class="relative text-center">
+        <div class="hidden sm:flex items-start pt-4 shrink-0">
+          <svg class="w-5 h-5 text-squad-300 dark:text-squad-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+        </div>
+        <div class="flex-1 relative text-center flex flex-col items-center">
           <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-squad-600 text-white font-bold text-lg mb-5 shadow-lg shadow-squad-600/25">2</div>
           <h3 class="font-semibold text-surface-900 dark:text-white mb-2">Initialize</h3>
-          <p class="text-sm text-surface-600 dark:text-surface-400 mb-4">Describe your project and Squad generates your team.</p>
-          <code class="text-xs font-mono bg-surface-900 dark:bg-surface-800 text-green-400 px-3 py-1.5 rounded-lg">squad init</code>
+          <p class="text-sm text-surface-600 dark:text-surface-400 mb-4 flex-1">Describe your project and Squad generates your team.</p>
+          <code class="text-sm font-mono bg-surface-100 dark:bg-surface-800 text-surface-700 dark:text-green-400 px-3 py-1.5 rounded-lg border border-surface-200 dark:border-transparent">squad init</code>
         </div>
-        <div class="relative text-center">
+        <div class="hidden sm:flex items-start pt-4 shrink-0">
+          <svg class="w-5 h-5 text-squad-300 dark:text-squad-600" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" /></svg>
+        </div>
+        <div class="flex-1 relative text-center flex flex-col items-center">
           <div class="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-squad-600 text-white font-bold text-lg mb-5 shadow-lg shadow-squad-600/25">3</div>
           <h3 class="font-semibold text-surface-900 dark:text-white mb-2">Ship</h3>
-          <p class="text-sm text-surface-600 dark:text-surface-400 mb-4">Talk to your team — they build, test, and land PRs.</p>
-          <code class="text-xs font-mono bg-surface-900 dark:bg-surface-800 text-green-400 px-3 py-1.5 rounded-lg">squad shell</code>
+          <p class="text-sm text-surface-600 dark:text-surface-400 mb-4 flex-1">Talk to your team — they build, test, and land PRs.</p>
+          <code class="text-sm font-mono bg-surface-100 dark:bg-surface-800 text-surface-700 dark:text-green-400 px-3 py-1.5 rounded-lg border border-surface-200 dark:border-transparent">squad shell</code>
         </div>
       </div>
     </div>
   </section>
 
   <!-- Explore the Docs -->
-  <section class="py-20 sm:py-28">
+  <section class="py-20 sm:py-28 reveal">
     <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
       <div class="text-center mb-12">
         <p class="text-squad-600 dark:text-squad-400 font-semibold text-sm tracking-wide uppercase mb-3">Documentation</p>
         <h2 class="text-3xl sm:text-4xl font-bold text-surface-900 dark:text-white">Explore the Docs</h2>
       </div>
 
-      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div class="grid grid-cols-1 sm:grid-cols-2 gap-5">
         <a href={`${base}docs/get-started/installation/`} class="group relative p-6 rounded-2xl bg-white dark:bg-surface-900 border border-surface-200 dark:border-surface-800 hover:border-squad-400 dark:hover:border-squad-600 hover:shadow-lg hover:shadow-squad-500/10 transition-all duration-300 hover:-translate-y-0.5 overflow-hidden">
           <div class="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-squad-400 to-squad-500"></div>
           <div class="text-2xl mb-3">🚀</div>
@@ -301,13 +317,13 @@ const base = import.meta.env.BASE_URL;
   </section>
 
   <!-- Final CTA -->
-  <section class="relative py-24 sm:py-32 overflow-hidden">
+  <section class="relative py-24 sm:py-32 overflow-hidden reveal">
     <div class="absolute inset-0 bg-gradient-to-br from-navy-800 via-navy-900 to-navy-950"></div>
     <div class="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(240,79,127,0.15),transparent_70%)]"></div>
     <div class="absolute inset-0 bg-[linear-gradient(rgba(255,255,255,0.04)_1px,transparent_1px),linear-gradient(90deg,rgba(255,255,255,0.04)_1px,transparent_1px)] bg-[size:40px_40px]"></div>
     <div class="relative max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 text-center">
-      <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6">Ready to build with<br />your AI team?</h2>
-      <p class="text-lg text-navy-200/80 mb-10 max-w-xl mx-auto">Install Squad and have your team up and running in under a minute. Open source, MIT licensed, community-driven.</p>
+      <h2 class="text-3xl sm:text-4xl lg:text-5xl font-bold text-white mb-6">Ship faster with<br />your AI team</h2>
+      <p class="text-lg text-navy-200/80 mb-10 max-w-xl mx-auto">One install. One command. Your full team, ready to build.</p>
       <div class="flex flex-col sm:flex-row items-center justify-center gap-4">
         <a
           href={`${base}docs/get-started/installation/`}
@@ -339,4 +355,15 @@ const base = import.meta.env.BASE_URL;
     copyBtn.innerHTML = '<svg class="w-4 h-4 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7" /></svg>';
     setTimeout(() => { copyBtn.innerHTML = svg; }, 2000);
   });
+
+  // Scroll reveal
+  const revealObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting) {
+        entry.target.classList.add('visible');
+        revealObserver.unobserve(entry.target);
+      }
+    });
+  }, { threshold: 0.1, rootMargin: '0px 0px -40px 0px' });
+  document.querySelectorAll('.reveal').forEach(el => revealObserver.observe(el));
 </script>
