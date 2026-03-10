@@ -28,7 +28,7 @@ npx github:bradygaster/squad
 ```
 
 **Requirements:**
-- Node.js 22+
+- Node.js 20+ (LTS)
 - GitHub Copilot (CLI, VS Code, Visual Studio, or Coding Agent)
 - A git repository (Squad stores team state in `.ai-team/`)
 - **`gh` CLI** — required for GitHub Issues, PRs, Ralph, and Project Boards ([install](https://cli.github.com/))
@@ -438,7 +438,7 @@ The coordinator uses 6.6% of its window. A 12-week veteran agent uses 4.5% — b
 - **Experimental** — file formats and APIs may change between versions.
 - **Silent success bug** — approximately 7–10% of background agent spawns complete all their file writes but return no text response. This is a platform-level issue. Squad detects it by checking the filesystem for work product and reports what it finds. Work is not lost.
 - **Platform latency** — response times depend on the Copilot platform. Complex multi-agent tasks take 40–60 seconds. Simple questions are answered in 2–3 seconds.
-- **Node 22+** — requires Node.js 22.0.0 or later.
+- **Node 20+** — requires a Node.js LTS release (v20.0.0 or later).
 - **GitHub Copilot required** — Squad works across Copilot hosts (CLI, VS Code, Visual Studio, Coding Agent).
 - **First session is the least capable** — agents improve as they accumulate history. Give it a few sessions before judging.
 

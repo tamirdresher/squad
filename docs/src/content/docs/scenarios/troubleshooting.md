@@ -62,7 +62,7 @@ Common issues and fixes for Squad installation and usage.
 
 **Problem:** `npx github:bradygaster/squad` fails with an engine compatibility error, or Squad behaves unexpectedly.
 
-**Cause:** Squad requires Node.js 22.0.0 or later (enforced via `engines` in `package.json`).
+**Cause:** Squad requires Node.js 20.0.0 or later (LTS), enforced via `engines` in `package.json`.
 
 **Fix:**
 
@@ -70,9 +70,9 @@ Common issues and fixes for Squad installation and usage.
 node --version
 ```
 
-If below v22, upgrade Node.js:
-- **nvm (macOS/Linux):** `nvm install 22 && nvm use 22`
-- **nvm-windows:** `nvm install 22 && nvm use 22`
+If below v20, upgrade to the latest LTS:
+- **nvm (macOS/Linux):** `nvm install --lts && nvm use --lts`
+- **nvm-windows:** `nvm install lts && nvm use lts`
 - **Direct download:** [nodejs.org](https://nodejs.org/)
 
 ---

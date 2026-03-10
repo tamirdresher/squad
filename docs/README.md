@@ -4,7 +4,7 @@ The documentation site for Squad, built with [Astro](https://astro.build/), [Tai
 
 ## Prerequisites
 
-- Node.js 22+
+- Node.js 20+ (LTS)
 - Run `npm install` from the `docs/` directory
 
 ## Commands
