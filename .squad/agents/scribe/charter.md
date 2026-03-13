@@ -86,25 +86,6 @@ After every substantial work session:
 
 ## The Memory Architecture
 
-```
-.squad/
-├── decisions.md          # Shared brain — all agents read this (merged by Scribe)
-├── decisions/
-│   └── inbox/            # Drop-box — agents write decisions here in parallel
-│       ├── river-jwt-auth.md
-│       └── kai-component-lib.md
-├── orchestration-log/    # Per-spawn log entries
-│   ├── 2025-07-01T10-00-river.md
-│   └── 2025-07-01T10-00-kai.md
-├── log/                  # Session history — searchable record
-│   ├── 2025-07-01-setup.md
-│   └── 2025-07-02-api.md
-└── agents/
-    ├── kai/history.md    # Kai's personal knowledge
-    ├── river/history.md  # River's personal knowledge
-    └── ...
-```
-
 - **decisions.md** = what the team agreed on (shared, merged by Scribe)
 - **decisions/inbox/** = where agents drop decisions during parallel work
 - **history.md** = what each agent learned (personal)

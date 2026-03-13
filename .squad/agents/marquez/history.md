@@ -1,127 +1,89 @@
 # Marquez — History
 
-## THE BAD (Issues That Hurt the Experience)
+## Core Context
 
-### P0: Critical Issues
+### Mission
+- Marquez owns first-time user experience, the first 30 seconds from install to "wow" moment
+- Key principle: "The impatient user bails at second 7"
+- Goal: Every moment from `squad --help` to first response must be clear, fast, and confidence-building
 
-**P0-1: Help text is a wall of undifferentiated text**
-The `help` output in cli-entry.ts (lines 70-119) is 50 lines of raw console.log. No grouping by category. No visual hierarchy between "things you'll use daily" (init, status) and "things you'll use once" (scrub-emails, aspire). Compare to GitHub CLI's `gh help` which groups commands into "CORE COMMANDS" and "ADDITIONAL COMMANDS." Users scanning this wall will miss the command they need.
+### Core UX Principles for Squad CLI
+1. **Never silent, never vague:** Every waiting state must explain WHAT is happening, not just THAT something is happening
+2. **Default labels should match reality:** "Thinking..." is wrong during routing. Labels should describe system state accurately
+3. **3-5 words max:** Feedback text must be scannable at a glance
+4. **Specific beats generic:** Activity hints ("Keaton reading file...") always override defaults
+5. **Test the first 30 seconds brutally:** Every moment must be clear, fast, confidence-building
 
-**P0-2: Stub commands pollute the experience**
-`triage`, `loop`, and `hire` are stubs that print a message and exit. `triage` says "(full implementation pending)" — this is a confession to the user that the product is incomplete. Either ship it or don't show it in help. Having 3 non-functional commands in the help listing destroys trust.
+### Recurring UX Anti-Patterns
+- **Inconsistent status vocabularies:** Different labels in different contexts (AgentPanel, /agents, help text)
+- **Information architecture sprawl:** Flat lists without grouping or visual hierarchy
+- **Silent waiting states:** Cold SDK connection (3-5s) without feedback feels like freezing
+- **Stub commands in help:** Non-functional commands destroy trust
+- **Inconsistent visual vocabulary:** Multiple separator styles, prompt characters, status labels
 
-**P0-3: Two taglines**
-Line 55: "Add an AI agent team to any project"
-Line 71: "Team of AI agents at your fingertips"
-These are displayed in different contexts (empty args vs. help). A product should have ONE tagline. This signals an unfinished brand identity.
+### Key File Paths
+- CLI entry: `packages/squad-cli/src/cli-entry.ts` (help text, status command)
+- Shell app: `packages/squad-cli/src/shell/App.tsx` (header, welcome, exit)
+- Input prompt: `packages/squad-cli/src/shell/components/InputPrompt.tsx`
+- Agent panel: `packages/squad-cli/src/shell/components/AgentPanel.tsx`
+- Commands: `packages/squad-cli/src/shell/commands.ts` (in-REPL commands like /help, /status, /quit)
 
-### P1: Significant Issues
+### Gold Standard Comparison
+**vs. Claude CLI:**
+- Claude has cleaner first-run (minimal, no banner overload), more responsive streaming, structured /help with categories
+- Squad advantage: Multi-agent panel and routing system is genuinely novel UI—Claude can't do this
 
-**P1-1: Separator character inconsistency**
-`AgentPanel.tsx` line 97: `'-'.repeat(sepWidth)` (dash characters)
-`MessageStream.tsx` line 97: `'-'.repeat(sepWidth)` (dash characters)
-But `App.tsx` uses Ink's `borderStyle="round"` with rounded box-drawing characters.
-The init ceremony uses `─` (Unicode box-drawing horizontal).
-Three different visual vocabularies for "line across the screen." Pick one.
+**vs. GitHub Copilot CLI:**
+- Copilot has tighter suggestion flow, simpler (no coordinator concept), better tool-call visibility ("Reading file...")
+- Squad advantage: Multi-agent orchestration is category-defining. Copilot doesn't do team coordination.
 
-**P1-2: The prompt character changes meaning**
-- Input prompt: `◆ squad>` (diamond is the brand mark)
-- Init ceremony: `◆ SQUAD` (diamond is the brand mark)
-- User messages: `❯` (right-pointing angle)
-- System messages: `▸ system:` (right-pointing triangle)
-This is fine as a system, but there's no documentation or consistency guide. The `▸` for system and `❯` for user are too visually similar. At a glance in a fast-scrolling conversation, they blend.
-
-**P1-3: Agent status labels are inconsistent**
-- AgentPanel compact mode: `streaming`, `working`
-- AgentPanel normal mode: `▶ Active` (not "streaming" or "working")
-- AgentPanel NO_COLOR: `[Active]`, `[Error]`, `[WORK]`, `[STREAM]`, `[ERR]`, `[IDLE]`
-Wait — compact mode shows `streaming`/`working` as lowercase text, but the `handleAgents` command in commands.ts shows `[WORK]`, `[STREAM]`, `[ERR]`, `[IDLE]` in uppercase brackets. Normal mode collapses both into `▶ Active`. There are THREE different status vocabularies depending on where you look.
-
-**P1-4: /agents and AgentPanel show different things**
-AgentPanel renders the live roster with pulsing dots and color. The `/agents` command returns a text list with `[WORK]`/`[STREAM]`/`[ERR]`/`[IDLE]` brackets. Same data, completely different presentation. This creates cognitive dissonance — the user sees one thing at the top of the screen and something different when they type `/agents`.
-
-**P1-5: "No team members yet" is wrong**
-`handleAgents()` returns "No team members yet." when registry is empty. But agents are discovered at lifecycle initialization from team.md. If the registry is empty, it's because initialization failed, not because there are no team members. The message should say "No agents connected. Try sending a message to wake them up."
-
-**P1-6: Completion flash only works in normal mode**
-`useCompletionFlash` is called in AgentPanel but the `completionFlash` Set is only rendered in the non-compact branch (line 132). Compact mode users never see the "✓ Done" flash. This is a responsive design gap.
-
-**P1-7: The roster line in the header is a string concatenation crime**
-```tsx
-const rosterText = welcome?.agents
-  .map((a, i) => `${a.emoji} ${a.name}${i < (welcome?.agents.length ?? 0) - 1 ? ' · ' : ''}`)
-  .join('') ?? '';
-```
-This produces `🏗️ Keaton · 💬 Riley · 🔧 Devon` — emoji + name separated by middots. But it's one giant `<Text>` node with `wrap="wrap"`. If the terminal is narrow enough to wrap, it'll break mid-agent (e.g., `🏗️ Keaton · 💬` on one line and `Riley · 🔧 Devon` on the next). This should use `<Box flexWrap="wrap">` with individual agent nodes, like AgentPanel does.
-
-### P2: Polish Issues
-
-**P2-1: Exit behavior is fragmented**
-- `Ctrl+C` exits (useInput handler in App.tsx)
-- `/quit` exits (commands.ts)
-- `/exit` exits (commands.ts)
-- `exit` exits (EXIT_WORDS in App.tsx)
-- But `quit` alone does NOT exit (not in EXIT_WORDS)
-
-If `/quit` works, `quit` should too. The asymmetry between `exit`/`quit` as bare words vs. slash commands is confusing.
-
-**P2-2: The goodbye message is underwhelming**
-`console.log('👋 Squad out.')` — after a rich, animated, color-coded experience, the exit is a plain console.log. No animation, no summary of what happened in the session. Claude CLI shows a brief session summary. This is a missed opportunity.
-
-**P2-3: `scrub-emails` default directory is `.ai-team`**
-Line 252: `const targetDir = args[1] || '.ai-team';` — defaults to the deprecated directory name. Should default to `.squad`.
-
-**P2-4: No confirmation for destructive operations**
-`/clear` sends `\x1Bc` (ANSI clear screen) with no confirmation. `/quit` exits immediately. For `/clear`, a "Clear screen? (y/n)" or at least "Screen cleared. Messages preserved in /history." would prevent the "I just lost my conversation" panic.
-
-**P2-5: Keyboard hints could be smarter**
-The header shows `↑↓ history · @Agent to direct · /help · Ctrl+C exit` regardless of context. On first run after init, it should emphasize `@Agent` since that's the primary interaction. Once the user has sent a few messages, the hints could adapt.
-
-**P2-6: `squad status` and `/status` show different information**
-`squad status` (cli-entry.ts lines 276-300) shows repo path, squad type (repo vs personal vs global).
-`/status` (commands.ts) shows team root, size, active count, conversation length.
-These are both called "status" but show completely different things. Users will be confused.
-
----
-
-## COMPARISON TO GOLD STANDARD
-
-### vs. Claude CLI
-- Claude has a cleaner first-run experience — minimal, focused, no banner overload
-- Claude's streaming feels more responsive because it doesn't batch by agent name
-- Claude's `/help` is structured with categories
-- Squad's multi-agent panel has no equivalent in Claude — this is a differentiator
-- **Squad advantage:** The agent roster and routing system is genuinely novel UI. Claude can't do this.
-
-### vs. GitHub Copilot CLI
-- Copilot CLI's suggestions flow is tighter — fewer concepts to learn
-- Copilot CLI doesn't need a "coordinator" concept — it's simpler
-- Copilot CLI has better tool-call visibility ("Reading file...", "Running command...")
-- **Squad advantage:** Squad already has activity hints, and the multi-agent orchestration is a category-defining feature. Copilot doesn't do team coordination.
-
-### What Best-in-Class CLIs Have That Squad Doesn't
-1. **Session persistence** — Claude saves conversations. Squad conversations disappear on exit.
-2. **Structured help** — `gh help` groups by category. Squad dumps a flat list.
-3. **Command autocomplete** — There's a `createCompleter` export but it's unclear if TAB completion works in the Ink shell.
-4. **Progress bars** — For long operations (init, upgrade), a determinate progress indicator would beat the indeterminate spinner.
-5. **Configuration command** — No `squad config` to set defaults, change themes, or adjust behavior.
-6. **Onboarding wizard** — First `squad init` should ask "What does your project do?" to personalize the welcome.
-
----
-
-## SUMMARY
-
-**Strengths:** The architectural intent is right. The init ceremony, streaming UX, ghost retry, and NO_COLOR accessibility are genuinely impressive. The multi-agent panel is a novel UI concept that no competitor has. The responsive layout strategy is well-thought-out.
-
-**Weaknesses:** Death by a thousand paper cuts. Three status vocabularies. Two taglines. Stub commands in help. Inconsistent separators. Different information behind the same "status" label. These small inconsistencies accumulate into an experience that feels 85% polished rather than 100%.
-
-**To get to an A:** Fix P0s (structured help, remove stubs, one tagline). Fix P1-3 and P1-4 (unified status vocabulary). Add session persistence. That's probably 2-3 days of focused work.
+**What Best-in-Class CLIs Have That Squad Doesn't:**
+1. Session persistence (conversations disappear on exit)
+2. Structured help (`gh help` groups by category)
+3. Command autocomplete (TAB completion)
+4. Progress bars for long operations (init, upgrade)
+5. Configuration command (`squad config`)
+6. Onboarding wizard ("What does your project do?")
 
 ## Learnings
 
+### 2026-03-05: Design Spec — Fixed Bottom Input Box (#679)
+
+**Task:** Brady request — "Input is a simple prompt line, not anchored in a squared-off box at bottom like Copilot CLI / Claude CLI." Design fixed-position input box per Copilot/Claude style.
+
+**Deliverable:** `docs/proposals/fixed-input-box-design.md`
+
+**Spec Contents:**
+1. ASCII wireframes at three terminal widths (120, 80, 40 columns): Idle, Typing, Processing, Error states
+2. Interaction states documented: Idle (`◆ squad> [cursor]`), Typing (text flows, hint hides), Processing (spinner + activity hint), Error (system message above box)
+3. Technical feasibility analysis:
+   - Alt-buffer NOT recommended (breaks scrollback, incompatible with streaming, fails on SSH)
+   - Recommended: Render InputPrompt in bordered `<Box borderStyle="round">` within standard buffer
+4. NO_COLOR & Accessibility: Color mode uses rounded box-drawing (╔═╗), NO_COLOR uses ASCII dashes (─────), prompt shortens at ≤60 columns
+5. Implementation phasing: Phase 1 (MVP) = add border wrapper; Phase 2 (Future) = static positioning if Ink adds height APIs
+
+**Key Insight:** Copilot/Claude's fixed-box UX doesn't require alt-buffer. A bordered container in standard buffer delivers same visual hierarchy while preserving Squad's streaming architecture and scrollback history.
+
+### 2026-03-01: CLI UI Polish PRD finalized — 20 Issues Created
+
+**Status:** Completed. Parallel spawn with Redfoot (Design), Cheritto (TUI), Kovash (REPL), Keaton (Lead) for image review synthesis.
+
+**Outcome:** Pragmatic alpha-first strategy adopted—fix P0 blockers + P1 quick wins, defer grand redesign to post-alpha.
+
+**PRD location:** `docs/prd-cli-ui-polish.md` (authoritative reference for alpha-1 release)
+
+**Issues created:** GitHub #662–681 (20 discrete issues with priorities P0/P1/P2/P3, effort estimates, team routing)
+
+**Key decisions merged:**
+- Fenster: Cast confirmation required for freeform REPL casts
+- Kovash: ShellApi.setProcessing() exposed to prevent spinner bugs in async paths
+- Brady: Alpha shipment acceptable, experimental banner required, rotating spinner messages (every ~3s)
+
+**Timeline:** P0 (1-2 days) → P1 (2-3 days) → P2 (1 week) — alpha ship when P0+P1 complete
+
 ### 2026-02-24: First 30 Seconds UX Audit — Critical Path Issues Filed
 
-**Task:** Brady directive — "The impatient user bails at second 7." Audit the first-time user experience from install to first "wow" moment. File GitHub issues for every un-delightful moment in the first 30 seconds.
+**Task:** Brady directive — "The impatient user bails at second 7." Audit first-time user experience from install to first "wow" moment.
 
 **Critical Paths Audited:**
 1. `squad --help` — information architecture and scannability
@@ -134,7 +96,6 @@ These are both called "status" but show completely different things. Users will 
 
 - **#419: Help text is overwhelming — users scan, not read** (P0)
   - 50-line flat list with no visual hierarchy
-  - Core commands buried alongside power-user utilities
   - Solution: Group into GETTING STARTED / TEAM MANAGEMENT / ADVANCED sections
   - Impact: First 7 seconds of user journey
 
@@ -148,304 +109,5 @@ These are both called "status" but show completely different things. Users will 
   - Help text doesn't lead with "just run squad"
   - `(default)` note hidden in 50-line command list
   - Solution: Lead with primary usage pattern at top of help
-  - Impact: Users waste time looking for "start" command
 
-- **#422: Spinner with no context — what is it doing?** (P0)
-  - Processing spinner shows ⠋ with zero explanation
-  - User sees spinner but doesn't know: connecting? routing? working?
-  - Solution: Activity hints already exist, need to show during spinner
-  - Impact: 3-second silence creates "is it broken?" anxiety
-
-- **#423: Welcome screen typewriter blocks input for 800ms** (P1)
-  - Typewriter animation on "◆ SQUAD" delays prompt render
-  - 500ms title + 300ms fade-in = 800ms before user can type
-  - Solution: Skip animation on subsequent launches (first-run only), OR make non-blocking
-  - Impact: Every launch feels slow
-
-- **#426: Two different taglines — pick one and stick with it** (P1)
-  - "Add an AI agent team to any project" vs "Team of AI agents at your fingertips"
-  - Inconsistent brand voice across help vs empty-args output
-  - Solution: Choose one, apply everywhere (README, help, banner)
-  - Impact: Brand consistency, perceived polish
-
-**Key Insight: The First 30 Seconds**
-
-Brady's hypothesis is correct: The critical window is seconds 1-30, and we're losing users at second 7.
-
-**Timeline of a first-time user:**
-- **0:00** — User runs `squad --help`
-- **0:03** — Eyes glaze over at 50-line wall of text
-- **0:07** — Can't find "how to start", runs `squad` hoping for guidance
-- **0:10** — Shell launches, sees typewriter animation
-- **0:11** — Waits for animation to finish before typing (feels blocked)
-- **0:12** — Types first message, hits enter
-- **0:15** — Sees spinner with no context
-- **0:18** — Still spinning. No feedback. User wonders if it's broken.
-- **0:22** — Either bails (Ctrl+C) OR content finally streams
-
-**The impatient user bails at 0:18** — after 6 seconds of silence post-enter.
-
-**What needs to change:**
-1. Help text must be scannable in 3 seconds (grouped sections)
-2. Default behavior must be obvious (lead with "just run squad")
-3. SDK connection must show status ("Connecting...")
-4. Welcome animation should be instant after first run
-5. Spinner must explain what it's doing ("Keaton connecting...")
-
-All 6 issues address the 0-30 second window. Fixing these removes the bail-out moments.
-
-**Files Identified for Changes:**
-- `packages/squad-cli/src/cli-entry.ts` — help text structure, tagline consistency
-- `packages/squad-cli/src/cli/shell/components/App.tsx` — welcome animation gating
-- `packages/squad-cli/src/cli/shell/components/InputPrompt.tsx` — spinner context display
-- `packages/squad-cli/src/cli/shell/index.ts` — SDK connection status messages
-
-**Next Actions:**
-- Cheritto (TUI Engineer): Address #423 (welcome animation), #422 (spinner context)
-- Fenster/Edie (Core Dev): Address #419 (help structure), #421 (help intro), #426 (tagline)
-- Kujan (SDK Expert): Address #420 (SDK connection feedback)
-
-### 2026-02-23: Initial CLI UX Audit Completed
-
-**Task:** Comprehensive UX audit of Squad CLI across all entry points and interactive shell components.
-
-**Files Reviewed:**
-- `packages/squad-cli/src/cli-entry.ts` — Command routing, help text, version output, error handling
-- `packages/squad-cli/src/cli/shell/components/App.tsx` — Shell layout, header, welcome text, keyboard hints
-- `packages/squad-cli/src/cli/shell/components/AgentPanel.tsx` — Agent roster, status display, separators
-- `packages/squad-cli/src/cli/shell/components/MessageStream.tsx` — Message rendering, thinking indicators, timestamps
-- `packages/squad-cli/src/cli/shell/components/InputPrompt.tsx` — Input handling, placeholders, disabled states
-- `packages/squad-cli/src/cli/shell/commands.ts` — Slash command implementations (/status, /help, /agents)
-- `packages/squad-cli/src/cli/shell/terminal.ts` — Terminal capability detection
-
-**Key UX Patterns Identified:**
-
-1. **Visual Hierarchy System:**
-   - ◆ for primary prompts/system (cyan)
-   - ❯ for user input (cyan)
-   - Role emoji + name for agents (green)
-   - Status indicators: pulsing dots for active, dim for idle
-
-2. **Color Semantics:**
-   - Cyan = user/system/prompts
-   - Green = agent responses
-   - Yellow = processing/warnings
-   - Red = errors
-   - Dim = secondary info/hints
-
-3. **Information Density Philosophy:**
-   - Header: identity + context (version, description, roster, focus)
-   - Panel: current agent states + activity
-   - Stream: conversation history with timestamps
-   - Prompt: current input + placeholder hints
-
-4. **Interaction Model:**
-   - Natural language (coordinator routing)
-   - @Agent direct addressing
-   - Slash commands for meta-actions (/status, /help, /agents, /history, /clear, /quit)
-   - Keyboard shortcuts (↑/↓ history, Ctrl+C quit)
-
-**Issues Found:** 21 total (5 P0, 9 P1, 7 P2)
-
-**Common UX Anti-Patterns Detected:**
-- **Inconsistent verbs** in command descriptions (P1) — no pattern across help text
-- **Hardcoded dimensions** (50-char separators) instead of terminal-aware layout (P1)
-- **Technical jargon** exposed to users ("Connecting", "Routing" phase labels) (P2)
-- **Redundant information** (agent count shown twice) (P1)
-- **Missing remediation hints** in error messages (P0)
-- **80-char violations** in help output (P0)
-- **Inconsistent visual vocabulary** (◇ vs ●, ─ vs ┄, color emoji vs text) (P1-P2)
-
-**UX Gates Defined:** 7 testable assertions for CI
-1. Help line length (≤80 chars)
-2. Version format (semver only)
-3. Error remediation hints (must contain actionable verbs)
-4. Empty state actionability (must mention "squad init")
-5. Terminal width compliance (80x24 golden test)
-6. Separator consistency (single character across components)
-7. Command verb consistency (imperative verbs)
-
-**Design Principles Extracted:**
-- **Crisp, confident, delightful** — not just functional
-- **Consistent visual language** reduces cognitive load
-- **Every error includes next action** — never leave users stuck
-- **Empty states are onboarding opportunities** — show the path forward
-- **Terminal-aware layout** — respect width constraints, degrade gracefully
-- **Minimal but meaningful** — information should earn its space
-
-**Next Actions:**
-- Breedan implements UX gates as Vitest tests
-- Brady or assigned dev addresses P0 blockers before next release
-- P1/P2 polish in subsequent iterations
-
-**Files Written:**
-- `.squad/decisions/inbox/marquez-ux-review-initial.md` — Full audit report with actionable diffs
-
-### 2026-02-23: Visual Polish Pass — "Make It Look Good"
-
-**Task:** Brady directive: "Put my name on it. Make it look good." Walk every component, file issues, fix them all.
-
-**Branch:** `squad/marquez-visual-love`
-**PR:** #413
-
-**Issues Filed (6):**
-- #391 — Separator characters use hyphens instead of box-drawing
-- #393 — /help output is unstyled plain text
-- #388 — /agents command uses ugly bracket notation
-- #392 — ThinkingIndicator default label nearly invisible
-- #389 — 'quit' bare word doesn't exit but '/quit' does
-- #390 — /status output is unstyled wall of text
-
-**Files Changed (7):**
-- `packages/squad-cli/src/cli/shell/components/AgentPanel.tsx` — `─` separators (both compact and normal)
-- `packages/squad-cli/src/cli/shell/components/MessageStream.tsx` — `─` turn separator
-- `packages/squad-cli/src/cli/shell/components/ThinkingIndicator.tsx` — Remove double-dim on "Thinking..."
-- `packages/squad-cli/src/cli/shell/components/App.tsx` — Add 'quit' to EXIT_WORDS
-- `packages/squad-cli/src/cli/shell/commands.ts` — Redesigned /help, /status, /agents with visual hierarchy
-- `test/cli-shell-comprehensive.test.ts` — Updated assertions for new output format
-- `test/repl-ux.test.ts` — Updated separator assertion
-
-**Design Decisions:**
-- Box-drawing `─` (U+2500) everywhere instead of ASCII `-` — one visual vocabulary
-- `/help` leads with "Talk to your team" (primary action) above meta commands
-- `/agents` uses same emoji + status language as AgentPanel (○ ready / ● active / ✖ error)
-- `/status` uses ◆ brand mark and clean aligned key-value layout
-- ThinkingIndicator: `italic` only, no `dimColor` — waiting feedback must be visible
-
-**What I didn't touch (and why):**
-- Init ceremony — already an A. Don't fix what works.
-- useAnimation.ts — clean hooks, 15fps cap is right, NO_COLOR handled properly.
-- Welcome banner layout — other agent (Cheritto) was actively improving the roster rendering.
-- InputPrompt — solid as-is. The cursor, placeholder, spinner all work.
-
-**Verification:** Build clean. All new test assertions pass. 3 pre-existing test failures (ThinkingIndicator isThinking=false, Tab autocomplete x2) confirmed unrelated.
-
-### 2026-02-24: Issue #422 — Spinner Context (Routing Label)
-
-**Task:** Brady issue — "The ThinkingIndicator shows a spinner but doesn't say WHAT it's doing. Add contextual text like 'Routing to agent...' or 'Agent thinking...'"
-
-**Branch:** `fix/issue-422`
-**PR:** #436
-
-**Root Cause:** ThinkingIndicator defaulted to "Thinking..." when no `activityHint` was provided. During the critical 3-5 second cold SDK connection, users saw a generic spinner with no explanation of what was happening — routing, connecting, or processing.
-
-**Solution:** Changed default label from "Thinking..." to "Routing to agent..." — matches what the system is actually doing during that phase (coordinator routing the request to an appropriate agent).
-
-**Files Changed:**
-- `packages/squad-cli/src/cli/shell/components/ThinkingIndicator.tsx` — Default label updated in both NO_COLOR and color branches
-- `test/regression-368.test.ts` — Updated 4 test assertions
-- `test/repl-ux.test.ts` — Updated 3 test assertions
-
-**Why "Routing to agent..." wins:**
-1. **Accurate:** That's literally what happens during cold SDK connection
-2. **Short:** 3 words, fits the 3-5 word guideline
-3. **Human:** No jargon, explains system state clearly
-4. **Covers the gap:** Activity hints already handle specific agent work ("Keaton thinking...", "Reading file...") — this fills the routing/connection phase
-
-**Activity hint priority preserved:** When SDK or MessageStream provides an explicit `activityHint`, it still overrides the default. The new label only shows when no specific context is available.
-
-**Impact:** Eliminates the "is it broken?" anxiety during first message send. Users now see clear feedback during every phase of request processing.
-
-**Tests:** All 127 tests pass (21 in regression-368, 106 in repl-ux).
-
-## Design Principles
-
-From the audits and fixes above, core UX principles for Squad CLI:
-
-1. **Never silent, never vague:** Every waiting state must explain WHAT is happening, not just THAT something is happening.
-2. **Default labels should match reality:** "Thinking..." is wrong during routing. Labels should describe system state accurately.
-3. **3-5 words max:** Feedback text must be scannable at a glance.
-4. **Specific beats generic:** Activity hints ("Keaton reading file...") always override defaults.
-5. **Test the first 30 seconds brutally:** The impatient user bails at second 7. Every moment from `squad --help` to first response must be clear, fast, and confidence-building.
-
-### 2026-02-24T17-25-08Z : Team consensus on public readiness
-📌 Full team assessment complete. All 7 agents: 🟡 Ready with caveats. Consensus: ship after 3 must-fixes (LICENSE, CI workflow, debug console.logs). No blockers to public source release. See .squad/log/2026-02-24T17-25-08Z-public-readiness-assessment.md and .squad/decisions.md for details.
-
-### 📌 Team update (2026-03-01T20-24-57Z): CLI UI Polish PRD finalized — 20 issues created, team routing established
-- **Status:** Completed — Parallel spawn of Redfoot (Design), Marquez (UX), Cheritto (TUI), Kovash (REPL), Keaton (Lead) for image review synthesis
-- **Outcome:** Pragmatic alpha-first strategy adopted — fix P0 blockers + P1 quick wins, defer grand redesign to post-alpha
-- **PRD location:** docs/prd-cli-ui-polish.md (authoritative reference for alpha-1 release)
-- **Issues created:** GitHub #662–681 (20 discrete issues with priorities P0/P1/P2/P3, effort estimates, team routing)
-- **Key decisions merged:**
-  - Fenster: Cast confirmation required for freeform REPL casts
-  - Kovash: ShellApi.setProcessing() exposed to prevent spinner bugs in async paths
-  - Brady: Alpha shipment acceptable, experimental banner required, rotating spinner messages (every ~3s)
-- **Timeline:** P0 (1-2 days) → P1 (2-3 days) → P2 (1 week) — alpha ship when P0+P1 complete
-- **Session log:** .squad/log/2026-03-01T20-13-00Z-ui-polish-prd.md
-- **Decision files merged to decisions.md:** keaton-prd-ui-polish.md, fenster-cast-confirmation-ux.md, kovash-processing-spinner.md, copilot directives
-
-### 2026-03-05: Design Spec — Fixed Bottom Input Box (#679)
-
-**Task:** Brady request — "Input is a simple prompt line, not anchored in a squared-off box at bottom like Copilot CLI / Claude CLI." Design fixed-position input box per Copilot/Claude style.
-
-**Branch:** `squad/679-input-box-design`  
-**PR:** #686  
-**Deliverable:** `docs/proposals/fixed-input-box-design.md`
-
-**Spec Contents:**
-
-1. **ASCII Wireframes** at three terminal widths (120, 80, 40 columns):
-   - Idle state (prompt visible, cursor blinking)
-   - Typing state (text wrapping in box)
-   - Processing state (spinner + activity hint)
-   - Error state (system message above box)
-
-2. **Interaction States:**
-   - Idle: `◆ squad> [cursor]` with hint text below
-   - Typing: Text flows into box, hint hides
-   - Processing: Spinner visible, `[Agent thinking...]` hint, user can still type `/` commands
-   - Error: Appears as system message above, input remains interactive
-
-3. **Technical Feasibility Analysis:**
-   - **Alt-buffer (NOT recommended):** Ink can use ANSI `\x1B[?1049h` but breaks scrollback history, incompatible with streaming philosophy, fails on SSH clients
-   - **Recommended approach:** Render InputPrompt in bordered `<Box borderStyle="round">` within standard buffer (same linear model, users can still scroll)
-   - Status: ✅ Possible with current Ink 6 API
-
-4. **NO_COLOR & Accessibility:**
-   - Color mode: Uses rounded box-drawing characters (╔═╗╚═╝╠═╣)
-   - NO_COLOR mode: Plain text with ASCII dashes (─────)
-   - Terminal width adaptation: Prompt shortens at ≤60 columns (`sq>` vs `◆ squad>`)
-
-5. **Implementation Phasing:**
-   - Phase 1 (MVP, Week 1): Add `<Box borderStyle="round">` wrapper to InputPrompt, no behavior changes
-   - Phase 2 (Future): Static positioning if Ink adds height APIs
-   - Phase 3 (Advanced): Optional alt-buffer mode behind feature flag
-
-6. **Design Decisions Log:**
-   - Why no alt-buffer? Streaming-first philosophy, users value scrollback, breaks on constrained terminals
-   - Why `borderStyle="round"`? Matches header style (consistency), softer than `double`, clean NO_COLOR fallback
-   - Error placement: As system messages above box (not inline) — keeps InputPrompt simple, errors are historical
-
-7. **Success Metrics:**
-   - Visual clarity: Box is obviously a separate input zone
-   - Terminal compatibility: Works at 40/80/120 without layout breaks
-   - Accessibility: NO_COLOR degrades gracefully
-   - Performance: No frame drops vs. current InputPrompt
-   - User feedback: Testers report "input feels more grounded"
-
-**Key Insight:** Copilot/Claude's fixed-box UX doesn't require alt-buffer. A bordered container in the standard buffer delivers the same visual hierarchy and affordance (dedicated input zone) while preserving Squad's streaming architecture and scrollback history.
-
-**Files Touched:**
-- Created: `docs/proposals/fixed-input-box-design.md` (250 lines, 7 sections, 3 decision rationales)
-- No code changes (proposal-first workflow)
-
----
-
-### History Audit — 2026-03-03
-
-**Corrections Applied:**
-
-1. **[CORRECTED] Entry at line 361 (2026-02-24T17-25-08Z):** Status "All 7 agents: 🟡 Ready with caveats" — this appears to record initial assessment, not final outcome. Entry is vague on what caveats remain. Left in place as historical context but flagged as partial info — future spawns should check `.squad/log/2026-02-24T17-25-08Z-public-readiness-assessment.md` for authoritative details, not assume this entry is complete.
-
-2. **[CORRECTED] Entry at lines 77-82 (2026-03-05 section):** Technical Feasibility explicitly records "NOT recommended" and "Recommended approach" — these are analysis notes, not final decisions yet. The section documents a proposal state, not shipped code. Clarified with "Status: proposal-only as of audit date."
-
-3. **[CLARIFIED] Entry at line 375:** "Decision files merged to decisions.md" — unclear if this merge happened before or after this entry was written. Added note: "This assumes merges completed; verify in decisions.md if rolling back decisions."
-
-4. **Clean entries verified:**
-   - P0/P1/P2 findings (lines 5-85): Accurately record issues filed, not intermediate requests
-   - Learnings sections (lines 122-349): Track final outcomes with clear task > result > insight pattern
-   - Design Spec (lines 377-430): Proposal document delivered, marked as such
-
-**Summary:** History is 95% clean. Entries accurately record outcomes, not intermediate requests. No v0.6.0 vs v0.8.17 conflicts, no reversed decisions, no intermediate states recorded as final. Three entries flagged with [CORRECTED] for future clarity but no content changed — future spawns should cross-reference external logs where noted.
-
-**No conflicts with .squad/decisions.md** — decisions file does not contradict any history entries. History hygiene skill satisfied.
+**Core Learning:** Never silent, never vague. Every waiting state must explain WHAT is happening, not just THAT something is happening. Default labels should match reality.
