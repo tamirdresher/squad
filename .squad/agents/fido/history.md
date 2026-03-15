@@ -31,6 +31,32 @@
 Both PRs show CI build failures (missing SDK exports: listRoles, searchRoles, getCategories, getRoleById, generateCharterFromRole). Investigation confirmed this is a **pre-existing issue on dev branch** (CI runs #23109355116, #23108671446 also fail). Local builds succeed. Not introduced by either PR.
 
 **Lesson reinforced:** When reviewing PRs with CI failures, always check if dev branch has the same failures. Don't block PRs for pre-existing platform issues.
+### PR #380 Quality Gate Review — FAIL (Test Assertion Sync Violation) (2026-03-14T03:35:00Z)
+
+**TEST FAILURE:** `test/docs-build.test.ts > features directory contains all expected markdown files` — Expected 33 files, found 34.
+
+**ROOT CAUSE:** PR #380 added `distributed-mesh.md` (new feature) and correctly added `distributed-mesh` to EXPECTED_FEATURES array. However, the base branch (dev @ dea678b) already contains `built-in-roles.md` (added in commit 83fd050, PR #368 on 2026-03-12), which was NOT in the test's expected list. The PR author updated the array to add their new feature but failed to notice the pre-existing gap.
+
+**BASELINE COMPARISON:**
+- Dev branch: 15 failures (docs-build, init tests [12 failures, missing skill templates], aspire-integration, cli-packaging-smoke)
+- PR branch (before sync): Same 15 failures
+- PR branch (after sync script): **3 failures** — aspire-integration (Docker), cli-packaging-smoke (npm install), and **1 NEW FAILURE in docs-build.test.ts**
+
+**POSITIVE FINDINGS:**
+- ✅ PR FIXED 12 test failures in test/init.test.ts by introducing `scripts/sync-skill-templates.mjs` and integrating it into prebuild
+- ✅ Sync script works correctly (syncs 15 skills from .squad/skills/ to package templates)
+- ✅ Build succeeds cleanly with sync script
+- ✅ No regression in existing test coverage (4142 tests passing vs 4084 on baseline)
+- ✅ `distributed-mesh.md` documentation file properly added to features directory
+- ✅ No new dependencies in package.json (only build script changes)
+
+**REQUIRED FIX:** Add `'built-in-roles'` to EXPECTED_FEATURES array in test/docs-build.test.ts. Array should be 34 items total (33 existing features + distributed-mesh).
+
+**COVERAGE GAP:** No unit tests for the distributed mesh feature itself. PR is templates + docs only, which aligns with the stated "no code changes" design decision. Future work should add tests for mesh sync logic when implemented.
+
+**VERDICT:** FAIL — Cannot merge until test assertion is corrected. The sync script is a major quality improvement (fixes 12 tests), but the test count mismatch must be resolved.
+
+**Test counts:** 4113 passed, 1 failed, 34 skipped, 46 todo (PR branch with 3 suites failing: aspire [pre-existing], cli-packaging [pre-existing], docs-build [NEW]).
 
 ### Name-Agnostic Testing Pattern
 Tests reading live .squad/ files (team.md, routing.md) must assert structure/behavior, not specific agent names. Names change during team rebirths. Two classes of tests: (1) live-file tests — must survive rebirths, use property checks, (2) inline-fixture tests — self-contained, can hardcode names. See ralph-triage.test.ts for the canonical pattern.

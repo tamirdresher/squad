@@ -298,6 +298,28 @@ git clone my-project && cd my-project && squad doctor
 
 The doctor always exits cleanly (no error code) because it's a diagnostic tool, not a gate. Use it to troubleshoot setup issues, validate team state, or run before opening an issue on GitHub.
 
+### Common Issues
+
+**Absolute path warning for teamRoot:**
+
+If you see `⚠ teamRoot uses absolute path — consider making it relative`, it means your `squad.config.ts` or `.squad/config.json` contains an absolute path like `C:\Users\me\squad\` or `/Users/me/squad/`. This breaks portability.
+
+**Fix:** Make the path relative to your project root:
+```json
+{
+  "teamRoot": ".squad"
+}
+```
+
+For linked teams (dual-root mode), use a relative path:
+```json
+{
+  "teamRoot": "../team-repo/.squad"
+}
+```
+
+See [FAQ: squad doctor complains about absolute path for teamRoot](../guide/faq.md#squad-doctor-complains-about-absolute-path-for-teamroot) for details.
+
 ---
 
 ## Version Management

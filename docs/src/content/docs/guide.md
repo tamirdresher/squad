@@ -8,12 +8,37 @@ It is not a chatbot wearing hats. Each team member is spawned as a real sub-agen
 
 ---
 
+## Which CLI should I use?
+
+**Use GitHub Copilot CLI for day-to-day work.** It's the recommended interface for interacting with your Squad — full agent spawning, model selection, and conversational access to all features.
+
+**Use Squad CLI for setup and operations:**
+- Initial setup: `squad init`
+- Diagnostics: `squad doctor`
+- Continuous triage: `squad triage --interval 10`
+- Aspire dashboard: `squad aspire`
+- Export/import: `squad export` and `squad import`
+
+**Common workflow:**
+```bash
+# Terminal 1: Run continuous triage (Squad CLI)
+squad triage --interval 10
+
+# Terminal 2: Work with your team (GitHub Copilot CLI)
+gh copilot
+> @squad what issues are ready to work?
+```
+
+Both CLIs read and write the same `.squad/` directory, so state stays synchronized. For more details, see [FAQ: Which CLI should I use?](guide/faq.md#which-cli-should-i-use) and [Client Compatibility Matrix](scenarios/client-compatibility.md).
+
+---
+
 ## Supported Platforms
 
 Squad is designed for **GitHub Copilot CLI** and ships with full support. **VS Code is now fully supported with zero code changes** — agents work identically on both platforms.
 
 **Current state:**
-- ✅ **GitHub Copilot CLI** — fully supported. This is the primary platform. Uses the stable `task` tool for sub-agent spawning, per-spawn model selection, and background mode.
+- ✅ **GitHub Copilot CLI** — fully supported. This is the recommended interface for day-to-day work. Uses the stable `task` tool for sub-agent spawning, per-spawn model selection, and background mode.
 - ✅ **VS Code Copilot** — fully supported (v0.4.0+). VS Code uses `runSubagent` for parallel execution and supports full `.ai-team/` read/write. See [Client Compatibility Matrix](scenarios/client-compatibility.md) for details.
 - ❌ **Other platforms** — JetBrains IDEs and other runtimes are untested. GitHub.com web-based Copilot is untested.
 

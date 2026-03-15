@@ -33,7 +33,10 @@ gh secret set COPILOT_ASSIGN_TOKEN
 git add .github/ .squad/ && git commit -m "feat: add copilot to squad" && git push
 
 # 5. Test — label any issue with squad:copilot
+gh issue edit <number> --add-label "squad:copilot"
 ```
+
+> **Why can't I use `gh issue edit --add-assignee "@copilot"`?** Bot accounts cannot be assigned via the GitHub CLI the same way as human users. Use label-based assignment instead. See [FAQ: Why doesn't gh issue edit --add-assignee "@copilot" work?](../guide/faq.md#why-doesnt-gh-issue-edit---add-assignee-copilot-work) for details.
 
 ---
 
