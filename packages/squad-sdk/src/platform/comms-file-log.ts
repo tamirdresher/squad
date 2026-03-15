@@ -10,6 +10,7 @@
 
 import { existsSync, mkdirSync, readFileSync, readdirSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
+import { safeTimestamp } from '../utils/safe-timestamp.js';
 import type { CommunicationAdapter, CommunicationChannel, CommunicationReply } from './types.js';
 
 export class FileLogCommunicationAdapter implements CommunicationAdapter {
@@ -29,7 +30,7 @@ export class FileLogCommunicationAdapter implements CommunicationAdapter {
     category?: string;
     author?: string;
   }): Promise<{ id: string; url?: string }> {
-    const timestamp = new Date().toISOString().replace(/:/g, '-').replace(/\.\d+Z$/, 'Z');
+    const timestamp = safeTimestamp();
     const slug = options.title.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40);
     const filename = `${timestamp}-${slug}.md`;
     const filepath = join(this.commsDir, filename);

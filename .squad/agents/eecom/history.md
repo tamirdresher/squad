@@ -24,3 +24,24 @@ CLI completeness audit (2026-03-08) confirmed: 26 primary commands routed in cli
 
 📌 **Team update (2026-03-08T21:18:00Z):** FIDO + EECOM released unanimous GO verdict for v0.8.24. Smoke test approved as release gate. FIDO confirmed 32/32 pass + publish.yml wired correctly. EECOM confirmed 26/26 commands + packaging complete (minor gap: "streams" alias untested, non-blocking).
 
+### Cross-Platform Filename and Config Fixes (#348, #356) (2026-03-15T05:30:00Z)
+
+**Context:** Two cross-platform bugs broke Squad on Windows: (1) log filenames contained colons in ISO 8601 timestamps (illegal on Windows), (2) `.squad/config.json` contained absolute machine-specific `teamRoot` path.
+
+**Investigation:**
+- Searched SDK for all timestamp usage in filenames — found `safeTimestamp()` utility already existed but wasn't consistently used
+- `comms-file-log.ts` (line 32) used inline `toISOString().replace(/:/g, '-')` instead of utility
+- `init.ts` (line 612) wrote absolute `teamRoot` to config.json on every init
+- Session-store already used `safeTimestamp()` correctly (line 71)
+
+**Fixes:**
+1. **Bug #348:** Updated `comms-file-log.ts` to import and use `safeTimestamp()` utility instead of inline timestamp formatting
+2. **Bug #356:** Removed `teamRoot` field from config.json (can be computed at runtime via `git rev-parse --show-toplevel`)
+3. Updated live `.squad/config.json` in repo to remove machine-specific path
+
+**Pattern:** Centralized timestamp formatting in `safeTimestamp()` utility (replaces colons + truncates milliseconds). Windows-safe format: `2026-03-15T05-30-00Z` instead of `2026-03-15T05:30:00.123Z`.
+
+**Test Impact:** All 150 tests pass. Communication adapter test doesn't validate specific filename format (structural test, not behavioral).
+
+**PR:** #404 opened targeting dev.
+

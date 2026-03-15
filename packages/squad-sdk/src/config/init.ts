@@ -609,7 +609,6 @@ export async function initSquad(options: InitOptions): Promise<InitResult> {
     }
     const squadConfig: Record<string, unknown> = {
       version: 1,
-      teamRoot: teamRoot,
     };
     if (detectedPlatform) {
       squadConfig.platform = detectedPlatform;
