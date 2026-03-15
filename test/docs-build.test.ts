@@ -50,6 +50,7 @@ const EXPECTED_SCENARIOS= [
 ];
 
 const EXPECTED_FEATURES = [
+  'built-in-roles',
   'ceremonies',
   'consult-mode',
   'copilot-coding-agent',
