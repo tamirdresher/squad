@@ -117,6 +117,12 @@ export interface InitOptions {
   streams?: SubSquadDefinition[];
   /** If true, use built-in base roles with useRole() in SDK config (default: false) */
   roles?: boolean;
+  /** ADO work item configuration — used when platform is azure-devops */
+  adoConfig?: {
+    defaultWorkItemType?: string;
+    areaPath?: string;
+    iterationPath?: string;
+  };
 }
 
 /**
@@ -719,18 +725,46 @@ export async function initSquad(options: InitOptions): Promise<InitResult> {
       squadConfig.platform = detectedPlatform;
     }
     if (detectedPlatform === 'azure-devops') {
-      // ADO work item defaults — users can customize these:
-      // - org/project: set when work items live in a different project than the repo
-      // - defaultWorkItemType: "User Story", "Scenario", "Bug", etc.
-      // - areaPath: e.g. "MyProject\\Team A" (backslash-separated)
-      // - iterationPath: e.g. "MyProject\\Sprint 1"
-      squadConfig.ado = {
-        // org: "my-org",           // uncomment if work items are in a different org
-        // project: "my-project",   // uncomment if work items are in a different project
-        // defaultWorkItemType: "User Story",
-        // areaPath: "",
-        // iterationPath: "",
-      };
+      // ADO work item defaults — attempt to introspect the process template
+      // to discover available work item types for the project.
+      let introspectedTypes: string[] | undefined;
+      try {
+        const remoteUrl = execFileSync('git', ['remote', 'get-url', 'origin'], { cwd: teamRoot, encoding: 'utf-8' }).trim();
+        // Parse org/project from remote URL for introspection
+        const httpsMatch = remoteUrl.match(/dev\.azure\.com\/([^/]+)\/([^/]+)\/_git/i);
+        const sshMatch = remoteUrl.match(/ssh\.dev\.azure\.com:v3\/([^/]+)\/([^/]+)\//i);
+        const vsMatch = remoteUrl.match(/([^/.]+)\.visualstudio\.com\/([^/]+)\/_git/i);
+        const parsed = httpsMatch ?? sshMatch ?? vsMatch;
+        if (parsed) {
+          const { getAvailableWorkItemTypes } = await import('../platform/azure-devops.js');
+          const types = getAvailableWorkItemTypes(parsed[1], parsed[2]);
+          const enabled = types.filter((t) => !t.disabled).map((t) => t.name);
+          if (enabled.length > 0) {
+            introspectedTypes = enabled;
+          }
+        }
+      } catch {
+        // Introspection failed — skip and use commented-out defaults
+      }
+
+      // Build the ADO config section: explicit options > introspected > commented defaults
+      const adoSection: Record<string, unknown> = {};
+      if (options.adoConfig?.defaultWorkItemType) {
+        adoSection.defaultWorkItemType = options.adoConfig.defaultWorkItemType;
+      }
+      if (options.adoConfig?.areaPath) {
+        adoSection.areaPath = options.adoConfig.areaPath;
+      }
+      if (options.adoConfig?.iterationPath) {
+        adoSection.iterationPath = options.adoConfig.iterationPath;
+      }
+
+      squadConfig.ado = adoSection;
+
+      // If introspection found types, store them so the user knows what's available
+      if (introspectedTypes?.length) {
+        adoSection._availableTypes = introspectedTypes;
+      }
     }
     // Only include extractionDisabled if explicitly set
     if (options.extractionDisabled) {
