@@ -193,6 +193,9 @@ async function main(): Promise<void> {
     console.log(`  ${BOLD}init-remote${RESET}    Link project to remote team root (shorthand)`);
     console.log(`             Usage: init-remote <team-repo-path>`);
     console.log(`  ${BOLD}rc-tunnel${RESET}      Check devtunnel CLI availability`);
+    console.log(`  ${BOLD}discover${RESET}   List known squads and their capabilities`);
+    console.log(`  ${BOLD}delegate${RESET}   Create work in another squad`);
+    console.log(`             Usage: delegate <squad-name> <description>`);
     console.log(`  ${BOLD}upstream${RESET}    Manage upstream Squad sources`);
     console.log(`             Usage: upstream add <source> [--name <n>] [--ref <branch>]`);
     console.log(`                    upstream remove <name>`);
@@ -537,6 +540,18 @@ async function main(): Promise<void> {
   if (cmd === 'upstream') {
     const { upstreamCommand } = await import('./cli/commands/upstream.js');
     await upstreamCommand(args.slice(1));
+    return;
+  }
+
+  if (cmd === 'discover') {
+    const { discoverCommand } = await import('./cli/commands/cross-squad.js');
+    await discoverCommand();
+    return;
+  }
+
+  if (cmd === 'delegate') {
+    const { delegateCommand } = await import('./cli/commands/cross-squad.js');
+    await delegateCommand(args.slice(1));
     return;
   }
 

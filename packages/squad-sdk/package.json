@@ -153,6 +153,10 @@
     "./builders": {
       "types": "./dist/builders/index.d.ts",
       "import": "./dist/builders/index.js"
+    },
+    "./runtime/cross-squad": {
+      "types": "./dist/runtime/cross-squad.d.ts",
+      "import": "./dist/runtime/cross-squad.js"
     }
   },
   "files": [
