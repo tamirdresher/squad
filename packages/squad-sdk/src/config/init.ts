@@ -735,7 +735,7 @@ export async function initSquad(options: InitOptions): Promise<InitResult> {
         const sshMatch = remoteUrl.match(/ssh\.dev\.azure\.com:v3\/([^/]+)\/([^/]+)\//i);
         const vsMatch = remoteUrl.match(/([^/.]+)\.visualstudio\.com\/([^/]+)\/_git/i);
         const parsed = httpsMatch ?? sshMatch ?? vsMatch;
-        if (parsed) {
+        if (parsed && parsed[1] && parsed[2]) {
           const { getAvailableWorkItemTypes } = await import('../platform/azure-devops.js');
           const types = getAvailableWorkItemTypes(parsed[1], parsed[2]);
           const enabled = types.filter((t) => !t.disabled).map((t) => t.name);
