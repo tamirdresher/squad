@@ -50,6 +50,8 @@ jobs:
 
       - name: Fetch and merge PR head
         run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git fetch origin pull/${{ inputs.pr_number }}/head:pr-head
           git merge pr-head --no-edit || {
             echo "::error::Merge conflict — PR cannot be cleanly merged into ${{ steps.pr.outputs.base_ref }}"
