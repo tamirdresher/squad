@@ -11,6 +11,81 @@ import * as fs from 'fs/promises';
 import * as path from 'path';
 import { ConfigurationError } from '../adapter/errors.js';
 
+// ---------------------------------------------------------------------------
+// Async mutex — prevents read-modify-write races when multiple agents
+// concurrently append to the same history.md (#479).
+//
+// Two layers of protection:
+//   1. In-process async mutex (handles concurrent agents in one Node.js process)
+//   2. Atomic writes via temp-file + rename (prevents partial reads)
+// ---------------------------------------------------------------------------
+
+/**
+ * Per-file async mutex.  Keyed by resolved file path so concurrent calls
+ * targeting the same history.md are serialized, while calls to different
+ * files run in parallel.
+ * @private
+ */
+const fileLocks = new Map<string, Promise<void>>();
+
+/**
+ * Execute `fn` while holding an in-process async mutex for `filePath`.
+ *
+ * Concurrent callers for the same path are queued — each waits for the
+ * previous to finish before starting.  Different paths run in parallel.
+ *
+ * @private
+ */
+async function withFileLock<T>(
+  filePath: string,
+  fn: () => Promise<T>,
+): Promise<T> {
+  // Normalize path to prevent two representations of the same file
+  const key = path.resolve(filePath);
+
+  // Chain: wait for whoever holds the lock right now
+  const prev = fileLocks.get(key) ?? Promise.resolve();
+
+  let releaseLock!: () => void;
+  const gate = new Promise<void>(resolve => {
+    releaseLock = resolve;
+  });
+  fileLocks.set(key, gate);
+
+  // Wait until the previous holder finishes
+  await prev;
+
+  try {
+    return await fn();
+  } finally {
+    releaseLock();
+    // Clean up if we are the last in the chain
+    if (fileLocks.get(key) === gate) {
+      fileLocks.delete(key);
+    }
+  }
+}
+
+/**
+ * Write a file atomically by writing to a temp file then renaming.
+ * Prevents concurrent readers from seeing partial content.
+ * @private
+ */
+async function atomicWriteFile(
+  filePath: string,
+  content: string,
+): Promise<void> {
+  const tmpPath = `${filePath}.${process.pid}.tmp`;
+  try {
+    await fs.writeFile(tmpPath, content, 'utf-8');
+    await fs.rename(tmpPath, filePath);
+  } catch (err) {
+    // Clean up temp file on failure
+    await fs.unlink(tmpPath).catch(() => {});
+    throw err;
+  }
+}
+
 /**
  * Standard history sections that agents maintain.
  */
@@ -147,45 +222,49 @@ export async function appendToHistory(
   try {
     const shadowPath = path.join(teamRoot, '.squad', 'agents', agentName, 'history.md');
     
-    // Read existing history
-    let historyContent: string;
-    try {
-      historyContent = await fs.readFile(shadowPath, 'utf-8');
-    } catch (error) {
-      throw new ConfigurationError(
-        `History shadow not found for agent '${agentName}'. Create it first with createHistoryShadow().`,
-        {
-          agentName,
-          operation: 'appendToHistory',
-          timestamp: new Date(),
-          metadata: { shadowPath },
-        },
-        error instanceof Error ? error : undefined
-      );
-    }
-    
-    // Find section or create it
-    const sectionHeader = `## ${section}`;
-    const sectionRegex = new RegExp(`^${sectionHeader}\\s*$([\\s\\S]*?)(?=^##\\s|\\Z)`, 'm');
-    const match = historyContent.match(sectionRegex);
-    
-    const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
-    const entry = `\n### ${timestamp}\n\n${content}\n`;
-    
-    let updatedContent: string;
-    
-    if (match) {
-      // Section exists, append to it
-      const fullMatch = match[0];
-      const sectionContent = match[1];
-      const updatedSection = `${sectionHeader}\n${sectionContent!.trimEnd()}${entry}`;
-      updatedContent = historyContent.replace(fullMatch, updatedSection);
-    } else {
-      // Section doesn't exist, create it at the end
-      updatedContent = historyContent.trimEnd() + `\n\n${sectionHeader}${entry}`;
-    }
-    
-    await fs.writeFile(shadowPath, updatedContent, 'utf-8');
+    // Acquire file lock before the read-modify-write cycle (#479)
+    await withFileLock(shadowPath, async () => {
+      // Read existing history (inside lock to prevent races)
+      let historyContent: string;
+      try {
+        historyContent = await fs.readFile(shadowPath, 'utf-8');
+      } catch (error) {
+        throw new ConfigurationError(
+          `History shadow not found for agent '${agentName}'. Create it first with createHistoryShadow().`,
+          {
+            agentName,
+            operation: 'appendToHistory',
+            timestamp: new Date(),
+            metadata: { shadowPath },
+          },
+          error instanceof Error ? error : undefined
+        );
+      }
+      
+      // Find section or create it
+      const sectionHeader = `## ${section}`;
+      const sectionRegex = new RegExp(`^${sectionHeader}\\s*$([\\s\\S]*?)(?=^##\\s|\\Z)`, 'm');
+      const match = historyContent.match(sectionRegex);
+      
+      const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+      const entry = `\n### ${timestamp}\n\n${content}\n`;
+      
+      let updatedContent: string;
+      
+      if (match) {
+        // Section exists, append to it
+        const fullMatch = match[0];
+        const sectionContent = match[1];
+        const updatedSection = `${sectionHeader}\n${sectionContent!.trimEnd()}${entry}`;
+        updatedContent = historyContent.replace(fullMatch, updatedSection);
+      } else {
+        // Section doesn't exist, create it at the end
+        updatedContent = historyContent.trimEnd() + `\n\n${sectionHeader}${entry}`;
+      }
+      
+      // Atomic write: temp file + rename prevents partial reads
+      await atomicWriteFile(shadowPath, updatedContent);
+    });
     
   } catch (error) {
     if (error instanceof ConfigurationError) {
