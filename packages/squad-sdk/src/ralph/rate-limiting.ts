@@ -105,8 +105,8 @@ export class PredictiveCircuitBreaker {
     if (this.samples.length < 3) return null;
 
     const n = this.samples.length;
-    const first = this.samples[0];
-    const last = this.samples[n - 1];
+    const first = this.samples[0]!;
+    const last = this.samples[n - 1]!;
 
     const elapsedMs = last.timestamp - first.timestamp;
     if (elapsedMs === 0) return null;
