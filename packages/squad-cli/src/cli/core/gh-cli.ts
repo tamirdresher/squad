@@ -128,3 +128,33 @@ export async function ghIssueEdit(issueNumber: number, options: GhEditOptions): 
   
   await execFileAsync('gh', args);
 }
+
+/** Rate limit status from GitHub API */
+export interface GhRateLimitStatus {
+  remaining: number;
+  limit: number;
+  resetAt: string;
+}
+
+/**
+ * Check current GitHub API rate limit status.
+ * Returns remaining/limit so the circuit breaker can make decisions.
+ */
+export async function ghRateLimitCheck(): Promise<GhRateLimitStatus> {
+  const { stdout } = await execFileAsync('gh', [
+    'api', 'rate_limit', '--jq',
+    '{ remaining: .rate.remaining, limit: .rate.limit, resetAt: .rate.reset | todate }'
+  ]);
+  return JSON.parse(stdout);
+}
+
+/**
+ * Detect if an error is a rate limit error (HTTP 429 or secondary rate limit).
+ */
+export function isRateLimitError(err: Error): boolean {
+  const msg = err.message.toLowerCase();
+  return msg.includes('rate limit') ||
+    msg.includes('429') ||
+    msg.includes('secondary rate limit') ||
+    msg.includes('api rate limit exceeded');
+}
