@@ -183,3 +183,5 @@ export class RalphMonitor {
     this.eventBus = null;
   }
 }
+
+export { loadCapabilities, canHandleIssue, filterByCapabilities, extractNeeds, type MachineCapabilities, KNOWN_CAPABILITIES } from './capabilities.js';
