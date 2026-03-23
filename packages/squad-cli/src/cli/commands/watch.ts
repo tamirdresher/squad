@@ -37,8 +37,6 @@ import {
 import {
   PredictiveCircuitBreaker,
   getTrafficLight,
-  shouldProceed,
-  getRetryDelay,
   type TrafficLight,
 } from '@bradygaster/squad-sdk/ralph/rate-limiting';
 
@@ -388,7 +386,6 @@ async function executeRound(
       cbState.cooldownMinutes = Math.min(10 * Math.pow(2, cbState.backoffRound - 1), 60);
       await saveCBState(squadDir, cbState);
 
-      const delay = getRetryDelay(2, cbState.consecutiveFailures);
       console.error(
         `${RED}[${timestamp}]${RESET} \u{26A1} Rate limited! Circuit OPEN \u2014 ` +
         `cooldown ${cbState.cooldownMinutes}min (failure #${cbState.consecutiveFailures})`
@@ -487,22 +484,32 @@ export async function runWatch(dest: string, intervalMinutes: number): Promise<v
   reportBoard(state, round, light);
 
   return new Promise<void>((resolve) => {
+    let roundInProgress = false;
     const intervalId = setInterval(
       async () => {
-        round++;
-        const { boardState: roundState, light: roundLight } = await executeRound(
-          round, pcb, cbState, squadDirInfo.path,
-          rules, modules, roster, hasCopilot, autoAssign
-        );
-        await eventBus.emit({
-          type: 'agent:milestone',
-          sessionId: monitorSessionId,
-          agentName: 'Ralph',
-          payload: { milestone: `Completed watch round ${round}`, task: 'watch cycle' },
-          timestamp: new Date(),
-        });
-        await monitor.healthCheck();
-        reportBoard(roundState, round, roundLight);
+        if (roundInProgress) {
+          console.log(`${DIM}[${new Date().toLocaleTimeString()}] Previous round still running — skipping${RESET}`);
+          return;
+        }
+        roundInProgress = true;
+        try {
+          round++;
+          const { boardState: roundState, light: roundLight } = await executeRound(
+            round, pcb, cbState, squadDirInfo.path,
+            rules, modules, roster, hasCopilot, autoAssign
+          );
+          await eventBus.emit({
+            type: 'agent:milestone',
+            sessionId: monitorSessionId,
+            agentName: 'Ralph',
+            payload: { milestone: `Completed watch round ${round}`, task: 'watch cycle' },
+            timestamp: new Date(),
+          });
+          await monitor.healthCheck();
+          reportBoard(roundState, round, roundLight);
+        } finally {
+          roundInProgress = false;
+        }
       },
       intervalMinutes * 60 * 1000
     );
