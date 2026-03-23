@@ -5,6 +5,7 @@ import {
   getRetryDelay,
   PredictiveCircuitBreaker,
   canUseQuota,
+  consumeQuota,
   type RatePool,
   type AgentPriority,
 } from '../packages/squad-sdk/src/ralph/rate-limiting.js';
@@ -182,7 +183,7 @@ describe('canUseQuota', () => {
     expect(canUseQuota(pool, 'ralph')).toBe(false);
   });
 
-  it('reclaims stale leases from other agents', () => {
+  it('is pure — does not reclaim stale leases from other agents', () => {
     const pool: RatePool = {
       totalLimit: 5000,
       resetAt: futureExpiry,
@@ -192,7 +193,51 @@ describe('canUseQuota', () => {
       },
     };
     canUseQuota(pool, 'ralph');
-    expect(pool.allocations.picard.allocated).toBe(0); // Reclaimed
+    expect(pool.allocations.picard!.allocated).toBe(2000); // NOT reclaimed — pure read
+  });
+
+  it('is pure — does not modify own stale lease', () => {
+    const pool: RatePool = {
+      totalLimit: 5000,
+      resetAt: futureExpiry,
+      allocations: {
+        ralph: { priority: 2, allocated: 1000, used: 500, leaseExpiry: pastExpiry },
+      },
+    };
+    expect(canUseQuota(pool, 'ralph')).toBe(true);
+    expect(pool.allocations.ralph!.allocated).toBe(1000); // Unchanged
+    expect(pool.allocations.ralph!.used).toBe(500);       // Unchanged
+  });
+});
+
+describe('consumeQuota', () => {
+  const futureExpiry = new Date(Date.now() + 300000).toISOString();
+  const pastExpiry = new Date(Date.now() - 60000).toISOString();
+
+  it('increments used count for the calling agent', () => {
+    const pool: RatePool = {
+      totalLimit: 5000,
+      resetAt: futureExpiry,
+      allocations: {
+        ralph: { priority: 2, allocated: 1000, used: 5, leaseExpiry: futureExpiry },
+      },
+    };
+    consumeQuota(pool, 'ralph');
+    expect(pool.allocations.ralph!.used).toBe(6);
+  });
+
+  it('reclaims stale leases from other agents', () => {
+    const pool: RatePool = {
+      totalLimit: 5000,
+      resetAt: futureExpiry,
+      allocations: {
+        picard: { priority: 0, allocated: 2000, used: 500, leaseExpiry: pastExpiry }, // Stale
+        ralph: { priority: 2, allocated: 1000, used: 500, leaseExpiry: futureExpiry },
+      },
+    };
+    consumeQuota(pool, 'ralph');
+    expect(pool.allocations.picard!.allocated).toBe(0); // Reclaimed
+    expect(pool.allocations.ralph!.used).toBe(501);     // Incremented
   });
 
   it('does not reclaim own stale lease', () => {
@@ -203,7 +248,32 @@ describe('canUseQuota', () => {
         ralph: { priority: 2, allocated: 1000, used: 500, leaseExpiry: pastExpiry },
       },
     };
+    consumeQuota(pool, 'ralph');
+    expect(pool.allocations.ralph!.allocated).toBe(1000); // Not reclaimed
+    expect(pool.allocations.ralph!.used).toBe(501);       // Incremented
+  });
+
+  it('is a no-op for unknown agents', () => {
+    const pool: RatePool = {
+      totalLimit: 5000,
+      resetAt: futureExpiry,
+      allocations: {},
+    };
+    expect(() => consumeQuota(pool, 'ghost')).not.toThrow();
+  });
+
+  it('canUseQuota + consumeQuota work correctly together', () => {
+    const pool: RatePool = {
+      totalLimit: 5000,
+      resetAt: futureExpiry,
+      allocations: {
+        ralph: { priority: 2, allocated: 1000, used: 999, leaseExpiry: futureExpiry },
+      },
+    };
+    // One quota left
     expect(canUseQuota(pool, 'ralph')).toBe(true);
-    expect(pool.allocations.ralph.allocated).toBe(1000); // Not reclaimed
+    consumeQuota(pool, 'ralph');
+    // Now exhausted
+    expect(canUseQuota(pool, 'ralph')).toBe(false);
   });
 });

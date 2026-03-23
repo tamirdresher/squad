@@ -2,8 +2,9 @@
  * Predictive Circuit Breaker — Rate Limit Protection
  *
  * Opens the circuit BEFORE getting a 429 by predicting when
- * API quota will be exhausted using linear regression on
- * recent rate limit header samples.
+ * API quota will be exhausted. Prediction uses the observed
+ * consumption rate between the oldest and newest samples
+ * (first-to-last delta), not a full least-squares regression.
  *
  * @see https://github.com/bradygaster/squad/issues/515
  */
@@ -98,7 +99,8 @@ export class PredictiveCircuitBreaker {
   }
 
   /**
-   * Predict seconds until quota exhaustion using linear regression.
+   * Predict seconds until quota exhaustion using the observed
+   * consumption rate between the first and last recorded samples.
    * Returns null if insufficient data or quota is not being consumed.
    */
   predictExhaustion(): number | null {
@@ -152,13 +154,26 @@ export interface RatePool {
 
 /**
  * Check if an agent has remaining quota in the cooperative pool.
- * Reclaims stale leases from crashed agents.
+ * Pure read — no side effects.
  */
 export function canUseQuota(pool: RatePool, agentName: string): boolean {
   const alloc = pool.allocations[agentName];
   if (!alloc) return true; // Unknown agent — allow gracefully
 
-  // Reclaim stale leases
+  return alloc.used < alloc.allocated;
+}
+
+/**
+ * Consume one unit of quota for an agent.
+ * Also reclaims stale leases from other crashed agents so their
+ * unused allocation is freed for the pool.
+ * Call this after canUseQuota() confirms there is quota available.
+ */
+export function consumeQuota(pool: RatePool, agentName: string): void {
+  const alloc = pool.allocations[agentName];
+  if (!alloc) return; // Unknown agent — nothing to consume
+
+  // Reclaim stale leases from other agents
   const now = new Date();
   for (const [name, a] of Object.entries(pool.allocations)) {
     if (new Date(a.leaseExpiry) < now && name !== agentName) {
@@ -166,7 +181,7 @@ export function canUseQuota(pool: RatePool, agentName: string): boolean {
     }
   }
 
-  return alloc.used < alloc.allocated;
+  alloc.used++;
 }
 
 /**
