@@ -86,6 +86,10 @@
       "types": "./dist/ralph/triage.d.ts",
       "import": "./dist/ralph/triage.js"
     },
+    "./ralph/capabilities": {
+      "types": "./dist/ralph/capabilities.d.ts",
+      "import": "./dist/ralph/capabilities.js"
+    },
     "./ralph/rate-limiting": {
       "types": "./dist/ralph/rate-limiting.d.ts",
       "import": "./dist/ralph/rate-limiting.js"
