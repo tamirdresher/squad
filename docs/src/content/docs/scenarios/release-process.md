@@ -33,7 +33,7 @@ Complete step-by-step guide for Squad maintainers: three-branch model (dev/previ
 |--------|---------|------------|---------------|---------------|
 | **dev** | Development — all work happens here | All team members | ❌ No | Everything (`.ai-team/`, team-docs, etc.) |
 | **preview** | Staging/testing — validated product only | Release coordinator | ✅ Yes | Distribution files only (`.ai-team/` blocked) |
-| **main** | Production — release source for `npx` | Release coordinator | ✅ Yes | Distribution files only (`.ai-team/` blocked) |
+| **main** | Production — npm release source | Release coordinator | ✅ Yes | Distribution files only (`.ai-team/` blocked) |
 
 ---
 
