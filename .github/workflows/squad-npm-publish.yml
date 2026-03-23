@@ -12,8 +12,70 @@ permissions:
   contents: read
   id-token: write
 jobs:
+  preflight:
+    name: Pre-publish dependency validation
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: "Scan for file: references in package.json files"
+        run: |
+          echo "Scanning all packages/*/package.json for file: references..."
+          FOUND=0
+          for pkg in packages/*/package.json; do
+            # Check dependencies, devDependencies, and optionalDependencies for file: refs
+            MATCHES=$(node -e "
+              const pkg = require('./$pkg');
+              const sections = ['dependencies', 'devDependencies', 'optionalDependencies', 'peerDependencies'];
+              for (const s of sections) {
+                for (const [name, ver] of Object.entries(pkg[s] || {})) {
+                  if (String(ver).startsWith('file:')) {
+                    console.log('  ❌ ' + s + '.' + name + ' = ' + ver);
+                  }
+                }
+              }
+            ")
+            if [ -n "$MATCHES" ]; then
+              echo "::error::file: dependency found in $pkg"
+              echo "$pkg:"
+              echo "$MATCHES"
+              FOUND=1
+            fi
+          done
+          if [ "$FOUND" -eq 1 ]; then
+            echo ""
+            echo "::error::PUBLISH BLOCKED — file: references break global installs (see v0.9.1 incident)"
+            echo "Fix: Replace file: references with proper version ranges before publishing."
+            exit 1
+          fi
+          echo "✅ No file: references found — safe to publish"
+      - name: Validate semver versions
+        run: |
+          echo "Validating version numbers are valid semver..."
+          node -e "
+            const fs = require('fs');
+            const path = require('path');
+            const semverRe = /^\d+\.\d+\.\d+(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$/;
+            const pkgs = fs.readdirSync('packages', { withFileTypes: true })
+              .filter(d => d.isDirectory())
+              .map(d => path.join('packages', d.name, 'package.json'))
+              .filter(p => fs.existsSync(p));
+            let failed = false;
+            for (const p of pkgs) {
+              const pkg = JSON.parse(fs.readFileSync(p, 'utf8'));
+              if (!semverRe.test(pkg.version)) {
+                console.error('::error::Invalid semver in ' + p + ': ' + pkg.version);
+                failed = true;
+              } else {
+                console.log('✅ ' + pkg.name + '@' + pkg.version);
+              }
+            }
+            if (failed) process.exit(1);
+          "
   smoke-test:
     name: CLI packaging smoke test
+    needs: preflight
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -28,11 +90,17 @@ jobs:
         run: npm run build
         env:
           SKIP_BUILD_BUMP: '1'
+      - name: Validate npm pack succeeds
+        run: |
+          echo "Verifying npm pack produces valid tarballs..."
+          npm -w packages/squad-sdk pack --dry-run
+          npm -w packages/squad-cli pack --dry-run
+          echo "✅ Both packages pack successfully"
       - name: Run CLI smoke tests
         run: npx vitest run test/cli-packaging-smoke.test.ts
   publish-sdk:
     name: Publish @bradygaster/squad-sdk
-    needs: smoke-test
+    needs: [preflight, smoke-test]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -82,7 +150,7 @@ jobs:
           echo "Registry propagation slow but package was published successfully"
   publish-cli:
     name: Publish @bradygaster/squad-cli
-    needs: [smoke-test, publish-sdk]
+    needs: [preflight, smoke-test, publish-sdk]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -105,7 +173,7 @@ jobs:
           echo "Publishing version: ${VERSION}"
       - name: Install dependencies
         run: npm ci
-      - name: Guard against file: dependencies
+      - name: "Guard against file: dependencies"
         run: |
           SDK_DEP=$(node -p "require('./packages/squad-cli/package.json').dependencies['@bradygaster/squad-sdk']")
           if [[ "$SDK_DEP" == file:* ]]; then
