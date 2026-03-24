@@ -1,0 +1,62 @@
+name: Research Report Back
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: read
+
+jobs:
+  report-back:
+    if: contains(github.event.label.name, 'research:report-back')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Post research findings to production issue
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.CROSS_REPO_TOKEN }}
+          script: |
+            const issue = context.payload.issue;
+            const productionRepo = '${{ vars.PRODUCTION_REPO }}';
+            const [prodOwner, prodRepo] = productionRepo.split('/');
+
+            // Extract production issue reference from the issue body
+            // Expected format: "> 🔗 Cross-posted from owner/repo#NUMBER"
+            const match = issue.body?.match(/Cross-posted from [^#]+#(\d+)/);
+            if (!match) {
+              core.warning('Could not find production issue reference in body — skipping report-back');
+              return;
+            }
+
+            const prodIssueNumber = parseInt(match[1], 10);
+
+            // Post findings back to the production issue
+            await github.rest.issues.createComment({
+              owner: prodOwner,
+              repo: prodRepo,
+              issue_number: prodIssueNumber,
+              body: [
+                `## 🔬 Research Complete`,
+                '',
+                `Findings from [${context.repo.owner}/${context.repo.repo}#${issue.number}](${issue.html_url}):`,
+                '',
+                issue.body || '_No summary provided._',
+                '',
+                '---',
+                `Research closed by @${context.payload.sender.login}.`,
+              ].join('\n')
+            });
+
+            // Update production issue label to 'research:complete'
+            await github.rest.issues.addLabels({
+              owner: prodOwner,
+              repo: prodRepo,
+              issue_number: prodIssueNumber,
+              labels: ['research:complete']
+            });
+            await github.rest.issues.removeLabel({
+              owner: prodOwner,
+              repo: prodRepo,
+              issue_number: prodIssueNumber,
+              name: 'research:active'
+            }).catch(() => {});

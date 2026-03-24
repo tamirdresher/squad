@@ -1,0 +1,62 @@
+name: Cross-Repo Squad Sync
+on:
+  issues:
+    types: [labeled]
+
+permissions:
+  issues: read
+
+jobs:
+  sync:
+    if: contains(github.event.label.name, 'research:request')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create mirror issue in research repo
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.CROSS_REPO_TOKEN }}
+          script: |
+            const issue = context.payload.issue;
+            const researchRepo = '${{ vars.RESEARCH_REPO }}';
+            const [owner, repo] = researchRepo.split('/');
+
+            // Create a mirror issue in the research repo
+            const created = await github.rest.issues.create({
+              owner,
+              repo,
+              title: `[Production Request] ${issue.title}`,
+              body: [
+                `> 🔗 Cross-posted from ${context.repo.owner}/${context.repo.repo}#${issue.number}`,
+                `> Original author: @${issue.user.login}`,
+                '',
+                issue.body || '_No description provided._',
+                '',
+                '---',
+                '**Ralph-R**: This issue was automatically mirrored from the production repo.',
+                'When research is complete, close this issue with a summary and the',
+                '`research:report-back` label to post findings back automatically.',
+              ].join('\n'),
+              labels: ['research:active', 'cross-repo']
+            });
+
+            // Comment on the original issue with a link to the research mirror
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              body: `🔬 **Research dispatched**: Mirror issue created at [${owner}/${repo}#${created.data.number}](${created.data.html_url}).\n\nFindings will be posted back here when research completes.`
+            });
+
+            // Update label: replace 'research:request' with 'research:active'
+            await github.rest.issues.addLabels({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              labels: ['research:active']
+            });
+            await github.rest.issues.removeLabel({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: issue.number,
+              name: 'research:request'
+            }).catch(() => {});
