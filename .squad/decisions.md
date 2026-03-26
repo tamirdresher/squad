@@ -5965,6 +5965,73 @@ Copied during init if user opts into distributed mode (future enhancement). For 
 ✅ **Copy `SKILL.md` to `templates/skills/distributed-mesh/SKILL.md`** (and SDK/CLI template dirs)
 
 ### No Changes Required
+
+---
+
+## 2026-03-26: Crash Recovery Execution — 10 PRs Merged
+
+**Author:** Scribe (documenting Round 2+3 outcomes)  
+**Date:** 2026-03-26T06:41:00Z  
+**Context:** Post-CLI crash triage session, team consensus executed across three recovery rounds.
+
+### Round 1 (Audit & Baseline)
+- **Flight** audited PR/issue state post-crash: found #617 already merged, #619 conflicting, 3 duplicates (#605, #604, #602) open
+- **FIDO** verified build baseline: ✅ 5,038 tests passing, dev green
+- **Scribe** merged stale decision inbox (procedures-model-update.md), logged crash session
+
+### Round 2 (Duplicate Closure & PR Actions)
+- **Flight** closed 3 duplicate PRs (#605, #604, #602) with rationale comments
+- **Procedures** rebased PR #619 (model catalog) onto dev, resolved 3 merge conflicts, merged
+- **FIDO** reviewed 9 community PRs: ✅ approved 3 (#625, #603, #608), requested changes on 6 (#623, #622, #621, #614, #607, #606)
+
+### Round 3 (Community Merges)
+- **Coordinator** merged 3 approved community PRs: #625 (notification-routing), #608 (security policy), #603 (Challenger agent template)
+- **Flight** confirmed all merges and verified state
+
+### Outcomes
+- **PRs merged:** 10 total
+  - 6 merge-plan PRs (#620, #627, #624, #611, #617, #619) ✅ all complete
+  - 3 community PRs (#625, #608, #603) ✅ merged
+  - 1 legacy PR (#592) ✅ merged
+- **PRs closed:** 3 duplicates
+- **PRs awaiting author changes:** 6 (#623, #622, #621, #614, #607, #606)
+- **Dev branch status:** 5,038 tests passing ✅ Green
+
+### Decisions Made
+1. **Duplicate closure rationale:**
+   - #605 → duplicate of #607 (ceremonies-related)
+   - #604 → duplicate of #603 (Challenger agent)
+   - #602 → duplicate of #606 (tiered agent memory)
+
+2. **Community PR quality gate:** FIDO identified systemic issues in lower-tier PRs:
+   - **Changeset package naming:** 4 PRs used unscoped `squad-cli` instead of `@bradygaster/squad-cli`
+   - **File paths:** 2 PRs placed files at root-level instead of correct package structure
+   - **Action:** Requested specific changes; authors must revise
+
+3. **Model catalog (PR #619):** Rebased with conflict resolution, merged successfully. Platform models now current: `claude-sonnet-4.6` (default), `gpt-5.3-codex` (specialist), new fallbacks added.
+
+### Next Steps
+- Monitor 6 change-request PRs for author responses (48h window)
+- Park draft PR #567 pending requirements clarification
+- Dev branch remains green; ready for follow-on feature work
+
+---
+
+## 2026-03-26: Decision Inbox Merge Complete
+
+**Author:** Scribe  
+**Date:** 2026-03-26T06:41:00Z
+
+### Inbox Files Merged & Deleted
+1. ✅ `fido-community-pr-review.md` — 9-PR review with quality gate findings
+2. ✅ `flight-crash-recovery-audit.md` — Baseline PR/issue audit post-crash
+3. ✅ `flight-phase1-execution.md` — Duplicate closure + community PR merge execution
+4. ✅ `procedures-model-update.md` — Model catalog refresh decision
+
+### Deduplication
+- **No exact duplicates found** — each inbox file covers distinct aspects (audit vs. execution vs. review)
+- **Integrated into crash-recovery decision** above (single coherent timeline)
+- All inbox files archived and deleted per standard Scribe workflow
 ❌ **squad.config.ts** — Does NOT need a `mesh` section. The mesh config lives in `mesh.json` as a separate concern. squad.config.ts is for agent behavior, not transport.
 
 ❌ **squad.agent.md** — Does NOT need mesh awareness. Agents learn mesh patterns from the skill file, not the coordinator prompt.

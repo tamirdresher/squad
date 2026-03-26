@@ -6,6 +6,8 @@
 
 Quality gate authority for all PRs. Test assertion arrays (EXPECTED_GUIDES, EXPECTED_FEATURES, EXPECTED_SCENARIOS, etc.) MUST stay in sync with files on disk. When reviewing PRs with CI failures, always check if dev branch has the same failures — don't block PRs for pre-existing issues. 3,931 tests passing, 149 test files, ~89s runtime.
 
+📌 **Team update (2026-03-26T06:41:00Z — Crash Recovery Execution & Community PR Review):** Post-CLI crash recovery completed: Round 1 baseline verified (5,038 tests ✅ green), Round 2 executed duplicate closures (#605/#604/#602) and 9-PR community batch review. FIDO approved 3 PRs (#625 notification-routing, #603 Challenger agent, #608 security policy—merged via Coordinator) and issued change requests on 6 PRs identifying systemic issues: changeset package naming (4 PRs used unscoped `squad-cli` instead of `@bradygaster/squad-cli`); file paths (2 PRs placed files at root instead of correct package structure). Quality gate result: high-bar community acceptance—approved 3/9 (33%), change-request 6/9 (67%), 0 rejections. PR #592 (legacy, high-quality) also merged. All actions complete; dev branch remains green. Decision inbox merged and deleted. Next: Monitor 6 change-request PRs for author responses.
+
 📌 **Team update (2026-03-25T15:23Z — Triage Session & PR Review Batch):** FIDO reviewed 10 open PRs for quality and merge readiness. Identified 3 duplicate/overlap pairs consolidating 6 PRs into 4: #607 (retro enforcement, comprehensive) approved for merge, #605 closed as duplicate (less comprehensive). #603 (Challenger agent, correct paths) approved for merge, #604 closed as duplicate (wrong file paths). #606 (tiered memory superset, 3-tier model) approved for merge, #602 closed as duplicate (narrower 2-tier scope). Merge-ready PRs identified: #611 (blocked on #610), #592 (joniba wiring guide, high-quality). Draft #567 not ready. Impact: reduces PR count from 10 to 7, eliminates file conflicts, preserves unique value. All other PRs (#611, #608, #592, #567) can proceed independently. Decisions merged to decisions.md and decisions inbox deleted.
 
 ## Learnings
@@ -208,4 +210,16 @@ Reviewed all 10 open PRs for quality, test coverage, and merge readiness.
 **Blocking issues:**
 - None for mergeability — all non-overlapping PRs are technically ready
 - Deduplication decision needed for tamirdresher's PRs before merging any of them
+
+### Community PR Batch Review — Post-Crash Recovery (2026-03-26)
+
+Reviewed 9 community PRs (8 from tamirdresher, 1 from eric-vanartsdalen). Key findings:
+
+1. **Changeset package name pattern:** 4 of 8 Tamir PRs (#623, #622, #621, #614) use unscoped `"squad-cli"` / `"squad-sdk"` instead of `"@bradygaster/squad-cli"` / `"@bradygaster/squad-sdk"`. Only #625 got this right. This is a recurring community contributor mistake — consider adding guidance to CONTRIBUTING.md or PR template.
+
+2. **File path pattern:** PRs #607 and #606 place files at root `ceremonies/`, `skills/`, `docs/`, `templates/` directories that don't exist. Skills belong in `packages/squad-cli/templates/skills/` and SDK equivalent. Community contributors don't know the monorepo layout.
+
+3. **Verdicts:** ✅ MERGE: #625 (notification-routing), #603 (Challenger agent), #608 (SECURITY.md). ⚠️ NEEDS CHANGES: #623, #622, #621, #614 (changeset fix), #607, #606 (path restructuring).
+
+**Learning:** Community contributors consistently struggle with two things: (a) scoped npm package names in changesets, and (b) monorepo file placement. Both are preventable with better contributor docs.
 

@@ -13,6 +13,8 @@ Procedures assigned:
 
 Pattern: Agent specification gap identified. Procedures owns formal spec structure and documentation; Flight owns architecture decisions.
 
+📌 **Team update (2026-03-26T06:41:00Z — Crash Recovery Execution & Model Catalog Merge):** Procedures executed Round 2 PR merge action: rebased PR #619 (model catalog refresh, issue #588) onto dev branch from main, resolved 3 merge conflicts, and successfully merged. Model catalog now current: default model bumped to `claude-sonnet-4.6` (latest standard-tier Claude), specialist bumped to `gpt-5.3-codex` (latest code-writing specialist), fallback chains restructured to include new models (`gpt-5.4`, `gpt-5.4-mini`) and removed dead models (`claude-opus-4.6-fast`). All 6 original merge-plan PRs (#620, #627, #624, #611, #617, #619) now ✅ complete. Dev branch green (5,038 tests). Decision inbox merged to decisions.md and deleted. Next: Ready for follow-on feature PRs.
+
 📌 **Team update (2026-03-22T06:44:01Z):** Flight issued comprehensive triage. Procedures owns Agent Specification PRD structure (#485). Architecture decisions from Flight. Coordinate on formal spec format and standard structure for future agent definitions.
 # Procedures — Project History
 
@@ -185,4 +187,12 @@ Also updated: examples section (showing `name` + `description` pairs), anti-patt
 **Branch:** `squad/613-vscode-routing-enforcement` — canonical source edited, synced to all 5 copies via `scripts/sync-templates.mjs`, build verified clean.
 
 **Remaining P1 fixes** (template renaming, prompt slimming, VS Code block relocation) deferred to separate PRs per the proposal's ship order.
+
+### 2026-07: PR #619 rebase and merge — model catalog final sync
+
+**Problem:** PR #619 (model catalog update, #588) was the last of 6 PRs in the pre-crash triage merge plan. It had accumulated old dev merge commits and was behind after PRs #620, #627, #624, #611, and #617 merged first. Template renames from #624 (`.agent.md` → `.agent.md.template`) changed which files needed updating.
+
+**Fix:** Used targeted `git rebase --onto dev <base>` to replay only the 2 actual PR commits (skipping accumulated dev merge noise). Rebase applied cleanly — one commit landed, one was auto-dropped as already upstream. After rebase, only `packages/squad-sdk/templates/squad.agent.md.template` and `templates/squad.agent.md.template` needed changes since the canonical and other copies already had the model updates from earlier merges.
+
+**Pattern:** When a PR branch has accumulated merge commits from dev, use `git rebase --onto dev <parent-of-first-PR-commit>` to cherry-pick only the relevant commits. This avoids conflict noise from old merge commits that are already in dev. Also: after template renames, the sync script may overwrite version stamps in the canonical file — revert those before pushing.
 
