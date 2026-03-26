@@ -1,3 +1,11 @@
+---
+name: retro-enforcement
+description: Enforce retrospective ceremonies on schedule and track action items as GitHub Issues
+domain: ceremonies, team-collaboration
+confidence: high
+source: earned (0% markdown completion vs 85%+ GitHub Issues across 6 retrospectives)
+---
+
 # Skill: Retro Enforcement
 
 ## Purpose
@@ -37,6 +45,52 @@ The function checks `.squad/log/` for any file matching `*retrospective*` dated 
 
 Example: `.squad/log/2026-03-24T14-45-00Z-retrospective.md`
 
+## Ceremony Format
+
+### Cadence
+
+| Field | Value |
+|-------|-------|
+| **Frequency** | Bi-weekly (every 2 weeks) or weekly for high-velocity squads |
+| **Trigger** | Automatic — Friday at 14:00 UTC, or when `Test-RetroOverdue` returns `$true` |
+| **Condition** | No `*retrospective*` log file exists in `.squad/log/` for the current week (Mon–Fri window) |
+| **Coordinator** | Squad Lead (Picard) or designated facilitator |
+| **Participants** | All squad members |
+| **Duration** | 20–30 minutes |
+
+### Inputs
+
+The facilitator should gather before running:
+1. **Orchestration logs** — `.squad/log/` files since the last retrospective
+2. **Closed issues** — GitHub Issues closed in the period (provides velocity data)
+3. **Open blockers** — Issues tagged `pending-user` or `blocked`
+4. **Decisions inbox** — New files in `.squad/decisions/inbox/` since last retro
+5. **Upstream activity** — PRs opened/merged to upstream repositories
+
+### Required Format: 4 Sections
+
+#### Section 1 — What Worked 🟢
+List 3–5 things that went well. Be specific: name the issue, the pattern, the agent, or the technique.
+
+#### Section 2 — What Didn't Work 🔴
+List 2–4 friction points or failures. Be honest. These become candidates for action items.
+
+#### Section 3 — Action Items (MUST be GitHub Issues)
+> ⚠️ **Critical rule:** Action items from retrospectives MUST be created as GitHub Issues — not markdown checklists.
+
+**Required Issue fields:**
+- Title: short, actionable verb phrase
+- Body: context from the retro, links to related issues
+- Assignee: the agent or human responsible
+- Label: `squad` + relevant area label
+- Milestone: current sprint (if applicable)
+
+#### Section 4 — Decision Updates
+For each pending decision from `.squad/decisions/inbox/`:
+- State: Approved / Rejected / Needs-more-info / Delegated
+- Owner: who executes next
+- Deadline: if time-sensitive
+
 ## Coordinator Integration
 
 Call `Test-RetroOverdue` **at the start of every round**, before building the work queue.
@@ -60,7 +114,6 @@ $workQueue = Get-PendingIssues | Sort-Object -Property Priority
 ### Blocking Semantics
 
 When `Test-RetroOverdue` returns `$true`:
-
 1. **Do not start any other work** until the retro completes
 2. **Spawn the facilitator agent** (Scribe or designated) with retro mode
 3. **Wait for the log file** to be written to `.squad/log/`
@@ -68,8 +121,6 @@ When `Test-RetroOverdue` returns `$true`:
 5. **Resume normal round** after retro log confirmed
 
 ## Action Item Enforcement
-
-Every retro action item MUST become a GitHub Issue. The facilitator agent is responsible for this. The coordinator verifies.
 
 ### Verification Check
 
@@ -108,33 +159,20 @@ From production data in tamirdresher/tamresearch1:
 | 2026-02-21 | Markdown `- [ ]` | 0/4 = **0%** |
 | 2026-03-24 | GitHub Issues | 4/4 = **100%** (after enforcement) |
 
-**Root cause:** Markdown checklists have no assignee, no notifications, no close event, and no query surface. They are invisible to every workflow that drives completion.
+## Output Artifacts
 
-## Cadence Enforcement
+After every retro, these artifacts MUST exist:
 
-### Recommended schedule
-- Weekly squads: window = 7 days
-- Bi-weekly squads: window = 14 days
+1. **Log file:** `.squad/log/{timestamp}-retrospective.md` — full retro record
+2. **GitHub Issues:** one per action item, linked from log file
+3. **Decision records:** updated entries in `.squad/decisions/` for any decisions made
 
-### Ralph integration example
+## Anti-Patterns to Avoid
 
-```powershell
-# ralph-watch.ps1 — round start hook
-function Invoke-RoundStart {
-    # 1. Always check retro first
-    if (Test-RetroOverdue -LogDir "$RepoRoot/.squad/log" -WindowDays 7) {
-        Write-Host "[RALPH] Retro overdue — enforcing before work queue"
-        Invoke-RetroSession
-        return  # Re-enter round after retro completes
-    }
-
-    # 2. Normal work queue
-    $issues = Get-ReadyIssues
-    foreach ($issue in $issues) {
-        Invoke-WorkItem -Issue $issue
-    }
-}
-```
+- ❌ Writing action items as markdown `- [ ]` checklists
+- ❌ Skipping the retro because the squad is "too busy"
+- ❌ Running a retro without creating any Issues
+- ❌ Creating duplicate Issues for the same action item across multiple retros
 
 ## Skill Metadata
 
