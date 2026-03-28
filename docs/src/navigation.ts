@@ -31,6 +31,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { title: 'Interactive Shell', slug: 'guide/shell' },
       { title: 'Extensibility', slug: 'guide/extensibility' },
       { title: 'Building Extensions', slug: 'guide/building-extensions' },
+      { title: 'Building Resilient Agents', slug: 'guide/building-resilient-agents' },
       { title: 'Contributing', slug: 'guide/contributing' },
       { title: 'Contributors', slug: 'guide/contributors' },
     ],
