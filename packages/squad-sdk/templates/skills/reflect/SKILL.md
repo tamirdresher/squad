@@ -2,10 +2,9 @@
 name: reflect
 description: Learning capture system that extracts HIGH/MED/LOW confidence patterns from conversations to prevent repeating mistakes. Use after user corrections ("no", "wrong"), praise ("perfect", "exactly"), or when discovering edge cases. Complements .squad/agents/{agent}/history.md and .squad/decisions.md.
 license: MIT
-metadata:
-  version: 1.0.0-squad
-  domain: team-memory, learning
-  confidence: high
+version: 1.0.0-squad
+domain: team-memory, learning
+confidence: high
 ---
 
 # Reflect Skill
@@ -20,7 +19,7 @@ Analyze conversations and propose improvements to squad knowledge based on what 
 
 **Reflect complements existing Squad knowledge systems:**
 
-1. **`.squad/agents/{agent}/history.md`** — Permanent learnings from completed work (READ-ONLY by agents, managed by human)
+1. **`.squad/agents/{agent}/history.md`** — Permanent learnings from completed work (append-only; each agent updates their own file; Scribe propagates cross-agent updates)
 2. **`.squad/decisions.md`** — Team-wide decisions that all agents respect
 3. **`reflect` skill** — Captures in-flight learnings from conversations that may graduate to history.md or decisions.md
 
@@ -129,7 +128,7 @@ Present findings:
 │                                                             │
 │ [HIGH] + Add constraint: "{specific constraint}"            │
 │   Source: "{quoted user correction}"                        │
-│   Target: .squad/decisions/inbox/{topic}.md                 │
+│   Target: .squad/decisions/inbox/{agent}-{topic}.md         │
 │                                                             │
 │ [MED]  + Add preference: "{specific preference}"            │
 │   Source: "{evidence from conversation}"                    │
