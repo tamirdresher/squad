@@ -41,6 +41,9 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
 
+      - name: Build (required for subpath export resolution)
+        run: npm run build
+
       - name: Run tests
         run: npm test
 
