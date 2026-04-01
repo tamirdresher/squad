@@ -136,7 +136,7 @@ function collectMetrics(squadDir: string): NapMetrics {
 
   let inboxFiles = 0;
   if (storage.existsSync(inboxDir)) {
-    inboxFiles = storage.listSync(inboxDir).filter(f => !f.startsWith('.')).length;
+    inboxFiles = storage.listSync(inboxDir).filter((f: string) => !f.startsWith('.')).length;
   }
 
   const total = dirSize(squadDir);
@@ -284,7 +284,7 @@ function cleanInbox(squadDir: string, dryRun: boolean): NapAction[] {
   const decisionsFile = path.join(squadDir, 'decisions.md');
   if (!storage.existsSync(inboxDir)) return [];
 
-  const files = storage.listSync(inboxDir).filter(f => !f.startsWith('.'));
+  const files = storage.listSync(inboxDir).filter((f: string) => !f.startsWith('.'));
   if (files.length === 0) return [];
 
   const actions: NapAction[] = [];

@@ -116,7 +116,7 @@ function parseTeamMd(squadDir: string): ParsedTeam {
     }
     
     if (inMembersTable && line.startsWith('|') && !line.includes('---') && !line.includes('Name')) {
-      const cells = line.split('|').map(s => s.trim()).filter(Boolean);
+      const cells = line.split('|').map((s: string) => s.trim()).filter(Boolean);
       if (cells.length >= 4) {
         const memberName = cells[0]!.toLowerCase();
         const status = cells[3]!;
@@ -179,7 +179,7 @@ function parseRoutingMd(squadDir: string): { rules: ParsedRoutingRule[]; default
     }
     
     if (inWorkTypeTable && line.startsWith('|') && !line.includes('---') && !line.includes('Work Type')) {
-      const cells = line.split('|').map(s => s.trim()).filter(Boolean);
+      const cells = line.split('|').map((s: string) => s.trim()).filter(Boolean);
       if (cells.length >= 3) {
         const workType = cells[0]!;
         const agentCell = cells[1]!;

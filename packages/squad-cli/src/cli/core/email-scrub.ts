@@ -57,7 +57,7 @@ export async function scrubEmails(dir: string): Promise<number> {
   if (storage.existsSync(logDir)) {
     try {
       const logFiles = storage.listSync(logDir)
-        .filter(f => f.endsWith('.md') || f.endsWith('.txt') || f.endsWith('.log'));
+        .filter((f: string) => f.endsWith('.md') || f.endsWith('.txt') || f.endsWith('.log'));
       
       for (const file of logFiles) {
         const filePath = path.join(logDir, file);
@@ -89,7 +89,7 @@ function scrubFile(filePath: string): boolean {
     
     // Replace bare emails in identity contexts (preserve in URLs and code)
     const lines = content.split('\n');
-    const scrubbed = lines.map(line => {
+    const scrubbed = lines.map((line: string) => {
       // Skip lines that look like URLs, code blocks, or examples
       if (line.includes('http://') || line.includes('https://') || 
           line.includes('```') || line.includes('example.com') ||

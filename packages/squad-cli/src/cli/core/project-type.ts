@@ -22,7 +22,7 @@ export function detectProjectType(dir: string): ProjectType {
       storage.existsSync(path.join(dir, 'build.gradle.kts'))) return 'java';
   try {
     const entries = storage.listSync(dir);
-    if (entries.some(e => e.endsWith('.csproj') || e.endsWith('.sln') || e.endsWith('.slnx') || e.endsWith('.fsproj') || e.endsWith('.vbproj'))) return 'dotnet';
+    if (entries.some((e: string) => e.endsWith('.csproj') || e.endsWith('.sln') || e.endsWith('.slnx') || e.endsWith('.fsproj') || e.endsWith('.vbproj'))) return 'dotnet';
   } catch {}
   return 'unknown';
 }

@@ -82,7 +82,7 @@ export function listSessions(teamRoot: string): SessionSummary[] {
   const dir = sessionsDir(teamRoot);
   if (!storage.existsSync(dir)) return [];
 
-  const files = storage.listSync(dir).filter(f => f.endsWith('.json'));
+  const files = storage.listSync(dir).filter((f: string) => f.endsWith('.json'));
   const summaries: SessionSummary[] = [];
 
   for (const file of files) {
@@ -154,6 +154,6 @@ export function loadSessionById(teamRoot: string, sessionId: string): SessionDat
 
 function findSessionFile(dir: string, sessionId: string): string | null {
   const files = storage.listSync(dir);
-  const match = files.find(f => f.includes(sessionId) && f.endsWith('.json'));
+  const match = files.find((f: string) => f.includes(sessionId) && f.endsWith('.json'));
   return match ? join(dir, match) : null;
 }

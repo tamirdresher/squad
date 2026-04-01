@@ -56,9 +56,9 @@ export async function runRC(cwd: string, options: RCOptions): Promise<void> {
   if (squadDir) {
     try {
       const teamMd = storage.readSync(path.join(squadDir, 'team.md')) ?? '';
-      const memberLines = teamMd.split('\n').filter(l => l.startsWith('|') && l.includes('Active'));
+      const memberLines = teamMd.split('\n').filter((l: string) => l.startsWith('|') && l.includes('Active'));
       for (const line of memberLines) {
-        const cols = line.split('|').map(c => c.trim()).filter(Boolean);
+        const cols = line.split('|').map((c: string) => c.trim()).filter(Boolean);
         if (cols.length >= 2 && cols[0] !== 'Name') {
           agents.push({ name: cols[0]!, role: cols[1]! });
         }
