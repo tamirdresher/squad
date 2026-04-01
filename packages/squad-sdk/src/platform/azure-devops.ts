@@ -56,8 +56,17 @@ function parseJson<T>(raw: string): T {
  *
  * Falls back to a minimal default list when the az CLI call fails
  * (e.g. no auth, no devops extension, offline).
+ *
+ * Results are memoized per org/project to avoid repeated az CLI calls in the
+ * same process (important for tests and any code that calls this in a loop).
  */
+const _workItemTypeCache = new Map<string, WorkItemTypeInfo[]>();
+
 export function getAvailableWorkItemTypes(org: string, project: string): WorkItemTypeInfo[] {
+  const cacheKey = `${org}\0${project}`;
+  const cached = _workItemTypeCache.get(cacheKey);
+  if (cached) return cached;
+
   const orgUrl = `https://dev.azure.com/${org}`;
   try {
     // Timeout after 3 s so tests and CI aren't blocked when az CLI is slow
@@ -75,18 +84,22 @@ export function getAvailableWorkItemTypes(org: string, project: string): WorkIte
       isDisabled?: boolean;
     }>>(raw);
 
-    return types.map((t) => ({
+    const result = types.map((t) => ({
       name: t.name ?? '',
       description: t.description ?? '',
       disabled: t.isDisabled === true,
     }));
+    _workItemTypeCache.set(cacheKey, result);
+    return result;
   } catch {
     // Fallback: return common defaults so callers aren't empty-handed
-    return [
+    const defaults = [
       { name: 'User Story', description: 'Tracks user-facing functionality', disabled: false },
       { name: 'Bug', description: 'Tracks a defect', disabled: false },
       { name: 'Task', description: 'Tracks a unit of work', disabled: false },
     ];
+    _workItemTypeCache.set(cacheKey, defaults);
+    return defaults;
   }
 }
 
