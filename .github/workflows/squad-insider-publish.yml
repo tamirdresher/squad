@@ -23,6 +23,7 @@ jobs:
       - uses: ./.github/actions/setup-squad-node
         with:
           node-version: ${{ matrix.node-version }}
+          install-command: 'install'
 
       - name: Build
         run: npm run build
@@ -40,6 +41,7 @@ jobs:
       - uses: ./.github/actions/setup-squad-node
         with:
           node-version: ${{ matrix.node-version }}
+          install-command: 'install'
 
       - name: Build (required for subpath export resolution)
         run: npm run build
@@ -98,6 +100,7 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           registry-url: 'https://registry.npmjs.org'
+          install-command: 'install'
 
       - name: Validate npm token
         run: |
