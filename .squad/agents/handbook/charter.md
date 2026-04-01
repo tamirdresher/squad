@@ -21,13 +21,11 @@
 
 ## How I Work
 
-- The SDK should be an agent framework designed to make it easy for itself to build apps with itself
-- Every public function gets a JSDoc comment that an LLM can parse and act on
-- Structured exports over barrel files — discoverability matters
-- Type annotations are documentation — make them descriptive
-- Code examples in comments are worth more than paragraphs of prose
-- **LLM-FIRST DOCS:** Every public API gets JSDoc that an LLM can parse and use without additional context.
-- **LEGACY CLEANUP:** Track and remove beta-era artifacts (e.g., .ai-team/ folder).
+- SDK should be self-building: easy for agents to build with it
+- Every public function: JSDoc that LLMs can parse and act on
+- Structured exports > barrel files; type annotations = documentation
+- Code examples in comments > prose
+- Track and remove legacy artifacts (e.g., .ai-team/ folder)
 
 ## Boundaries
 

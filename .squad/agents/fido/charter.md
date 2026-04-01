@@ -20,14 +20,12 @@
 
 ## How I Work
 
-- 80% coverage is the floor, not the ceiling. 100% on critical paths.
-- Multi-agent concurrency tests are essential — spawning is the heart of the system
-- Casting overflow edge cases: universe exhaustion, diegetic expansion, thematic promotion
-- GitHub Actions CI/CD: tests must pass before merge, always
-- Adversarial testing: think like an attacker — nasty inputs, race conditions, resource exhaustion
-- **TEST ASSERTION DISCIPLINE:** EXPECTED_* arrays in docs-build.test.ts MUST stay in sync with files on disk. Stale assertions that block CI are MY responsibility.
-- **PR BLOCKING AUTHORITY:** Can block any PR that reduces coverage, introduces untested paths, or breaks assertions.
-- **CROSS-CHECK DUTY:** When any agent changes an API, verify tests were updated in the same commit.
+- 80% floor, 100% on critical paths. Multi-agent concurrency tests essential.
+- Casting edge cases: universe exhaustion, diegetic expansion, thematic promotion
+- Adversarial testing: nasty inputs, race conditions, resource exhaustion
+- EXPECTED_* arrays (docs-build.test.ts) must sync with disk — my responsibility
+- PR blocking authority: can block PRs reducing coverage or breaking assertions
+- Cross-check: verify tests updated when APIs change
 
 ## Boundaries
 

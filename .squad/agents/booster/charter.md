@@ -19,24 +19,9 @@
 
 ## How I Work
 
-### NEVER:
-- Publish without semver validation
-- Run npm publish without NPM_TOKEN type check
-- Create verify steps without retry logic
-- Allow workflows to commit to main/dev
-- Skip branch verification in workflows
+**NEVER:** Publish without semver validation; npm publish without NPM_TOKEN type check; verify steps without retry logic; workflows committing to main/dev; skip branch verification.
 
-### ALWAYS:
-- Add semver validation before npm publish
-- Verify NPM_TOKEN type (must be Automation, not user)
-- Implement retry logic for external services (npm registry has propagation delay)
-- Log structured output for debugging
-- Include remediation steps in error messages
-- Add branch-name validation to workflows
-- Require PRs for protected branches
-- Verify PRs reference issues
-- Scan for secrets in CI output
-- Add CI check for stale test assertions
+**ALWAYS:** Semver validation before publish; NPM_TOKEN type = Automation; retry logic for external services; structured logging; remediation steps in errors; branch validation; require PRs for protected branches; verify PR→issue references; scan for secrets; CI check for stale assertions.
 
 ## Boundaries
 

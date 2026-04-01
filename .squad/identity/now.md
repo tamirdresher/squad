@@ -1,9 +1,9 @@
 ---
-updated_at: 2026-03-15T15:50:00Z
-focus_area: Post-sprint — SDK work + remaining bugs
-version: v0.8.25-build.4
+updated_at: 2026-03-16T12:30:00Z
+focus_area: "Skills migration + three-layer tooling (#330 + #354) — RELEASE BLOCKER"
+version: v0.8.25-build.10
 branch: dev
-tests_passing: ~4157
+tests_passing: ~4321
 tests_todo: 46
 tests_skipped: 5
 test_files: 154
@@ -14,65 +14,46 @@ process: All work through PRs. Branch naming squad/{issue-number}-{slug}. Never 
 
 # What We're Focused On
 
-**Status:** Irritating bugs sprint COMPLETE. 7 issues closed, 8 PRs merged to dev, 5 community PRs merged. CI lockfile fix resolved 8-day build failure. Reskill needed, then dive into SDK work and remaining bugs.
+**Status:** Skills migration and three-layer tooling awareness are the team's #1 priority. These two issues (#330 + #354) MUST ship together before the next release. All team efforts focused here.
 
-## Current State
+## The Big One — Skills Migration + Three-Layer Tooling (#330 + #354)
 
-**Version:** v0.8.25-build.4 (on dev, not yet released)
-- **Packages:** @bradygaster/squad-sdk, @bradygaster/squad-cli
-- **Branch:** dev
-- **Build:** ✅ clean (0 errors, CI green)
-- **Tests:** ~4,157 passed, 46 todo, 5 skipped, ~154 test files
-  - Only failure: aspire-integration.test.ts (needs Docker, pre-existing)
-  - New: docs-links.test.ts (internal link + anchor validation from diberry)
+**RELEASE BLOCKER — must ship before next release.**
 
-**Stack:**
-- TypeScript (strict mode, ESM-only)
-- Node.js ≥20
-- @github/copilot-sdk
-- Vitest (test runner)
-- esbuild (bundler)
+Two issues, one body of work:
+- **#330** (spboyer) — Coordinator detects and enforces all three tooling layers (local skills, global MCP, global Copilot skills)
+- **#354** (bradygaster) — Migrate skills from `.squad/skills/` to `.copilot/skills/`
 
-**Team:** Apollo 13 / NASA Mission Control
-- 19 active agents + Scribe + Ralph + @copilot
+### Why this matters
+- Skills in `.squad/skills/` are invisible to Copilot's discovery system
+- Global MCP tools (azure-mcp-*, etc.) are detected but not enforced — no pre-flight research
+- Global Copilot skills are completely invisible to the coordinator
+- 11 of 13 deployment fix commits in Shayne's Azure session were avoidable with available tools
+- ~115KB of skill content loaded fully on every routing decision (vs frontmatter-only scanning in `.copilot/skills/`)
 
-## What Just Shipped (Irritating Bugs Sprint — 2026-03-15)
+### Execution sequence
+1. **Prototype** — verify spawned agents inherit MCP tools from parent session (gates design)
+2. **Governance** — update squad.agent.md (6 refs), add three-layer model + pre-flight rules
+3. **SDK/CLI** — update init, upgrade (migration), export/import, doctor, SkillScriptLoader paths
+4. **Physical move** — 23 skills from `.squad/skills/` → `.copilot/skills/`, update cross-refs
+5. **Backward compat** — check both locations for one version
+6. **Tests** — skill routing, migration, backward compat
+7. **Docs** — update all path references
 
-### Bug Fixes (our PRs)
-- **PR #409** — Version stamp in agent charter.md (#321)
-- **PR #411** — SDK init trio: Ralph in init (#338), config sync after cast (#337), @copilot removed from routing templates (#339)
-- **PR #412** — Base roles opt-in via `--roles` flag (#379) — @spboyer pinged
-- **PR #414** — CI lockfile fix (stale nested SDK entry caused 8-day build failure)
+### Gating question
+Do spawned `general-purpose` agents inherit MCP tools from the coordinator's session? This determines whether "Azure skills + Azure MCP" is a real pipeline or just documentation.
 
-### Community PRs (Tamir Dresher)
-- **PR #415** — Rework rate OTEL metrics in squad-sdk (5th DORA metric)
-- **PR #381** — Rework rate CLI command (`squad rework`) — cherry-picked to dev
+## Next Up (After #330/#354)
 
-### Community PRs (Dina Berry)
-- **PR #389** — Docs consolidation & reduction (-1,471 net lines, closes #258/#351)
-- **PR #393** — baseBranch alignment to dev (closes #350)
-- **PR #396** — Docs quality CI (markdownlint, cspell, link validation)
+### Quick Wins
+- **#320** — Docs migration guide version pin (PAO)
+- **#347** — SDK init quality gate (FIDO)
 
-### Issues Closed
-#321, #337, #338, #339, #348, #356, #379, #258, #350, #351
-
-## Next Up (Post-Reskill)
-
-### Remaining Sprint Bugs
-- **#342** — CastingEngine bypass (casting doesn't use the engine)
-- **#363** — WSL transient error handling
-- **#340** — SDK feature parity audit
-
-### SDK Work
-- SDK builder improvements
-- Feature parity between CLI and SDK paths
-
-### Upgrade Notes for PAO
-- Captured in session files — PAO needs to review and update docs for:
-  - `--roles` flag for `squad init`
-  - Version stamp in charters
-  - Ralph auto-inclusion in init
-  - Config sync after casting (SDK users)
+### Recently Shipped
+- **#322** — Model selection updated to Claude Sonnet 4.6 / GPT-5.4 (PR #429, merged)
+- **#342** — Closed (already shipped via PR #417)
+- **A2A (#332-336)** — Shelved (too risky short-term)
+- **#316, #357** — Shelved (A2A dependency)
 
 ## Process
 

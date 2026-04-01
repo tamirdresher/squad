@@ -14,7 +14,9 @@ export const NAV_SECTIONS: NavSection[] = [
     title: 'Get Started',
     dir: 'get-started',
     items: [
+      { title: 'Quick start', slug: 'get-started/five-minute-start' },
       { title: 'Installation', slug: 'get-started/installation' },
+      { title: 'Choose your path', slug: 'get-started/choosing-your-path' },
       { title: 'Your First Session', slug: 'get-started/first-session' },
       { title: 'Migration Guide', slug: 'get-started/migration' },
     ],
@@ -27,6 +29,8 @@ export const NAV_SECTIONS: NavSection[] = [
       { title: 'Sample Prompts', slug: 'guide/sample-prompts' },
       { title: 'Personal Squad', slug: 'guide/personal-squad' },
       { title: 'Interactive Shell', slug: 'guide/shell' },
+      { title: 'Extensibility', slug: 'guide/extensibility' },
+      { title: 'Building Extensions', slug: 'guide/building-extensions' },
       { title: 'Contributing', slug: 'guide/contributing' },
       { title: 'Contributors', slug: 'guide/contributors' },
     ],
@@ -79,6 +83,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { title: 'SDK Integration', slug: 'reference/integration' },
       { title: 'Tools & Hooks', slug: 'reference/tools-and-hooks' },
       { title: 'Config', slug: 'reference/config' },
+      { title: 'Glossary', slug: 'reference/glossary' },
     ],
   },
   {
@@ -100,6 +105,7 @@ export const NAV_SECTIONS: NavSection[] = [
       { title: 'Upgrading', slug: 'scenarios/upgrading' },
       { title: 'Multi-Codespace', slug: 'scenarios/multi-codespace' },
       { title: 'Private Repos', slug: 'scenarios/private-repos' },
+      { title: 'Cross-Org Auth', slug: 'scenarios/cross-org-auth' },
       { title: 'Team Portability', slug: 'scenarios/team-portability' },
       { title: 'Team State Storage', slug: 'scenarios/team-state-storage' },
       { title: 'Switching Models', slug: 'scenarios/switching-models' },
@@ -116,6 +122,7 @@ export const NAV_SECTIONS: NavSection[] = [
     title: 'Concepts',
     dir: 'concepts',
     items: [
+      { title: 'Architecture', slug: 'concepts/architecture' },
       { title: 'Your Team', slug: 'concepts/your-team' },
       { title: 'Memory & Knowledge', slug: 'concepts/memory-and-knowledge' },
       { title: 'Parallel Work', slug: 'concepts/parallel-work' },

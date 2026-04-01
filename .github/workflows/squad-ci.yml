@@ -3,7 +3,7 @@ name: Squad CI
 on:
   pull_request:
     branches: [dev, preview, main, insider]
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, edited]
   push:
     branches: [dev, insider]
 
@@ -38,8 +38,26 @@ jobs:
         with:
           node-version: 22
 
+      - name: Fix stale lockfile entries
+        run: |
+          node -e "
+            const fs = require('fs');
+            const lock = JSON.parse(fs.readFileSync('package-lock.json', 'utf8'));
+            const pkgs = lock.packages || {};
+            const stale = Object.keys(pkgs).filter(k =>
+              k.includes('/node_modules/@bradygaster/squad-') &&
+              pkgs[k].resolved && pkgs[k].resolved.startsWith('https://')
+            );
+            if (stale.length) {
+              stale.forEach(k => { console.log('Removing: ' + k); delete pkgs[k]; });
+              fs.writeFileSync('package-lock.json', JSON.stringify(lock, null, 2) + '\n');
+            } else {
+              console.log('Lockfile clean');
+            }
+          "
+
       - name: Install dependencies
-        run: npm ci
+        run: npm install
 
       - name: Install docs dependencies
         run: npm ci

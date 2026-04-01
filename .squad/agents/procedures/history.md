@@ -4,6 +4,8 @@
 
 ## Learnings
 
+📌 **Team update (2026-03-22T09-35Z — Wave 1):** Economy mode governance proposal and personal squad consult-mode governance proposal authored for squad.agent.md — both DRAFT, awaiting Flight review before merging. Economy mode adds Layer 3 table + spawn convention (`💰 economy`) + model catalog audit. Personal squad adds consult mode detection, path reference table, spawn guidance. Persistent model preference (Layer 0) documented. Proposed new skill: `.squad/skills/consult-mode/SKILL.md` (post-approval). Deterministic skill pattern proven effective. PR #503 open with skills module. Next: Flight review → merge governance to squad.agent.md. No blocking issues.
+
 ### 2026-03-10: Deterministic skill pattern
 
 **Problem:** Skills were too loose. The distributed-mesh skill was tested in a real project (mesh-demo), and agents generated 76 lines of validator code, 5 test files with 43 tests, regenerated sync scripts that should have been copied from templates, and left decision files empty. The skill document let agents interpret intent instead of following explicit steps.
@@ -63,4 +65,46 @@
 **Implementation:** Updated `.github/agents/squad.agent.md` (new section + constraint) and all 19 active agent charters in `.squad/agents/*/charter.md`.
 
 **Pattern:** Policies added as subsections under "How I Work" in charters to ensure they're loaded with agent context. Coordinator-level policies live in squad.agent.md with explicit enforcement instructions.
+
+### 2026-03-16: Team-wide reskill — 17.4% reduction
+
+**Context:** Routine maintenance reskill, one day after previous reskill (2026-03-15). Last reskill brought the system from 117.4KB to 51.7KB. This pass focused on remaining oversized charters.
+
+**Work done:**
+- **Scribe (2143→1557):** Compressed workflow steps, kept essential commit instructions
+- **Handbook (1807→1529):** Removed repetitive LLM-FIRST DOCS emphasis
+- **FIDO (1715→1370):** Consolidated verbose NEVER/ALWAYS sections
+- **Booster (1583→1368):** Same NEVER/ALWAYS compression pattern
+
+**Results:** 26,721→17,088 bytes (charters), 28,602→28,602 bytes (histories), total 55,323→45,690 bytes. 9,633 bytes saved (17.4% reduction). All charters now ≤1.5KB.
+
+**Skill extraction:** No new patterns extracted. CastingEngine integration work (from EECOM March 15) is still evolving — not yet mature enough for skill template. Histories all <12KB, no compression needed.
+
+**Pattern:** NEVER/ALWAYS sections in charters compress well — fold bullet lists into single-paragraph summaries. Essential workflow details (Scribe's commit steps) should stay verbose.
+
+### 2026-03-22: Economy mode skill and personal squad governance (#500, #344)
+
+**Task:** Two governance tasks — economy mode skill design and personal squad coordinator awareness.
+
+**Economy mode (SKILL.md):**
+- Created `.squad/skills/economy-mode/SKILL.md` as a Layer 3 modifier, not a new resolution layer
+- Key design decision: economy mode ONLY affects Layer 3 auto-selection — Layer 0/1/2 (user intent) always wins
+- `💰` indicator in spawn acknowledgments keeps it transparent
+- Activation via session phrase, persistent config (`economyMode: true` in config.json), or CLI flag
+- Architecture trips shift from opus → sonnet; code tasks shift from sonnet → gpt-4.1/gpt-5-mini
+- Confidence: `low` — first implementation, not yet validated
+
+**Personal squad governance (proposals):**
+- Gap analysis: coordinator has no consult mode awareness despite full SDK implementation
+- Five gaps identified: Init Mode missing personal squad resolution, no consult mode detection, TEAM_ROOT has no personal-squad semantics, charter templates lack consult-mode patterns, no consult-mode skill
+- Proposed `CONSULT_MODE: true` as spawn prompt signal, `🧳 consult` in acknowledgments
+- Proposed new consult-mode skill (after governance approval — skill after governance, not before)
+
+**Governance workflow pattern:** When proposals touch squad.agent.md (governance territory), write to `decisions/inbox/` for Flight review. Don't directly edit squad.agent.md — Flight reviews governance changes.
+
+**Catalog audit finding:** `claude-sonnet-4.6`, `gpt-5.4`, `gpt-5.3-codex` appear in model-selection SKILL.md fallback chains but are absent from squad.agent.md's "Valid models" catalog. Documented in economy-mode governance proposal for Flight to address.
+
+### Session 2 Summary (2026-03-22)
+
+Wave 1 governance work on #500 and #344: authored economy-mode skill (`SKILL.md`), economy-mode governance proposal, and personal-squad governance proposal. Caught `claude-sonnet-4.6` missing from valid models catalog. PR #503 (`squad/500-344-governance`) merged to dev.
 

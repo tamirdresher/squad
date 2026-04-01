@@ -11,7 +11,7 @@ import { mkdir, rm, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
 import { randomBytes } from 'crypto';
-import { runDoctor, getDoctorMode } from '@bradygaster/squad-cli/commands/doctor';
+import { runDoctor, getDoctorMode, checkNodeVersion } from '@bradygaster/squad-cli/commands/doctor';
 import type { DoctorCheck } from '@bradygaster/squad-cli/commands/doctor';
 
 const TEST_ROOT = join(process.cwd(), `.test-doctor-${randomBytes(4).toString('hex')}`);
@@ -55,6 +55,9 @@ describe('squad doctor', () => {
     expect(checks.some((c: DoctorCheck) => c.name === 'agents/ directory exists' && c.status === 'pass')).toBe(true);
     expect(checks.some((c: DoctorCheck) => c.name === 'casting/registry.json exists' && c.status === 'pass')).toBe(true);
     expect(checks.some((c: DoctorCheck) => c.name === 'decisions.md exists' && c.status === 'pass')).toBe(true);
+    // ESM checks return 'warn' (not fail) when node_modules absent from test dir
+    expect(checks.some((c: DoctorCheck) => c.name === 'vscode-jsonrpc exports field')).toBe(true);
+    expect(checks.some((c: DoctorCheck) => c.name === 'copilot-sdk session.js ESM patch')).toBe(true);
   });
 
   it('reports failures on an empty directory', async () => {
@@ -62,8 +65,8 @@ describe('squad doctor', () => {
 
     const squadDirCheck = checks.find((c: DoctorCheck) => c.name === '.squad/ directory exists');
     expect(squadDirCheck?.status).toBe('fail');
-    // When .squad/ is missing the file checks are skipped — only one check
-    expect(checks.length).toBe(1);
+    // When .squad/ is missing the file checks are skipped — only .squad/ + Node version + 2 ESM checks
+    expect(checks.length).toBe(4);
   });
 
   it('detects remote mode from config.json with teamRoot', async () => {
@@ -93,6 +96,80 @@ describe('squad doctor', () => {
     await scaffold(TEST_ROOT);
     const mode = getDoctorMode(TEST_ROOT);
     expect(mode).toBe('local');
+  });
+
+  it('reports node:sqlite check as pass on current Node version', async () => {
+    const checks = await runDoctor(TEST_ROOT);
+    const nodeCheck = checks.find((c: DoctorCheck) => c.name.includes('node:sqlite'));
+    expect(nodeCheck).toBeDefined();
+    // Tests run on Node >= 22.5.0 — should always pass in CI
+    expect(nodeCheck?.status).toBe('pass');
+  });
+
+  it('checkNodeVersion returns fail for Node <22.5.0', () => {
+    const result = checkNodeVersion('20.18.0');
+    expect(result.status).toBe('fail');
+    expect(result.message).toContain('22.5.0');
+    expect(result.message).toContain('nodejs.org');
+  });
+
+  it('checkNodeVersion returns fail for Node 22.4.x', () => {
+    const result = checkNodeVersion('22.4.0');
+    expect(result.status).toBe('fail');
+    expect(result.message).toContain('22.5.0');
+  });
+
+  it('checkNodeVersion returns pass for Node 22.5.0', () => {
+    const result = checkNodeVersion('22.5.0');
+    expect(result.status).toBe('pass');
+    expect(result.message).toContain('22.5.0');
+  });
+
+  it('checkNodeVersion returns pass for Node 24.x', () => {
+    const result = checkNodeVersion('24.0.0');
+    expect(result.status).toBe('pass');
+  });
+
+  it('warns when a recent rate limit status file exists', async () => {
+    await scaffold(TEST_ROOT);
+    const status = {
+      timestamp: new Date().toISOString(),
+      retryAfter: 7200,
+      model: 'claude-sonnet-4.5',
+      message: 'Rate limit exceeded',
+    };
+    await writeFile(
+      join(TEST_ROOT, '.squad', 'rate-limit-status.json'),
+      JSON.stringify(status),
+    );
+
+    const checks = await runDoctor(TEST_ROOT);
+    const rlCheck = checks.find((c: DoctorCheck) => c.name === 'rate limit status');
+    expect(rlCheck).toBeDefined();
+    expect(rlCheck?.status).toBe('warn');
+    expect(rlCheck?.message).toContain('claude-sonnet-4.5');
+    expect(rlCheck?.message).toContain('squad economy on');
+  });
+
+  it('passes rate limit status as stale when timestamp is old', async () => {
+    await scaffold(TEST_ROOT);
+    const oldTs = new Date(Date.now() - 5 * 3600 * 1000).toISOString(); // 5h ago
+    await writeFile(
+      join(TEST_ROOT, '.squad', 'rate-limit-status.json'),
+      JSON.stringify({ timestamp: oldTs, retryAfter: 7200, model: null, message: 'old' }),
+    );
+
+    const checks = await runDoctor(TEST_ROOT);
+    const rlCheck = checks.find((c: DoctorCheck) => c.name === 'rate limit status');
+    expect(rlCheck?.status).toBe('pass');
+    expect(rlCheck?.message).toContain('appears resolved');
+  });
+
+  it('does not include rate limit status check when file is absent', async () => {
+    await scaffold(TEST_ROOT);
+    const checks = await runDoctor(TEST_ROOT);
+    const rlCheck = checks.find((c: DoctorCheck) => c.name === 'rate limit status');
+    expect(rlCheck).toBeUndefined();
   });
 
   it('warns on absolute teamRoot', async () => {

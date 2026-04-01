@@ -34,6 +34,25 @@ export * from './runtime/rework.js';
 export { getMeter, getTracer } from './runtime/otel.js';
 export { safeTimestamp } from './utils/safe-timestamp.js';
 export { EventBus as RuntimeEventBus } from './runtime/event-bus.js';
+export {
+  type SquadManifest,
+  type SquadContact,
+  type AcceptedWorkType,
+  type DiscoveredSquad,
+  type CrossSquadIssueOptions,
+  type CrossSquadIssueResult,
+  type CrossSquadWorkStatus,
+  validateManifest,
+  readManifest,
+  discoverSquads,
+  discoverFromUpstreams,
+  discoverFromRegistry,
+  buildDelegationArgs,
+  buildStatusCheckArgs,
+  parseIssueStatus,
+  formatDiscoveryTable,
+  findSquadByName,
+} from './runtime/cross-squad.js';
 
 export * from './marketplace/index.js';
 export * from './build/index.js';
@@ -46,6 +65,7 @@ export * from './streams/index.js';
 export {
   defineTeam,
   defineAgent,
+  defineBudget,
   defineRouting,
   defineCeremony,
   defineHooks,
@@ -60,6 +80,7 @@ export type {
   AgentRef,
   ScheduleExpression,
   BuilderModelId,
+  BudgetDefinition,
   ModelPreference,
   DefaultsDefinition,
   TeamDefinition,

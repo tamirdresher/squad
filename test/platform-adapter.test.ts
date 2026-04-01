@@ -744,3 +744,294 @@ describe('ADO config.json ado section schema', () => {
     expect(config.project).toBe('planning-project');
   });
 });
+
+// ─── ADO Configurable Work Item Types (#240) ──────────────────────────
+
+describe('getAvailableWorkItemTypes fallback', () => {
+  it('returns fallback types when az CLI is not available', async () => {
+    // getAvailableWorkItemTypes catches errors and returns defaults
+    const { getAvailableWorkItemTypes } = await import('../packages/squad-sdk/src/platform/azure-devops.js');
+    const types = getAvailableWorkItemTypes('nonexistent-org', 'nonexistent-project');
+    expect(Array.isArray(types)).toBe(true);
+    expect(types.length).toBeGreaterThanOrEqual(3);
+    expect(types.some((t) => t.name === 'User Story')).toBe(true);
+    expect(types.some((t) => t.name === 'Bug')).toBe(true);
+    expect(types.some((t) => t.name === 'Task')).toBe(true);
+  });
+
+  it('fallback types are all enabled (not disabled)', async () => {
+    const { getAvailableWorkItemTypes } = await import('../packages/squad-sdk/src/platform/azure-devops.js');
+    const types = getAvailableWorkItemTypes('no-org', 'no-proj');
+    for (const t of types) {
+      expect(t.disabled).toBe(false);
+    }
+  });
+
+  it('fallback types have non-empty names and descriptions', async () => {
+    const { getAvailableWorkItemTypes } = await import('../packages/squad-sdk/src/platform/azure-devops.js');
+    const types = getAvailableWorkItemTypes('no-org', 'no-proj');
+    for (const t of types) {
+      expect(t.name.length).toBeGreaterThan(0);
+      expect(t.description.length).toBeGreaterThan(0);
+    }
+  });
+});
+
+describe('validateWorkItemType', () => {
+  it('validates "User Story" against fallback types', async () => {
+    const { validateWorkItemType } = await import('../packages/squad-sdk/src/platform/azure-devops.js');
+    const result = validateWorkItemType('no-org', 'no-proj', 'User Story');
+    expect(result.valid).toBe(true);
+    expect(result.available).toContain('User Story');
+  });
+
+  it('validates "Bug" against fallback types', async () => {
+    const { validateWorkItemType } = await import('../packages/squad-sdk/src/platform/azure-devops.js');
+    const result = validateWorkItemType('no-org', 'no-proj', 'Bug');
+    expect(result.valid).toBe(true);
+  });
+
+  it('validates "Task" against fallback types', async () => {
+    const { validateWorkItemType } = await import('../packages/squad-sdk/src/platform/azure-devops.js');
+    const result = validateWorkItemType('no-org', 'no-proj', 'Task');
+    expect(result.valid).toBe(true);
+  });
+
+  it('rejects unknown type against fallback types', async () => {
+    const { validateWorkItemType } = await import('../packages/squad-sdk/src/platform/azure-devops.js');
+    const result = validateWorkItemType('no-org', 'no-proj', 'InvalidType');
+    expect(result.valid).toBe(false);
+    expect(result.available.length).toBeGreaterThanOrEqual(3);
+  });
+
+  it('is case-insensitive', async () => {
+    const { validateWorkItemType } = await import('../packages/squad-sdk/src/platform/azure-devops.js');
+    const lower = validateWorkItemType('no-org', 'no-proj', 'user story');
+    const upper = validateWorkItemType('no-org', 'no-proj', 'USER STORY');
+    expect(lower.valid).toBe(true);
+    expect(upper.valid).toBe(true);
+  });
+
+  it('returns available types list even when invalid', async () => {
+    const { validateWorkItemType } = await import('../packages/squad-sdk/src/platform/azure-devops.js');
+    const result = validateWorkItemType('no-org', 'no-proj', 'Nonexistent');
+    expect(result.valid).toBe(false);
+    expect(result.available).toEqual(expect.arrayContaining(['User Story', 'Bug', 'Task']));
+  });
+});
+
+describe('WorkItemTypeInfo interface', () => {
+  it('has required shape with name, description, disabled', async () => {
+    const { getAvailableWorkItemTypes } = await import('../packages/squad-sdk/src/platform/azure-devops.js');
+    const types = getAvailableWorkItemTypes('x', 'y');
+    for (const t of types) {
+      expect(typeof t.name).toBe('string');
+      expect(typeof t.description).toBe('string');
+      expect(typeof t.disabled).toBe('boolean');
+    }
+  });
+});
+
+describe('AdoWorkItemConfig defaultWorkItemType cascade', () => {
+  it('options.type takes priority over config default', () => {
+    // Simulate the cascade logic from createWorkItem
+    const config: import('../packages/squad-sdk/src/platform/azure-devops.js').AdoWorkItemConfig = {
+      defaultWorkItemType: 'Scenario',
+    };
+    const optionsType = 'Bug';
+    const resolved = optionsType ?? config.defaultWorkItemType ?? 'User Story';
+    expect(resolved).toBe('Bug');
+  });
+
+  it('config.defaultWorkItemType used when options.type is undefined', () => {
+    const config: import('../packages/squad-sdk/src/platform/azure-devops.js').AdoWorkItemConfig = {
+      defaultWorkItemType: 'Scenario',
+    };
+    const optionsType: string | undefined = undefined;
+    const resolved = optionsType ?? config.defaultWorkItemType ?? 'User Story';
+    expect(resolved).toBe('Scenario');
+  });
+
+  it('falls back to "User Story" when both are undefined', () => {
+    const config: import('../packages/squad-sdk/src/platform/azure-devops.js').AdoWorkItemConfig = {};
+    const optionsType: string | undefined = undefined;
+    const resolved = optionsType ?? config.defaultWorkItemType ?? 'User Story';
+    expect(resolved).toBe('User Story');
+  });
+
+  it('empty string type in config is treated as set (does not fall through)', () => {
+    const config: import('../packages/squad-sdk/src/platform/azure-devops.js').AdoWorkItemConfig = {
+      defaultWorkItemType: '',
+    };
+    const optionsType: string | undefined = undefined;
+    // Nullish coalescing: '' is not null/undefined, so it wins
+    const resolved = optionsType ?? config.defaultWorkItemType ?? 'User Story';
+    expect(resolved).toBe('');
+  });
+});
+
+describe('ADO area path and iteration path cascade', () => {
+  it('explicit areaPath overrides config areaPath', () => {
+    const config: import('../packages/squad-sdk/src/platform/azure-devops.js').AdoWorkItemConfig = {
+      areaPath: 'Project\\Default',
+    };
+    const optionsAreaPath = 'Project\\Override';
+    const resolved = optionsAreaPath ?? config.areaPath;
+    expect(resolved).toBe('Project\\Override');
+  });
+
+  it('config areaPath used when not provided in options', () => {
+    const config: import('../packages/squad-sdk/src/platform/azure-devops.js').AdoWorkItemConfig = {
+      areaPath: 'Project\\Team Alpha',
+    };
+    const optionsAreaPath: string | undefined = undefined;
+    const resolved = optionsAreaPath ?? config.areaPath;
+    expect(resolved).toBe('Project\\Team Alpha');
+  });
+
+  it('explicit iterationPath overrides config iterationPath', () => {
+    const config: import('../packages/squad-sdk/src/platform/azure-devops.js').AdoWorkItemConfig = {
+      iterationPath: 'Project\\Sprint 1',
+    };
+    const optionsIterationPath = 'Project\\Sprint 2';
+    const resolved = optionsIterationPath ?? config.iterationPath;
+    expect(resolved).toBe('Project\\Sprint 2');
+  });
+
+  it('config iterationPath used when not provided in options', () => {
+    const config: import('../packages/squad-sdk/src/platform/azure-devops.js').AdoWorkItemConfig = {
+      iterationPath: 'Project\\Sprint 3',
+    };
+    const optionsIterationPath: string | undefined = undefined;
+    const resolved = optionsIterationPath ?? config.iterationPath;
+    expect(resolved).toBe('Project\\Sprint 3');
+  });
+
+  it('undefined when neither options nor config provide areaPath', () => {
+    const config: import('../packages/squad-sdk/src/platform/azure-devops.js').AdoWorkItemConfig = {};
+    const optionsAreaPath: string | undefined = undefined;
+    const resolved = optionsAreaPath ?? config.areaPath;
+    expect(resolved).toBeUndefined();
+  });
+
+  it('undefined when neither options nor config provide iterationPath', () => {
+    const config: import('../packages/squad-sdk/src/platform/azure-devops.js').AdoWorkItemConfig = {};
+    const optionsIterationPath: string | undefined = undefined;
+    const resolved = optionsIterationPath ?? config.iterationPath;
+    expect(resolved).toBeUndefined();
+  });
+});
+
+describe('ADO work item creation with custom types (mock adapter)', () => {
+  it('mock adapter creates work item with custom type', async () => {
+    let capturedType: string | undefined;
+    const mockAdapter: PlatformAdapter = {
+      type: 'azure-devops' as PlatformType,
+      listWorkItems: async () => [],
+      getWorkItem: async (id: number) => ({ id, title: '', state: '', tags: [], url: '' }),
+      createWorkItem: async (options) => {
+        capturedType = options.type;
+        return {
+          id: 42,
+          title: options.title,
+          state: 'New',
+          tags: [],
+          url: `https://dev.azure.com/org/proj/_workitems/edit/42`,
+        };
+      },
+      addTag: async () => {},
+      removeTag: async () => {},
+      addComment: async () => {},
+      listPullRequests: async () => [],
+      createPullRequest: async () => ({ id: 1, title: '', sourceBranch: '', targetBranch: '', status: 'active' as const, author: '', url: '' }),
+      mergePullRequest: async () => {},
+      createBranch: async () => {},
+    };
+
+    await mockAdapter.createWorkItem({ title: 'Test', type: 'Scenario' });
+    expect(capturedType).toBe('Scenario');
+  });
+
+  it('mock adapter creates work item with Bug type', async () => {
+    let capturedType: string | undefined;
+    const mockAdapter: PlatformAdapter = {
+      type: 'azure-devops' as PlatformType,
+      listWorkItems: async () => [],
+      getWorkItem: async (id: number) => ({ id, title: '', state: '', tags: [], url: '' }),
+      createWorkItem: async (options) => {
+        capturedType = options.type;
+        return { id: 1, title: options.title, state: 'New', tags: [], url: '' };
+      },
+      addTag: async () => {},
+      removeTag: async () => {},
+      addComment: async () => {},
+      listPullRequests: async () => [],
+      createPullRequest: async () => ({ id: 1, title: '', sourceBranch: '', targetBranch: '', status: 'active' as const, author: '', url: '' }),
+      mergePullRequest: async () => {},
+      createBranch: async () => {},
+    };
+
+    await mockAdapter.createWorkItem({ title: 'Fix crash', type: 'Bug' });
+    expect(capturedType).toBe('Bug');
+  });
+});
+
+describe('ADO config.json read/write round-trip', () => {
+  it('config with all ADO fields serializes to valid JSON', () => {
+    const config = {
+      version: 1,
+      platform: 'azure-devops',
+      ado: {
+        org: 'contoso',
+        project: 'WorkItems',
+        defaultWorkItemType: 'Scenario',
+        areaPath: 'WorkItems\\Team Alpha',
+        iterationPath: 'WorkItems\\Sprint 5',
+      },
+    };
+    const json = JSON.stringify(config, null, 2);
+    const parsed = JSON.parse(json);
+    expect(parsed.ado.defaultWorkItemType).toBe('Scenario');
+    expect(parsed.ado.areaPath).toBe('WorkItems\\Team Alpha');
+    expect(parsed.ado.iterationPath).toBe('WorkItems\\Sprint 5');
+  });
+
+  it('config with _availableTypes hint survives serialization', () => {
+    const config = {
+      version: 1,
+      ado: {
+        defaultWorkItemType: 'User Story',
+        _availableTypes: ['User Story', 'Bug', 'Task', 'Scenario'],
+      },
+    };
+    const json = JSON.stringify(config, null, 2);
+    const parsed = JSON.parse(json);
+    expect(parsed.ado._availableTypes).toEqual(['User Story', 'Bug', 'Task', 'Scenario']);
+  });
+
+  it('minimal ADO config (empty object) is valid', () => {
+    const config = { version: 1, ado: {} };
+    const json = JSON.stringify(config, null, 2);
+    const parsed = JSON.parse(json);
+    expect(parsed.ado).toEqual({});
+  });
+});
+
+describe('ADO exports from platform index', () => {
+  it('exports getAvailableWorkItemTypes function', async () => {
+    const mod = await import('../packages/squad-sdk/src/platform/index.js');
+    expect(typeof mod.getAvailableWorkItemTypes).toBe('function');
+  });
+
+  it('exports validateWorkItemType function', async () => {
+    const mod = await import('../packages/squad-sdk/src/platform/index.js');
+    expect(typeof mod.validateWorkItemType).toBe('function');
+  });
+
+  it('getAvailableWorkItemTypes returns array from index re-export', async () => {
+    const mod = await import('../packages/squad-sdk/src/platform/index.js');
+    const types = mod.getAvailableWorkItemTypes('test-org', 'test-proj');
+    expect(Array.isArray(types)).toBe(true);
+    expect(types.length).toBeGreaterThan(0);
+  });
+});

@@ -18,21 +18,15 @@
 
 ## How I Work
 
-**Worktree awareness:** Use the `TEAM ROOT` provided in the spawn prompt to resolve all `.squad/` paths. If no TEAM ROOT is given, run `git rev-parse --show-toplevel` as fallback.
+**Worktree awareness:** Use `TEAM ROOT` from spawn prompt; fallback: `git rev-parse --show-toplevel`.
 
-After every substantial work session:
-
-1. **Log the session** to `.squad/log/{timestamp}-{topic}.md` — who worked, what was done, decisions made, key outcomes. Brief, facts only.
-
-2. **Merge the decision inbox:** Read `.squad/decisions/inbox/`, APPEND each to `.squad/decisions.md`, delete inbox files after merging.
-
-3. **Deduplicate decisions.md:** Parse into `### ` blocks. Remove exact duplicates (same heading). Consolidate overlapping decisions (same topic, different authors) into a single merged block with combined rationale.
-
-4. **Propagate cross-agent updates:** For newly merged decisions affecting other agents, append `📌 Team update ({timestamp}): {summary} — decided by {Name}` to their `history.md`.
-
-5. **Commit `.squad/` changes:** `cd` to team root, `git add .squad/`, check `git diff --cached --quiet`, write message to temp file, `git commit -F`. Windows: no `git -C`, no embedded newlines in `-m`.
-
-6. **Never speak to the user.** Never appear in responses. Work silently.
+After substantial work:
+1. Log session to `.squad/log/{timestamp}-{topic}.md` (who, what, outcomes)
+2. Merge `.squad/decisions/inbox/` → `.squad/decisions.md`, delete inbox files
+3. Deduplicate decisions.md by `### ` blocks (exact duplicates, overlapping topics)
+4. Propagate: append `📌 Team update` to affected agents' history.md
+5. Commit: cd to team root, `git add .squad/`, temp file, `git commit -F` (Windows: no `-C`, no `-m` newlines)
+6. Never speak to user. Silent background operation.
 
 ## Boundaries
 

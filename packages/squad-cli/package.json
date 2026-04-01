@@ -1,6 +1,6 @@
 {
   "name": "@bradygaster/squad-cli",
-  "version": "0.8.25-build.4",
+  "version": "0.8.25-build.10",
   "description": "Squad CLI — Command-line interface for the Squad multi-agent runtime",
   "type": "module",
   "bin": {
@@ -136,6 +136,10 @@
       "types": "./dist/cli/commands/copilot.d.ts",
       "import": "./dist/cli/commands/copilot.js"
     },
+    "./commands/cost": {
+      "types": "./dist/cli/commands/cost.d.ts",
+      "import": "./dist/cli/commands/cost.js"
+    },
     "./commands/copilot-bridge": {
       "types": "./dist/cli/commands/copilot-bridge.d.ts",
       "import": "./dist/cli/commands/copilot-bridge.js"
@@ -154,7 +158,7 @@
     "postbuild": "node -e \"require('fs').cpSync('src/remote-ui', 'dist/remote-ui', {recursive: true})\""
   },
   "engines": {
-    "node": ">=20"
+    "node": ">=22.5.0"
   },
   "dependencies": {
     "@bradygaster/squad-sdk": "*",

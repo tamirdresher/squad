@@ -213,6 +213,172 @@ function checkDecisionsMd(squadDir: string): DoctorCheck {
   };
 }
 
+/**
+ * Report the last detected rate limit, if any, by reading the status file
+ * written by the shell when a rate limit error is caught.
+ */
+function checkRateLimitStatus(squadDir: string): DoctorCheck | undefined {
+  const statusPath = path.join(squadDir, 'rate-limit-status.json');
+  if (!fileExists(statusPath)) return undefined;
+
+  const data = tryReadJson(statusPath) as Record<string, unknown> | undefined;
+  if (!data) {
+    return {
+      name: 'rate limit status',
+      status: 'warn',
+      message: 'rate-limit-status.json exists but could not be parsed',
+    };
+  }
+
+  const ts = typeof data['timestamp'] === 'string' ? new Date(data['timestamp']) : null;
+  const retryAfter = typeof data['retryAfter'] === 'number' ? data['retryAfter'] : null;
+  const model = typeof data['model'] === 'string' ? data['model'] : null;
+
+  const age = ts ? Math.floor((Date.now() - ts.getTime()) / 1000) : null;
+  const ageStr = age !== null ? ` (${formatAge(age)} ago)` : '';
+  const modelStr = model ? ` on model: ${model}` : '';
+  const retryStr = retryAfter ? ` — retry after ${retryAfter}s` : '';
+
+  // If last rate limit was more than 4 hours ago, treat as stale info (pass)
+  const stale = age !== null && age > 4 * 3600;
+
+  return {
+    name: 'rate limit status',
+    status: stale ? 'pass' : 'warn',
+    message: stale
+      ? `Last rate limit${ageStr}${modelStr} — appears resolved. Run \`squad economy on\` to reduce future risk.`
+      : `Rate limit detected${ageStr}${modelStr}${retryStr}. Run \`squad economy on\` to switch to cheaper models.`,
+  };
+}
+
+function formatAge(seconds: number): string {
+  if (seconds >= 3600) {
+    const h = Math.floor(seconds / 3600);
+    return `${h}h`;
+  }
+  if (seconds >= 60) {
+    const m = Math.floor(seconds / 60);
+    return `${m}m`;
+  }
+  return `${seconds}s`;
+}
+
+// ── ESM compatibility checks ────────────────────────────────────────
+
+// ── environment checks ─────────────────────────────────────────────
+
+/**
+ * Check that Node.js is ≥22.5.0 for node:sqlite availability.
+ * Accepts an optional version string for testing.
+ */
+export function checkNodeVersion(nodeVersion?: string): DoctorCheck {
+  const version = nodeVersion ?? process.versions.node;
+  const parts = version.split('.').map(Number);
+  const major = parts[0] ?? 0;
+  const minor = parts[1] ?? 0;
+  const ok = major > 22 || (major === 22 && minor >= 5);
+  return {
+    name: 'Node.js ≥22.5.0 (node:sqlite)',
+    status: ok ? 'pass' : 'fail',
+    message: ok
+      ? `v${version} — node:sqlite available`
+      : `v${version} — node:sqlite requires ≥22.5.0. Upgrade at https://nodejs.org/en/download`,
+  };
+}
+
+/**
+ * Check that vscode-jsonrpc has the `exports` field needed for Node 22/24+
+ * strict ESM subpath resolution. Without it, `import('vscode-jsonrpc/node')`
+ * fails with ERR_PACKAGE_PATH_NOT_EXPORTED.
+ */
+function checkVscodeJsonrpcExports(cwd: string): DoctorCheck {
+  const possiblePaths = [
+    path.join(cwd, 'node_modules', 'vscode-jsonrpc', 'package.json'),
+    path.join(cwd, 'packages', 'squad-cli', 'node_modules', 'vscode-jsonrpc', 'package.json'),
+  ];
+
+  for (const pkgPath of possiblePaths) {
+    if (!fileExists(pkgPath)) continue;
+
+    const pkg = tryReadJson(pkgPath) as Record<string, unknown> | undefined;
+    if (!pkg) {
+      return {
+        name: 'vscode-jsonrpc exports field',
+        status: 'fail',
+        message: 'package.json found but not valid JSON',
+      };
+    }
+
+    if (pkg['exports'] && typeof pkg['exports'] === 'object') {
+      const exports = pkg['exports'] as Record<string, unknown>;
+      if (exports['./node']) {
+        return {
+          name: 'vscode-jsonrpc exports field',
+          status: 'pass',
+          message: 'exports field present with ./node subpath',
+        };
+      }
+    }
+
+    return {
+      name: 'vscode-jsonrpc exports field',
+      status: 'fail',
+      message: 'missing exports field — run postinstall or reinstall (see #449)',
+    };
+  }
+
+  return {
+    name: 'vscode-jsonrpc exports field',
+    status: 'warn',
+    message: 'vscode-jsonrpc not found in node_modules',
+  };
+}
+
+/**
+ * Check that @github/copilot-sdk session.js has the .js extension fix
+ * on its vscode-jsonrpc/node import (defense-in-depth behind the exports patch).
+ */
+function checkCopilotSdkSessionPatch(cwd: string): DoctorCheck {
+  const possiblePaths = [
+    path.join(cwd, 'node_modules', '@github', 'copilot-sdk', 'dist', 'session.js'),
+    path.join(cwd, 'packages', 'squad-cli', 'node_modules', '@github', 'copilot-sdk', 'dist', 'session.js'),
+  ];
+
+  for (const sessionPath of possiblePaths) {
+    if (!fileExists(sessionPath)) continue;
+
+    try {
+      const content = fs.readFileSync(sessionPath, 'utf8');
+
+      if (/from\s+["']vscode-jsonrpc\/node["']/.test(content)) {
+        return {
+          name: 'copilot-sdk session.js ESM patch',
+          status: 'fail',
+          message: 'session.js has extensionless vscode-jsonrpc/node import — run postinstall (see #449)',
+        };
+      }
+
+      return {
+        name: 'copilot-sdk session.js ESM patch',
+        status: 'pass',
+        message: 'session.js imports use .js extension',
+      };
+    } catch {
+      return {
+        name: 'copilot-sdk session.js ESM patch',
+        status: 'warn',
+        message: 'could not read session.js',
+      };
+    }
+  }
+
+  return {
+    name: 'copilot-sdk session.js ESM patch',
+    status: 'warn',
+    message: '@github/copilot-sdk not found in node_modules',
+  };
+}
+
 // ── public API ──────────────────────────────────────────────────────
 
 /**
@@ -247,7 +413,16 @@ export async function runDoctor(cwd?: string): Promise<DoctorCheck[]> {
     checks.push(checkAgentsDir(squadDir));
     checks.push(checkCastingRegistry(squadDir));
     checks.push(checkDecisionsMd(squadDir));
+    const rateLimitCheck = checkRateLimitStatus(squadDir);
+    if (rateLimitCheck) checks.push(rateLimitCheck);
   }
+
+  // 10. Node.js version (node:sqlite availability)
+  checks.push(checkNodeVersion());
+
+  // 11-12. ESM compatibility (Node 22/24+)
+  checks.push(checkVscodeJsonrpcExports(resolvedCwd));
+  checks.push(checkCopilotSdkSessionPatch(resolvedCwd));
 
   return checks;
 }

@@ -45,6 +45,18 @@ export interface ModelPreference {
   readonly fallback?: BuilderModelId;
 }
 
+/** Budget configuration for token/cost limits. */
+export interface BudgetDefinition {
+  /** Max tokens per individual agent spawn (prompt + completion). */
+  readonly perAgentSpawn?: number;
+
+  /** Max total tokens per coordinator session. */
+  readonly perSession?: number;
+
+  /** Warn the user when budget utilization reaches this fraction (0.0-1.0, default 0.8). */
+  readonly warnAt?: number;
+}
+
 // ---------------------------------------------------------------------------
 // DefaultsDefinition — squad-level defaults
 // ---------------------------------------------------------------------------
@@ -53,6 +65,9 @@ export interface ModelPreference {
 export interface DefaultsDefinition {
   /** Default model preference for agents that don't specify one. */
   readonly model?: BuilderModelId | ModelPreference;
+
+  /** Default budget limits applied to agents that don't specify one. */
+  readonly budget?: BudgetDefinition;
 }
 
 // ---------------------------------------------------------------------------
@@ -101,6 +116,9 @@ export interface AgentDefinition {
 
   /** Preferred model identifier or structured model preference. */
   readonly model?: BuilderModelId | ModelPreference;
+
+  /** Optional token budget for this agent. */
+  readonly budget?: BudgetDefinition;
 
   /** Tools this agent is allowed to use. */
   readonly tools?: readonly string[];

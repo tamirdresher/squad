@@ -19,6 +19,18 @@ SKIP_BUILD_BUMP=1 environment variable intended to prevent version mutation duri
 ### Smoke Test Gating in Publish Pipeline
 Smoke tests now run as a dedicated `smoke-test` job in publish.yml before any npm publish operations. Both publish-sdk and publish-cli jobs depend on smoke-test passing. Prevents publishing broken CLI packages to npm. Smoke test runs `npx vitest run test/cli-packaging-smoke.test.ts` after a full build. Test takes ~30-60s for pack+install validation.
 
+### CI Pipeline Hardening — March 20, 2026
+
+**Changes shipped in commit 6cbabb5 (dev branch):**
+
+1. **`edited` trigger added** — `pull_request` event types now include `edited`. Previously, retargeting a PR from `main→dev` would not refire CI because the base branch change uses the `edited` event type. Six PRs (#470, #469, #468, #467, #454, #451) were manually close/reopened to compensate.
+
+2. **Lockfile lint step added** — New step `Lint lockfile for stale workspace entries` runs before `npm ci` in the `test` job. Uses Node inline script to detect any `packages/*/node_modules/@bradygaster/squad-*` entries in `package-lock.json` that have an `https://` resolved URL (indicating a stale nested registry copy shadowing the workspace symlink). Exits with error code + remediation instructions if found. This catches the TypeScript type-mismatch class of failures at the lockfile level, not at build time.
+
+3. **Default branch changed to `dev`** — Repo default branch switched from `main` to `dev` via GitHub API. Community PRs now naturally target `dev`.
+
+**Pattern confirmed:** The `edited` event gap was the exact reason retargeted PRs were not getting CI runs. Any future PR base-branch change will now trigger a fresh CI run automatically.
+
 ### CI Failure Pattern Analysis — March 15, 2026
 Analyzed 20 CI runs from March 15. Identified 3 distinct failure categories:
 
