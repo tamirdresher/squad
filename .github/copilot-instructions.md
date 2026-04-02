@@ -54,12 +54,12 @@ These are bootstrap utilities that run **before** the Squad SDK is loaded. If th
 - ✅ **LOOK** for `— zero dependencies` markers in file headers as a signal
 
 ### Why this matters
-Regression tests guard these files (`detect-squad-dir.test.ts` verifies zero external dependencies), but **prevention is better than detection**. A broken bootstrap means the entire CLI fails to start — no helpful error, just a crash.
+Regression tests guard these files (`detect-squad-dir-zero-deps.test.ts` verifies zero external dependencies), but **prevention is better than detection**. A broken bootstrap means the entire CLI fails to start — no helpful error, just a crash.
 
 > **When adding new bootstrap utilities**, add them to this table and write a matching zero-dependency regression test.
 
 ### SDK/CLI package boundary
-The CLI (`squad-cli`) depends on the SDK (`squad-sdk`). Some CLI files run **before** the SDK is fully loaded. The entire `packages/squad-cli/src/cli/core/` directory contains bootstrap utilities — treat every file in it with extra caution. If you need to add SDK imports to a `core/` file, verify it isn't in the protected list above and confirm the SDK is loaded at that point in the startup sequence.
+The CLI (`squad-cli`) depends on the SDK (`squad-sdk`). Some CLI files run **before** the SDK is fully loaded. The `packages/squad-cli/src/cli/core/` directory contains a mix of early-startup/bootstrap utilities and later SDK-dependent modules, so treat every file in it with extra caution. The protected list above is the authoritative set of zero-dependency bootstrap files. If you need to add SDK imports to another `core/` file, verify it is not in the protected list above and confirm the SDK is loaded at that point in the startup sequence.
 
 ## Sweeping Refactor Rules
 

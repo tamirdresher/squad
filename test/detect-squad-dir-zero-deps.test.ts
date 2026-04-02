@@ -25,11 +25,11 @@ describe('detect-squad-dir zero-dependency guard', () => {
   const source = readFileSync(SOURCE_PATH, 'utf-8');
 
   it('must not import from @bradygaster/squad-sdk', () => {
-    expect(source).not.toMatch(/from\s+['"]@bradygaster\/squad-sdk['"]/);
+    expect(source).not.toMatch(/from\s+['"]@bradygaster\/squad-sdk(?:\/[^'"]+)?['"]/);
   });
 
   it('must not require @bradygaster/squad-sdk', () => {
-    expect(source).not.toMatch(/require\s*\(\s*['"]@bradygaster\/squad-sdk['"]\s*\)/);
+    expect(source).not.toMatch(/require\s*\(\s*['"]@bradygaster\/squad-sdk(?:\/[^'"]+)?['"]\s*\)/);
   });
 
   it('should import from node:fs for filesystem operations', () => {
