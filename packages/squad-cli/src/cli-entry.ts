@@ -413,6 +413,26 @@ async function main(): Promise<void> {
       ? args[capabilitiesIdx + 1]!.split(',').map(s => s.trim())
       : undefined;
 
+    // ── Warn about unrecognised flags (#739) ───────────────────
+    const knownValueFlags = new Set([
+      '--interval', '--copilot-flags', '--agent-cmd', '--max-concurrent',
+      '--timeout', '--board-project', '--webhook-url', '--alert-threshold',
+      '--max-budget', '--capabilities',
+    ]);
+    const knownBoolFlags = new Set(['--execute']);
+    for (const cap of registry.all()) {
+      knownBoolFlags.add(`--${cap.name}`);
+      knownBoolFlags.add(`--no-${cap.name}`);
+    }
+
+    for (let i = 0; i < args.length; i++) {
+      const arg = args[i]!;
+      if (!arg.startsWith('--')) continue;
+      if (knownValueFlags.has(arg)) { i++; continue; }   // skip its value
+      if (knownBoolFlags.has(arg)) continue;
+      console.warn(`⚠  Unknown watch flag ignored: ${arg}`);
+    }
+
     // Load config: .squad/config.json merged with CLI overrides
     const config = loadWatchConfig(process.cwd(), {
       interval,
