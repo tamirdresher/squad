@@ -72,7 +72,7 @@ const migrations: Migration[] = [
         return;
       }
 
-      const skillNames = storage.listSync(legacySkillsDir).filter(entry =>
+      const skillNames = storage.listSync(legacySkillsDir).filter((entry: string) =>
         storage.existsSync(path.join(legacySkillsDir, entry, 'SKILL.md')),
       );
       if (skillNames.length === 0) {

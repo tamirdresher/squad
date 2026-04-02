@@ -78,7 +78,7 @@ function detectProjectType(dir: string): string {
   
   try {
     const entries = storage.listSync(dir);
-    if (entries.some(e => e.endsWith('.csproj') || e.endsWith('.sln') || 
+    if (entries.some((e: string) => e.endsWith('.csproj') || e.endsWith('.sln') || 
                          e.endsWith('.slnx') || e.endsWith('.fsproj') || 
                          e.endsWith('.vbproj'))) return 'dotnet';
   } catch {}
@@ -383,7 +383,7 @@ function syncAllSkills(dest: string, templatesDir: string): number {
   copyDirRecursive(skillsSrc, skillsDest, false);
   // Count skill directories synced
   try {
-    return storage.listSync(skillsSrc).filter(e =>
+    return storage.listSync(skillsSrc).filter((e: string) =>
       storage.isDirectorySync(path.join(skillsSrc, e))
     ).length;
   } catch { return 0; }
@@ -483,7 +483,7 @@ export async function runUpgrade(dest: string, options: UpgradeOptions = {}): Pr
     const workflowsDest = path.join(dest, '.github', 'workflows');
     
     if (storage.existsSync(workflowsSrc)) {
-      const wfFiles = storage.listSync(workflowsSrc).filter(f => f.endsWith('.yml'));
+      const wfFiles = storage.listSync(workflowsSrc).filter((f: string) => f.endsWith('.yml'));
       storage.mkdirSync(workflowsDest, { recursive: true });
       
       for (const file of wfFiles) {
@@ -555,7 +555,7 @@ export async function runUpgrade(dest: string, options: UpgradeOptions = {}): Pr
   const workflowsDest = path.join(dest, '.github', 'workflows');
   
   if (storage.existsSync(workflowsSrc)) {
-    const wfFiles = storage.listSync(workflowsSrc).filter(f => f.endsWith('.yml'));
+    const wfFiles = storage.listSync(workflowsSrc).filter((f: string) => f.endsWith('.yml'));
     storage.mkdirSync(workflowsDest, { recursive: true });
     
     for (const file of wfFiles) {
