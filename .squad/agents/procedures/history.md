@@ -196,21 +196,3 @@ Also updated: examples section (showing `name` + `description` pairs), anti-patt
 
 **Pattern:** When a PR branch has accumulated merge commits from dev, use `git rebase --onto dev <parent-of-first-PR-commit>` to cherry-pick only the relevant commits. This avoids conflict noise from old merge commits that are already in dev. Also: after template renames, the sync script may overwrite version stamps in the canonical file — revert those before pushing.
 
-### 2026-07: Protected Files guardrail + Sweeping Refactor Rules
-
-**Problem:** Commit `26047dc5` (StorageProvider abstraction) accidentally converted `detect-squad-dir.ts` from raw `node:fs` to `FSStorageProvider`, breaking the insider build. Bootstrap files run before the SDK loads — converting them to SDK imports is a fatal mistake. EECOM fixed the code; Procedures added the guardrails.
-
-**Phase 1:** Added "Protected Files — Zero External Dependencies" section to `.github/copilot-instructions.md` with `detect-squad-dir.ts` as the initial entry. Placed between Git Safety and Team Context as a safety rule.
-
-**Phase 2 (this session):** Expanded the section after Flight identified 4 more zero-dependency bootstrap files (`errors.ts`, `gh-cli.ts`, `output.ts`, `history-split.ts`). Verified each file — all confirmed zero-dependency (3 have explicit header markers, 1 has zero imports). Added:
-- Full 5-file protected table with purpose descriptions
-- SDK/CLI package boundary subsection explaining the `core/` directory's special status
-- New "Sweeping Refactor Rules" section — 5-step checklist to prevent blind codebase-wide conversions
-- Rule to scan for `— zero dependencies` header markers before refactoring any file
-- Rule to verify SDK barrel exports before adding `import { X } from '@bradygaster/squad-sdk'`
-
-**Pattern:** Defense in depth for dependency boundaries: (1) file header markers signal constraints to humans and agents, (2) copilot-instructions.md lists protected files explicitly, (3) regression tests catch violations that slip through. All three layers needed — markers alone aren't enough when an agent does a sweeping refactor without reading headers.
-
-
-
-📌 **Team Update:** Bootstrap fix (PR #756) complete. detect-squad-dir.ts reverted to zero-dependency. Regression guard added. Protected Files pattern established in copilot-instructions.md. Four additional bootstrap utilities flagged for future protection: errors.ts, gh-cli.ts, output.ts, history-split.ts.

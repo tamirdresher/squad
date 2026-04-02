@@ -223,6 +223,3 @@ Reviewed 9 community PRs (8 from tamirdresher, 1 from eric-vanartsdalen). Key fi
 
 **Learning:** Community contributors consistently struggle with two things: (a) scoped npm package names in changesets, and (b) monorepo file placement. Both are preventable with better contributor docs.
 
-
-
-📌 **Team Update:** Bootstrap fix (PR #756) complete. detect-squad-dir.ts reverted to zero-dependency. Regression guard added. Protected Files pattern established in copilot-instructions.md. Four additional bootstrap utilities flagged for future protection: errors.ts, gh-cli.ts, output.ts, history-split.ts.

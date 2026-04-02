@@ -185,6 +185,3 @@ Decision written to `.squad/decisions/inbox/flight-release-hardening-plan.md`.
 **Pattern:** Tamir is a high-output contributor (6 PRs in 2 weeks) but needs proposal-first discipline. Joniba and diberry deliver MSFT-level quality.
 
 Decision written to `.squad/decisions/inbox/flight-triage-session-plan.md`.
-
-
-📌 **Team Update:** Bootstrap fix (PR #756) complete. detect-squad-dir.ts reverted to zero-dependency. Regression guard added. Protected Files pattern established in copilot-instructions.md. Four additional bootstrap utilities flagged for future protection: errors.ts, gh-cli.ts, output.ts, history-split.ts.
