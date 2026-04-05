@@ -3,7 +3,7 @@
 const fs = require('fs');
 const path = require('path');
 
-const { calculatePrRework, calculateReworkSummary } = require('./lib/rework');
+const { calculatePrRework, calculateReworkSummary } = require('./lib/rework.cjs');
 
 const GREEN = '\x1b[32m';
 const RED = '\x1b[31m';
