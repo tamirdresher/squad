@@ -17,6 +17,48 @@ const storage = new FSStorageProvider();
 
 const CYAN = '\x1b[36m';
 
+// ── APM manifest generation ───────────────────────────────────────────────────
+
+/**
+ * Generate a starter apm.yml at the project root.
+ *
+ * Only creates the file if it doesn't already exist, so repeat `squad init`
+ * invocations are safe (skipExisting semantics mirror the SDK's behaviour).
+ *
+ * APM (Agent Package Manager) is package.json for AI agent context.
+ * See: https://github.com/microsoft/apm
+ */
+export function generateApmYml(dest: string, projectName: string): void {
+  const apmPath = path.join(dest, 'apm.yml');
+  if (fs.existsSync(apmPath)) return; // skip if already present
+
+  const content = [
+    `# apm.yml — Agent Package Manager manifest`,
+    `# See: https://github.com/microsoft/apm`,
+    `#`,
+    `# This file makes your Squad skills versioned, portable, and community-shareable.`,
+    `# Run 'squad skill publish' to populate the skills section after adding skills.`,
+    ``,
+    `name: ${projectName}`,
+    `version: 1.0.0`,
+    ``,
+    `# Skills — add entries here or run 'squad skill publish' to auto-populate`,
+    `skills: []`,
+    ``,
+    `# Instruction files deployed by 'apm install'`,
+    `instructions:`,
+    `  - path: .squad/copilot-instructions.md`,
+    `    target: .github/copilot-instructions.md`,
+    ``,
+    `# Prompts deployed by 'apm install'`,
+    `prompts:`,
+    `  - path: .squad/skills/*/skill.md`,
+    `    target: .github/prompts/`,
+  ].join('\n') + '\n';
+
+  fs.writeFileSync(apmPath, content, 'utf8');
+}
+
 /**
  * Detect if the target directory is inside a parent git repo.
  * Returns the normalized git root path if a parent repo is detected,
@@ -285,6 +327,19 @@ export async function runInit(dest: string, options: RunInitOptions = {}): Promi
   for (const file of result.skippedFiles) {
     // Files are already relative to teamRoot, just display as-is
     console.log(`${DIM}${file} already exists — skipping${RESET}`);
+  }
+
+  // ── APM manifest ─────────────────────────────────────────────────────────────
+  // Generate apm.yml so skills are ready for APM publishing/installation.
+  // Uses the project name derived from the directory basename.
+  const projectName = path.basename(dest) || 'my-project';
+  const apmPath = path.join(dest, 'apm.yml');
+  const apmAlreadyExisted = fs.existsSync(apmPath);
+  generateApmYml(dest, projectName);
+  if (!apmAlreadyExisted) {
+    success('apm.yml');
+  } else {
+    console.log(`${DIM}apm.yml already exists — skipping${RESET}`);
   }
 
   // ── Celebration ceremony ──────────────────────────────────────────

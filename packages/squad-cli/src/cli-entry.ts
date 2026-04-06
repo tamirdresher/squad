@@ -203,6 +203,10 @@ async function main(): Promise<void> {
     console.log(`             Usage: copilot [--off] [--auto-assign]`);
     console.log(`  ${BOLD}plugin${RESET}     Manage plugin marketplaces`);
     console.log(`             Usage: plugin marketplace add|remove|list|browse`);
+    console.log(`  ${BOLD}skill${RESET}      APM (Agent Package Manager) integration`);
+    console.log(`             Usage: skill publish [<name>]  — export to APM format`);
+    console.log(`                    skill install <source>  — install from APM registry`);
+    console.log(`                    skill list              — list installed skills`);
     console.log(`  ${BOLD}export${RESET}     Export squad to a portable JSON snapshot`);
     console.log(`             Default: squad-export.json (use --out <path> to override)`);
     console.log(`  ${BOLD}import${RESET}     Import squad from an export file`);
@@ -613,6 +617,12 @@ async function main(): Promise<void> {
   if (cmd === 'plugin') {
     const { runPlugin } = await import('./cli/commands/plugin.js');
     await runPlugin(getSquadStartDir(), args.slice(1));
+    return;
+  }
+
+  if (cmd === 'skill') {
+    const { runSkill } = await import('./cli/commands/skill.js');
+    await runSkill(process.cwd(), args.slice(1));
     return;
   }
 
