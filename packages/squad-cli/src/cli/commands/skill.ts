@@ -71,8 +71,26 @@ async function readProjectName(dest: string): Promise<string> {
   return basename(dest);
 }
 
-/** Collect all skills from the squad skills directory. */
-async function collectSkills(skillsDir: string): Promise<ApmSkill[]> {
+/**
+ * Resolve the skills directory, preferring .copilot/skills/ over .squad/skills/.
+ * Returns { dir, relPrefix } where relPrefix is the display path (e.g. '.copilot/skills').
+ */
+function resolveSkillsDir(dest: string): { dir: string; relPrefix: string } {
+  const copilotSkills = join(dest, '.copilot', 'skills');
+  if (existsSync(copilotSkills)) {
+    return { dir: copilotSkills, relPrefix: '.copilot/skills' };
+  }
+  const squadDirInfo = detectSquadDir(dest);
+  const squadSkills = join(squadDirInfo.path, 'skills');
+  if (existsSync(squadSkills)) {
+    return { dir: squadSkills, relPrefix: `${squadDirInfo.name}/skills` };
+  }
+  // Default to .copilot/skills/ for new installs
+  return { dir: copilotSkills, relPrefix: '.copilot/skills' };
+}
+
+/** Collect all skills from the skills directory. */
+async function collectSkills(skillsDir: string, relPrefix: string): Promise<ApmSkill[]> {
   if (!existsSync(skillsDir)) return [];
   const skills: ApmSkill[] = [];
   try {
@@ -85,7 +103,7 @@ async function collectSkills(skillsDir: string): Promise<ApmSkill[]> {
       skills.push({
         name: fm['name'] ?? entry,
         description: fm['description'],
-        path: `.squad/skills/${entry}/skill.md`,
+        path: `${relPrefix}/${entry}/skill.md`,
         version: fm['version'],
         source: fm['source'],
       });
@@ -105,11 +123,10 @@ async function collectSkills(skillsDir: string): Promise<ApmSkill[]> {
  * Creates/updates apm.yml at the project root.
  */
 async function publish(dest: string, skillName?: string): Promise<void> {
-  const squadDirInfo = detectSquadDir(dest);
-  const skillsDir = join(squadDirInfo.path, 'skills');
+  const { dir: skillsDir, relPrefix } = resolveSkillsDir(dest);
 
   if (!existsSync(skillsDir)) {
-    fatal('No skills directory found. Create .squad/skills/ first.');
+    fatal('No skills directory found. Create .copilot/skills/ first.');
   }
 
   const projectName = await readProjectName(dest);
@@ -118,7 +135,7 @@ async function publish(dest: string, skillName?: string): Promise<void> {
     // Publish a single named skill
     const skillFile = join(skillsDir, skillName, 'skill.md');
     if (!existsSync(skillFile)) {
-      fatal(`Skill '${skillName}' not found at .squad/skills/${skillName}/skill.md`);
+      fatal(`Skill '${skillName}' not found at ${relPrefix}/${skillName}/skill.md`);
     }
 
     const content = await readFile(skillFile, 'utf8');
@@ -140,13 +157,13 @@ async function publish(dest: string, skillName?: string): Promise<void> {
       .join('\n');
 
     await writeFile(apmSkillPath, skillApm + '\n', 'utf8');
-    success(`Published skill '${skillName}' to .squad/skills/${skillName}/apm.yml`);
+    success(`Published skill '${skillName}' to ${relPrefix}/${skillName}/apm.yml`);
     info(`${DIM}APM format ready — push to GitHub to share via APM registry${RESET}`);
     return;
   }
 
   // Publish all skills → update project-level apm.yml
-  const skills = await collectSkills(skillsDir);
+  const skills = await collectSkills(skillsDir, relPrefix);
   const apmPath = join(dest, 'apm.yml');
 
   // Read existing apm.yml to preserve manually-added fields
@@ -172,7 +189,7 @@ async function publish(dest: string, skillName?: string): Promise<void> {
     `name: ${existing.name ?? projectName}`,
     `version: 1.0.0`,
     ``,
-    `# Skills exported from .squad/skills/`,
+    `# Skills exported from ${relPrefix}/`,
     `skills:`,
     ...skills.map(s =>
       [
@@ -192,7 +209,7 @@ async function publish(dest: string, skillName?: string): Promise<void> {
     ``,
     `# Prompts deployed by 'apm install'`,
     `prompts:`,
-    `  - path: .squad/skills/*/skill.md`,
+    `  - path: ${relPrefix}/*/skill.md`,
     `    target: .github/prompts/`,
   ];
 
@@ -204,7 +221,7 @@ async function publish(dest: string, skillName?: string): Promise<void> {
       info(`  ${DIM}• ${s.name}${RESET}`);
     }
   } else {
-    success(`Created apm.yml (no skills found yet — add skills to .squad/skills/)`);
+    success(`Created apm.yml (no skills found yet — add skills to ${relPrefix}/)`);
   }
   info(`${DIM}Run 'apm publish' to push to the APM registry${RESET}`);
 }
@@ -223,8 +240,7 @@ async function install(dest: string, source: string): Promise<void> {
     fatal('Usage: squad skill install <owner/repo>[/<skill-name>] | <url>');
   }
 
-  const squadDirInfo = detectSquadDir(dest);
-  const skillsDir = join(squadDirInfo.path, 'skills');
+  const { dir: skillsDir, relPrefix } = resolveSkillsDir(dest);
 
   if (!existsSync(skillsDir)) {
     await mkdir(skillsDir, { recursive: true });
@@ -232,7 +248,7 @@ async function install(dest: string, source: string): Promise<void> {
 
   // URL-based install
   if (source.startsWith('http://') || source.startsWith('https://')) {
-    await installFromUrl(source, skillsDir);
+    await installFromUrl(source, skillsDir, relPrefix);
     return;
   }
 
@@ -252,11 +268,11 @@ async function install(dest: string, source: string): Promise<void> {
 
   info(`${DIM}Fetching skill(s) from ${owner}/${repo}...${RESET}`);
 
-  // Try to find skills via gh api — look for .squad/skills/ or apm.yml
+  // Try to find skills via gh api — look for apm.yml or .copilot/skills/
   await installFromGitHub(owner, repo, skillFilter, skillsDir, dest);
 }
 
-async function installFromUrl(url: string, skillsDir: string): Promise<void> {
+async function installFromUrl(url: string, skillsDir: string, relPrefix: string): Promise<void> {
   let content: string;
   try {
     // Node 18+ has built-in fetch
@@ -283,7 +299,7 @@ async function installFromUrl(url: string, skillsDir: string): Promise<void> {
   await writeFile(join(skillDir, 'skill.md'), content, 'utf8');
 
   success(`Installed skill '${skillName}' from URL`);
-  info(`  ${DIM}Location: .squad/skills/${skillName}/skill.md${RESET}`);
+  info(`  ${DIM}Location: ${relPrefix}/${skillName}/skill.md${RESET}`);
 }
 
 async function installFromGitHub(
@@ -303,11 +319,11 @@ async function installFromGitHub(
     ]);
     apmContent = Buffer.from(stdout.trim(), 'base64').toString('utf8');
   } catch {
-    // No apm.yml — fall back to looking for .squad/skills/
+    // No apm.yml — fall back to scanning skills directories
   }
 
   if (!apmContent) {
-    // Fall back: try to list .squad/skills/ directory via API
+    // Fall back: try skills directories via API
     await installSkillsFromSquadDir(owner, repo, skillFilter, skillsDir);
     return;
   }
@@ -395,8 +411,8 @@ async function installSkillsFromSquadDir(
   skillFilter: string | undefined,
   skillsDir: string,
 ): Promise<void> {
-  // Try .squad/skills/ (new convention) and .copilot/skills/ (older)
-  const candidates = ['.squad/skills', '.copilot/skills', 'skills'];
+  // Try .copilot/skills/ (standard) then .squad/skills/ (legacy) then bare skills/
+  const candidates = ['.copilot/skills', '.squad/skills', 'skills'];
   let entries: Array<{ name: string; path: string; type: string }> = [];
 
   for (const candidate of candidates) {
@@ -466,18 +482,17 @@ async function installSkillsFromSquadDir(
 /**
  * squad skill list
  *
- * Lists installed skills from .squad/skills/.
+ * Lists installed skills from .copilot/skills/ (or legacy .squad/skills/).
  */
 async function listSkills(dest: string): Promise<void> {
-  const squadDirInfo = detectSquadDir(dest);
-  const skillsDir = join(squadDirInfo.path, 'skills');
+  const { dir: skillsDir, relPrefix } = resolveSkillsDir(dest);
 
   if (!existsSync(skillsDir)) {
-    info('No skills directory found. Run "squad init" first or create .squad/skills/');
+    info('No skills directory found. Run "squad init" first or create .copilot/skills/');
     return;
   }
 
-  const skills = await collectSkills(skillsDir);
+  const skills = await collectSkills(skillsDir, relPrefix);
 
   if (skills.length === 0) {
     info(`${DIM}No skills installed yet.${RESET}`);
