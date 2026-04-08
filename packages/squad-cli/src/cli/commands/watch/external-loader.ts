@@ -9,7 +9,7 @@ import { join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import type { CapabilityRegistry } from './registry.js';
 import type { WatchCapability } from './types.js';
-import { GREEN, YELLOW, RESET } from '../../core/output.js';
+import { GREEN, YELLOW, RED, BOLD, DIM, RESET } from '../../core/output.js';
 
 /** Required fields on a valid WatchCapability. */
 const REQUIRED_FIELDS: ReadonlyArray<keyof WatchCapability> = [
@@ -41,6 +41,24 @@ export async function loadExternalCapabilities(
 
   const entries = await readdir(capDir);
   const jsFiles = entries.filter(f => f.endsWith('.js')).sort();
+
+  if (jsFiles.length === 0) {
+    return 0;
+  }
+
+  // Security: warn user before executing external code
+  console.log(
+    `\n${YELLOW}${BOLD}⚠️  SECURITY: Loading ${jsFiles.length} external capability file(s) from .squad/capabilities/${RESET}`,
+  );
+  for (const f of jsFiles) {
+    console.log(`${DIM}    • ${f}${RESET}`);
+  }
+  console.log(
+    `${YELLOW}    External capabilities execute with FULL process permissions (file system, network, credentials).${RESET}`,
+  );
+  console.log(
+    `${YELLOW}    Review these files if you did not author them.${RESET}\n`,
+  );
 
   let loaded = 0;
 
@@ -75,6 +93,14 @@ export async function loadExternalCapabilities(
       if (!validPhases.includes(cap.phase)) {
         console.log(
           `${YELLOW}⚠️ Failed to load capability from ${filename}: invalid phase '${cap.phase}' (must be one of: ${validPhases.join(', ')})${RESET}`,
+        );
+        continue;
+      }
+
+      // Security: block hijacking of built-in capabilities
+      if (registry.get(cap.name)) {
+        console.log(
+          `${YELLOW}⚠️ External capability "${cap.name}" conflicts with built-in — skipped (potential hijack)${RESET}`,
         );
         continue;
       }
