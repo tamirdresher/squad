@@ -15,6 +15,8 @@
  *   add a corresponding assertion here.  The grep one-liner in the test
  *   description shows how to audit.
  *
+ *     grep -rn "from '@bradygaster/squad-sdk" packages/squad-cli/src/
+ *
  * Related incident: v0.9.3-insider.1 shipped with FSStorageProvider missing
  * from the SDK barrel — broke users at runtime while tests passed locally.
  */
@@ -264,7 +266,13 @@ describe('cross-package exports — CLI → SDK', () => {
       const pkg = JSON.parse(
         fs.readFileSync(resolve(sdkRoot!, 'package.json'), 'utf8'),
       );
-      const exportsMap = pkg.exports as Record<string, Record<string, string>>;
+      expect(pkg.exports, 'SDK package.json should have an exports field').toBeDefined();
+      expect(
+        typeof pkg.exports === 'object' && pkg.exports !== null,
+        'exports should be an object',
+      ).toBe(true);
+
+      const exportsMap = pkg.exports as Record<string, unknown>;
       const missing: string[] = [];
 
       for (const [subpath, targets] of Object.entries(exportsMap)) {
@@ -274,9 +282,12 @@ describe('cross-package exports — CLI → SDK', () => {
           }
           continue;
         }
-        for (const [condition, file] of Object.entries(targets)) {
-          if (!existsSync(resolve(sdkRoot!, file))) {
-            missing.push(`${subpath}[${condition}] → ${file}`);
+        if (typeof targets === 'object' && targets !== null) {
+          for (const [condition, file] of Object.entries(targets as Record<string, unknown>)) {
+            if (typeof file !== 'string') continue;
+            if (!existsSync(resolve(sdkRoot!, file))) {
+              missing.push(`${subpath}[${condition}] → ${file}`);
+            }
           }
         }
       }

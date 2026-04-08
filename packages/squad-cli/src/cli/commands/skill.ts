@@ -42,6 +42,26 @@ export interface ApmManifest {
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
+/** Wrap a YAML scalar in single quotes if it contains special characters. */
+export function escapeYamlValue(val: string): string {
+  if (/[:#'"\n\r]/.test(val)) {
+    return `'${val.replace(/'/g, "''")}'`;
+  }
+  return val;
+}
+
+/** Type guard for objects with string `name` and `path` properties. */
+function isNamedPath(obj: unknown): obj is { name: string; path: string } {
+  return (
+    typeof obj === 'object' &&
+    obj !== null &&
+    'name' in obj &&
+    'path' in obj &&
+    typeof (obj as Record<string, unknown>).name === 'string' &&
+    typeof (obj as Record<string, unknown>).path === 'string'
+  );
+}
+
 /** Parse `---\nkey: value\n---` front-matter from a Markdown file. */
 function parseFrontMatter(content: string): Record<string, string> {
   const match = content.match(/^---\r?\n([\s\S]*?)\r?\n---/);
@@ -144,14 +164,14 @@ async function publish(dest: string, skillName?: string): Promise<void> {
     // Build the skill's own apm.yml inside its directory
     const apmSkillPath = join(skillsDir, skillName, 'apm.yml');
     const skillApm = [
-      `name: ${fm['name'] ?? skillName}`,
-      `version: ${fm['version'] ?? '1.0.0'}`,
-      fm['description'] ? `description: "${fm['description']}"` : null,
+      `name: ${escapeYamlValue(fm['name'] ?? skillName)}`,
+      `version: ${escapeYamlValue(fm['version'] ?? '1.0.0')}`,
+      fm['description'] ? `description: ${escapeYamlValue(fm['description'])}` : null,
       ``,
       `skills:`,
-      `  - name: ${fm['name'] ?? skillName}`,
+      `  - name: ${escapeYamlValue(fm['name'] ?? skillName)}`,
       `    path: skill.md`,
-      fm['description'] ? `    description: "${fm['description']}"` : null,
+      fm['description'] ? `    description: ${escapeYamlValue(fm['description'])}` : null,
     ]
       .filter(l => l !== null)
       .join('\n');
@@ -186,17 +206,17 @@ async function publish(dest: string, skillName?: string): Promise<void> {
     `# apm.yml — Agent Package Manager manifest`,
     `# See: https://github.com/microsoft/apm`,
     ``,
-    `name: ${existing.name ?? projectName}`,
+    `name: ${escapeYamlValue(existing.name ?? projectName)}`,
     `version: 1.0.0`,
     ``,
     `# Skills exported from ${relPrefix}/`,
     `skills:`,
     ...skills.map(s =>
       [
-        `  - name: ${s.name}`,
-        s.description ? `    description: "${s.description}"` : null,
+        `  - name: ${escapeYamlValue(s.name)}`,
+        s.description ? `    description: ${escapeYamlValue(s.description)}` : null,
         `    path: ${s.path}`,
-        s.version ? `    version: ${s.version}` : null,
+        s.version ? `    version: ${escapeYamlValue(s.version)}` : null,
       ]
         .filter(l => l !== null)
         .join('\n')
@@ -281,8 +301,9 @@ async function installFromUrl(url: string, skillsDir: string, relPrefix: string)
       fatal(`Failed to fetch ${url}: ${res.status} ${res.statusText}`);
     }
     content = await res.text();
-  } catch (err: any) {
-    fatal(`Failed to fetch ${url}: ${err.message}`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : String(err);
+    fatal(`Failed to fetch ${url}: ${message}`);
     return;
   }
 
@@ -341,7 +362,7 @@ async function installFromGitHub(
     }
     if (inSkills && line.match(/^[a-z]/i) && !line.startsWith('  ')) {
       // New top-level key — exit skills section
-      if (currentSkill.name && currentSkill.path) skillPaths.push(currentSkill as { name: string; path: string });
+      if (isNamedPath(currentSkill)) skillPaths.push(currentSkill);
       currentSkill = {};
       inSkills = false;
     }
@@ -349,13 +370,13 @@ async function installFromGitHub(
       const nameMatch = line.match(/^\s+- name:\s*(.+)$/);
       const pathMatch = line.match(/^\s+path:\s*(.+)$/);
       if (nameMatch) {
-        if (currentSkill.name && currentSkill.path) skillPaths.push(currentSkill as { name: string; path: string });
+        if (isNamedPath(currentSkill)) skillPaths.push(currentSkill);
         currentSkill = { name: nameMatch[1]!.trim() };
       }
       if (pathMatch) currentSkill.path = pathMatch[1]!.trim();
     }
   }
-  if (currentSkill.name && currentSkill.path) skillPaths.push(currentSkill as { name: string; path: string });
+  if (isNamedPath(currentSkill)) skillPaths.push(currentSkill);
 
   // Filter by skill name if specified
   const toInstall = skillFilter
@@ -395,8 +416,9 @@ async function installFromGitHub(
       success(`Installed skill '${skill.name}'`);
       info(`  ${DIM}Source: ${owner}/${repo}${skill.path}${RESET}`);
       installed++;
-    } catch (err: any) {
-      warn(`Failed to install '${skill.name}': ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      warn(`Failed to install '${skill.name}': ${message}`);
     }
   }
 

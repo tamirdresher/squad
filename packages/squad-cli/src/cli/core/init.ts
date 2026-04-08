@@ -13,6 +13,7 @@ import { fatal } from './errors.js';
 import { detectProjectType } from './project-type.js';
 import { getPackageVersion, stampVersion } from './version.js';
 import { initSquad as sdkInitSquad, cleanupOrphanInitPrompt, ensurePersonalSquadDir, resolvePersonalSquadDir, type InitOptions } from '@bradygaster/squad-sdk';
+import { escapeYamlValue } from '../commands/skill.js';
 
 const storage = new FSStorageProvider();
 
@@ -40,7 +41,7 @@ export function generateApmYml(dest: string, projectName: string): void {
     `# This file makes your Squad skills versioned, portable, and community-shareable.`,
     `# Run 'squad skill publish' to populate the skills section after adding skills.`,
     ``,
-    `name: ${projectName}`,
+    `name: ${escapeYamlValue(projectName)}`,
     `version: 1.0.0`,
     ``,
     `# Skills — add entries here or run 'squad skill publish' to auto-populate`,
@@ -292,9 +293,10 @@ export async function runInit(dest: string, options: RunInitOptions = {}): Promi
   let result;
   try {
     result = await sdkInitSquad(initOptions);
-  } catch (err: any) {
+  } catch (err: unknown) {
     process.off('SIGINT', sigintHandler);
-    fatal(`Failed to initialize squad: ${err.message}`);
+    const message = err instanceof Error ? err.message : String(err);
+    fatal(`Failed to initialize squad: ${message}`);
     return; // Unreachable but makes TS happy
   }
 
