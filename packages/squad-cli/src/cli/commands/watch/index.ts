@@ -11,14 +11,6 @@ import fs from 'node:fs';
 import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import { FSStorageProvider } from '@bradygaster/squad-sdk';
-
-const storage = new FSStorageProvider();
-const execFileAsync = promisify(execFile);
-
-// On Windows, az is a .cmd batch script — execFile needs shell:true to run it.
-const azCmd = 'az';
-const azExecOpts = process.platform === 'win32' ? { shell: true } : {};
-
 import { detectSquadDir } from '../../core/detect-squad-dir.js';
 import { fatal } from '../../core/errors.js';
 import { GREEN, RED, DIM, BOLD, RESET, YELLOW } from '../../core/output.js';
@@ -45,6 +37,13 @@ import type { WatchCapability, WatchContext, WatchPhase, CapabilityResult } from
 import { CapabilityRegistry } from './registry.js';
 import { createDefaultRegistry } from './capabilities/index.js';
 import { createVerboseLogger, type VerboseLogger } from './verbose.js';
+
+const storage = new FSStorageProvider();
+const execFileAsync = promisify(execFile);
+
+// On Windows, az is a .cmd batch script — execFile needs shell:true to run it.
+const azCmd = 'az';
+const azExecOpts = process.platform === 'win32' ? { shell: true } : {};
 
 // ── Re-exports for backward compatibility ────────────────────────
 
