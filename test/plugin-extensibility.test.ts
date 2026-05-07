@@ -387,6 +387,91 @@ describe('plugin behavioral influence on spawned squad agents', () => {
     });
   }
 
+  it('simulates scenario-specific spawned-agent planning deltas from enabled plugin context', async () => {
+    const scenarios: PluginSimulationScenario[] = [
+      {
+        sampleName: 'plugin-knowledge-graphify',
+        pluginId: 'graphify-knowledge',
+        triggerTask: 'Map the code and documentation relationships before changing the plugin runtime.',
+        expectedStrategy: 'graphify-knowledge-graph',
+        enabledEvidence: [
+          'knowledge graph',
+          'code relationship analysis',
+          'graphify-out/GRAPH_REPORT.md',
+        ],
+      },
+      {
+        sampleName: 'plugin-memory-mempalace',
+        pluginId: 'mempalace-memory',
+        triggerTask: 'Organize durable team context, agent learnings, decisions, open work, and repeated patterns.',
+        expectedStrategy: 'mempalace-spatial-memory',
+        enabledEvidence: [
+          'rooms',
+          'shelves',
+          'trails',
+          'landmarks',
+        ],
+      },
+      {
+        sampleName: 'plugin-knowledge-index-server',
+        pluginId: 'index-server-knowledge',
+        triggerTask: 'Find the governed team instructions and reusable knowledge standards for this task.',
+        expectedStrategy: 'index-server-governed-catalog',
+        enabledEvidence: [
+          'governed instruction',
+          'knowledge catalog',
+          'validated team instructions',
+        ],
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      const tmpDir = mkdtempSync(join(tmpdir(), `squad-plugin-simulation-${scenario.pluginId}-`));
+      tmpDirs.push(tmpDir);
+      mkdirSync(join(tmpDir, '.squad'), { recursive: true });
+      writeFile(join(tmpDir, '.squad', 'agents', 'data', 'charter.md'), [
+        '# Data Charter',
+        '',
+        '## Identity',
+        '',
+        '**Name:** Data',
+        '**Role:** Code Expert',
+        '**Expertise:** C#, Go, .NET',
+        '**Style:** Direct',
+        '',
+        '## Collaboration',
+        '',
+        'Use installed project context when provided.',
+        '',
+      ].join('\n'));
+
+      const sampleDir = join(process.cwd(), 'samples', scenario.sampleName);
+      await capturePluginCommand(tmpDir, ['install', sampleDir]);
+
+      const disabledPrompt = await spawnAndCaptureSystemPrompt(tmpDir);
+      const disabledPlan = simulateSpawnedAgentPlan(disabledPrompt, scenario.triggerTask);
+      expect(disabledPlan.strategy, `${scenario.pluginId} disabled strategy`).toBe('baseline-charter');
+      expect(disabledPlan.evidence).toEqual([]);
+      expect(disabledPlan.externalExecutionRequired).toBe(false);
+      expect(disabledPlan.externalExecutionProhibited).toBe(false);
+      for (const evidence of scenario.enabledEvidence) {
+        expect(disabledPlan.summary).not.toContain(evidence);
+      }
+
+      await capturePluginCommand(tmpDir, ['enable', scenario.pluginId]);
+      const enabledPrompt = await spawnAndCaptureSystemPrompt(tmpDir);
+      const enabledPlan = simulateSpawnedAgentPlan(enabledPrompt, scenario.triggerTask);
+
+      expect(enabledPlan.strategy, `${scenario.pluginId} enabled strategy`).toBe(scenario.expectedStrategy);
+      expect(enabledPlan.externalExecutionRequired).toBe(false);
+      expect(enabledPlan.externalExecutionProhibited).toBe(true);
+      expect(enabledPlan.summary).toContain('No live package install, external CLI execution, MCP startup, or live provider query is required.');
+      for (const evidence of scenario.enabledEvidence) {
+        expect(enabledPlan.summary).toContain(evidence);
+      }
+    }
+  });
+
   it('does not read outside .squad when installed plugin state is tampered', async () => {
     const tmpDir = mkdtempSync(join(tmpdir(), 'squad-plugin-behavior-tamper-'));
     tmpDirs.push(tmpDir);
@@ -450,4 +535,99 @@ async function spawnAndCaptureSystemPrompt(teamRoot: string): Promise<string> {
   }
 
   return capturedConfigs[0]?.systemMessage?.content ?? '';
+}
+
+type PluginSimulationStrategy =
+  | 'baseline-charter'
+  | 'graphify-knowledge-graph'
+  | 'mempalace-spatial-memory'
+  | 'index-server-governed-catalog';
+
+interface PluginSimulationScenario {
+  sampleName: string;
+  pluginId: string;
+  triggerTask: string;
+  expectedStrategy: Exclude<PluginSimulationStrategy, 'baseline-charter'>;
+  enabledEvidence: string[];
+}
+
+interface SimulatedSpawnedAgentPlan {
+  strategy: PluginSimulationStrategy;
+  summary: string;
+  evidence: string[];
+  externalExecutionRequired: boolean;
+  externalExecutionProhibited: boolean;
+}
+
+function simulateSpawnedAgentPlan(systemPrompt: string, task: string): SimulatedSpawnedAgentPlan {
+  const evidence: string[] = [];
+  const lowerPrompt = systemPrompt.toLowerCase();
+  const lowerTask = task.toLowerCase();
+  const externalExecutionProhibited = lowerPrompt.includes('squad has not installed upstream packages')
+    && lowerPrompt.includes('started mcp servers')
+    && lowerPrompt.includes('run external plugin commands');
+  const base = 'No live package install, external CLI execution, MCP startup, or live provider query is required.';
+
+  if (
+    lowerPrompt.includes('graphify knowledge graph integration')
+    && lowerPrompt.includes('graphify-out/graph_report.md')
+    && (lowerTask.includes('relationship') || lowerTask.includes('code'))
+  ) {
+    evidence.push('knowledge graph', 'code relationship analysis', 'graphify-out/GRAPH_REPORT.md');
+    return {
+      strategy: 'graphify-knowledge-graph',
+      summary: [
+        'Use Graphify knowledge graph guidance for code relationship analysis.',
+        'If existing static artifacts are present, inspect graphify-out/GRAPH_REPORT.md before direct source traversal.',
+        base,
+      ].join(' '),
+      evidence,
+      externalExecutionRequired: false,
+      externalExecutionProhibited,
+    };
+  }
+
+  if (
+    lowerPrompt.includes('mempalace memory provider')
+    && lowerPrompt.includes('memory as rooms, shelves, trails, and landmarks')
+    && (lowerTask.includes('durable') || lowerTask.includes('learnings') || lowerTask.includes('decisions'))
+  ) {
+    evidence.push('rooms', 'shelves', 'trails', 'landmarks');
+    return {
+      strategy: 'mempalace-spatial-memory',
+      summary: [
+        'Use MemPalace memory-palace concepts: rooms for project context, shelves for agent learnings, landmarks for decisions, and trails for open work.',
+        base,
+      ].join(' '),
+      evidence,
+      externalExecutionRequired: false,
+      externalExecutionProhibited,
+    };
+  }
+
+  if (
+    lowerPrompt.includes('index server knowledge integration')
+    && lowerPrompt.includes('governed instruction and knowledge catalog')
+    && (lowerTask.includes('instruction') || lowerTask.includes('knowledge') || lowerTask.includes('standards'))
+  ) {
+    evidence.push('governed instruction', 'knowledge catalog', 'validated team instructions');
+    return {
+      strategy: 'index-server-governed-catalog',
+      summary: [
+        'Treat Index Server guidance as a governed instruction and knowledge catalog for durable validated team instructions and reusable standards.',
+        base,
+      ].join(' '),
+      evidence,
+      externalExecutionRequired: false,
+      externalExecutionProhibited,
+    };
+  }
+
+  return {
+    strategy: 'baseline-charter',
+    summary: 'Use only the base Data charter and normal repository inspection.',
+    evidence,
+    externalExecutionRequired: false,
+    externalExecutionProhibited,
+  };
 }
