@@ -248,7 +248,7 @@ export function validatePluginManifest(manifest: SquadPluginManifest): PluginVal
   validateUpstreamMetadata(manifest.upstream, errors, warnings);
   validateMcpMetadata(manifest.mcp, errors, warnings);
   validateProviderContracts(manifest.providers, errors, warnings);
-  validateRuntimeManifest(manifest.runtime, errors);
+  validateRuntimeManifest(manifest.runtime, errors, warnings);
   if (!Array.isArray(manifest.files) || manifest.files.length === 0) {
     errors.push('files must include at least one static file deployment');
   } else {
@@ -832,6 +832,7 @@ function validateProviderContracts(
 function validateRuntimeManifest(
   runtime: PluginRuntimeManifest | undefined,
   errors: string[],
+  warnings: string[],
 ): void {
   if (runtime === undefined) {
     return;
@@ -853,10 +854,10 @@ function validateRuntimeManifest(
       errors.push(`${prefix} must be an object`);
       continue;
     }
-    if (!RUNTIME_CAPABILITY_TYPES.includes(capability.type)) {
+    if (!(RUNTIME_CAPABILITY_TYPES as readonly unknown[]).includes(capability.type)) {
       errors.push(`${prefix}.type must be one of: ${RUNTIME_CAPABILITY_TYPES.join(', ')}`);
     }
-    if (!APPROVED_RUNTIME_PROVIDERS.includes(capability.provider)) {
+    if (!(APPROVED_RUNTIME_PROVIDERS as readonly unknown[]).includes(capability.provider)) {
       errors.push(
         `${prefix}.provider "${capability.provider}" is not approved. Allowed providers: ${APPROVED_RUNTIME_PROVIDERS.join(', ')}`,
       );
@@ -900,6 +901,7 @@ function validateRuntimeManifest(
       }
     }
     validateOptionalString(`${prefix}.description`, capability.description, errors);
+    warnings.push(`${prefix} uses built-in artifact operations only; Squad will not execute plugin-supplied code`);
   }
 }
 
