@@ -111,6 +111,37 @@ export interface PluginMcpMetadata {
   reason?: string;
 }
 
+const PROVIDER_TYPES = [
+  'memory',
+  'knowledge',
+  'persistence',
+  'event',
+  'policy',
+] as const;
+const PROVIDER_MODES = ['read', 'write', 'read-write'] as const;
+const PROVIDER_PROTOCOLS = ['static-artifact', 'mcp'] as const;
+
+export type PluginProviderType = typeof PROVIDER_TYPES[number];
+export type PluginProviderMode = typeof PROVIDER_MODES[number];
+export type PluginProviderProtocol = typeof PROVIDER_PROTOCOLS[number];
+
+export interface PluginProviderMcpBinding {
+  server?: string;
+  tool?: string;
+  capability?: string;
+}
+
+export interface PluginProviderContract {
+  id: string;
+  type: PluginProviderType;
+  mode?: PluginProviderMode;
+  protocol?: PluginProviderProtocol;
+  description?: string;
+  artifact?: string;
+  mcp?: PluginProviderMcpBinding;
+  capabilities?: string[];
+}
+
 export interface SquadPluginManifest {
   id: string;
   name: string;
@@ -124,6 +155,7 @@ export interface SquadPluginManifest {
   repository?: PluginRepositoryMetadata;
   upstream?: PluginUpstreamMetadata;
   mcp?: PluginMcpMetadata;
+  providers?: PluginProviderContract[];
   files: PluginFileDeployment[];
 }
 
@@ -189,6 +221,7 @@ export function validatePluginManifest(manifest: SquadPluginManifest): PluginVal
   validateRepositoryMetadata(manifest.repository, errors);
   validateUpstreamMetadata(manifest.upstream, errors, warnings);
   validateMcpMetadata(manifest.mcp, errors, warnings);
+  validateProviderContracts(manifest.providers, errors, warnings);
   if (!Array.isArray(manifest.files) || manifest.files.length === 0) {
     errors.push('files must include at least one static file deployment');
   } else {
@@ -261,6 +294,7 @@ function normalizePluginManifest(raw: unknown): SquadPluginManifest {
       repository: normalizeRepositoryMetadata(raw.repository),
       upstream: normalizeUpstreamMetadata(raw.upstream),
       mcp: normalizeMcpMetadata(raw.mcp),
+      providers: normalizeProviderContracts(raw.providers),
       files: [],
     };
   }
@@ -278,6 +312,7 @@ function normalizePluginManifest(raw: unknown): SquadPluginManifest {
     repository: normalizeRepositoryMetadata(raw.repository),
     upstream: normalizeUpstreamMetadata(raw.upstream),
     mcp: normalizeMcpMetadata(raw.mcp),
+    providers: normalizeProviderContracts(raw.providers),
     files: filesRaw.map((item, index) => normalizePluginFile(item, index)),
   };
 }
@@ -565,6 +600,47 @@ function normalizeMcpMetadata(raw: unknown): PluginMcpMetadata | undefined {
   };
 }
 
+function normalizeProviderContracts(raw: unknown): PluginProviderContract[] | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.map((item) => normalizeProviderContract(item));
+}
+
+function normalizeProviderContract(raw: unknown): PluginProviderContract {
+  if (!isRecord(raw)) {
+    return { id: '', type: 'memory' };
+  }
+  const provider: PluginProviderContract = {
+    id: readString(raw, 'id'),
+    type: readString(raw, 'type') as PluginProviderType,
+    mode: readOptionalString(raw, 'mode') as PluginProviderMode | undefined,
+    protocol: readOptionalString(raw, 'protocol') as PluginProviderProtocol | undefined,
+    description: readOptionalString(raw, 'description'),
+    artifact: readOptionalString(raw, 'artifact'),
+    mcp: normalizeProviderMcpBinding(raw.mcp),
+    capabilities: readOptionalStringArray(raw, 'capabilities'),
+  };
+  return provider;
+}
+
+function normalizeProviderMcpBinding(raw: unknown): PluginProviderMcpBinding | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (!isRecord(raw)) {
+    return {};
+  }
+  return {
+    server: readOptionalString(raw, 'server'),
+    tool: readOptionalString(raw, 'tool'),
+    capability: readOptionalString(raw, 'capability'),
+  };
+}
+
 function validateRepositoryMetadata(
   repository: PluginRepositoryMetadata | undefined,
   errors: string[],
@@ -624,6 +700,63 @@ function validateMcpMetadata(
   validateOptionalString('mcp.reason', mcp.reason, errors);
   if (mcp.installCommand) {
     warnings.push('mcp.installCommand is metadata only; Squad will not execute it');
+  }
+}
+
+function validateProviderContracts(
+  providers: PluginProviderContract[] | undefined,
+  errors: string[],
+  warnings: string[],
+): void {
+  if (providers === undefined) {
+    return;
+  }
+  if (!Array.isArray(providers)) {
+    errors.push('providers must be an array when provided');
+    return;
+  }
+  for (const [index, provider] of providers.entries()) {
+    const prefix = `providers[${index}]`;
+    if (!isRecord(provider)) {
+      errors.push(`${prefix} must be an object`);
+      continue;
+    }
+    validateName(`${prefix}.id`, provider.id, errors);
+    if (!PROVIDER_TYPES.includes(provider.type)) {
+      errors.push(`${prefix}.type must be one of: ${PROVIDER_TYPES.join(', ')}`);
+    }
+    if (provider.mode !== undefined && !PROVIDER_MODES.includes(provider.mode)) {
+      errors.push(`${prefix}.mode must be one of: ${PROVIDER_MODES.join(', ')}`);
+    }
+    if (provider.protocol !== undefined && !PROVIDER_PROTOCOLS.includes(provider.protocol)) {
+      errors.push(`${prefix}.protocol must be one of: ${PROVIDER_PROTOCOLS.join(', ')}`);
+    }
+    validateOptionalString(`${prefix}.description`, provider.description, errors);
+    if (provider.artifact !== undefined) {
+      validateRelativePath(`${prefix}.artifact`, provider.artifact, errors);
+      validateStaticFileExtension(`${prefix}.artifact`, provider.artifact, errors);
+      const root = provider.artifact.split('/')[0];
+      if (!root || !ALLOWED_TARGET_ROOTS.has(root)) {
+        errors.push(`${prefix}.artifact must start with one of: ${[...ALLOWED_TARGET_ROOTS].join(', ')}`);
+      }
+    }
+    if (provider.capabilities !== undefined) {
+      if (!Array.isArray(provider.capabilities)) {
+        errors.push(`${prefix}.capabilities must be an array when provided`);
+      } else if (!provider.capabilities.every((capability) => typeof capability === 'string' && capability.trim().length > 0)) {
+        errors.push(`${prefix}.capabilities must contain only non-empty strings`);
+      }
+    }
+    if (provider.mcp !== undefined) {
+      if (!isRecord(provider.mcp)) {
+        errors.push(`${prefix}.mcp must be an object when provided`);
+      } else {
+        validateOptionalString(`${prefix}.mcp.server`, provider.mcp.server, errors);
+        validateOptionalString(`${prefix}.mcp.tool`, provider.mcp.tool, errors);
+        validateOptionalString(`${prefix}.mcp.capability`, provider.mcp.capability, errors);
+        warnings.push(`${prefix}.mcp is provider metadata only; Squad will not start MCP servers or call provider tools`);
+      }
+    }
   }
 }
 

@@ -7,6 +7,7 @@ import {
   type PluginMcpMetadata,
   type PluginComponentKind,
   type PluginFileDeployment,
+  type PluginProviderContract,
   type PluginRepositoryMetadata,
   type PluginUpstreamMetadata,
   type SquadPluginManifest,
@@ -34,6 +35,7 @@ export interface InstalledPlugin {
   repository?: PluginRepositoryMetadata;
   upstream?: PluginUpstreamMetadata;
   mcp?: PluginMcpMetadata;
+  providers?: PluginProviderContract[];
   files: InstalledPluginFile[];
 }
 
@@ -158,6 +160,10 @@ export async function buildActivePluginContext(
       plugin.mcp?.available ? `MCP metadata: ${plugin.mcp.server ?? plugin.mcp.entryPoint ?? 'available'} (metadata only)` : undefined,
     ].filter((line): line is string => typeof line === 'string').join('\n'));
 
+    if (plugin.providers && plugin.providers.length > 0) {
+      sections.push(formatProviderContracts(plugin.providers));
+    }
+
     for (const file of [...plugin.files].sort((a, b) => a.target.localeCompare(b.target))) {
       if (!isSafeInstalledPluginTarget(file.target)) {
         sections.push(`#### Installed artifact: .squad/${file.target}\nSkipped unsafe plugin state target.`);
@@ -215,6 +221,7 @@ export function upsertInstalledPlugin(
     repository: manifest.repository,
     upstream: manifest.upstream,
     mcp: manifest.mcp,
+    providers: manifest.providers,
     files: options.files,
   };
 
@@ -392,4 +399,30 @@ function isSafeInstalledPluginTarget(target: string): boolean {
     && normalized !== '..'
     && !normalized.startsWith('../')
     && !normalized.split('/').includes('..');
+}
+
+function formatProviderContracts(providers: PluginProviderContract[]): string {
+  const lines = [
+    '#### Provider contracts',
+    'Provider contracts are declarative metadata only. Squad does not start MCP servers, call provider tools, or query live provider backends during agent spawn.',
+  ];
+
+  for (const provider of [...providers].sort((a, b) => a.id.localeCompare(b.id))) {
+    const details = [
+      `type=${provider.type}`,
+      provider.mode ? `mode=${provider.mode}` : undefined,
+      provider.protocol ? `protocol=${provider.protocol}` : undefined,
+      provider.artifact ? `artifact=.squad/${provider.artifact}` : undefined,
+      provider.capabilities && provider.capabilities.length > 0 ? `capabilities=${provider.capabilities.join(', ')}` : undefined,
+      provider.mcp?.server ? `mcp.server=${provider.mcp.server}` : undefined,
+      provider.mcp?.tool ? `mcp.tool=${provider.mcp.tool}` : undefined,
+      provider.mcp?.capability ? `mcp.capability=${provider.mcp.capability}` : undefined,
+    ].filter((detail): detail is string => typeof detail === 'string');
+    lines.push(`- ${provider.id}: ${details.join('; ')}`);
+    if (provider.description) {
+      lines.push(`  ${provider.description}`);
+    }
+  }
+
+  return lines.join('\n');
 }

@@ -2,7 +2,7 @@
 
 > ⚠️ **Experimental** — Squad is alpha software. APIs, commands, and behavior may change between releases.
 
-Plugins package reusable Squad capabilities such as agents, knowledge packs, workflows, ceremonies, memory providers, routing guidance, decisions, hook metadata, and adapter metadata. The MVP is intentionally conservative: plugins are declarative static-file bundles. Squad records hook and adapter metadata, but it does not execute plugin-supplied code.
+Plugins package reusable Squad capabilities such as agents, knowledge packs, workflows, ceremonies, memory providers, routing guidance, decisions, hook metadata, adapter metadata, and typed provider contracts. The MVP is intentionally conservative: plugins are declarative static-file bundles. Squad records hook, adapter, and provider metadata, but it does not execute plugin-supplied code.
 
 Squad plugins do not replace Copilot plugins or Copilot skills. If a Squad plugin depends on Copilot-owned extensibility, declare that under `copilot.requires`; Squad records and surfaces the dependency, but it does not install it or run Copilot plugin commands.
 
@@ -94,6 +94,22 @@ The MVP manifest file is `plugin.manifest.json`. The validator also accepts lega
     "installCommand": "demo-tool-mcp",
     "reason": "Optional external MCP server users may configure separately."
   },
+  "providers": [
+    {
+      "id": "demo-memory",
+      "type": "memory",
+      "mode": "read-write",
+      "protocol": "mcp",
+      "description": "Declarative memory provider contract.",
+      "artifact": "memory/providers/demo-memory.md",
+      "mcp": {
+        "server": "demo-tool",
+        "tool": "query-memory",
+        "capability": "durable-memory"
+      },
+      "capabilities": ["durable-memory", "context-recall"]
+    }
+  ],
   "files": [
     {
       "source": "guidance.md",
@@ -129,13 +145,15 @@ Squad validates and records these dependencies so users know what Copilot plugin
 
 External integration metadata is also record-only. Fields such as `repository`, `upstream.installCommand`, and `mcp.installCommand` explain how a human can install external tools separately; Squad never runs those commands.
 
+Provider contracts are the typed extension seam for memory and knowledge systems. A contract declares the provider `type` (`memory`, `knowledge`, `persistence`, `event`, or `policy`), access `mode` (`read`, `write`, or `read-write`), `protocol` (`static-artifact` or `mcp`), optional static artifact binding, optional MCP binding metadata, and capability labels. These fields let spawned agents understand that a plugin represents a memory or knowledge provider without letting the plugin run code. During the MVP, provider contracts are prompt metadata only: Squad does not start MCP servers, call provider tools, query live memory backends, or install provider packages.
+
 ---
 
 ## Runtime behavior
 
-Enabled plugins affect spawned Squad agents through their installed static artifacts. When an agent session is spawned, Squad reads `.squad/plugins/runtime.json`, finds enabled active plugin roles, and injects the installed guidance/metadata files into the agent system context under a `Plugin Context` section.
+Enabled plugins affect spawned Squad agents through their installed static artifacts and provider contracts. When an agent session is spawned, Squad reads `.squad/plugins/runtime.json`, finds enabled active plugin roles, and injects the installed guidance/metadata files plus provider contract summaries into the agent system context under a `Plugin Context` section.
 
-This is still declarative-only behavior: Squad consumes copied Markdown/metadata from `.squad/`, but it does not install upstream packages, start MCP servers, execute plugin commands, or query external tools during plugin install or agent spawn.
+This is still declarative-only behavior: Squad consumes copied Markdown/metadata from `.squad/`, but it does not install upstream packages, start MCP servers, execute plugin commands, call provider tools, or query external tools during plugin install or agent spawn.
 
 Disabled plugins do not contribute prompt context, even if their files remain installed on disk.
 
@@ -147,9 +165,9 @@ The repository includes local sample plugins that exercise external integration 
 
 | Example | Purpose |
 | --- | --- |
-| `samples/plugin-knowledge-graphify` | Knowledge graph profile for the real `safishamsi/graphify` project and PyPI package `graphifyy`. It installs static guidance under `.squad/knowledge/graphify/`. |
-| `samples/plugin-knowledge-index-server` | Instruction and knowledge MCP profile for the real `jagilber-org/index-server` project and npm package `@jagilber-org/index-server`. It installs static guidance under `.squad/knowledge/index-server/`. |
-| `samples/plugin-memory-mempalace` | Memory-palace-style provider profile for the real `MemPalace/mempalace` CLI and optional `mempalace-mcp` server. It installs static guidance under `.squad/memory/providers/`. |
+| `samples/plugin-knowledge-graphify` | Knowledge graph profile for the real `safishamsi/graphify` project and PyPI package `graphifyy`. It declares a `knowledge` provider contract bound to a static artifact under `.squad/knowledge/graphify/`. |
+| `samples/plugin-knowledge-index-server` | Instruction and knowledge MCP profile for the real `jagilber-org/index-server` project and npm package `@jagilber-org/index-server`. It declares a metadata-only `knowledge` provider contract for the Index Server MCP catalog. |
+| `samples/plugin-memory-mempalace` | Memory-palace-style provider profile for the real `MemPalace/mempalace` CLI and optional `mempalace-mcp` server. It declares a metadata-only `memory` provider contract for spatial memory. |
 
 Graphify's Copilot support is a separately installed skill/integration, not a Squad memory provider or a Squad-managed Copilot plugin. Index Server is an MCP-governed instruction/knowledge catalog, not a memory provider, although it is adjacent because agents can persist validated knowledge across sessions and repositories. MemPalace is a real memory system, but Squad still does not install its package, start MCP, or configure assistant hooks.
 
@@ -177,6 +195,7 @@ The MVP security gate is strict:
 - No Copilot plugin commands are run by Squad; `copilot.requires` is dependency metadata only.
 - No external package install hints or MCP setup hints are run by Squad; `repository`, `upstream`, and `mcp` fields are metadata only.
 - Hook and adapter declarations are metadata only.
+- Provider contracts are metadata only; they do not authorize live provider calls.
 - Plugin file writes are limited to declared relative targets under `.squad/`.
 - Path traversal, absolute paths, symlinks, and script/executable extensions are rejected.
 

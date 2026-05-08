@@ -223,6 +223,7 @@ async function runPluginLifecycle(dest: string, squadDir: string, args: string[]
     }
     success(`Plugin manifest is valid: ${bold(manifest.id)}@${manifest.version}`);
     printExternalMetadata(manifest);
+    printProviderContracts(manifest);
     printCopilotDependencies(manifest.copilot);
     if (action === 'dry-run') {
       console.log(`\n${BOLD}Dry run deployment plan:${RESET}\n`);
@@ -257,6 +258,7 @@ async function runPluginLifecycle(dest: string, squadDir: string, args: string[]
     if (dryRun) {
       success(`Plugin manifest is valid: ${bold(manifest.id)}@${manifest.version}`);
       printExternalMetadata(manifest);
+      printProviderContracts(manifest);
       printCopilotDependencies(manifest.copilot);
       console.log(`\n${BOLD}Dry run deployment plan:${RESET}\n`);
       for (const file of plan.files) {
@@ -297,6 +299,7 @@ async function runPluginLifecycle(dest: string, squadDir: string, args: string[]
     }
     success(`Installed plugin ${bold(manifest.id)}@${manifest.version} (disabled)`);
     printExternalMetadata(manifest);
+    printProviderContracts(manifest);
     printCopilotDependencies(manifest.copilot);
     return;
   }
@@ -326,7 +329,8 @@ async function runPluginLifecycle(dest: string, squadDir: string, args: string[]
         : '';
       const upstream = plugin.upstream?.package ? ` upstream=${plugin.upstream.package}` : '';
       const mcp = plugin.mcp?.available ? ' mcp=available' : '';
-      console.log(`  ${BOLD}${plugin.id}${RESET}@${plugin.version}  ${DIM}${status}${RESET}${roles}${copilotDependencies}${upstream}${mcp}`);
+      const providers = plugin.providers?.length ? ` providers=${plugin.providers.length}` : '';
+      console.log(`  ${BOLD}${plugin.id}${RESET}@${plugin.version}  ${DIM}${status}${RESET}${roles}${copilotDependencies}${upstream}${mcp}${providers}`);
     }
     console.log();
     return;
@@ -565,6 +569,29 @@ function printExternalMetadata(manifest: ReturnType<typeof parsePluginManifestCo
     }
   }
   console.log(`${DIM}Squad records this metadata but does not install packages, start MCP servers, or run external commands.${RESET}`);
+}
+
+function printProviderContracts(manifest: ReturnType<typeof parsePluginManifestContent>): void {
+  const providers = manifest.providers ?? [];
+  if (providers.length === 0) {
+    return;
+  }
+
+  console.log(`\n${BOLD}Provider contracts:${RESET}`);
+  for (const provider of providers) {
+    const mode = provider.mode ? ` mode=${provider.mode}` : '';
+    const protocol = provider.protocol ? ` protocol=${provider.protocol}` : '';
+    const artifact = provider.artifact ? ` artifact=.squad/${provider.artifact}` : '';
+    const capabilities = provider.capabilities?.length ? ` capabilities=${provider.capabilities.join(',')}` : '';
+    console.log(`  - ${provider.id}: type=${provider.type}${mode}${protocol}${artifact}${capabilities}`);
+    if (provider.mcp) {
+      const server = provider.mcp.server ? ` server=${provider.mcp.server}` : '';
+      const tool = provider.mcp.tool ? ` tool=${provider.mcp.tool}` : '';
+      const capability = provider.mcp.capability ? ` capability=${provider.mcp.capability}` : '';
+      console.log(`    MCP binding:${server}${tool}${capability} ${DIM}(metadata only)${RESET}`);
+    }
+  }
+  console.log(`${DIM}Squad records provider contracts but does not start MCP servers, call provider tools, or query live provider backends.${RESET}`);
 }
 
 function bold(value: string): string {

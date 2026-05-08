@@ -53,6 +53,16 @@ describe('plugin manifest parser and validator', () => {
           },
         ],
       },
+      providers: [
+        {
+          id: 'demo-memory',
+          type: 'memory',
+          mode: 'read-write',
+          protocol: 'static-artifact',
+          artifact: 'knowledge/demo-plugin/guidance.md',
+          capabilities: ['durable-context'],
+        },
+      ],
       files: [
         { source: 'guidance.md', target: 'knowledge/demo-plugin/guidance.md', type: 'knowledge' },
       ],
@@ -64,6 +74,14 @@ describe('plugin manifest parser and validator', () => {
     expect(manifest.copilot?.requires?.[0]).toMatchObject({
       id: 'github/copilot-plugin-example',
       optional: true,
+    });
+    expect(manifest.providers?.[0]).toMatchObject({
+      id: 'demo-memory',
+      type: 'memory',
+      mode: 'read-write',
+      protocol: 'static-artifact',
+      artifact: 'knowledge/demo-plugin/guidance.md',
+      capabilities: ['durable-context'],
     });
 
     const plan = createPluginInstallPlan(manifest, { dryRun: true });
@@ -176,6 +194,73 @@ describe('plugin manifest parser and validator', () => {
     expect(validation.warnings.join('\n')).toContain('mcp.installCommand is metadata only');
   });
 
+  it('validates provider contracts as declarative metadata only', () => {
+    const manifest = parsePluginManifestContent(JSON.stringify({
+      id: 'provider-tool',
+      name: 'Provider Tool',
+      version: '1.0.0',
+      components: {
+        memory: { provider: 'provider-tool' },
+      },
+      providers: [
+        {
+          id: 'provider-tool',
+          type: 'memory',
+          mode: 'read-write',
+          protocol: 'mcp',
+          artifact: 'memory/providers/provider-tool.md',
+          mcp: {
+            server: 'provider-tool',
+            tool: 'query-memory',
+            capability: 'durable-memory',
+          },
+          capabilities: ['durable-memory', 'context-recall'],
+        },
+      ],
+      files: [
+        { source: 'provider.md', target: 'memory/providers/provider-tool.md', type: 'doc' },
+      ],
+    }), 'plugin.manifest.json');
+
+    const validation = validatePluginManifest(manifest);
+
+    expect(validation.valid, validation.errors.join(', ')).toBe(true);
+    expect(validation.warnings.join('\n')).toContain('providers[0].mcp is provider metadata only');
+  });
+
+  it('rejects unsafe provider contracts', () => {
+    const manifest = parsePluginManifestContent(JSON.stringify({
+      id: 'bad-provider',
+      name: 'Bad Provider',
+      version: '1.0.0',
+      components: {
+        memory: { provider: 'bad-provider' },
+      },
+      providers: [
+        {
+          id: 'bad-provider',
+          type: 'memory-exec',
+          mode: 'admin',
+          protocol: 'stdio',
+          artifact: '../secret.md',
+          capabilities: [''],
+        },
+      ],
+      files: [
+        { source: 'provider.md', target: 'memory/providers/provider.md', type: 'doc' },
+      ],
+    }), 'plugin.manifest.json');
+
+    const validation = validatePluginManifest(manifest);
+
+    expect(validation.valid).toBe(false);
+    expect(validation.errors.join('\n')).toContain('providers[0].type must be one of');
+    expect(validation.errors.join('\n')).toContain('providers[0].mode must be one of');
+    expect(validation.errors.join('\n')).toContain('providers[0].protocol must be one of');
+    expect(validation.errors.join('\n')).toContain('providers[0].artifact must be a relative path');
+    expect(validation.errors.join('\n')).toContain('providers[0].capabilities must contain only non-empty strings');
+  });
+
   it('rejects non-https external metadata URLs', () => {
     const manifest = parsePluginManifestContent(JSON.stringify({
       id: 'external-tool',
@@ -226,6 +311,16 @@ describe('squad plugin lifecycle CLI', () => {
       files: [
         { source: 'guidance.md', target: 'knowledge/demo-plugin/guidance.md', type: 'knowledge' },
       ],
+      providers: [
+        {
+          id: 'demo-memory',
+          type: 'memory',
+          mode: 'read-write',
+          protocol: 'static-artifact',
+          artifact: 'knowledge/demo-plugin/guidance.md',
+          capabilities: ['durable-context'],
+        },
+      ],
     }, null, 2));
     writeFile(join(pluginDir, 'guidance.md'), '# Demo Plugin\n\nStatic knowledge content.\n');
   });
@@ -249,7 +344,13 @@ describe('squad plugin lifecycle CLI', () => {
       .toBe('# Demo Plugin\n\nStatic knowledge content.\n');
 
     const installed = JSON.parse(readFileSync(join(tmpDir, '.squad', 'plugins', 'installed.json'), 'utf8')) as {
-      plugins: Array<{ id: string; enabled: boolean; roles: string[]; copilot?: { requires?: Array<{ id: string }> } }>;
+      plugins: Array<{
+        id: string;
+        enabled: boolean;
+        roles: string[];
+        copilot?: { requires?: Array<{ id: string }> };
+        providers?: Array<{ id: string; type: string; protocol?: string }>;
+      }>;
     };
     expect(installed.plugins[0]).toMatchObject({
       id: 'demo-plugin',
@@ -260,6 +361,9 @@ describe('squad plugin lifecycle CLI', () => {
           { id: 'github/copilot-plugin-example' },
         ],
       },
+      providers: [
+        { id: 'demo-memory', type: 'memory', protocol: 'static-artifact' },
+      ],
     });
 
     await capturePluginCommand(tmpDir, ['verify']);
@@ -318,6 +422,7 @@ describe('plugin behavioral influence on spawned squad agents', () => {
       installedFile: ['knowledge', 'graphify', 'graphify-integration.md'],
       expectedGuidance: 'Graphify is the `safishamsi/graphify` knowledge graph tool',
       expectedPackage: 'Upstream package: graphifyy (pypi)',
+      expectedProvider: 'graphify: type=knowledge; mode=read; protocol=static-artifact; artifact=.squad/knowledge/graphify/graphify-integration.md; capabilities=knowledge-graph, code-relationship-analysis, static-report-guidance',
     },
     {
       name: 'plugin-memory-mempalace',
@@ -325,6 +430,7 @@ describe('plugin behavioral influence on spawned squad agents', () => {
       installedFile: ['memory', 'providers', 'mempalace-provider.md'],
       expectedGuidance: 'MemPalace is an example memory provider profile',
       expectedPackage: 'Upstream package: mempalace (pypi)',
+      expectedProvider: 'mempalace: type=memory; mode=read-write; protocol=mcp; artifact=.squad/memory/providers/mempalace-provider.md; capabilities=spatial-memory, durable-context, agent-learning-trails; mcp.server=mempalace; mcp.tool=memory-palace; mcp.capability=spatial-memory',
     },
     {
       name: 'plugin-knowledge-index-server',
@@ -332,6 +438,7 @@ describe('plugin behavioral influence on spawned squad agents', () => {
       installedFile: ['knowledge', 'index-server', 'index-server-integration.md'],
       expectedGuidance: 'Index Server is the `jagilber-org/index-server` MCP instruction indexing server',
       expectedPackage: 'Upstream package: @jagilber-org/index-server (npm)',
+      expectedProvider: 'index-server: type=knowledge; mode=read; protocol=mcp; artifact=.squad/knowledge/index-server/index-server-integration.md; capabilities=governed-instructions, knowledge-catalog, team-standards; mcp.server=index-server; mcp.tool=query-index; mcp.capability=governed-knowledge-catalog',
     },
   ];
 
@@ -380,10 +487,12 @@ describe('plugin behavioral influence on spawned squad agents', () => {
       expect(enabledPrompt).toContain('## Plugin Context');
       expect(enabledPrompt).toContain('## Active Squad Plugins');
       expect(enabledPrompt).toContain('Squad has not installed upstream packages, started MCP servers, or run external plugin commands.');
+      expect(enabledPrompt).toContain('Provider contracts are declarative metadata only.');
       expect(enabledPrompt).toContain(`### ${sample.id.includes('graphify') ? 'Graphify Knowledge Graph' : sample.id.includes('mempalace') ? 'MemPalace Memory' : 'Index Server Knowledge'} (${sample.id}@1.0.0)`);
       expect(enabledPrompt).toContain(`#### Installed artifact: .squad/${sample.installedFile.join('/')}`);
       expect(enabledPrompt).toContain(sample.expectedGuidance);
       expect(enabledPrompt).toContain(sample.expectedPackage);
+      expect(enabledPrompt).toContain(sample.expectedProvider);
     });
   }
 

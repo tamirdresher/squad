@@ -6,7 +6,7 @@ The plugin MVP is designed for reusable Squad knowledge and configuration, not e
 
 Copilot plugin dependencies can be declared with `copilot.requires`. They are metadata only: Squad records and displays them so users know which Copilot plugins to install through Copilot's own lifecycle.
 
-External packages, repositories, and MCP servers can be described with `repository`, `upstream`, and `mcp`. They are also metadata only: Squad may display install hints, but it must not run package managers, start MCP servers, configure assistant clients, or install assistant hooks.
+External packages, repositories, and MCP servers can be described with `repository`, `upstream`, and `mcp`. Typed provider contracts can be described with `providers`. They are also metadata only: Squad may display install hints and inject provider summaries into spawned-agent context, but it must not run package managers, start MCP servers, configure assistant clients, call provider tools, query live provider backends, or install assistant hooks.
 
 ---
 
@@ -23,6 +23,7 @@ External packages, repositories, and MCP servers can be described with `reposito
 | Hidden capabilities are inferred from arbitrary strings | Runtime roles are derived only from declared component keys. |
 | Squad plugin install silently installs Copilot plugins | `copilot.requires` is validated as dependency metadata only. Squad does not call Copilot plugin commands. |
 | Squad plugin install silently installs external packages or starts MCP servers | `repository`, `upstream`, and `mcp` are validated as metadata only. Squad does not run install hints or MCP setup hints. |
+| Provider contract triggers live memory or knowledge backend calls | `providers` is validated as declarative metadata only. Squad surfaces provider type, protocol, artifact, capabilities, and MCP binding hints without starting servers or calling tools. |
 | Network egress from plugin-supplied content | MVP plugin lifecycle commands do not execute plugin content, so plugin content cannot initiate network calls. |
 
 ---
@@ -38,6 +39,7 @@ The following must remain unreachable from `validate`, `dry-run`, `install`, `en
 5. Treating arbitrary capability strings as trusted runtime roles.
 6. Running Copilot plugin commands from the Squad plugin lifecycle.
 7. Running upstream package install hints or MCP setup hints from the Squad plugin lifecycle.
+8. Calling live provider tools or querying external provider backends from plugin metadata.
 
 ---
 

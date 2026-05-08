@@ -27,6 +27,21 @@
     "available": false,
     "reason": "Graphify is represented here as a CLI and Copilot skill integration, not a Squad-managed MCP memory provider."
   },
+  "providers": [
+    {
+      "id": "graphify",
+      "type": "knowledge",
+      "mode": "read",
+      "protocol": "static-artifact",
+      "description": "Knowledge graph provider contract for code relationship guidance already materialized as static artifacts.",
+      "artifact": "knowledge/graphify/graphify-integration.md",
+      "capabilities": [
+        "knowledge-graph",
+        "code-relationship-analysis",
+        "static-report-guidance"
+      ]
+    }
+  ],
   "files": [
     {
       "source": "knowledge/graphify-integration.md",

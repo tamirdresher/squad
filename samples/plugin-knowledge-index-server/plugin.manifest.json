@@ -33,6 +33,26 @@
     "installCommand": "npx -y @jagilber-org/index-server@latest --dashboard",
     "reason": "Index Server provides an MCP-governed instruction and knowledge catalog. Squad records the metadata but does not start it."
   },
+  "providers": [
+    {
+      "id": "index-server",
+      "type": "knowledge",
+      "mode": "read",
+      "protocol": "mcp",
+      "description": "Governed instruction and knowledge catalog provider contract.",
+      "artifact": "knowledge/index-server/index-server-integration.md",
+      "mcp": {
+        "server": "index-server",
+        "tool": "query-index",
+        "capability": "governed-knowledge-catalog"
+      },
+      "capabilities": [
+        "governed-instructions",
+        "knowledge-catalog",
+        "team-standards"
+      ]
+    }
+  ],
   "files": [
     {
       "source": "knowledge/index-server-integration.md",
