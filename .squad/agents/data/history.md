@@ -76,3 +76,11 @@ Unified decision in `.squad/decisions.md` combining Data's technical evidence + 
 
 **Key Refinement:** Event-driven seam is already architecturally sound from Feb planning. Periodic MVP accelerates first validation without waiting for ADC managed identity token acceptance. Same ADC API surface (resumeSandbox + execShell + stopSandbox) works for both trigger types; adapter is the only difference.
 
+## 2026-05-17T09:05:10.003+05:30 — ADC Squad Runner Demo SDK Integration Complete
+
+**Runtime Contracts Added:** Squad SDK integration contracts documented and implemented in demo repo at commit `a209b90`.
+
+**Build System Fixed:** TypeScript build validated for runner and work-items-api with strict type checking and ESM compliance. Documentation (`docs/reliability.md`) covers MVP reliability invariants.
+
+**P0 Blocking Issue Identified:** `copilot` task executor stub in `LocalPollingProvider` must be implemented before MVP validation can proceed with live issue processing.
+

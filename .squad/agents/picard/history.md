@@ -20,3 +20,11 @@ Seed sources:
 - Tamir wants this Squad to focus on new Squad features, agent frameworks, Durable Tasks/DTD, Azure distributed systems, and Clawpilot/m.
 - Periodic ephemeral ADC sandbox is optimal MVP for event-driven execution: operationally simple (no new Azure infra), naturally resilient to duplicate events, fully reversible to webhook adapter once managed identity token acceptance is verified. Architect for forward-compat: same ADC API calls (resumeSandbox + execShell + stopSandbox) work for both cron-triggered (MVP) and event-triggered (future) execution patterns.
 
+## 2026-05-17T09:05:10.003+05:30 — ADC Squad Runner Demo PRD/Design/Implementation Complete
+
+**Deliverable Status:** Full PRD, design document, and implementation completed across agent team.
+
+**Consolidation:** Picard drafted comprehensive PRD and design documentation; implementation specs, Squad runtime integration contracts, and reliability invariants finalized with agent consensus. Email sent to tamirdresher@microsoft.com with complete package.
+
+**Next Steps:** Live ADC auth validation, secrets provisioning, Squad CLI installation in sandbox, then validation run with periodic ephemeral model (GitHub Actions cron → `squad schedule run daily-triage --json`).
+

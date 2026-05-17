@@ -72,6 +72,19 @@ Pattern works identically for GitHub webhook → `workflow_dispatch`, Event Grid
 - Sandbox resume is sub-second; periodic interval (15–60 min default) is operationally feasible without cold-start concerns
 - Cost model: MVP is bounded (sandbox only runs during scan windows, ~5–15 min per cycle); event-driven doesn't materially improve cost once periodic model validated
 
+## 2026-05-17T09:05:10.003+05:30 — ADC Squad Runner Demo Repository Delivery
+
+**Private Repo Created:** `tamirdresher_microsoft/adc-squad-runner-demo` at `C:\Users\tamirdresher\source\repos\adc-squad-runner-demo` (remote: https://github.com/tamirdresher_microsoft/adc-squad-runner-demo).
+
+**Implementation Commits:**
+- `f69aaab` — Initial implementation with full scaffold
+- `077dc9e` — Docs update
+- `a209b90` — TypeScript build fix, runtime integration contracts, `runner/adc-api.d.ts`, `docs/reliability.md`
+
+**Build Validation:** Runner and work-items-api validated and passing.
+
+**Deployment Path Validated:** GitHub Actions OIDC with `az login --federated-token` is confirmed as lowest-risk auth surface for ADC sandbox resumption in MVP phase.
+
 **Deferred Platform Concerns (Non-MVP):**
 - Event Grid / Service Bus integration (infrastructure layer concern, not Squad core)
 - Azure Function webhook deployment (deferred until managed identity token acceptance verified)
