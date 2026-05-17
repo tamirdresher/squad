@@ -146,42 +146,93 @@
 
 **Files changed in target repo:** `.gitignore`, `WorkflowExample.cs`, `Squad.AgentFramework.Demo.AppHost/AppHost.cs`.
 
-### 2026-05-14T11:29:53.602+05:30: ADC-Squad Event-Driven Execution Model
+### 2026-05-17T08:40:44.473+05:30: ADC-Squad Execution Model — Periodic Ephemeral MVP with Event-Driven Seam
 
-**By:** Data, Geordi, Seven, Coordinator, with B'Elanna + Nick Greenfield input
+**By:** Picard, Geordi, B'Elanna, Data, Worf (consolidated)
 
-**What:** Adopt event-driven execution model for Squad on Azure Developer CLI / Azure Container Apps using `squad schedule fire` CLI entry point with ADC Redis stream adapter.
+**What:** Design and sequence the execution model for running Squad on ADC sandboxes, with short-term MVP (periodic ephemeral scan) and long-term event-driven extensibility.
 
-**Evidence:**
-- ADC implements `SandboxEventPublisherService` (Redis streams + XADD/XREADGROUP) for sandbox lifecycle events
-- Squad SDK already declares `EventTrigger` in scheduler.ts but isDue() returns false (externally fired)
-- No native Squad webhook/Event Grid/Service Bus/Azure Functions trigger presently wired to sandbox lifecycle
-- Proposed solution adds small core seam (`fireEventTrigger`/`squad schedule fire`) plus ADC-specific adapter
+**MVP Decision: Periodic Ephemeral Sandbox (Model B)**
 
-**Decision:**
-1. **Squad core:** Add `fireEventTrigger(manifest, state, eventName, payload)` to scheduler.ts; add `squad schedule fire <eventName> [--payload <json>]` CLI command
-   - Finds EventTrigger entries matching eventName, executes associated tasks
-   - No ADC/Azure/Redis references in core; platform-neutral
-   - ExternalSquadEvent interface: flat, source-agnostic envelope
-
-2. **ADC adapter (separate):** Minimal Node.js script (~80 lines) subscribes to ADC's Redis stream (`GlobalConstants.SandboxEventStreamKey`), wraps `SandboxStoppedEventData` into ExternalSquadEvent, calls `squad schedule fire sandbox:stopped --payload '{"sandboxId": "..."}'`
-
-3. **First prototype target:** Validate end-to-end Redis event → adapter → Squad coordinator invoked once, sandbox exits cleanly
+Trigger Squad to run every N minutes (default 15–60 min) via GitHub Actions cron or Azure Timer Function. The sandbox:
+1. Resumes (or creates) a named ADC sandbox via `adc-api.js`
+2. Runs `squad schedule run <schedule-id>` to poll GitHub for issues, process them, and persist state
+3. Suspends the sandbox on completion
+4. Cost is bounded: sandbox only runs during scan windows (~5–15 min per cycle)
 
 **Rationale:**
-- Aligns with platform design (event-triggered, ephemeral compute)
-- Eliminates wasteful polling during idle periods  
-- Small, reversible, validates full path without DTS/ACA prerequisites
-- Defers complexity (DTS wrapping, Event Grid/Service Bus, Managed Identity) to later when pattern proven
+- **Lowest operational surface.** No Azure Function to deploy/maintain, no webhook secret to rotate, no managed identity token verification blockers.
+- **Fits ADC's ephemeral design.** Suspend/resume is sub-second. Scales naturally as workload grows without long-lived cost.
+- **Naturally resilient to duplicate events.** The model ignores GitHub event delivery entirely; duplicate webhooks have zero effect. Ground truth is re-derived from GitHub on each scan.
+- **Maps to existing Squad primitives.** `CronTrigger` and `IntervalTrigger` in scheduler.ts are already in place. GitHub Actions workflow or Azure Timer Function are natural providers.
+- **Fully reversible to event-driven.** The same `adc-api.js` calls (`resumeSandbox` + `execShell` + `stopSandbox`) are event-triggered instead of time-triggered with minimal adapter code (~80 lines).
 
-**Next Actions:**
-1. Implement `fireEventTrigger()` in Squad SDK
-2. Implement `squad schedule fire` CLI command (~50 lines)
-3. Write ADC adapter script (~80 lines)
-4. Add schedule.json entry for sandbox-stopped-handler
-5. Validate end-to-end
+**Event-Driven Seam (Future, Non-Blocking):**
 
-**Risks:** Auth/Managed Identity handling, state persistence alignment, event schema extensibility — addressed in integration layer, not core.
+Once the periodic model proves reliable and event-driven latency becomes a requirement, add:
+1. **Squad Core:** `fireEventTrigger(manifest, state, eventName)` in scheduler.ts (~20 lines) + `squad schedule fire <eventName> [--payload <json>]` CLI command (~60 lines). Platform-neutral, no ADC/Redis references in core.
+2. **ADC Adapter (Separate):** Minimal script (~80 lines) subscribes to ADC Redis stream, wraps `SandboxStoppedEventData`, calls `squad schedule fire sandbox:stopped --payload <json>`.
+3. **Webhook Adapter (Azure Function, Future):** GitHub webhook → Azure Function → `squad schedule fire github:issue-opened --payload <json>` with managed identity and rate limiting.
+
+**Reliability Invariants (All Models):**
+
+| # | Invariant | Mechanism |
+|---|-----------|-----------|
+| I-1 | **Claim before act** | Apply `squad:processing` GitHub label before any work; verify label applied before proceeding |
+| I-2 | **Terminal state is permanent** | `squad:done` label written before sandbox exits; stale-lease sweep re-queues if `done` is never set |
+| I-3 | **Stale lease TTL enforced** | Every scan checks for `squad:processing` > 30 min old; unconditionally clear and re-queue |
+| I-4 | **Duplicate events have no effect** | Model B ignores event delivery; re-derives ground truth from GitHub per scan |
+| I-5 | **Ground truth from GitHub only** | No in-memory/in-sandbox state trusted across invocations; fresh API query on startup |
+| I-6 | **Cancellation respected** | Before posting writes, re-check issue is still open and labeled; exit cleanly if cancelled |
+| I-7 | **Idempotent guards on writes** | Before comment/PR/label, pre-read to detect if already applied; no duplicate writes |
+| I-8 | **Concurrency cap per scan** | Claim max N issues per cycle (e.g., N=3) to bound compute and prevent backlog floods |
+
+**Implementation Sequencing (MVP Phase):**
+
+1. **Immediate (Squad SDK):**
+   - Implement real `copilot` task type execution in `LocalPollingProvider` (~20 lines). **Critical gap:** without this, `squad schedule run` runs but agent is never invoked in ADC.
+   - Add `--json` flag to `schedule run` for structured output (P1).
+   - Export helpers for reliability invariants: `applyLeaseLabel()`, `checkLeaseExpiry()`, etc. (P1).
+
+2. **MVP Adapter (ADC + GitHub Actions, ~150 lines total):**
+   - GitHub Actions workflow (`.github/workflows/squad-adc-loop.yml`): cron trigger → `az login` → `adc-api.js` → `resumeSandbox` → `squad schedule run daily-triage` → `stopSandbox`.
+   - State file (`.squad/.schedule-state.json`) survives suspend/resume; adapter wraps state commits in `git add / git commit / git push`.
+   - Manifest entry in `schedule.json`: `daily-triage` with `CronTrigger` interval (e.g., every 15 min) or `IntervalTrigger`.
+
+3. **Security Guardrails (Pre-MVP):**
+   - Apply Worf's mandatory guardrails: G1 (no secret interpolation), G2 (idempotency), G3 (Key Vault), G4 (sandbox TTL), G5 (execution timeout).
+   - Issue payloads written to files, never interpolated into commands.
+   - Auto-suspend policy on every sandbox: `enabled: true, idleTimeout: 30 min`.
+
+4. **Future (Non-MVP):**
+   - Event-driven seam (`fireEventTrigger` + CLI) once periodic model is proven.
+   - Azure Function webhook adapter when sub-minute latency is required (blocked by managed identity token acceptance by ADC API — must verify first).
+   - Durable Functions orchestration when workflow becomes multi-step (Plan → Implement → Review → PR).
+
+**What NOT in MVP:**
+- Event Grid / Service Bus integration (blocked on ADC managed identity token acceptance verification).
+- Durable Task Scheduler (deferred until multi-step workflow needed).
+- Long-lived continuous loop sandbox (rejected by Worf: unbounded cost, no crash recovery, single point of failure).
+- Webhook adapter (deferred to after MVP validation).
+
+**Risks & Mitigations:**
+
+| Risk | Mitigation |
+|------|-----------|
+| `copilot` task type remains stubbed in production ADC | **P0:** Implement real execution path before any ADC validation run |
+| Payload env var leaked to subprocesses | Document `SQUAD_EVENT_PAYLOAD` scope; clear after task or pass via temp file |
+| Concurrent `fire` invocations cause `.schedule-state.json` corruption | ADC/Function must not double-fire same event; GitHub labels provide external idempotency gate |
+| Command injection via issue payload | Apply Worf's G1: issue payloads only written to files, never interpolated into shell |
+| Unbounded agent runtime | Apply Worf's G5: hard timeout on `execShell` (30 min suggested); ADC auto-suspend as safety net |
+| Stale leases accumulate if scan crashes | Lease TTL check (30 min) on every scan startup; unconditional clear |
+
+**Stakeholders & Approvals:**
+
+- ✅ **Picard (Architecture):** Endorses periodic ephemeral MVP; event-driven seam is reversible.
+- ✅ **Geordi (ADC/Azure):** Confirms periodic model uses only customer-accessible ADC surfaces (`adc-api.js`, Portal, `az login`).
+- ✅ **B'Elanna (Reliability):** Eight reliability invariants are non-negotiable; GitHub labels as state store is sufficient MVP.
+- ✅ **Data (Squad SDK):** Owns implementation of `fireEventTrigger()` + CLI + real `copilot` task execution.
+- ✅ **Worf (Security):** Model 1 (webhook, future) and Model 2 (periodic, MVP) conditionally approved with mandatory guardrails G1–G5; Model 3 (long-lived) rejected.
 
 ## Governance
 

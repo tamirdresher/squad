@@ -57,3 +57,22 @@ Data owns Squad SDK side: implement `fireEventTrigger(manifest, state, eventName
 **Decision Merged:**
 Unified decision in `.squad/decisions.md` combining Data's technical evidence + Geordi's platform research + Seven's architectural verification. Inbox files deduplicated and cleared. Ready for implementation planning.
 
+## 2026-05-17T08:40:44.473+05:30 — ADC Execution Model Convergence: MVP Path + Seam Refinement
+
+**Consolidation:** Five-agent planning session (Picard, Geordi, B'Elanna, Data, Worf) converged on periodic ephemeral ADC sandbox (Model B) as MVP with event-driven seam (fireEventTrigger + `squad schedule fire`) as non-blocking future path.
+
+**Cross-Agent Synthesis:**
+- **Picard + Geordi** aligned on periodic ephemeral as operationally simplest (no new infra, no managed identity token blockers, fully reversible to event-driven)
+- **B'Elanna** derived 8 reliability invariants from failure-mode analysis; GitHub labels + GitHub API queries provide durable state across suspend/resume
+- **Data** refined SDK surface: core changes are strictly platform-neutral (`fireEventTrigger`, CLI); ADC/Redis/auth concerns stay in adapter layer; flagged `copilot` task executor stub in LocalPollingProvider as P0 blocking issue
+- **Worf** conditionally approved Models 1 (webhook, future) and 2 (periodic, MVP) with mandatory guardrails G1–G5; explicitly rejected Model 3 (long-lived) for cost and crash-recovery reasons
+
+**Implementation Sequencing:**
+1. P0: Fix `copilot` task executor in LocalPollingProvider (blocks validation)
+2. P0: Implement `fireEventTrigger(manifest, state, eventName)` (~20 lines) + `squad schedule fire` CLI (~60 lines)
+3. MVP Adapter: GitHub Actions workflow + suspend/resume logic (~150 lines total)
+4. Security: Apply Worf's G1–G5 guardrails before touching live issues
+5. Deferred: Managed identity verification (Model 1 blocker), Durable Functions (multi-step requirement), multi-sandbox parallelism
+
+**Key Refinement:** Event-driven seam is already architecturally sound from Feb planning. Periodic MVP accelerates first validation without waiting for ADC managed identity token acceptance. Same ADC API surface (resumeSandbox + execShell + stopSandbox) works for both trigger types; adapter is the only difference.
+

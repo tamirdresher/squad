@@ -61,4 +61,22 @@ Pattern works identically for GitHub webhook → `workflow_dispatch`, Event Grid
 - Seven ensures architectural consistency (no bloat, merge drivers intact, extensible for future sources)
 - Ready for implementation PRs + ADC integration validation
 
+## 2026-05-17T08:40:44.473+05:30 — ADC Execution Model: MVP Path Selection
+
+**Five-Agent Planning Convergence:** Picard, Geordi, B'Elanna, Data, and Worf converged on periodic ephemeral ADC sandbox (Model B, GitHub Actions cron) as MVP execution strategy.
+
+**Geordi's Platform Analysis:**
+- Periodic ephemeral uses only customer-accessible ADC surfaces (`adc-api.js`, Management Portal, `az login`) — no infrastructure behind ADC boundary required
+- GitHub Actions OIDC (with `az login --federated-token`) is the lowest-risk near-term validation path; requires no new Azure resources
+- Managed identity token acceptance by ADC API is the blocker for webhook/Azure Function adapter (Model 1); must verify with ADC team before medium-term escalation
+- Sandbox resume is sub-second; periodic interval (15–60 min default) is operationally feasible without cold-start concerns
+- Cost model: MVP is bounded (sandbox only runs during scan windows, ~5–15 min per cycle); event-driven doesn't materially improve cost once periodic model validated
+
+**Deferred Platform Concerns (Non-MVP):**
+- Event Grid / Service Bus integration (infrastructure layer concern, not Squad core)
+- Azure Function webhook deployment (deferred until managed identity token acceptance verified)
+- Durable Functions orchestration (deferred until multi-step workflow — Plan → Implement → Review → PR)
+- ADC internal event-bus details (Redis, consumer groups, XAUTOCLAIM) are production-ready but external listener pattern via separate adapter is cleaner than embedding in Squad core
+
+**Implementation Sequencing:** Same ADC API calls work for both periodic (MVP) and event-driven (future). GitHub Actions cron is the MVP trigger; webhook adapter (future) swaps cron with webhook listener without changing ADC integration code.
 
