@@ -9,6 +9,7 @@ import type { RepoSpec } from '@bradygaster/squad-sdk';
 import { detectSquadDir } from '../core/detect-squad-dir.js';
 import { success, warn, info } from '../core/output.js';
 import { fatal } from '../core/errors.js';
+import { getPackageVersion } from '../core/version.js';
 import { ghAvailable, ghAuthenticated } from '../core/gh-cli.js';
 
 interface ExportManifest {
@@ -21,6 +22,8 @@ interface ExportManifest {
   casting: Record<string, unknown>;
   agents: Record<string, { charter?: string; history?: string }>;
   skills: string[];
+  decisions?: string;
+  team?: string;
 }
 
 export interface ExportRepoOptions {
@@ -35,20 +38,26 @@ function buildManifest(dest: string, storage: FSStorageProvider, squadInfo: { pa
   const manifest: ExportManifest = {
     version: '1.0',
     exported_at: new Date().toISOString(),
-    squad_version: '0.6.0',
+    squad_version: getPackageVersion(),
     casting: {},
     agents: {},
-    skills: []
+    skills: [],
   };
 
   // Read top-level squad files (team.md, decisions.md, routing.md)
   const teamMdPath = path.join(squadInfo.path, 'team.md');
   const teamMdContent = storage.readSync(teamMdPath);
-  if (teamMdContent !== undefined) manifest.team_md = teamMdContent;
+  if (teamMdContent !== undefined) {
+    manifest.team_md = teamMdContent;
+    manifest.team = teamMdContent;
+  }
 
   const decisionsMdPath = path.join(squadInfo.path, 'decisions.md');
   const decisionsMdContent = storage.readSync(decisionsMdPath);
-  if (decisionsMdContent !== undefined) manifest.decisions_md = decisionsMdContent;
+  if (decisionsMdContent !== undefined) {
+    manifest.decisions_md = decisionsMdContent;
+    manifest.decisions = decisionsMdContent;
+  }
 
   const routingMdPath = path.join(squadInfo.path, 'routing.md');
   const routingMdContent = storage.readSync(routingMdPath);
@@ -155,7 +164,7 @@ export async function runExport(dest: string, outPath?: string, repoOptions?: Ex
       fatal(`Failed to export to repo: ${(err as Error).message}`);
     }
 
-    warn('Review agent histories before sharing — they may contain project-specific information');
+    warn('Review agent histories, decisions, and team content before sharing — they may contain project-specific information');
     return;
   }
 
@@ -170,5 +179,5 @@ export async function runExport(dest: string, outPath?: string, repoOptions?: Ex
 
   const displayPath = path.relative(dest, finalOutPath) || path.basename(finalOutPath);
   success(`Exported squad to ${displayPath}`);
-  warn('Review agent histories before sharing — they may contain project-specific information');
+  warn('Review agent histories, decisions, and team content before sharing — they may contain project-specific information');
 }

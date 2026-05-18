@@ -22,6 +22,8 @@ interface ImportManifest {
   casting: Record<string, unknown>;
   agents: Record<string, { charter?: string; history?: string }>;
   skills: string[];
+  decisions?: string;
+  team?: string;
 }
 
 export interface ImportRepoOptions {
@@ -79,9 +81,28 @@ function applyManifest(
   storage.mkdirSync(path.join(squadDir, 'log'), { recursive: true });
   storage.mkdirSync(path.join(dest, '.copilot', 'skills'), { recursive: true });
 
-  // Write empty project-specific files
-  storage.writeSync(path.join(squadDir, 'decisions.md'), manifest.decisions_md ?? '');
-  storage.writeSync(path.join(squadDir, 'team.md'), manifest.team_md ?? '');
+  if (manifest.decisions_md !== undefined && typeof manifest.decisions_md !== 'string') {
+    fatal('Invalid export file: "decisions_md" field must be a string');
+  }
+  if (manifest.team_md !== undefined && typeof manifest.team_md !== 'string') {
+    fatal('Invalid export file: "team_md" field must be a string');
+  }
+  if (manifest.routing_md !== undefined && typeof manifest.routing_md !== 'string') {
+    fatal('Invalid export file: "routing_md" field must be a string');
+  }
+  if (manifest.decisions !== undefined && typeof manifest.decisions !== 'string') {
+    fatal('Invalid export file: "decisions" field must be a string');
+  }
+  if (manifest.team !== undefined && typeof manifest.team !== 'string') {
+    fatal('Invalid export file: "team" field must be a string');
+  }
+
+  const decisionsContent = manifest.decisions_md ?? manifest.decisions ?? '';
+  const teamContent = manifest.team_md ?? manifest.team ?? '';
+
+  // Write top-level squad files
+  storage.writeSync(path.join(squadDir, 'decisions.md'), decisionsContent);
+  storage.writeSync(path.join(squadDir, 'team.md'), teamContent);
   if (manifest.routing_md !== undefined) {
     storage.writeSync(path.join(squadDir, 'routing.md'), manifest.routing_md);
   }
