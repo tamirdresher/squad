@@ -704,18 +704,32 @@ async function main(): Promise<void> {
     const { runExport } = await import('./cli/commands/export.js');
     const outIdx = args.indexOf('--out');
     const outPath = (outIdx !== -1 && args[outIdx + 1]) ? args[outIdx + 1] : undefined;
-    await runExport(getSquadStartDir(), outPath);
+    const repoIdx = args.indexOf('--repo');
+    const repoArg = (repoIdx !== -1 && args[repoIdx + 1]) ? args[repoIdx + 1] : undefined;
+    const branchIdx = args.indexOf('--branch');
+    const branchArg = (branchIdx !== -1 && args[branchIdx + 1]) ? args[branchIdx + 1] : undefined;
+    const repoOptions = repoArg ? { repo: repoArg, branch: branchArg } : undefined;
+    await runExport(getSquadStartDir(), outPath, repoOptions);
     return;
   }
 
   if (cmd === 'import') {
     const { runImport } = await import('./cli/commands/import.js');
-    const importFile = args[1];
-    if (!importFile) {
-      fatal('Usage: squad import <file> [--force]');
-    }
+    const repoIdx = args.indexOf('--repo');
+    const repoArg = (repoIdx !== -1 && args[repoIdx + 1]) ? args[repoIdx + 1] : undefined;
+    const branchIdx = args.indexOf('--branch');
+    const branchArg = (branchIdx !== -1 && args[branchIdx + 1]) ? args[branchIdx + 1] : undefined;
     const hasForce = args.includes('--force');
-    await runImport(getSquadStartDir(), importFile, hasForce);
+    if (repoArg) {
+      const repoOptions = { repo: repoArg, branch: branchArg };
+      await runImport(getSquadStartDir(), '', hasForce, repoOptions);
+    } else {
+      const importFile = args[1];
+      if (!importFile) {
+        fatal('Usage: squad import <file> [--force] or squad import --repo owner/repo [--branch branch] [--force]');
+      }
+      await runImport(getSquadStartDir(), importFile, hasForce);
+    }
     return;
   }
 
