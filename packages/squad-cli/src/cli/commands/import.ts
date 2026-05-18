@@ -79,6 +79,14 @@ export async function runImport(dest: string, importPath: string, force: boolean
   storage.mkdirSync(path.join(squadDir, 'log'), { recursive: true });
   storage.mkdirSync(path.join(dest, '.copilot', 'skills'), { recursive: true });
 
+  // Validate optional string fields
+  if (manifest.decisions !== undefined && typeof manifest.decisions !== 'string') {
+    fatal('Invalid export file: "decisions" field must be a string');
+  }
+  if (manifest.team !== undefined && typeof manifest.team !== 'string') {
+    fatal('Invalid export file: "team" field must be a string');
+  }
+
   // Write project-specific files from manifest (fall back to empty if not present)
   storage.writeSync(path.join(squadDir, 'decisions.md'), manifest.decisions || '');
   storage.writeSync(path.join(squadDir, 'team.md'), manifest.team || '');

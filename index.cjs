@@ -1099,7 +1099,7 @@ if (cmd === 'export') {
 
   const displayPath = path.relative(dest, outPath) || path.basename(outPath);
   console.log(`${GREEN}✓${RESET} Exported squad to ${displayPath}`);
-  console.log(`${DIM}⚠ Review agent histories before sharing — they may contain project-specific information${RESET}`);
+  console.log(`${DIM}⚠ Review agent histories, decisions, and team content before sharing — they may contain project-specific information${RESET}`);
   process.exit(0);
 }
 
@@ -1155,6 +1155,14 @@ if (cmd === 'import') {
   fs.mkdirSync(path.join(aiTeamDir, 'orchestration-log'), { recursive: true });
   fs.mkdirSync(path.join(aiTeamDir, 'log'), { recursive: true });
   fs.mkdirSync(path.join(aiTeamDir, 'skills'), { recursive: true });
+
+  // Validate optional string fields
+  if (manifest.decisions !== undefined && typeof manifest.decisions !== 'string') {
+    fatal('Invalid export file: "decisions" field must be a string');
+  }
+  if (manifest.team !== undefined && typeof manifest.team !== 'string') {
+    fatal('Invalid export file: "team" field must be a string');
+  }
 
   // Write project-specific files from manifest (fall back to empty if not present)
   fs.writeFileSync(path.join(aiTeamDir, 'decisions.md'), manifest.decisions || '');

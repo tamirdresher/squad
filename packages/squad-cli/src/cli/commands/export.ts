@@ -8,6 +8,7 @@ import { FSStorageProvider } from '@bradygaster/squad-sdk';
 import { detectSquadDir } from '../core/detect-squad-dir.js';
 import { success, warn } from '../core/output.js';
 import { fatal } from '../core/errors.js';
+import { getPackageVersion } from '../core/version.js';
 
 interface ExportManifest {
   version: string;
@@ -35,7 +36,7 @@ export async function runExport(dest: string, outPath?: string): Promise<void> {
   const manifest: ExportManifest = {
     version: '1.0',
     exported_at: new Date().toISOString(),
-    squad_version: '0.6.0',
+    squad_version: getPackageVersion(),
     casting: {},
     agents: {},
     skills: [],
@@ -122,5 +123,5 @@ export async function runExport(dest: string, outPath?: string): Promise<void> {
 
   const displayPath = path.relative(dest, finalOutPath) || path.basename(finalOutPath);
   success(`Exported squad to ${displayPath}`);
-  warn('Review agent histories before sharing — they may contain project-specific information');
+  warn('Review agent histories, decisions, and team content before sharing — they may contain project-specific information');
 }
