@@ -381,6 +381,133 @@ execShell(sandboxId, "node /squad/runner.js")
 
 `ralph-watch.ps1` from tamresearch1 is production-proven: 150+ rounds, dedup via assignees, parallel agent dispatch, circuit breaker — all working. This ADC adaptation is a **direct port** of that model: replace local copilot CLI invocation with ADC sandbox resume → execShell, replace assignee-based dedup with GitHub label-based dedup (`squad:processing` + 10-min TTL), replace mutex with label atomicity (GitHub API is the coordination primitive). The design preserves:
 
+---
+
+### 2026-05-18T18:40:55.751+03:00: Geordi Local E2E Validation — ADC Runner Demo Dry-Run Passed
+
+**By:** Geordi (after local human-style validation)
+
+**What:** Local dry-run validation of adc-squad-runner-demo completed successfully:
+- ✅ .NET Functions build (`AdcRalph.Functions.csproj`)
+- ✅ AdcRalph console tests (4 scenarios: issue claim/dispatch, stopped sandbox requeue, running sandbox lease extension, approved PR merge/done)
+- ✅ Runner npm ci/build/test (self-test created simulated sandbox, executed echo, stopped sandbox)
+- ✅ Work-items-api npm ci/build (0 vulnerabilities)
+- ✅ API smoke test on port 3100 (`/health`, `/work-items` GET/POST)
+
+**Gaps (not blocking local demo):**
+- Azure Functions Core Tools unavailable locally; Functions host startup dry-run skipped
+- No .sln file found; built project directly
+- No live ADC sandbox/GitHub mutations; dry-run only
+
+**Why:** Validate that documented quick-start path builds and executes locally before scheduling live E2E.
+
+**Verdict:** Local evidence accepted. Functional build and basic component integration proven. True live E2E (ADC sandbox + GitHub mutation + lease workflow) required before production approval. Gate: next cycle, controlled ADC sandbox + GitHub issue workflow test.
+
+---
+
+### 2026-05-18T11:42:44.342+03:00: Worf Security & Reliability Review — ADC Runner v2 (No-CLI Directive), Guardrails G13–G19
+
+**By:** Worf (Security & Reliability Review)  
+**Supersedes:** 2026-05-18T07:52:45 v1 review (G1–G12 remain; this adds G13–G19)
+
+**What:** Conditional approval of ADC Runner v2 architecture (Azure Timer Function, 5-min interval, no Squad CLI changes, automated PR creation with human merge gate, conflict escalation) with seven new mandatory guardrails G13–G19.
+
+**Key Approvals:**
+- ✅ 5-minute Azure timer with `[Singleton]` (Worf-safe under G13)
+- ✅ GitHub label `squad:processing` as distributed lease (B'Elanna invariants I-1/I-2)
+- ✅ Sandbox assignment tracking in git-backed `.squad/.schedule-state.json` (G14)
+- ✅ `execShell` command construction via payload file upload, no dynamic interpolation (G16)
+- ✅ PR creation by agent; does NOT merge to protected branches (G18)
+- ✅ GitHub App or machine account PAT for GitHub API; no personal developer PAT
+
+**Rejections:**
+- ❌ Automated PR merge without human approval (G18 enforced)
+- ❌ Automated conflict resolution (G19: conflicts escalate to human; no auto-merge on conflict)
+
+**New Guardrails (G13–G19):**
+- **G13:** Label claim atomic + re-read verification; stale lease TTL reduced to 10 min (5-min cycles)
+- **G14:** Assignment state committed to git before `resumeSandbox` is called
+- **G15:** Sandbox ID validated against allowlist regex `^[a-zA-Z0-9_-]{1,64}$`
+- **G16:** Command string is a fixed literal; payload via file upload; no GitHub-user-controlled content in command
+- **G17:** Payload file deleted by runner script after read; Function calls `rm -f` in finally block
+- **G18:** Agent may NOT merge protected branches autonomously; human approval required + branch protection enforced
+- **G19:** Conflicts escalate to human; Function posts comment + `squad:conflict` label, stops retry after 3 failures
+
+**Blocking Pre-Demo Questions:**
+1. G11 (prior): Verify Managed Identity bearer token accepted by ADC API
+2. Specify fixed entrypoint command (e.g., `copilot --no-interactive`, `node runner.js`)
+3. Confirm GitHub App or machine account PAT decision
+
+---
+
+### 2026-05-18T11:42:44.342+03:00: B'Elanna Durable Lease & State Machine — ADC Runner MVP
+
+**By:** B'Elanna (Durable Systems Engineer)
+
+**What:** Complete state machine, lease model, duplicate-prevention protocol, TTL/recovery, PR lifecycle, and conflict handling for the 5-min Azure-timer-driven ADC runner. GitHub labels = external atomic state store; `.squad/.lease-store.json` = git-backed durability record.
+
+**Core Mechanisms:**
+- **Lease Record:** `.squad/.lease-store.json` with schema v1; 30-min TTL, refreshed per scan
+- **Label Dedup:** Claim `squad:processing` before work; re-read to verify no race; skip if pre-existing
+- **TTL Recovery:** Every 5-min scan, sweep stale leases (expires_at < now); clear label, re-queue issue
+- **PR Lifecycle:** issue → PR → (conflict?) → merged/closed → terminal `squad:done`
+- **Conflict Resolution:** Detect `mergeable_state=dirty` → assign sandbox to rebase; 3 failures → escalate to Picard
+- **Concurrency Cap:** N=3 issues claimed per scan; bounds compute
+
+**Label Taxonomy:**
+| Label | Meaning | Terminal? |
+|-------|---------|-----------|
+| `squad` | Issue is squad work | No |
+| `squad:agent:<name>` | Routed to agent | No |
+| `squad:processing` | Lease held | No |
+| `squad:pr-open` | PR under review | No |
+| `squad:conflict` | Merge conflict | No |
+| `squad:done` | Merged/closed/done | **Yes** |
+
+**Decision Needed:** Lease-store conflict handling — prefer last-write-wins (GitHub label authoritative, lease-store eventually consistent) to avoid new infra.
+
+---
+
+### 2026-05-18T11:42:44.342+03:00: Data Azure Timer Watch Emulation — Ralph CLI-Free Execution
+
+**By:** Data (Squad Framework Expert)
+
+**What:** Decompose `squad watch --execute` (continuous polling loop) into three discrete phases that run once per 5-min Azure Timer cycle, no Squad CLI changes needed.
+
+**Three Phases (executed inside ADC sandbox via `execShell`):**
+1. **Triage:** `node .squad/templates/ralph-triage.js` — fetch open `squad` issues, apply `squad:{agent}` labels to untriaged
+2. **PR Sweep:** `gh pr list` + `gh pr merge` — check for ready-to-merge PRs
+3. **Execute:** `gh copilot --message "Ralph, Go! ..."` — single agent invocation for all actionable issues; agent reads `ralph-instructions.md` for dedup logic
+
+**Execution Contract (in-sandbox):**
+```bash
+git pull --ff-only
+GITHUB_TOKEN="..." node .squad/templates/ralph-triage.js ...
+gh pr list | ... | gh pr merge ...
+gh copilot --message "Ralph, Go! ..."
+git add .squad && git commit -m "chore: ralph cycle ..." && git push
+```
+
+**What Does NOT Change:**
+- Squad CLI: zero changes
+- `ralph-instructions.md`: must document `squad:processing` lease protocol (I-1–I-3)
+- Run script enforces stale-TTL sweep pre-flight; agent enforces claim-before-act
+
+---
+
+### 2026-05-18T11:42:44.342+03:00: Geordi In-Sandbox Agent Command — Open Decision
+
+**By:** Geordi (Azure Platform Engineering)
+
+**What:** Open decision on what command runs inside ADC sandbox via `sandbox.ExecuteShellCommandAsync()`.
+
+**Options Being Evaluated:**
+1. **Option A (Recommended):** Pre-baked `ralph-runner.sh` in `copilot` disk image; Function passes work metadata via env vars only
+2. **Option B:** `gh copilot suggest --autopilot` (no custom image); behavior in non-interactive shells TBD
+3. **Option C:** Inline bash script uploaded by Function (Worf-safe if no interpolated issue data)
+
+**Blocking:** Picard/Data must specify the fixed literal command and confirm sandbox image strategy before implementation starts.
+
 1. **Thin orchestrator:** 5-min loop, no state engine
 2. **Battle-tested dedup:** label-based vs. assignee-based is a swap, same pattern
 3. **Auditable:** all decisions logged in GitHub labels + `.squad/.lease-store.json` (git-tracked)
