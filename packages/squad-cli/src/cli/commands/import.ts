@@ -141,7 +141,7 @@ export async function runImport(dest: string, importPath: string, force: boolean
   success(`Imported squad from ${path.basename(resolvedPath)}`);
   info(`  ${agentNames.length} agents: ${agentNames.join(', ')}`);
   info(`  ${manifest.skills.length} skills imported`);
-  if (manifest.routing) {
+  if (manifest.routing !== undefined) {
     info(`  routing.md imported`);
   }
   info(`  Casting: ${universe} universe preserved`);
