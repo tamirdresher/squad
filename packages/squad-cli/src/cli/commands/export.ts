@@ -16,6 +16,7 @@ interface ExportManifest {
   casting: Record<string, unknown>;
   agents: Record<string, { charter?: string; history?: string }>;
   skills: string[];
+  routing?: string;
 }
 
 /**
@@ -96,6 +97,13 @@ export async function runExport(dest: string, outPath?: string): Promise<void> {
     }
   } catch (err) {
     console.error(`Warning: could not read skills: ${(err as Error).message}`);
+  }
+
+  // Read routing.md
+  const routingPath = path.join(squadInfo.path, 'routing.md');
+  const routingContent = storage.readSync(routingPath);
+  if (routingContent !== undefined) {
+    manifest.routing = routingContent;
   }
 
   // Determine output path

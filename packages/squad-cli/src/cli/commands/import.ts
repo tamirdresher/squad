@@ -17,6 +17,7 @@ interface ImportManifest {
   casting: Record<string, unknown>;
   agents: Record<string, { charter?: string; history?: string }>;
   skills: string[];
+  routing?: string;
 }
 
 /**
@@ -81,6 +82,11 @@ export async function runImport(dest: string, importPath: string, force: boolean
   storage.writeSync(path.join(squadDir, 'decisions.md'), '');
   storage.writeSync(path.join(squadDir, 'team.md'), '');
 
+  // Write routing.md if present in manifest
+  if (manifest.routing) {
+    storage.writeSync(path.join(squadDir, 'routing.md'), manifest.routing);
+  }
+
   // Write casting state
   for (const [key, value] of Object.entries(manifest.casting)) {
     storage.writeSync(
@@ -135,6 +141,9 @@ export async function runImport(dest: string, importPath: string, force: boolean
   success(`Imported squad from ${path.basename(resolvedPath)}`);
   info(`  ${agentNames.length} agents: ${agentNames.join(', ')}`);
   info(`  ${manifest.skills.length} skills imported`);
+  if (manifest.routing) {
+    info(`  routing.md imported`);
+  }
   info(`  Casting: ${universe} universe preserved`);
   console.log();
   warn('Project-specific learnings are marked in agent histories — review if needed');
