@@ -62,4 +62,31 @@ Seven responsible for architectural consistency checks: ExternalSquadEvent doesn
 
 **Decision Status:** Unified in `.squad/decisions.md` with cross-agent consensus. Inbox decisions merged and cleared. Ready for implementation PRs (Squad core small + ADC adapter separate).
 
+## 2026-05-18T21:55:38.138+03:00 — Copilot Memory API Research Concluded
+
+**Research Outcome:** Confirmed no callable CRUD API for Copilot Memory exists in @github/copilot-sdk v0.1.32.
+
+**Evidence Chain:**
+- Web search: GitHub Docs, VS Code agents, Copilot SDK repo all show memory as abstracted agent/UI concept, not callable storage.
+- SDK inspection: @github/copilot-sdk v0.1.32 exports CopilotClient + session management + messaging, but no memory read/write/search/delete.
+- Code review: squad-memory-governance has CopilotMemoryProviderClient interface but zero concrete implementation to external API.
+
+**Recommendation Applied:** Do not implement provider=copilot as direct storage. Keep hostInjectedCopilotAdapter as sole bridge. Document publicly that Squad will not fake remote memory and will fail closed until real API exists.
+
+**Related Work:** Data implemented fail-closed boundary; Worf approved multi-gate security review. Decisions merged to canonical `.squad/decisions.md`.
+
+
+## 2026-05-18T23:12:22.380+03:00 — Local Memory E2E Oracle & Parity Research Completed
+
+**Assignment:** Define true E2E behavior for local governed memory; separate CLI/tool-layer proof from unit-test-only claims; establish test criteria and simulation gaps.
+
+**Deliverables:**
+- E2E Behavioral Oracle (seven-local-memory-e2e-oracle.md): 428 lines defining baseline behavior, upgrade semantics, rejection gates, audit redaction, and acceptable simulation boundaries
+- Fleet eShop Reference Analysis: Identified proven parity implementation patterns (executeShellCommand, dispatch/claim/progress, orchestration state)
+- Copilot Spaces Assessment: Concluded not viable as memory provider (read-only MCP, no write API)
+- Parity Roadmap: Five phases mapped with P0/P1/P2 priorities
+
+**Outcome:** ✅ Oracle approved by Worf; approved for production merge. Known simulation gaps (Copilot agent behavior, LLM context injection, multi-session persistence) honestly documented.
+
+**Impact:** Local memory governance bridge unblocked; infrastructure provisioning and live E2E defer to next phase.
 

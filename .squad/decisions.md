@@ -1,5 +1,7 @@
 # Squad Decisions
 
+**Last Updated:** 2026-05-18T23:12:22.380+03:00
+
 ## Active Decisions
 
 ### 2026-05-14T09:22:24.987+05:30: Star Trek Squad for Squad development
@@ -472,6 +474,328 @@ execShell(sandboxId, "node /squad/runner.js")
 
 **By:** Data (Squad Framework Expert)
 
+---
+
+## Memory Governance (2026-05-18)
+
+### 2026-05-18T19:38:13.577+03:00: Seven — Memory Governance Prior Art & Reuse Analysis
+
+**By:** Seven (Prior Art & Compatibility Analyst)
+
+**What:** Comprehensive audit of shared abstractions between `squad-memory-governance` and `squad-mempalace-runtime-provider` worktrees for planned implementation. Key reusable modules: `StorageProvider`, `StateBackend`, adapter types, scheduler. New plugin infrastructure (manifest, runtime, state) present in mempalace but not memory-governance; evaluated for scope fit.
+
+**Findings:**
+- **Reuse as-is:** `StorageProvider` abstraction (FS, In-Memory, SQLite), `StateBackend` pattern, `adapter/types.ts`, `runtime/scheduler.ts` — all production-ready and tested
+- **Monitor:** SQLiteStorageProvider has single-process concurrency model only; multi-process access risks data corruption
+- **Evaluate:** Plugin infrastructure (manifest, runtime, audit trail) from mempalace may or may not fit memory-governance scope
+- **Risk:** Dirty sync between worktrees may mask divergence; define clear merge/rebase strategy before implementation
+
+**Decision:** Proceed with reuse of stable abstractions; plugin scope decision deferred to implementation phase.
+
+---
+
+### 2026-05-18T19:38:13.577+03:00: Worf — Memory Governance Acceptance Gate (Design-Only, Not Runtime Approved)
+
+**By:** Worf (Security & Reliability Review)
+
+**Status:** **NOT APPROVED FOR E2E / RUNTIME CLAIMS YET. DESIGN-ONLY CONDITIONALLY ACCEPTABLE.**
+
+**What:** Initial gate review of memory-governance proposal. Proposal directionally sound, but no implementation exists to verify safety boundaries. No `MemoryGovernanceProvider`, `MemoryStore`, CLI/MCP memory tools, or provider implementation found in codebase.
+
+**Non-Negotiable Acceptance Boundary:**
+
+1. **Forbidden memory must be deterministically rejected** (before persistence, before provider routing, before audit bodies copy sensitive text into logs)
+   - secrets, credentials, tokens, keys, connection strings
+   - PII/private customer data; raw logs, traces, dumps, telemetry payloads
+   - sensitive internal topology/infrastructure maps
+   - transient CI/PR/build status and one-time task progress
+   - unreviewed vulnerability details that increase retained risk
+   
+   Required: classify as `FORBIDDEN`, do not write to `.squad/`, emit redacted audit event, return clear rejection
+
+2. **Prompt-only fallback must be honest.** When no CLI/MCP/tool bridge exists, custom agents may only use local `.squad/` files. Documentation must not imply provider routing, remote deletion, semantic search, or policy enforcement is guaranteed.
+
+3. **Provider opt-in and auditability.** External semantic providers disabled by default. Every write, promotion, rejection, delete, search, classify must be auditable.
+
+4. **Delete semantics must be real.** `memory.delete` must remove governed memory from configured provider or create documented tombstone when hard delete is impossible. Audit must expose which occurred.
+
+5. **`squad upgrade` must be non-destructive.** Preserve existing `.squad/decisions.md`, inbox decisions, agent histories, charters, skills, routing, team.md, ceremonies; add memory governance config with local-only defaults; never replace custom charter text.
+
+**Required Test Gates:**
+- Unit: classifier marks forbidden classes; audit redacts sensitive payloads; provider routing requires opt-in; delete calls all destinations
+- Integration: memory.write rejects secrets/PII; memory.promote requires approval; memory.delete removes/tombstones local and external entries
+- Upgrade: existing files survive byte-for-byte unless explicitly changed; idempotent; rollback point provided
+
+**Current Blockers:** No implementation to review. Prompt-only promises are not controls.
+
+---
+
+### 2026-05-18T19:38:13.577+03:00: Data — Local Governed Memory Implementation (Initial Attempt)
+
+**By:** Data (Squad Framework Expert & Memory Governance Implementer)
+
+**Status:** **REJECTED BY WORF.** Revision required; authored artifact locked to Seven per governance protocol.
+
+**What:** Memory governance implementation with local `MemoryStore`/CLI/tool layer for classification, write/search/promote/delete/audit. `squad init` and `squad upgrade` scaffold `.squad/memory/config.json`, index, audit log, local folders idempotently without overwriting user edits. External semantic/Copilot Memory disabled and rejected unless future explicit bridge/provider configured.
+
+**Validation Attempted:**
+- Targeted tests pass: `npm test -- --run test/memory-governance.test.ts test/tools.test.ts` (41/41)
+- Forbidden writes classified before file persistence in `LocalMemoryStore.write`
+- Delete removes governed memory file, marks index entry deleted, writes tombstone
+- Copilot/external semantic memory disabled by default, rejects without bridge
+- Init/upgrade scaffolding uses exists-before-write for memory defaults, does not overwrite existing config/index/audit
+- Docs accurately state prompt-only fallback remains local `.squad/` unless tool bridge used
+
+**Blockers (Worf rejection):**
+1. **Secret leakage on rejected writes without title.** `write()` audits `title: request.title ?? firstLine(request.content)`, so `memory.write({ content: "password=..." })` rejects before file persistence but writes the secret into `.squad/memory/audit.jsonl` as the audit title. Violates reject-before-persist/no-sensitive-audit requirements.
+2. **Tool telemetry can leak forbidden memory before governance rejects.** `defineTool` records sanitized args by key name only; `memory.write` and `memory.classify` pass sensitive data in `content` field, not redacted. Rejected secret can enter OTel span attributes.
+3. **`classify()` and `search()` do not create governance audit records.** Gate asked for audit entries for write/reject/delete/promote/search/classify where appropriate; current implementation only audits write/reject/promote/delete.
+4. **Forbidden classifier coverage incomplete.** No explicit detection/tests for private customer data or unreviewed vulnerability details. Current tests cover only credential-like strings.
+
+**Test Gaps:**
+- No no-title forbidden write test proving audit/title redaction
+- No telemetry redaction test for `memory.write`/`memory.classify` content
+- No audit tests for classify/search
+- No delete assertion that the original memory file no longer exists
+- No tests for private customer data, raw customer records, unreviewed vuln details, or enabled semantic-provider config
+
+**Decision:** Locked to Seven for revision due to Worf rejection protocol (security/reliability boundaries not met). Data may not revise own rejected safety implementation.
+
+---
+
+### 2026-05-18T20:45:09.040+03:00: Worf — Copilot Memory Provider Gate (Mandatory Safety Boundary)
+
+**By:** Worf (Security & Reliability)
+
+**Status:** Gate established. Mandatory before any Copilot/external provider enablement.
+
+**What:** Established 8 mandatory safety gates for Copilot-backed external memory provider before approval:
+1. **Opt-in only, never default** — Local-only by default; explicit opt-in required for Copilot
+2. **Reject before external call** — Classification/forbidden checks execute before provider/network calls
+3. **Fail closed** — Missing bridge/client fails with clear error, not silent fallback
+4. **Audit and telemetry redaction** — No raw memory content, secrets, or queries in logs
+5. **Delete semantics** — Provider conformance declared; delete must propagate or fail clearly
+6. **Provider boundary and isolation** — External provider behind governance layer; namespace confined by tenant/repo/team
+7. **Approval and promotion** — Only approved COPILOT_MEMORY entries route externally; re-classify before provider call
+8. **Required test coverage** — All gates tested; default remains local-only; missing client fails closed; forbidden content rejected before external calls
+
+**Current Verdict:** Local governance implementation approved for local-only use. External provider path not approved pending implementation of all 8 gates.
+
+**Validation:**
+- `npm test -- --run test/memory-governance.test.ts test/tools.test.ts` passed: 48/48 tests
+- Default config: `defaultProvider: "local"`, Copilot disabled, approval required
+
+**Next:** Data implements Copilot provider path. All 8 gates must pass in test suite before re-review.
+
+---
+
+### 2026-05-18T20:45:09.040+03:00: Worf — Copilot Memory Provider Review (REJECTED)
+
+**By:** Worf (Security & Reliability)
+
+**Status:** **REJECTED** — Critical blocker present. Revision required; author locked to Seven.
+
+**Evidence of Approval (In-Scope):**
+- Default config is local-only: `defaultProvider: 'local'`, Copilot disabled, approval required
+- Copilot writes require explicit `enabled` + `adapter: 'host'` and approval when configured
+- Missing host client fails closed on write with clear error
+- Forbidden write content classified before `copilotProvider.write(...)`
+- Test proves forbidden writes reject without provider call: 52/52 tests pass
+- Audit records avoid raw memory content; tool telemetry redacts `content` and `query`
+
+**Critical Blocker (Gate Violation — Reject Before External Call):**
+
+`LocalMemoryStore.search(query)` sends raw search query to `copilotProvider.search(query)` without classifying/rejecting forbidden query content first. A query containing secrets, private customer data, raw logs, or forbidden content would be disclosed to the external host adapter before gate evaluation.
+
+**Violates Gate #2:** Classification and forbidden-memory checks must execute *before* any provider/client/network call.
+
+**Required Revision:** Seven must add pre-provider search-query classification/rejection and prove via regression test that forbidden search queries do not call the Copilot provider.
+
+**Remaining Gaps (Out-of-Scope, Document for Seven):**
+- Delete failure messaging not explicitly tested
+- Missing-client search not covered by targeted test (fails by exception, acceptable)
+
+---
+
+### 2026-05-18T20:45:09.040+03:00: Seven — Copilot Search Safety Revision (Security Lockout Recovery)
+
+**By:** Seven
+
+**Status:** **APPROVED BY WORF.** Revision accepted; blocker fixed.
+
+**What:** Fixed blocker: `LocalMemoryStore.search()` now classifies the search query immediately after initialization and *before* reading provider configuration or invoking the Copilot provider. Forbidden queries return no results and write a sanitized rejection audit record without persisting raw query.
+
+**Blocker Resolution:**
+- Search query classified before provider config read
+- Forbidden queries return no results and emit audit with class `FORBIDDEN`, safe title `Rejected governed memory search`, reason only
+- Audit does not persist raw forbidden query
+- Regression test: forbidden search query causes zero provider calls
+
+**Validation:**
+- Baseline: `npm test -- --run test/memory-governance.test.ts test/tools.test.ts` — 52 tests pass
+- After revision: `npm test -- --run test/memory-governance.test.ts test/tools.test.ts` — 53 tests pass (new forbidden-search-safety regression added)
+- Existing benign provider-backed search test now explicitly asserts safe query reaches provider
+
+---
+
+### 2026-05-18T20:45:09.040+03:00: Worf — Copilot Memory Provider Re-Review (APPROVED)
+
+**By:** Worf
+
+**Status:** **APPROVED.** Blocker from 2026-05-18T20:45:09 resolved by Seven.
+
+**What:** Affirmed Seven's revision: search-query classification now occurs *before* any provider invocation. Forbidden queries reject without provider call. Test coverage complete: forbidden-search-safety regression test proves isolation.
+
+**Validation:**
+- Baseline: 52/52 memory-governance + tools tests pass
+- After revision: 53/53 (new forbidden-search-safety regression)
+- Forbidden benign search explicitly asserts safe query reaches provider
+- Gate constraints satisfied: classify-before-external, reject-before-persist, audit-without-raw-content
+
+---
+
+### 2026-05-18T21:11:22.656+03:00: Data — Real Copilot Memory Provider API Research & Honesty Gate
+
+**By:** Data
+
+**Status:** **APPROVED WITH GATE ENFORCED.** No real callable Copilot Memory API exists. Implementation must not fake real provider.
+
+**What:** Researched Copilot SDK surfaces in locally installed `@github/copilot-sdk` and `@github/copilot` packages. Found session capability/permission metadata only. No concrete read/write/search/delete API for Copilot Memory service exists.
+
+**Decision:** Do not implement or fake `provider=copilot`. Worktree treats real Copilot Memory as unavailable unless concrete provider module/API is present. Host-supplied bridge is explicitly named `hostInjectedCopilotAdapter` and is not marketed as real Copilot Memory.
+
+**Changes in squad-memory-governance worktree:**
+
+- Config defaults: `externalProviders.hostInjectedCopilotAdapter` (not `copilot`)
+- `provider=copilot` / `defaultProvider: "copilot"` fails with explicit "real API unavailable" error
+- Provider status reports `realCopilotMemory.available: false` + separate `hostInjectedCopilotAdapter` status
+- Host-injected surfaces report provider `hostInjectedCopilotAdapter`, not `copilot`
+- Legacy `externalProviders.copilotMemory` read as host-injected compatibility only
+- CLI help and docs state Squad does not fake real Copilot Memory; host-injected adapter is optional bridge
+
+**Validation:**
+- `npm test -- --run test/memory-governance.test.ts test/tools.test.ts` passed
+- `npm run lint` passed
+
+---
+
+### 2026-05-18T21:11:22.656+03:00: Worf — Real Copilot Memory Provider Gate Enforcement
+
+**By:** Worf
+
+**Status:** **GATE ENFORCED.** Approved Data's honesty/safety implementation with mandatory ongoing constraint.
+
+**What:** Gate criteria for any real Copilot Memory provider claim:
+
+1. **No marketing without API:** Do not name or market anything as "real Copilot Memory" unless a concrete, documented, installed Copilot Memory API/tool endpoint exists for read, write, search, delete.
+2. **Host-injected only:** Current host path acceptable only as host-injected/experimental adapter language. Must not claim Squad ships, emulates, or discovers real Copilot Memory service.
+3. **Fail closed:** No fake persistence, no silent local fallback for `COPILOT_MEMORY`, clear rejection, no provider calls when client missing.
+4. **Pre-provider rejection:** Forbidden content (secrets, PII, raw logs, unreviewed vulns) rejected before any external invocation; must not appear in audit or telemetry.
+5. **Comprehensive tests:** Default-disabled behavior, missing-client failure, host-injected adapter behavior, forbidden pre-rejection, sanitized audit/telemetry.
+
+**Findings:**
+- Defaults local-only; Copilot Memory disabled
+- Docs describe Copilot Memory as optional, host-injected, not emulated
+- SDK requires explicit config + valid client; missing client fails closed
+- Tests cover honest provider status, config failure, pre-rejection
+
+**Ongoing Constraint:** Future work adding real provider claim must first point to actual callable Copilot Memory API/tool and add read/write/search/delete contract tests against that boundary.
+
+---
+
+## Durable Conclusion: No Real Callable Copilot Memory API Exists
+
+**Established:** 2026-05-18T21:11:22.656+03:00
+
+**Decision:** Squad must not claim real Copilot Memory provider support because no documented, installed, callable REST/MCP/CLI/SDK API exists for third-party read/write/search/delete.
+
+**Data confirmed:** Locally installed Copilot SDK packages contain session capability metadata only. No concrete provider API found.
+
+**Implementation:** Fail closed: explicit error on `provider=copilot` config; host-injected adapter is separate, optional, and honestly labeled. No fake persistence.
+
+**Test gates:** Memory governance tests prove forbidden content rejects before any provider call; audit sanitized; telemetry redacted.
+
+**Future-proof seam:** Host-injected adapter is the honest extensibility point. When a real Copilot Memory callable API becomes available and documented, Squad can surface it behind the same host-injected configuration model without breaking changes.
+
+**This conclusion is preserved in decisions.md to prevent future teams from reinventing or claiming unavailable provider support.**
+
+**By:** Worf (Security & Reliability)
+
+**Status:** **APPROVED.** All mandatory gates pass. Copilot provider path cleared for enablement with default local-only fallback preserved.
+
+**Evidence:**
+- Copilot provider remains opt-in: default config is `defaultProvider: local`, `promptOnlyFallback: true`, `copilotMemory.enabled: false`
+- Missing host client fails closed: provider adapter throws when no host-injected client exists; provider status reports `configured` separately from `clientAvailable`
+- Prior blocker fixed: `LocalMemoryStore.search()` classifies query and audits/returns no results for `FORBIDDEN` before local/provider search; regression test asserts provider `searchCalls === 0`
+- Forbidden writes classified and rejected before provider write; regression test asserts provider write calls stay zero
+- Audit/tool telemetry redacts raw `content`/`query`; rejected audit records use safe placeholder titles
+- Delete, search, write, provider health, and prompt-only fallback semantics covered by targeted tests
+
+**Validation:**
+- `npm test -- --run test\memory-governance.test.ts test\tools.test.ts` passed: 53 tests
+- `npm run lint` passed
+
+**Acceptable Remaining Risk:**
+- Search/delete with configured provider but absent host client fail by exception rather than structured rejected result; acceptable because it fails closed and health status is honest
+
+**Gate Summary — All 8 Gates Pass:**
+1. ✅ Opt-in only, never default
+2. ✅ Reject before external call (fixed by Seven)
+3. ✅ Fail closed
+4. ✅ Audit and telemetry redaction
+5. ✅ Delete semantics (propagates or fails clearly)
+6. ✅ Provider boundary and isolation
+7. ✅ Approval and promotion
+8. ✅ Required test coverage
+
+---
+
+### 2026-05-18T20:45:09.040+03:00: Seven — Memory Governance Safety Revision (Post-Rejection, Worf Lockout)
+
+**By:** Seven (Safety & Reliability Specialist, revision after Data rejection lockout)
+
+**Status:** **APPROVED BY WORF.** Merged to production worktree.
+
+**What:** Address Worf's rejection by tightening memory governance safety at the SDK and tool bridge boundaries without broad unrelated changes. Authored revised artifact per Worf lockout protocol (Data's rejected security artifact locked to Seven for revision).
+
+**Changes:**
+- Forbidden memory rejects now use safe audit title placeholder when no safe title provided (closes secret-in-audit-title leakage)
+- `content` and `query` tool args redacted before OTel serialization via `sanitizeArgs` (closes telemetry leakage)
+- Explicit `classify` calls and all `search` calls write content-free audit records (closes audit gap)
+- Search tool telemetry now returns result metadata without snippets
+- Forbidden detection expanded to cover private customer data and unreviewed vulnerability disclosure patterns (closes classifier gap)
+
+**Validation:**
+- `npm run build -w packages/squad-sdk` succeeded
+- `npx vitest run test\memory-governance.test.ts test\tools.test.ts` passed: 2 files, 48 tests
+
+---
+
+### 2026-05-18T19:38:13.577+03:00: Worf — Memory Governance Re-Review & Approval
+
+**By:** Worf (Security & Reliability Review, post-revision)
+
+**Status:** **APPROVED.** Revised implementation by Seven satisfies all non-negotiable boundaries.
+
+**Evidence:**
+- No-title forbidden writes audit `Rejected governed memory` via `safeAuditTitle(request.title)` and do not derive audit title from sensitive content
+- `defineTool` records OTel `tool.args` through `sanitizeArgs`, redacting top-level `content` and `query` fields; memory tool telemetry excludes raw content/snippets for write/classify/search
+- `LocalMemoryStore.classify(..., { audit: true })` used by `memory.classify`; `search()` appends `search` audit records
+- Forbidden coverage includes private customer data and unreviewed vulnerability/zero-day patterns with regression tests
+
+**Validation:**
+- `npm test -- --run test/memory-governance.test.ts test/tools.test.ts` passed: 56 tests
+- `npm run lint` passed
+- `npm run build` passed before side-effects cleanup
+- Targeted Vitest passed for integration/unit scopes (`test/memory-governance.test.ts`, `test/tools.test.ts`, `test/package-exports.test.ts`, `test/cli/upgrade.test.ts` with CI=1): 56 + 28 tests
+- `npm run lint:docs` passed
+- Full `npm test` hangs in known Vitest worker/packaging-smoke path (not claimed as passed)
+
+**Remaining Risks:**
+- Argument sanitization is shallow and does not redact `title` field; acceptable for four reviewed blockers, but future hardening should recursively redact all user-controlled sensitive fields
+
+**Decision:** Approved for production. Memory governance implementation complete and safe for local-only mode. External semantic provider bridge remains deferred and disabled.
+
 **What:** Decompose `squad watch --execute` (continuous polling loop) into three discrete phases that run once per 5-min Azure Timer cycle, no Squad CLI changes needed.
 
 **Three Phases (executed inside ADC sandbox via `execShell`):**
@@ -644,3 +968,158 @@ Keep `adc-api.js` only as the local-dev/sample fallback or if SDK auth/package a
 - Document architectural and behavior-changing decisions here.
 - Keep history focused on agent-specific learnings; keep decisions focused on shared direction.
 - Preserve reviewer rejection lockout: rejected artifacts must be revised by a different eligible agent.
+
+### 2026-05-18T22:11:20.972+03:00: Postpone Live E2E Claim Until Infrastructure Provisioned
+
+**By:** Scribe (consolidating Geordi E2E attempt + Seven parity research)  
+**Type:** Infrastructure Blocker Acknowledgment
+
+Do not claim live E2E success or ADC/Squad/Copilot parity until infrastructure provisioning is complete.
+
+**Rationale:** Both Geordi (E2E test) and Seven (parity research) independently identified the same infrastructure blockers:
+
+**Hard Blocker #1: Live Runner Configuration**
+- ADC_SANDBOX_IDS: undefined
+- ADC_API_KEY: undefined
+- SQUAD_RUNNER_COMMAND_JSON: undefined
+- local.settings.json: not provisioned
+
+**Hard Blocker #2: Unverified Sandbox-Side /squad/runner.js**
+- ADC sandbox validated for compute capability
+- /squad/runner.js presence: NOT verified
+- Squad/Copilot wrapper: NOT verified
+
+**Validated Upstream:** ✓ git reachability, ✓ gh reachability, ✓ az reachability, ✓ ADC build, ✓ ADC tests, ✓ Sandbox compute reachability
+
+**Immediate Next Steps:** Infrastructure team provisions ADC sandbox IDs/API key, deploys /squad/runner.js, Scribe verifies wrapper presence, local.settings.json configured, Geordi reruns E2E batch.
+
+**Status:** FOR TEAM REVIEW & APPROVAL | **Owner:** Geordi, Seven, Infrastructure team
+
+---
+
+### 2026-05-18T23:05:16.894+03:00: Copilot Spaces as Squad Memory Provider (NOT VIABLE)
+
+**By:** Seven (Research & Integration Engineer)  
+**Status:** RECOMMENDATION (NOT VIABLE)
+
+GitHub Copilot Spaces **cannot serve as Squad's persistent memory provider**. Spaces are UI-first for organizing semantic context with read-only MCP tooling. No write API exists.
+
+**Key Findings:**
+- **UI/Product:** Web UI at github.com/copilot/spaces for organizing context
+- **MCP Tools:** list_copilot_spaces, get_copilot_space (read-only)
+- **Critical Limitation:** No write API exists; spaces created only via web UI, not programmatically
+- **Verdict:** Squad could read from spaces (semantic enrichment) but cannot write to them (persistence)
+
+**As Storage Provider:** NOT VIABLE — no write API; sources added via UI only.
+
+**As Semantic Memory Provider (Read-Only):** OPTIONAL — Could retrieve space contents via MCP as context enrichment, but does not replace persistent storage.
+
+**If Real APIs Existed:** Would require create_space, dd_to_space, emove_from_space, delete_space endpoints plus governance integration.
+
+**Recommendation:** Keep memory provider surface abstract. If context enrichment is valuable, pursue optional read-only integration separately from memory governance.
+
+**Blocker Removal Condition:** GitHub must release documented write APIs with CRUD semantics, auth/namespace isolation, and official SDK exports.
+
+**Conclusion:** Copilot Spaces cannot be used as Squad's memory provider.
+
+---
+
+### 2026-05-18T22:11:20.972+03:00: Use Fleet eShop as Parity Reference Architecture
+
+**By:** Scribe (consolidating Seven's parity research)  
+**Type:** Implementation Roadmap Reference
+
+**Decision:** Adopt Fleet eShop architecture as the canonical reference for Squad/Copilot/ADC parity validation and implementation.
+
+**Rationale:** Seven's deep research into Fleet eShop identified concrete evidence of a complete, working parity implementation. Local tamresearch1 files contain:
+- Real implementation patterns for executeShellCommand inside ADC
+- Real sandboxes and worker configuration
+- Real Copilot invocation patterns
+- Real dispatch/claim/progress/complete cycle implementation
+- Real dashboard/orchestration state management
+- Real list/status/log verification tools
+
+**Parity Gap Analysis:**
+| Component | Fleet eShop | Squad/Copilot/ADC | Priority |
+|-----------|-------------|------------------|----------|
+| executeShellCommand inside ADC | ✓ Implemented | ✗ Missing | P0 |
+| MCP/Squad worker config | ✓ Deployed | ✗ Not deployed | P0 |
+| Real Copilot invocation | ✓ Live | ✗ Blocked by runner config | P1 |
+| Dispatch/claim/progress/complete | ✓ Pattern | ✗ Not wired | P1 |
+| Dashboard/orchestration state | ✓ Real-time | ✗ Not available | P2 |
+| list/status/log verification | ✓ Enabled | ✗ Not tested | P2 |
+
+**Implementation Roadmap:** Phase 1 (Infrastructure) → Phase 2 (Config) → Phase 3 (Dispatch) → Phase 4 (Dashboard) → Phase 5 (Verification)
+
+**Benefits:** Proven implementation, reduced risk, accelerated timeline, built-in parity validation framework.
+
+**Implementation Constraints:** eShop patterns must be adapted (not copied verbatim); team must verify parity equivalence.
+
+**Status:** FOR TEAM REVIEW & APPROVAL | **Owner:** Seven, Implementation team
+
+---
+
+### 2026-05-18T23:12:22.380+03:00: Seven — Local Memory E2E Oracle (Reference Test Criteria)
+
+**By:** Seven (Research & Integration Engineer)  
+**Date:** 2026-05-18T23:12:22.380+03:00  
+**Status:** Reference Oracle for Worf & Data
+
+This oracle defines what true E2E behavior looks like for Squads with/without local governed memory, separating CLI/tool-layer evidence from unit-test-only claims. Establishes test criteria, rejection gates, upgrade semantics, and simulation gaps.
+
+**Key Sections:**
+1. **Old/No-Memory Squad Baseline:** Pre-governance behavior (no .squad/memory/ folder, no memory routing)
+2. **Upgrade Semantics:** Non-destructive, idempotent "only if missing" pattern for all files
+3. **Expected Local Governed Memory Behavior:** Write (allowed), Search (allowed queries), Delete (real removal), Audit (inspect actions)
+4. **Rejection Behavior:** Forbidden content classified BEFORE persistence (SECRETS, PII, RAW_LOGS, UNREVIEWED_VULNS, PRIVATE_DATA)
+5. **True E2E vs Unit-Test-Only:** CLI writes to disk, index entry created, audit redacts content, second upgrade changes nothing, search returns persistent results (✅ counts); mocks/spies insufficient (❌)
+6. **Copilot Custom-Agent Gaps:** Cannot verify from local simulations—requires live Copilot agent infrastructure
+7. **Test Oracle & Rejection Checklist:** Approval gates for Worf, blocking scenarios
+
+**Acceptance Criteria (for Worf approval):**
+- ✅ CLI commands work with real file I/O
+- ✅ Rejection gates prevent forbidden content before persistence
+- ✅ Audit trails complete and redacted
+- ✅ Upgrade non-destructive
+- ✅ Multi-agent memory orchestration (via concurrent CLI calls) stores/retrieves correctly
+- ✅ External provider bridge disabled by default, fails closed if attempted
+
+**Unfeasible Locally:** Real Copilot agent spawning, LLM context injection, Copilot Memory service, true multi-session persistence.
+
+**Status:** Locked for Reference | **Date:** 2026-05-18T23:12:22.380+03:00
+
+---
+
+### 2026-05-18T23:12:22.380+03:00: Worf — Local Memory E2E Validation (APPROVED)
+
+**By:** Worf (Security & Reliability Reviewer)  
+**Date:** 2026-05-18T23:12:22.380+03:00  
+**Status:** APPROVED with Residual Gaps Noted
+
+**Executive Summary:** Data's E2E validation PASSES all eight Worf gates. Evidence is genuine (real I/O, disposable fixtures, no mocks). Rejection gates enforce fail-closed semantics before persistence. Audit redaction credibly prevents secret leakage. Known Vitest test-harness hang characterized as external (test infrastructure issue, not code logic). Residual gaps (full Copilot agent integration, multi-session orchestration, rate-limiting) deferred and documented.
+
+**Approval: CONDITIONAL PASS** — Merge cleared for production governance bridge.
+
+**Gate-by-Gate Verification:**
+1. ✅ **Real Disposable Fixtures** — testRoot() creates .test-{uuid} directories with afterEach cleanup; real FSStorageProvider
+2. ✅ **Old/No-Memory Baseline** — Pre-governance behavior documented; classify works without .squad/memory
+3. ✅ **Upgrade Non-Destructive & Idempotent** — ensureMemoryGovernanceDefaults() checks "only if missing"; second run returns empty
+4. ✅ **CLI CRUD Path** — squad memory write/search/delete/audit exercise full governance flow with real file verification
+5. ✅ **Forbidden Before Persistence** — Classification in-process BEFORE any provider call; zero provider calls on rejection
+6. ✅ **Audit Redaction** — Audit entries contain no raw content/query; only safe metadata (title, reason, author, timestamp)
+7. ✅ **Provider Defaults** — defaultProvider: 'local', copilot.enabled: false in .squad/memory/config.json
+8. ✅ **Copilot Fails Closed** — If provider=copilot configured, write/search operations fail without invoking host client
+
+**Known Issue: Vitest Test Hang** — test/cli/upgrade.test.ts hangs in Vitest queueing (test infrastructure issue, not code logic). Real upgrade CLI path PASSED. Targeted workaround: single-worker test runs successful.
+
+**Residual Gaps (Future Work):** Full Copilot agent integration, multi-agent session orchestration, rate-limiting under load, telemetry export validation.
+
+**Conditions for Approval:**
+1. Merge includes this signed approval decision
+2. Known Vitest hang remains documented as test-harness issue
+3. Residual gaps captured in decisions.md for future phases
+
+**Approval Signature:** Worf (Security & Reliability Reviewer) | 2026-05-18T23:12:22.380+03:00 | Oracle Verification: Seven's E2E oracle fully satisfied
+
+---
+

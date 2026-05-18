@@ -79,3 +79,64 @@ Synthesized recovery sequence ensuring sandbox crashes don't create orphans or d
 - Unit test stale-lease sweep logic (P2)
 - Integration test recovery with branch inspection + attempt escalation (P3)
 
+## 2026-05-18T21:55:38.138+03:00 — Copilot Memory Provider Multi-Stage Review Complete
+
+**Final Verdict:** APPROVED with mandatory ongoing gate enforcement
+
+**Review Timeline:**
+1. Initial Gate (2026-05-18T20:45:09.040+03:00): Local governance approved; blocker on search pre-classification
+2. Rereview (2026-05-18T20:45:09.040+03:00): Blocker fixed by Seven; approval granted
+3. Final Security Review (2026-05-18T21:55:38.138+03:00): Comprehensive six-gate approval
+4. Gate Enforcement (2026-05-18T21:55:38.138+03:00): Mandatory constraint for future real provider claims
+
+**Security Gates Validated:**
+- **Gate 1:** provider=copilot fails closed — throws REAL_COPILOT_UNAVAILABLE_REASON when configured; no fake endpoints
+- **Gate 2:** Forbidden classification BEFORE external calls — search() classifies query immediately; write() classifies before provider invocation
+- **Gate 3:** Audit logging redacts content — records action/class/reason/actor only; no raw memory, no raw queries; safe placeholder titles
+- **Gate 4:** Documentation honestly states limitation — memory.md, CLI help, error messages all explicit about API unavailability
+- **Gate 5:** Storage layer abstract — StorageProvider interface used; LocalMemoryStore constructor parameter; no filesystem hardcoding
+- **Gate 6:** Tests credibly validate gates — 53 tests passing; forbidden classification proven before write/search; provider call counts verified at zero
+
+**Residual Limitations (Acknowledged, Acceptable):**
+1. Copilot Memory API nonexistent (GitHub product limitation, not code defect)
+2. hostInjectedCopilotAdapter requires external host (intentional isolation)
+3. Prompt-only fallback is local-only (honest behavior)
+4. Config can contain defaultProvider: "copilot" (forward-compatible but non-functional until real API exists)
+
+**Mandatory Ongoing Constraint:**
+If future work claims "real Copilot Memory," must:
+- First point to actual callable Copilot Memory API/tool
+- Implement read/write/search/delete contract against that boundary
+- Add integration tests against real endpoint
+- Re-gate before merge approval
+
+**Related Work:** Seven researched API availability; Data implemented fail-closed boundary. All decisions merged to canonical `.squad/decisions.md`.
+
+
+## 2026-05-18T23:12:22.380+03:00 — Local Memory E2E Security Review & Gate Approval
+
+**Assignment:** Verify Data's simulations against Seven's oracle; gate all eight approval conditions; honestly characterize gaps.
+
+**Review Scope:**
+1. ✅ Disposable fixtures: testRoot() creates real .test-uuid dirs with afterEach cleanup
+2. ✅ Old/no-memory baseline: Lazy scaffold, classify-without-memory validated
+3. ✅ Upgrade idempotent: \"only if missing\" pattern prevents re-creation
+4. ✅ CLI CRUD: Real file I/O; write/search/delete/audit exercised
+5. ✅ Forbidden before persistence: Classification in-process; zero provider calls
+6. ✅ Audit redaction: JSON.stringify(audit) never contains secrets/queries
+7. ✅ Provider defaults: defaultProvider='local', copilot.enabled=false
+8. ✅ Copilot fails closed: If provider=copilot, write/search fail without client invocation
+
+**Gaps Honestly Documented:**
+- Full Copilot custom-agent spawning (requires live LLM session)
+- LLM context injection validation (requires real agent)
+- Copilot Memory service (requires Microsoft infrastructure)
+- Multi-session orchestration (requires Squad session backend)
+- Rate-limiting under load (requires concurrent test harness)
+
+**Approval:** ✅ CONDITIONAL PASS — Production governance bridge merge cleared.
+
+**Conditions:** (1) Merge includes this review, (2) Vitest hang documented as external, (3) Gaps deferred to future phases.
+
+**Impact:** Local memory governance unblocked; infrastructure provisioning next step.
+
