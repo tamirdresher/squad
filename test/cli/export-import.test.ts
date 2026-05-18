@@ -252,4 +252,78 @@ describe('CLI: export/import commands', () => {
     expect(history).toContain('📌 Imported from');
     expect(history).toContain('my-project-export');
   });
+
+  it('should export and import team.md, decisions.md, and routing.md', async () => {
+    const teamPath = join(TEST_ROOT, '.squad', 'team.md');
+    await writeFile(teamPath, '# My Team\nLead: Alice\n');
+    await writeFile(join(TEST_ROOT, '.squad', 'decisions.md'), '# Decisions\n- Use TypeScript\n');
+    await writeFile(join(TEST_ROOT, '.squad', 'routing.md'), '# Routing\n- `*.ts` → fenster\n');
+
+    const exportPath = join(TEST_ROOT, 'squad-export.json');
+    await runExport(TEST_ROOT, exportPath);
+
+    // Verify manifest contains these fields
+    const content = await readFile(exportPath, 'utf-8');
+    const manifest = JSON.parse(content);
+    expect(manifest.team_md).toBe('# My Team\nLead: Alice\n');
+    expect(manifest.decisions_md).toBe('# Decisions\n- Use TypeScript\n');
+    expect(manifest.routing_md).toBe('# Routing\n- `*.ts` → fenster\n');
+
+    // Import and verify round-trip
+    await runImport(IMPORT_ROOT, exportPath, false);
+    const importedTeam = await readFile(join(IMPORT_ROOT, '.squad', 'team.md'), 'utf-8');
+    const importedDecisions = await readFile(join(IMPORT_ROOT, '.squad', 'decisions.md'), 'utf-8');
+    const importedRouting = await readFile(join(IMPORT_ROOT, '.squad', 'routing.md'), 'utf-8');
+    expect(importedTeam).toBe('# My Team\nLead: Alice\n');
+    expect(importedDecisions).toBe('# Decisions\n- Use TypeScript\n');
+    expect(importedRouting).toBe('# Routing\n- `*.ts` → fenster\n');
+  });
+
+  it('should reject agent names with path traversal', async () => {
+    const teamPath = join(TEST_ROOT, '.squad', 'team.md');
+    await writeFile(teamPath, '# Team\n');
+
+    // Create a malicious export file with path traversal in agent name
+    const maliciousManifest = {
+      version: '1.0',
+      exported_at: new Date().toISOString(),
+      squad_version: '0.6.0',
+      casting: {},
+      agents: { '../../../etc/evil': { charter: 'malicious content' } },
+      skills: [],
+    };
+    const exportPath = join(TEST_ROOT, 'malicious-export.json');
+    await writeFile(exportPath, JSON.stringify(maliciousManifest));
+
+    await expect(
+      runImport(IMPORT_ROOT, exportPath, false)
+    ).rejects.toThrow(/Invalid agent name|Path traversal/);
+  });
+
+  it('should handle older bundles without team_md/decisions_md gracefully', async () => {
+    const teamPath = join(TEST_ROOT, '.squad', 'team.md');
+    await writeFile(teamPath, '# Team\n');
+
+    // Old format bundle without team_md, decisions_md, routing_md
+    const oldManifest = {
+      version: '1.0',
+      exported_at: new Date().toISOString(),
+      squad_version: '0.6.0',
+      casting: {},
+      agents: {},
+      skills: [],
+    };
+    const exportPath = join(TEST_ROOT, 'old-export.json');
+    await writeFile(exportPath, JSON.stringify(oldManifest));
+
+    await runImport(IMPORT_ROOT, exportPath, false);
+
+    // Should write empty defaults
+    const importedTeam = await readFile(join(IMPORT_ROOT, '.squad', 'team.md'), 'utf-8');
+    const importedDecisions = await readFile(join(IMPORT_ROOT, '.squad', 'decisions.md'), 'utf-8');
+    expect(importedTeam).toBe('');
+    expect(importedDecisions).toBe('');
+    // routing.md should not be created if not in bundle
+    expect(existsSync(join(IMPORT_ROOT, '.squad', 'routing.md'))).toBe(false);
+  });
 });
