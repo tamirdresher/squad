@@ -30,3 +30,52 @@ Worf owns security and reliability review for this Squad's work.
 
 **Implementation Path:** Guardrails apply before any live GitHub issue processing begins. Demo repo ready for validation phase pending Squad SDK fixes and ADC auth setup.
 
+## 2026-05-18T12:08:34.040+03:00 — Stale-Lease Recovery Guardrails & Three-Failure Escalation
+
+**Mandatory Guardrails for Safe Sandbox Crash Recovery (G20–G26):**
+
+Synthesized recovery sequence ensuring sandbox crashes don't create orphans or duplicate work:
+
+**Pre-Conditions for Recovery (All Required):**
+- P1: Lease TTL expired (`expires_at < now()`)
+- P2: No PR exists for the issue's branch (if PR exists, transition to `pr_open`, not requeue)
+- P3: ADC confirms sandbox is `STOPPED`/`CRASHED`/`NOT_FOUND` (G20: never reclaim while sandbox is `RUNNING`)
+- P4: Lease-store committed to git **before** label removal (audit trail written first; if Function crashes, git history is clean)
+- P5: Attempt counter incremented and tracked (enable three-failure circuit breaker)
+
+**Mandatory Sequence (Non-Negotiable Order, G26):**
+1. Verify sandbox stopped (G20) — ADC status check; grace period if RUNNING
+2. Inspect branch state (G21) — GitHub API; resume from branch tip if partial commits exist
+3. Verify `squad:done` NOT present (G22) — sweep bug if it is; skip recovery, delete lease only
+4. Increment attempt counter (P5)
+5. Build recovery payload (include `resumeBranch` if applicable)
+6. Write updated lease-store, git commit & push (P4: audit trail before label change)
+7. Remove `squad:processing` label (idempotent: treat 404 as success)
+8. Post recovery comment on GitHub (mandatory audit trail with sandbox_id, phase, lease times, attempt, action)
+9. If `attempt < 3`: re-apply `squad:agent:<name>` (return to TRIAGED)
+10. If `attempt >= 3`: apply `squad:stuck`, post human escalation comment, do NOT requeue (G25)
+
+**Key Safeguards:**
+- **G23:** Recovery PRs must include history note ("created after sandbox recovery attempt N") so reviewers know partial work was restarted
+- **G24:** Idempotent label removal (404 = success) and duplicate comment detection (skip if same sandbox_id + claimed_at already exists)
+- **G25:** Three-failure escalation is circuit breaker; prevents infinite retry on structural issues. Escalation tags Picard (approver agent) for human judgment
+- **G26:** Any step failure halts sequence; no skip-ahead. If step 8 (git push) fails, sweep aborts and retries next cycle
+
+**Label Taxonomy Addition:**
+- `squad:stuck` — Terminal label (until manually cleared); issue failed automated recovery 3 times and requires human review before re-queuing
+
+**Why This Works:**
+- Ordered sequence makes failure modes detectable: git history is clean even if GitHub labels crash
+- Sandbox-stopped check (G20) prevents race where slow sandbox is declared dead while still executing
+- Branch inspection (G21) prevents two sandboxes writing same branch (data corruption)
+- Attempt counter (G25) is circuit breaker for structural failures
+- Mandatory recovery comment creates human-readable audit trail independent of git and label history
+
+**Approved:** All G20–G26 guardrails are non-negotiable for production. Recovery sequence is complete, ordered, and machine-readable for Azure Function implementation.
+
+**Next Implementation:**
+- Review Azure Function implementation for G20–G26 compliance (pre-implementation gate)
+- Code recovery sequence in C# (P2 priority, after G11 Managed Identity confirmation)
+- Unit test stale-lease sweep logic (P2)
+- Integration test recovery with branch inspection + attempt escalation (P3)
+

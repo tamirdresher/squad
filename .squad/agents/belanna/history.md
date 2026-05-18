@@ -32,3 +32,26 @@ B'Elanna owns durable/distributed workflow thinking for Squad-related agent syst
 
 **Deferred Concerns:** Multi-step orchestration (Plan → Implement → Review → PR) and Durable Functions coordination deferred until workflow complexity exceeds single-stage triage processing.
 
+## 2026-05-18T12:08:34.040+03:00 — Sandbox Failure Mode Analysis & Orphan Prevention Proof
+
+**Deep-Dive Analysis:** Authored comprehensive failure-mode trace addressing "Does a crashing sandbox create orphan issues?"
+
+**Answer:** No orphans, provided TTL + stale-lease sweep + PR existence check are wired correctly. Maximum stuck time = 35 minutes (TTL + 1 scan interval). Three-layer prevention: GitHub label (external atomic gate), lease-store (durable record), PR detection (partial work preservation).
+
+**Key Learnings:**
+- **Label age alone is insufficient for correctness.** A 35-minute `squad:processing` label could be dead sandbox (should reclaim) or slow sandbox (should NOT interrupt). Must distinguish using either:
+  - **Model A (Recommended):** ADC status check — query `getSandboxStatus(id)`. If `RUNNING` → extend TTL → recheck. Only sweep when `STOPPED`/`CRASHED`/`NOT_FOUND`.
+  - **Model B (Fallback):** Sandbox heartbeat write — sandbox writes `expires_at = now() + TTL` every 10 min. Stale sweep skips if heartbeat is recent.
+- **Partial work must be detected and preserved.** Branch inspection on recovery detects commits on `squad/issue-<N>`. New sandbox **resumes from branch tip** (not fresh from main) if partial work exists. Prevents restarting and losing prior progress.
+- **Attempt counter is the circuit breaker.** Three consecutive failures indicate structural issue (bad payload, impossible task), not transient crash. Escalate to human review after 3 attempts.
+
+**Confirmation:**
+- Model A preferred (no agent-side instrumentation needed; dead sandbox simply stops writing extensions).
+- TTL provides hard upper bound on stuck time; heartbeat/status mechanism determines when to reclaim *within* that bound.
+- Stale-lease sweep is the durable recovery mechanism; must run before claiming fresh work to prevent race.
+
+**Next Implementation:**
+- Implement TTL extension logic in Azure Function P2 (requires Geordi confirmation of ADC status API availability).
+- Code recovery path with branch inspection + attempt counter (P2 Azure Function, P3 integration test).
+- Write integration test validating recovery with partial commits + attempt escalation (P3).
+

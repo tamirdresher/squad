@@ -405,15 +405,74 @@ execShell(sandboxId, "node /squad/runner.js")
 - ✅ **Worf (Security & Reliability):** Conditional approval with mandatory guardrails G13–G19; rejected automated merge and automated conflict resolution; requires human approval gate on protected branches and conflict escalation to human
 - ✅ **Seven (Governance):** Audited ADC corrections against tamresearch1 source of truth; confirmed pre-baked image approach, disk-backed suspend, no late-startup installs
 
+#### Sandbox Death & Orphan Issue Recovery (Subsection)
+
+**By:** B'Elanna (Reliability), Worf (Security & Reliability)  
+**Status:** Design-phase decision; clarifies failure mode handling for stale-lease sweep.
+
+**Problem:** A sandbox crashes, is evicted, or times out before completing work. The `squad:processing` label remains on an issue with an expired lease. The orchestrator must safely reclaim the issue without duplicating work or corrupting branch state.
+
+**Solution: Stale-Lease Recovery with Mandatory Guardrails**
+
+The stale-lease sweep (running every 5-minute scan cycle) reclaims stuck issues by:
+
+1. **Detecting stale leases:** For each lease with `expires_at < now()` (TTL expired)
+2. **Verifying sandbox is stopped (G20):** Query ADC: `getSandboxStatus(sandbox_id)`. If `RUNNING` or `SUSPENDED`, extend TTL by one cycle (grace period) and skip recovery. Only proceed if sandbox is `STOPPED`, `CRASHED`, or `NOT_FOUND`.
+3. **Checking for partial work (P2 + G21):** Inspect `squad/issue-<N>` branch via GitHub API.
+   - **No branch:** Fresh start safe; new sandbox starts from `main`.
+   - **Branch exists, not in PR:** Partial commits present. New sandbox **must** resume from branch tip (payload includes `"resumeBranch": true`, `"branchRef": "squad/issue-<N>"`).
+   - **Branch in merged PR:** Caught by P2 check; should not occur. Abort requeue, apply `squad:stuck`.
+4. **Incrementing attempt counter (P5 + G25):** Read `attempt` from expired lease; increment in recovery. If `attempt >= 3`, escalate to `squad:stuck` (no requeue, human review required).
+5. **Ordered recovery sequence (G26):**
+   - Update lease-store, git commit & push (P4: audit log written first)
+   - Remove `squad:processing` label
+   - Post recovery comment (mandatory audit trail per G24): sandbox_id, phase at expiry, lease TTL, action taken, attempt count
+   - Re-apply `squad:agent:<name>` label (issue returns to TRIAGED) if `attempt < 3`, or `squad:stuck` if escalating
+6. **No requeue if terminal (G22):** Skip recovery if `squad:done` is present; delete stale lease entry only, no label changes.
+
+**Why this prevents orphans:**
+- GitHub label `squad:processing` is the external atomic gate; stale-lease sweep is the reclaim mechanism (both must execute in order).
+- Branch inspection (G21) prevents two sandboxes from conflicting on the same branch.
+- Sandbox-stopped check (G20) prevents reclaiming a live sandbox that is merely slow.
+- Three-attempt escalation (G25) prevents infinite retry loops on structural failures (bad payload, impossible task).
+- Audit comments (mandatory per G24) create human-readable recovery trail independent of git log.
+
+**Labels added to taxonomy:**
+- `squad:stuck` — Terminal until manually cleared by human; issue failed automated recovery 3 times.
+
+**Distinction: Dead vs. Slow Sandbox**
+- Label age alone cannot distinguish. Must use ADC status check (Model A, preferred) or sandbox heartbeat write (Model B, fallback).
+- **Model A (Recommended):** Before each stale-sweep, scanner queries ADC status. If `RUNNING` → extend TTL by one cycle → recheck next scan. Only sweep when ADC says sandbox is `STOPPED`/`CRASHED`/`NOT_FOUND`.
+- **Model B (Fallback):** Sandbox writes heartbeat to lease-store every 10 min. Stale sweep skips if heartbeat is recent.
+
+Currently, the design uses **Model A + grace period** (Worf G20): allow one cycle of "maybe it's slow" before reclaim.
+
+**Related guardrails (cross-ref Worf G20–G26):**
+- G20: Verify sandbox stopped before requeue
+- G21: Inspect branch state before requeue; resume from branch tip if partial work exists
+- G22: Do NOT requeue if `squad:done` present (sweep bug if occurs)
+- G23: Recovery PRs include history in description ("PR created after sandbox recovery attempt N")
+- G24: Idempotent label removal & comment posting (treat 404 as success; skip duplicate comments)
+- G25: Stuck-issue escalation after 3 attempts; apply `squad:stuck`, post comment tagging Picard, do NOT return to queue
+- G26: Exact recovery sequence (lease-store first, then label removal, then comment, then re-label) is non-negotiable; any step failure halts sequence
+
+**What's NOT in MVP:**
+- No autonomous sandbox restart/relaunch (reclaim only, no re-issue of work to same failed sandbox).
+- No fuzzy heuristics for "how long is too long"; exact TTL (10 min for 5-min cycles) or explicit ADC status check.
+- No Durable Task framework timeout extension (outside Squad scope; ADC auto-suspend is safety net).
+
+**Why:** Production-proven pattern: stale-work reclaim is the only durable recovery when executors are ephemeral. The three-layer audit (GitHub labels, lease-store git history, recovery comment) makes failures visible and human-reviewable.
+
 #### Next Steps (Implementation Phase)
 
 1. **P0 — Worf Gate (G11):** Geordi confirms Managed Identity bearer token accepted by ADC API (blocks Azure Function auth)
 2. **P1 — Squad SDK:** Real `copilot` task execution in `LocalPollingProvider` (~20 lines); export lease-label helpers
 3. **P1 — Pre-baked image:** Create `runner.js` in copilot disk image; bake into ADC image
-4. **P2 — Azure Function:** C# .NET function with `Microsoft.Adc.Client`; implements 5-min loop per above spec
+4. **P2 — Azure Function:** C# .NET function with `Microsoft.Adc.Client`; implements 5-min loop per above spec; implement stale-lease sweep + recovery (G20–G26)
 5. **P2 — Local Ralph watch fallback:** `ralph-watch-adc.ps1` for dev/demo (local version, not cloud)
 6. **P3 — PR/merge gating:** Validate GitHub branch protection integration; test human approval flow
-7. **Future (Non-MVP):** Event-driven seam once periodic validates; webhook adapter for sub-minute latency
+7. **P3 — Stale-lease recovery testing:** Unit test stale-lease sweep; integration test recovery with branch inspection + attempt counter
+8. **Future (Non-MVP):** Event-driven seam once periodic validates; webhook adapter for sub-minute latency
 
 ### 2026-05-18T06:10:18.038+03:00: ADC means AgentDevCompute — corrected source-of-truth and demo constraints
 
