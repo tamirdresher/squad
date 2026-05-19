@@ -1,6 +1,6 @@
 # Squad Decisions
 
-**Last Updated:** 2026-05-19T07:11:25.375+03:00
+**Last Updated:** 2026-05-19T07:55:11.928+03:00
 
 ## Active Decisions
 
@@ -1306,3 +1306,116 @@ Key files:
 - `schemas/transcript-row.schema.json`, `schemas/metrics-header.csv`
 
 **Next:** Coordinate with Worf (gate HB-1–HB-8), Picard (scope lock), Seven (protocol finalization) before full-scale run.
+
+---
+
+### 2026-05-19T07:55:11.928+03:00: Seven — Memory Governance Coverage: Blog Concepts vs Implementation
+
+**By:** Seven (Research & Integration Engineer)  
+**Status:** Finding  
+**Scope:** Verification that blog post concepts on "different kinds of things to remember" are included in memory governance design and implementation.
+
+**Verdict: SUBSTANTIAL ALIGNMENT with SPECIFIC GAPS**
+
+The memory governance provider implementation captures **80-85% of the blog post's core concepts** about memory classification and tiering.
+
+**What's included:**
+- ✅ Memory classification system (TRANSIENT, LOCAL, DECISION, POLICY, COPILOT_MEMORY, FORBIDDEN)
+- ✅ Tiered memory model (hot/cold/wiki)
+- ✅ Audit trail + tombstones for deletion
+- ✅ Safety rejection rules (forbidden patterns)
+- ✅ Write-time intelligence (classification before persistence)
+- ✅ Local-first default + opt-in external providers
+
+**What's missing or partial:**
+- ⚠️ **Load-guidance tags** ([ALWAYS], [ON-DEMAND], [ARCHIVE]) — conceptually present but NOT formalized in SDK or docs
+- ⚠️ **Cloudflare-inspired memory types** — mapped to 6 classes but naming differs
+- ⚠️ **Ingestion verification pipeline** — Classify + Store present; Extract/Verify stages implicit/incomplete
+- ⚠️ **Supersession chains** — MemoryIndexEntry has `status: 'superseded'` but no forward-link implementation
+- ⚠️ **Multi-channel retrieval** — No mention in current phase 0-4 roadmap
+
+**Critical Gaps for Dry Run:**
+1. Load-Guidance Tags Not Formalized — Agents won't know which memory to load at which time (HIGH priority)
+2. Supersession Chains Incomplete — Old decisions aren't linked to replacements (MEDIUM priority)
+3. Ingestion Verification Step Missing — Deduplication assigned to Scribe but isn't automated (MEDIUM priority)
+4. Multi-Channel Retrieval Not Planned — Agents can only grep; no semantic/HyDE search (LOW priority)
+
+**Recommendations:**
+- Before dry run, update experiment prompt to include load-guidance tags explicitly
+- Document decision replacements: "When a decision is superseded, add '**SUPERSEDED by [decision-id]**' to the old entry"
+- Phase 1 dry run should treat Scribe's inbox merge as the verification gate
+
+---
+
+### 2026-05-19T07:55:11.928+03:00: Data — Expanded Memory A/B 3-Turn Dry Run Result
+
+**By:** Data  
+**When:** 2026-05-19T07:55:11.928+03:00  
+**Status:** Dry run complete; 10-turn pilot and 50-turn scale-out not run.
+
+**Result:** Ran 3-turn dry run under substitute harness. Copilot CLI smoke passed turn 1 (session 3abf22da, 48.5s). Full paired A/B conclusion path is substitute-direct-layer-harness, not Copilot UI proof.
+
+**Fixture:** Commit `8961ee9d45a3bbf2929808889e46057283936dcc`, Tree `fa25d87e390e3ea48712f6a086ca2ac58f6cc051`
+
+**Sub-results:**
+- Orientation passed in substitute harness for both variants
+- Seeded recall: A returned `NOT_IN_CONTEXT`; B recalled prior n=20 boundary and blog two-layer memory concept
+- Forbidden/transient sample rejected without repeating synthetic secret in outputs
+- **Meaning:** Dry run supports harness shape and memory-layer behavior; does not establish full Copilot UI value
+
+**Worf Gate Snapshot:**
+- HB-1/2/3/4/5/7: Evidenced enough for dry-run review
+- **HB-6/HB-8 BLOCKING:** Need token/cost accounting + halt-on-$50 ceiling; silence detector + three-hang escalation
+
+**Key Artifacts:**
+- Session: `e9c1993c-7118-476c-acb1-9616a7fecbe1`
+- Progress: `.copilot/session-state/.../expanded-memory-ab/dry-run-3turn-20260519T075511/progress-report.md`
+
+---
+
+### 2026-05-19T07:55:11.928+03:00: Worf — Expanded Memory A/B 3-Turn Dry Run Gate Result
+
+**By:** Worf (Security & Reliability Reviewer)  
+**When:** 2026-05-19T07:55:11.928+03:00  
+**Status:** CONDITIONAL PASS — 10-turn pilot may proceed after two targeted fixes
+
+**Hard Blocker Verdicts:**
+
+| Blocker | Verdict | Evidence |
+|---------|---------|----------|
+| **HB-1** Credentials / fixture isolation | ✅ SATISFIED | Local fixture only; no live credentials |
+| **HB-2** Transcript redaction | ✅ SATISFIED | Redaction pass applied; synthetic secret absent from outputs |
+| **HB-3** Content-exclusion compliance | ✅ SATISFIED | No denials observed |
+| **HB-4** Third-party PII | ✅ SATISFIED | Fixture uses `example.invalid` identity |
+| **HB-5** Timeout enforcement | ✅ SATISFIED | Copilot smoke capped at 60s (actual: 48.5s) |
+| **HB-7** Rate-limit compliance | ✅ SATISFIED | `interTurnDelaySeconds: 5`; no 429 observed |
+| **HB-6** Token/cost budget | ❌ BLOCKING | No token count, dollar amount, or halt-on-ceiling mechanism |
+| **HB-8** Runaway/silence detection | ❌ BLOCKING | Wall-clock timeout exists; >5 min silence detector and three-hang escalation NOT evidenced |
+
+**Allowed Claims:**
+1. "In a 3-turn substitute-harness dry run, governed local memory enabled recall of seeded decisions while no-memory variant returned NOT_IN_CONTEXT."
+2. "Memory governance SDK correctly rejected forbidden content; synthetic secret did not appear in outputs or audit."
+3. "Copilot CLI smoke passed for turn-1 orientation (session 3abf22da, 48.5s)."
+
+**Not Allowed Claims:**
+1. "Copilot CLI E2E proves memory value." — Only 1 of 6 A/B turns used real Copilot CLI
+2. "Memory improves agent productivity/quality." — No multi-turn evidence yet
+3. "Harness is production-ready for 50-turn runs." — HB-6/HB-8 not cleared
+
+**Seven's Impact:**
+Load-guidance tags missing formalization requires explicit experiment prompt rules (ALWAYS/ON-DEMAND/ARCHIVE file lists). For pilot, Data must embed load-guidance rules to stay within HB-6 cost ceiling.
+
+**Verdict: 10-TURN PILOT MAY PROCEED AFTER:**
+1. **HB-6 fix:** Machine-readable token/cost accounting with $50 halt-on-ceiling
+2. **HB-8 fix:** Silence detector (>5 min → kill + log "hung") + three-hang escalation
+3. **Prompt update:** Embed load-guidance tags from Seven's analysis
+
+**Next Gate:** worf-expanded-memory-ab-10turn-pilot-gate (pending Data's HB-6 + HB-8 fixes)
+
+---
+
+### 2026-05-19T07:55:11.928+03:00: User Directive — Send Progress Updates and Interim Sub-Results
+
+**By:** Copilot (via directive capture)  
+**What:** During the expanded memory experiment, send progress updates and interim sub-results with their meaning as the experiment runs.  
+**Why:** User request — keep experiment progress, partial evidence, and limitations visible rather than only reporting at the end.
