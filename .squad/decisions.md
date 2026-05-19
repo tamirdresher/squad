@@ -1,6 +1,6 @@
 # Squad Decisions
 
-**Last Updated:** 2026-05-19T06:33:42.877+03:00
+**Last Updated:** 2026-05-19T07:11:25.375+03:00
 
 ## Active Decisions
 
@@ -1139,3 +1139,170 @@ This oracle defines what true E2E behavior looks like for Squads with/without lo
 **Boundary:** The non-interactive `copilot -C <repo> --agent squad -p ...` smoke returned status 0 but not the requested sentinel, so it is inconclusive and not full UI E2E evidence. Worf gate: n=20 is adequate for the controlled paired signal, not broad generalization; coupled/scripted metrics do not cleanly satisfy the threshold for user-scope claims.
 
 **Artifacts:** `C:\Users\tamirdresher\.copilot\session-state\memory-ab-20260519T063342\memory-ab-report.md`; inbox oracle/results summarized and cleared.
+
+---
+
+### 2026-05-19T07:11:25.375+03:00: User Directive — Expanded Cross-Repo Memory Experiment: Write All Actions and Analysis
+
+**By:** Copilot (via Copilot)
+
+**What:** For the expanded cross-repo Copilot/Squad memory experiment, write down all actions, prompts, runs, outputs, limitations, and analysis for audit and later review.
+
+**Why:** User request — captured for team memory and experiment reproducibility.
+
+---
+
+### 2026-05-19T07:11:25.375+03:00: User Directive — Disable GitHub Workflows in Experiment Repo Variants
+
+**By:** Copilot (via Copilot)
+
+**What:** For all expanded memory A/B experiment repositories, remove or disable GitHub workflows in cloned/forked/generated repo variants so GitHub Actions does not run and fail in forks or repos where workflows are disabled.
+
+**Why:** User request — prevent noisy or failing workflow runs during experiment setup.
+
+---
+
+### 2026-05-19T07:11:25.375+03:00: Expanded Cross-Repo Memory A/B Experiment — Scope & Gate Memo (Picard)
+
+**By:** Picard (Project Lead)
+
+**Status:** PROPOSAL — Awaiting Tamir confirmation on Gate 3 (Copilot CLI E2E feasibility)
+
+**What:** Scoped, auditable 50-turn paired trials across 5 repos (eShop, Aspire, EF Core, TypeScript/Node, Squad-squad) with two variants: with/without local governed memory. Identical prompts, deterministic logging, real Copilot CLI E2E (preferred) or substitute harness (fallback). Tier 1 (3 repos, ~8–10 trials) can start immediately with Star Trek Squad; Tier 2 follows if Tamir approves.
+
+**Key Decisions:**
+- **Atomic Unit:** {repo, variant, 50-turn conversation} → 1 session log
+- **Total Scope:** 5 repos × 2 variants × 1–3 session iterations = 10–15 complete runs (~500–750 turns total)
+- **Variants:** A = no memory (baseline); B = local memory governance enabled
+- **Output:** Complete session logs, audit trail, memory ops, error stack
+- **Can Start:** Harness development, repo portfolio definition, prompt authoring
+- **Requires Approval:** Copilot CLI E2E integration, external repo clones, rate-limit strategy, researcher squad decision
+
+**Boundaries:**
+- Real Copilot CLI E2E if infrastructure approved; harness fallback with clear caveats
+- No separate researchers squad unless scope exceeds Phase 1
+- Acceptance criteria: 50 turns per variant, identical prompts A/B, memory ops audited, metrics computed, reproducibility artifacts
+
+**Next Steps:** Data (harness + local trial 2–3d), Seven + Tamir (50-turn prompts 2–3d), Worf (security audit 1d), Picard (repo portfolio 1d), Tamir (Gate 3 decision).
+
+---
+
+### 2026-05-19T07:11:25.375+03:00: Expanded Memory A/B Test Protocol — 50-Turn Multi-Repo Experiment (Seven)
+
+**By:** Seven (Research & Integration Engineer)
+
+**Status:** Design phase, ready for implementation delegation
+
+**What:** Production-rigor protocol scaling prior n=20 proof-of-concept to 6 repos × 2 variants × 5 seed strategies = 60 complete datasets (600 turns). Identical prompts traced from repo SHAs through audit logs. Metrics focus on decision recall under compaction stress, safety violations, token efficiency, task success. Separate analyst squad processes transcripts and produces durable findings.
+
+**Repository Portfolio:** Squad-squad (local), Squad Core/Brady (clone), Aspire (.NET), EF Core (.NET), eShop (monorepo), Node.js or CPython (optional/reserve)
+
+**Turn Categories (50 total):**
+1. Orientation (5) — Map repo, list decision points
+2. Bug Diagnosis (8) — Trace issues, recall prior context
+3. Feature Request (7) — Design feature, check conflicts
+4. Test Generation (6) — Write tests, verify constraints
+5. Refactoring (6) — Restructure, check breaking changes
+6. Cross-Turn Recall (8) — Forced recall from 10 turns prior
+7. Safety & Policy (5) — Credential handling, guardrails
+8. Context Compression (4) — Summarize in 200 words
+9. Correction Cycles (3) — Follow-ups on mistakes
+10. Summarization (2) — Final recap, durable decisions
+
+**Memory Seeding:** Slim (5–8 core decisions, 0 distractors), Medium (10–15 + 15–20 distractors), Large (20–25 + 50–100 distractors)
+
+**Primary Metrics:**
+- Decision Recall Accuracy: B ≥ 0.80 (vs. prior 0.50 delta)
+- Distractor Rejection Rate: B ≥ 0.90
+- Task Success (Overall): B median ≥ 4
+- Corrections Needed: B-A reduction ≥ 2
+- Safety Violations: B count ≤ A count
+
+**Audit Artifacts:** Per-run turns, memory-log.jsonl, tool-invocations.jsonl, failures.jsonl, final-summary.json. Centralized: config.json, prompts.json, memory-seeds/, metrics/, audit/
+
+**Analyst Squad:** Casey (Lead Analyst), Morgan (Auditor), Riley (Synthesist), Pat (QA). Timeline: 60 datasets → audit (1 wk) → metrics (1 wk) → synthesis (1 wk) → report due 2 wks post-close.
+
+**Implementation Checklist:** Repo setup, prompt library, memory seeds, turn harness, variant isolation, audit schema, analyst squad assignment, dry run (1 pair, 10 turns), full run (60 pairs, 600 turns), analysis.
+
+---
+
+### 2026-05-19T07:11:25.375+03:00: Expanded Memory A/B Experiment — Quick Reference Matrix (Seven)
+
+**By:** Seven (Research & Integration Engineer)
+
+**What:** Quick reference table for 60-dataset experiment structure (6 repos × 2 variants × 5 seed strategies = 600 turns). Includes repository list, variant definitions, turn categories, memory seeds, primary metrics with success thresholds, contamination safeguards, audit artifacts per run, and analyst squad roles.
+
+**Key Metrics Success Thresholds:**
+- Decision Recall Accuracy: B-A ≥ +0.70 (slim: no lift, large: +1.0)
+- Distractor Rejection Rate: B-A ≥ +0.80
+- Task Success Overall: B-A ≥ +0.80
+- Corrections Needed: B-A ≤ -1.5
+- Safety Violations: B ≤ A
+- Token Overhead: <20%
+
+**Contamination Safeguards:** Separate session dirs, separate LLM sessions, separate memory stores, fixed checksummed prompts, variant marker injected post-prompt, audit log of all memory ops/tool calls.
+
+**Decision Thresholds:**
+- Production Ready (B-A recall ≥0.70, safety B≤A, overhead <20%): "Local governed memory enables safe, efficient decision recall under compaction stress."
+- Partial Success (B-A recall 0.40–0.69): "Memory layer valuable for high-recall workloads; not recommended for cost-sensitive tasks."
+- Not Ready (B-A recall <0.40 or safety B>A): "Governed memory prototype shows promise but needs retrieval tuning and stricter policy enforcement."
+
+---
+
+### 2026-05-19T07:11:25.375+03:00: Expanded Memory A/B Experiment — Safety & Audit Gate (Worf)
+
+**By:** Worf (Security & Reliability Reviewer)
+
+**Status:** GATE DEFINITION — Hard blockers and approval checklist before experiment execution
+
+**Scope:** Multi-repo, 50-turn paired Copilot CLI sessions (memory vs. no-memory) across eShop, Aspire, Squad, EF Core, TypeScript/Node/Python repos
+
+**12 Hard Blockers (Must Clear Before Execution):**
+
+1. **HB-1:** No live credentials in clones; all target repos pinned to public commit SHAs; short-lived tokens only (≤1h), scoped read-only, stored in env vars
+2. **HB-2:** Transcripts never contain GitHub PATs, Azure keys, connection strings, JWT tokens, cookies; deterministic post-processing redaction (regex + allow-list) before commit
+3. **HB-3:** Content-exclusion policies apply; Copilot refusal → log "EXCLUDED" and continue; no workarounds; no denial paths exposed in public artifacts
+4. **HB-4:** No third-party PII beyond operator's GitHub handle; hash/strip third-party names/emails from repo history
+5. **HB-5:** Hard timeout 60 minutes wall-clock per 50-turn session; SIGTERM on exceed, log as "timeout"
+6. **HB-6:** Token/cost budget defined before execution ($50 pilot / $500 full); halt all remaining sessions if ceiling hit
+7. **HB-7:** Rate-limit compliance; 5-second inter-turn minimum delay, exponential backoff on 429; no parallel sessions same identity
+8. **HB-8:** Runaway detection; >5 min silence → kill turn, log "hung"; three consecutive hangs per repo → pause repo + alert
+9. **HB-9:** No overclaiming beyond design scope; valid: "In controlled paired sessions, governed memory improves X with effect size Y"; invalid: productivity claims or broad generalization
+10. **HB-10:** Multiple comparisons corrected (Bonferroni/FDR); raw p-values insufficient for multi-metric claims
+11. **HB-11:** Effect sizes + confidence intervals mandatory; p-values alone not acceptable
+12. **HB-12:** Repo selection bias acknowledged; eShop/Aspire/EF Core do not represent "diverse codebases" without equal representation from TypeScript/Node/Python
+
+**Data's Harness Gates (D-1 through D-6):** Deterministic prompt injection, session isolation, timeout + cost enforcement, redaction pass, reproducibility, failure handling
+
+**Seven's Protocol Gates (S-1 through S-6):** Pre-registration, randomization, blinding, power analysis, stopping rules, honest limitations
+
+**Verdict:** Experiment BLOCKED until all 12 hard blockers addressed. Pilot run (2 repos, 10 turns) may proceed once HB-1–HB-8 cleared.
+
+---
+
+### 2026-05-19T07:11:25.375+03:00: Expanded Memory A/B Harness Design (Data)
+
+**By:** Data (Squad Framework Expert)
+
+**Status:** Gated yes, but do not run unattended 50-turn batches until 3-turn dry run and 10-turn pilot pass
+
+**Evidence:** Prior n=20 evidence is scoped memory-layer validation only, not Copilot UI proof. In this session:
+- `copilot --agent squad -p ... --share ...` returned exact sentinel
+- `copilot --agent squad --resume=<session-id> -p ...` worked for second scripted turn after parsing session id
+- PowerShell wrapper rejected `-C` and `--name`; cwd must be set externally, sessions resume by parsed id
+- Share exports contain current turn only, not complete transcript; harness must persist one share/stdout/stderr bundle per turn
+
+**Boundary:** This proves 1–2 turn scriptability only. Full 50-turn experiment must be staged: 3-turn dry run, 10-turn pilot, then 50-turn batches. If Copilot session resume, transcript capture, timeouts, or contamination controls fail, fall back to direct Squad CLI/SDK replay (labeled substitute memory-layer evidence).
+
+**Artifacts:** Session scaffolding created under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\`
+
+Key files:
+- `README.md`
+- `RUNBOOK.md`
+- `config/experiment.json`, `config/repos.json`, `config/memory-seed.json`
+- `prompts/turns-50.json`
+- `scripts/setup-variants.ps1`, `scripts/run-copilot-paired.ps1`
+- `analysis/extract-metrics.mjs`, `analysis/analyze-results.mjs`
+- `schemas/transcript-row.schema.json`, `schemas/metrics-header.csv`
+
+**Next:** Coordinate with Worf (gate HB-1–HB-8), Picard (scope lock), Seven (protocol finalization) before full-scale run.
