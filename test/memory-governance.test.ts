@@ -453,6 +453,80 @@ describe('LocalMemoryStore', () => {
     });
   });
 
+
+  it('CLI emits safe memory diagnostics when log level is enabled', async () => {
+    const root = testRoot('memory-cli-diagnostics');
+    const output: string[] = [];
+    const diagnostics: string[] = [];
+    const originalLog = console.log;
+    const originalError = console.error;
+    console.log = (value?: unknown) => {
+      output.push(String(value));
+    };
+    console.error = (value?: unknown) => {
+      diagnostics.push(String(value));
+    };
+    try {
+      await runMemoryCommand(root, [
+        'write',
+        '--log-level',
+        'debug',
+        '--content',
+        'password=never-log-this-value',
+        '--title',
+        'Sensitive write',
+        '--class',
+        'LOCAL',
+      ]);
+    } finally {
+      console.log = originalLog;
+      console.error = originalError;
+    }
+
+    expect(JSON.parse(output[0] ?? '{}')).toMatchObject({
+      stored: false,
+      classification: { class: 'FORBIDDEN' },
+    });
+    expect(diagnostics.join('\n')).toContain('[memory:info] command.start command=write');
+    expect(diagnostics.join('\n')).toContain('[memory:debug] write.request');
+    expect(diagnostics.join('\n')).toContain('contentLength=');
+    expect(diagnostics.join('\n')).not.toContain('never-log-this-value');
+  });
+
+  it('CLI memory diagnostics report safe counts and providers without breaking JSON stdout', async () => {
+    const root = testRoot('memory-cli-diagnostics-search');
+    const store = new LocalMemoryStore(new FSStorageProvider(), root);
+    await store.write({
+      content: 'Use safe diagnostic events for memory commands.',
+      title: 'Diagnostic events',
+      author: 'data',
+      requestedClass: 'LOCAL',
+    });
+
+    const output: string[] = [];
+    const diagnostics: string[] = [];
+    const originalLog = console.log;
+    const originalError = console.error;
+    console.log = (value?: unknown) => {
+      output.push(String(value));
+    };
+    console.error = (value?: unknown) => {
+      diagnostics.push(String(value));
+    };
+    try {
+      await runMemoryCommand(root, ['search', '--verbose', '--query', 'diagnostic events']);
+    } finally {
+      console.log = originalLog;
+      console.error = originalError;
+    }
+
+    const results = JSON.parse(output[0] ?? '[]');
+    expect(results).toHaveLength(1);
+    expect(diagnostics.join('\n')).toContain('[memory:info] search.complete count=1 providers=local');
+    expect(diagnostics.join('\n')).toContain('[memory:debug] search.request queryLength=');
+    expect(diagnostics.join('\n')).not.toContain('diagnostic events');
+  });
+
   it('writes, searches, deletes, tombstones, and audits through hostInjectedCopilotAdapter', async () => {
     const root = testRoot('memory-provider-host-client');
     const providerWrites: CopilotMemoryProviderWriteRequest[] = [];

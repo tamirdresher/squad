@@ -73,6 +73,11 @@ squad memory audit
 squad memory provider
 ```
 
+Use `--log-level info|debug` (or `--verbose`) when troubleshooting memory command
+activity. Diagnostics are written to stderr and include safe metadata such as the command,
+provider, load-guidance, path, result counts, and timing. They do not print raw memory
+content or search text.
+
 Prompt-only Copilot custom agents still fall back to direct `.squad/` file edits. That
 fallback is intentionally local: it does not claim provider-backed semantic memory,
 external indexing, policy enforcement, or remote deletion unless a CLI/MCP/tool bridge is

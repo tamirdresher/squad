@@ -8,7 +8,35 @@ import {
 const REAL_COPILOT_UNAVAILABLE_REASON =
   'Real Copilot Memory API unavailable: no concrete callable API was found in installed @github/copilot SDK/tooling. Squad will not fake provider=copilot; use hostInjectedCopilotAdapter only when a host supplies a client.';
 
+type MemoryDiagnosticLevel = 'none' | 'error' | 'info' | 'debug';
+
+type MemoryProviderConfig = {
+  defaultProvider: 'local' | 'hostInjectedCopilotAdapter' | 'copilot';
+  externalProviders: {
+    hostInjectedCopilotAdapter: {
+      enabled: boolean;
+      requireApproval: boolean;
+    };
+  };
+};
+
+type MemoryProviderStatus = {
+  defaultProvider: 'local' | 'hostInjectedCopilotAdapter' | 'copilot';
+  realCopilotMemory: { available: false; configured: boolean; reason: string };
+  hostInjectedCopilotAdapter: { enabled: boolean; requireApproval: boolean; clientAvailable: boolean; configured: boolean };
+};
+
+const MEMORY_DIAGNOSTIC_LEVELS: Record<MemoryDiagnosticLevel, number> = {
+  none: 0,
+  error: 1,
+  info: 2,
+  debug: 3,
+};
+
 function readFlag(args: string[], name: string): string | undefined {
+  const equalsPrefix = `${name}=`;
+  const equalsValue = args.find(arg => arg.startsWith(equalsPrefix));
+  if (equalsValue) return equalsValue.slice(equalsPrefix.length);
   const index = args.indexOf(name);
   return index >= 0 ? args[index + 1] : undefined;
 }
@@ -44,8 +72,64 @@ function parseBoolean(value: string | undefined, defaultValue: boolean): boolean
   throw new Error(`Expected boolean value, got: ${value}`);
 }
 
+function parseLogLevel(value: string | undefined): MemoryDiagnosticLevel {
+  if (!value) return 'none';
+  const normalized = value.toLowerCase();
+  if (normalized === 'none' || normalized === 'silent' || normalized === 'off') return 'none';
+  if (normalized === 'error') return 'error';
+  if (normalized === 'info') return 'info';
+  if (normalized === 'debug' || normalized === 'verbose' || normalized === 'all') return 'debug';
+  throw new Error(`Unknown memory log level: ${value}. Expected none|error|info|debug.`);
+}
+
+function parseDiagnostics(args: string[]): { args: string[]; logLevel: MemoryDiagnosticLevel } {
+  const filtered: string[] = [];
+  let logLevel: MemoryDiagnosticLevel | undefined;
+
+  for (let index = 0; index < args.length; index++) {
+    const arg = args[index]!;
+    if (arg === '--verbose' || arg === '-v') {
+      logLevel ??= 'debug';
+      continue;
+    }
+    if (arg === '--log-level') {
+      logLevel = parseLogLevel(args[index + 1]);
+      index++;
+      continue;
+    }
+    if (arg.startsWith('--log-level=')) {
+      logLevel = parseLogLevel(arg.slice('--log-level='.length));
+      continue;
+    }
+    filtered.push(arg);
+  }
+
+  return { args: filtered, logLevel: logLevel ?? parseLogLevel(process.env['SQUAD_MEMORY_LOG_LEVEL']) };
+}
+
+function createMemoryDiagnostics(logLevel: MemoryDiagnosticLevel) {
+  const emit = (level: Exclude<MemoryDiagnosticLevel, 'none'>, event: string, data: Record<string, unknown> = {}) => {
+    if (MEMORY_DIAGNOSTIC_LEVELS[logLevel] < MEMORY_DIAGNOSTIC_LEVELS[level]) return;
+    const details = Object.entries(data)
+      .filter(([, value]) => value !== undefined)
+      .map(([key, value]) => `${key}=${value}`)
+      .join(' ');
+    console.error(`[memory:${level}] ${event}${details ? ` ${details}` : ''}`);
+  };
+
+  return {
+    error: (event: string, data?: Record<string, unknown>) => emit('error', event, data),
+    info: (event: string, data?: Record<string, unknown>) => emit('info', event, data),
+    debug: (event: string, data?: Record<string, unknown>) => emit('debug', event, data),
+  };
+}
+
 export async function runMemoryCommand(projectRoot: string, args: string[]): Promise<void> {
-  const operation = args[0] ?? 'help';
+  const diagnosticsConfig = parseDiagnostics(args);
+  const commandArgs = diagnosticsConfig.args;
+  const diagnostics = createMemoryDiagnostics(diagnosticsConfig.logLevel);
+  const operation = commandArgs[0] ?? 'help';
+  const startedAt = Date.now();
   const store = new LocalMemoryStore(new FSStorageProvider(), projectRoot);
   const providerStore = store as LocalMemoryStore & {
     configureHostInjectedCopilotAdapter(options: {
@@ -53,98 +137,186 @@ export async function runMemoryCommand(projectRoot: string, args: string[]): Pro
       requireApproval?: boolean;
       defaultProvider?: 'local' | 'hostInjectedCopilotAdapter';
       actor?: string;
-    }): Promise<unknown>;
-    providerStatus(): Promise<unknown>;
+    }): Promise<MemoryProviderConfig>;
+    providerStatus(): Promise<MemoryProviderStatus>;
   };
 
-  if (operation === 'classify') {
-    const content = readContent(args);
-    const loadGuidance = parseLoadGuidance(readFlag(args, '--load-guidance'));
-    const classification = await store.classify({
-      content,
-      requestedClass: parseClass(readFlag(args, '--class')),
-      metadata: loadGuidance ? { loadGuidance } : undefined,
-    });
-    console.log(JSON.stringify(classification, null, 2));
-    return;
-  }
+  diagnostics.info('command.start', { command: operation, projectRoot });
 
-  if (operation === 'write') {
-    const content = readContent(args);
-    const loadGuidance = parseLoadGuidance(readFlag(args, '--load-guidance'));
-    const result = await store.write({
-      content,
-      title: readFlag(args, '--title'),
-      author: readFlag(args, '--author'),
-      requestedClass: parseClass(readFlag(args, '--class')),
-      approved: args.includes('--approved'),
-      metadata: loadGuidance ? { loadGuidance } : undefined,
-    });
-    console.log(JSON.stringify(result, null, 2));
-    return;
-  }
-
-  if (operation === 'search') {
-    const query = readFlag(args, '--query') ?? args.slice(1).join(' ');
-    console.log(JSON.stringify(await store.search(query), null, 2));
-    return;
-  }
-
-  if (operation === 'promote') {
-    const id = args[1];
-    const targetClass = parseClass(readFlag(args, '--class'));
-    if (!id || !targetClass || targetClass === 'FORBIDDEN' || targetClass === 'TRANSIENT') {
-      throw new Error('Usage: squad memory promote <id> --class LOCAL|DECISION|POLICY|COPILOT_MEMORY');
-    }
-    console.log(JSON.stringify(await store.promote(id, targetClass, readFlag(args, '--actor')), null, 2));
-    return;
-  }
-
-  if (operation === 'delete') {
-    const id = args[1];
-    if (!id) throw new Error('Usage: squad memory delete <id>');
-    console.log(JSON.stringify({ deleted: await store.delete(id, readFlag(args, '--actor')) }, null, 2));
-    return;
-  }
-
-  if (operation === 'audit') {
-    console.log(JSON.stringify(await store.auditLog(), null, 2));
-    return;
-  }
-
-  if (operation === 'provider' || operation === 'providers' || operation === 'status') {
-    if (readFlag(args, '--provider') === 'copilot' || args.includes('--default-copilot')) {
-      throw new Error(REAL_COPILOT_UNAVAILABLE_REASON);
-    }
-    if (args.includes('--enable-host-injected-copilot-adapter') || args.includes('--enable-copilot')) {
-      console.log(JSON.stringify(await providerStore.configureHostInjectedCopilotAdapter({
-        enabled: true,
-        requireApproval: parseBoolean(readFlag(args, '--require-approval'), true),
-        defaultProvider: args.includes('--default-host-injected-copilot-adapter')
-          ? 'hostInjectedCopilotAdapter'
-          : undefined,
-        actor: readFlag(args, '--actor'),
-      }), null, 2));
+  try {
+    if (operation === 'classify') {
+      const content = readContent(commandArgs);
+      const loadGuidance = parseLoadGuidance(readFlag(commandArgs, '--load-guidance'));
+      const requestedClass = parseClass(readFlag(commandArgs, '--class'));
+      diagnostics.debug('classify.request', { contentLength: content.length, requestedClass, loadGuidance });
+      const classification = await store.classify({
+        content,
+        requestedClass,
+        metadata: loadGuidance ? { loadGuidance } : undefined,
+      });
+      diagnostics.info('classify.complete', {
+        class: classification.class,
+        allowed: classification.allowed,
+        destination: classification.destination,
+        loadGuidance: classification.loadGuidance,
+        elapsedMs: Date.now() - startedAt,
+      });
+      console.log(JSON.stringify(classification, null, 2));
       return;
     }
-    if (args.includes('--disable-host-injected-copilot-adapter') || args.includes('--disable-copilot')) {
-      console.log(JSON.stringify(await providerStore.configureHostInjectedCopilotAdapter({
-        enabled: false,
-        defaultProvider: 'local',
-        actor: readFlag(args, '--actor'),
-      }), null, 2));
+
+    if (operation === 'write') {
+      const content = readContent(commandArgs);
+      const loadGuidance = parseLoadGuidance(readFlag(commandArgs, '--load-guidance'));
+      const requestedClass = parseClass(readFlag(commandArgs, '--class'));
+      diagnostics.debug('write.request', {
+        contentLength: content.length,
+        requestedClass,
+        loadGuidance,
+        titleProvided: readFlag(commandArgs, '--title') !== undefined,
+        authorProvided: readFlag(commandArgs, '--author') !== undefined,
+        approved: commandArgs.includes('--approved'),
+      });
+      const result = await store.write({
+        content,
+        title: readFlag(commandArgs, '--title'),
+        author: readFlag(commandArgs, '--author'),
+        requestedClass,
+        approved: commandArgs.includes('--approved'),
+        metadata: loadGuidance ? { loadGuidance } : undefined,
+      });
+      diagnostics.info('write.complete', {
+        stored: result.stored,
+        class: result.classification.class,
+        provider: result.classification.class === 'COPILOT_MEMORY' ? 'hostInjectedCopilotAdapter' : 'local',
+        loadGuidance: result.classification.loadGuidance,
+        path: result.path,
+        elapsedMs: Date.now() - startedAt,
+      });
+      console.log(JSON.stringify(result, null, 2));
       return;
     }
-    console.log(JSON.stringify(await providerStore.providerStatus(), null, 2));
-    return;
-  }
 
-  console.log([
-    'Usage: squad memory <classify|write|search|promote|delete|audit|provider>',
-    '  write --content "..." --class LOCAL --title "..." --author scribe [--load-guidance ALWAYS|ON-DEMAND|ARCHIVE|NEVER]',
-    '  search --query "testing strategy"',
-    '  provider [--enable-host-injected-copilot-adapter|--disable-host-injected-copilot-adapter] [--require-approval true|false]',
-    '  provider --provider copilot fails unless a real Copilot Memory API module is present.',
-    'hostInjectedCopilotAdapter is not real provider=copilot persistence; enabling config alone never fakes remote memory.',
-  ].join('\n'));
+    if (operation === 'search') {
+      const query = readFlag(commandArgs, '--query') ?? commandArgs.slice(1).join(' ');
+      diagnostics.debug('search.request', { queryLength: query.length });
+      const results = await store.search(query);
+      diagnostics.info('search.complete', {
+        count: results.length,
+        providers: [...new Set(results.map(result => result.provider ?? 'local'))].join(',') || 'none',
+        elapsedMs: Date.now() - startedAt,
+      });
+      console.log(JSON.stringify(results, null, 2));
+      return;
+    }
+
+    if (operation === 'promote') {
+      const id = commandArgs[1];
+      const targetClass = parseClass(readFlag(commandArgs, '--class'));
+      if (!id || !targetClass || targetClass === 'FORBIDDEN' || targetClass === 'TRANSIENT') {
+        throw new Error('Usage: squad memory promote <id> --class LOCAL|DECISION|POLICY|COPILOT_MEMORY');
+      }
+      diagnostics.debug('promote.request', { id, targetClass, actorProvided: readFlag(commandArgs, '--actor') !== undefined });
+      const result = await store.promote(id, targetClass, readFlag(commandArgs, '--actor'));
+      diagnostics.info('promote.complete', {
+        id,
+        stored: result.stored,
+        class: result.classification.class,
+        path: result.path,
+        elapsedMs: Date.now() - startedAt,
+      });
+      console.log(JSON.stringify(result, null, 2));
+      return;
+    }
+
+    if (operation === 'delete') {
+      const id = commandArgs[1];
+      if (!id) throw new Error('Usage: squad memory delete <id>');
+      diagnostics.debug('delete.request', { id, actorProvided: readFlag(commandArgs, '--actor') !== undefined });
+      const deleted = await store.delete(id, readFlag(commandArgs, '--actor'));
+      diagnostics.info('delete.complete', { id, deleted, elapsedMs: Date.now() - startedAt });
+      console.log(JSON.stringify({ deleted }, null, 2));
+      return;
+    }
+
+    if (operation === 'audit') {
+      const audit = await store.auditLog();
+      diagnostics.info('audit.complete', { count: audit.length, elapsedMs: Date.now() - startedAt });
+      console.log(JSON.stringify(audit, null, 2));
+      return;
+    }
+
+    if (operation === 'provider' || operation === 'providers' || operation === 'status') {
+      if (readFlag(commandArgs, '--provider') === 'copilot' || commandArgs.includes('--default-copilot')) {
+        throw new Error(REAL_COPILOT_UNAVAILABLE_REASON);
+      }
+      if (commandArgs.includes('--enable-host-injected-copilot-adapter') || commandArgs.includes('--enable-copilot')) {
+        const requireApproval = parseBoolean(readFlag(commandArgs, '--require-approval'), true);
+        diagnostics.debug('provider.configure.request', {
+          enabled: true,
+          requireApproval,
+          defaultProvider: commandArgs.includes('--default-host-injected-copilot-adapter') ? 'hostInjectedCopilotAdapter' : undefined,
+        });
+        const config = await providerStore.configureHostInjectedCopilotAdapter({
+          enabled: true,
+          requireApproval,
+          defaultProvider: commandArgs.includes('--default-host-injected-copilot-adapter')
+            ? 'hostInjectedCopilotAdapter'
+            : undefined,
+          actor: readFlag(commandArgs, '--actor'),
+        });
+        diagnostics.info('provider.configure.complete', {
+          defaultProvider: config.defaultProvider,
+          hostInjectedCopilotAdapterEnabled: config.externalProviders.hostInjectedCopilotAdapter.enabled,
+          requireApproval: config.externalProviders.hostInjectedCopilotAdapter.requireApproval,
+          elapsedMs: Date.now() - startedAt,
+        });
+        console.log(JSON.stringify(config, null, 2));
+        return;
+      }
+      if (commandArgs.includes('--disable-host-injected-copilot-adapter') || commandArgs.includes('--disable-copilot')) {
+        diagnostics.debug('provider.configure.request', { enabled: false, defaultProvider: 'local' });
+        const config = await providerStore.configureHostInjectedCopilotAdapter({
+          enabled: false,
+          defaultProvider: 'local',
+          actor: readFlag(commandArgs, '--actor'),
+        });
+        diagnostics.info('provider.configure.complete', {
+          defaultProvider: config.defaultProvider,
+          hostInjectedCopilotAdapterEnabled: config.externalProviders.hostInjectedCopilotAdapter.enabled,
+          elapsedMs: Date.now() - startedAt,
+        });
+        console.log(JSON.stringify(config, null, 2));
+        return;
+      }
+      const status = await providerStore.providerStatus();
+      diagnostics.info('provider.status.complete', {
+        defaultProvider: status.defaultProvider,
+        realCopilotConfigured: status.realCopilotMemory.configured,
+        hostInjectedCopilotAdapterConfigured: status.hostInjectedCopilotAdapter.configured,
+        hostInjectedCopilotAdapterClientAvailable: status.hostInjectedCopilotAdapter.clientAvailable,
+        elapsedMs: Date.now() - startedAt,
+      });
+      console.log(JSON.stringify(status, null, 2));
+      return;
+    }
+
+    diagnostics.info('help.complete', { elapsedMs: Date.now() - startedAt });
+    console.log([
+      'Usage: squad memory <classify|write|search|promote|delete|audit|provider>',
+      '  write --content "..." --class LOCAL --title "..." --author scribe [--load-guidance ALWAYS|ON-DEMAND|ARCHIVE|NEVER]',
+      '  search --query "testing strategy"',
+      '  provider [--enable-host-injected-copilot-adapter|--disable-host-injected-copilot-adapter] [--require-approval true|false]',
+      '  provider --provider copilot fails unless a real Copilot Memory API module is present.',
+      '  diagnostics: --log-level none|error|info|debug or --verbose (stderr; never logs raw memory content or search text).',
+      'hostInjectedCopilotAdapter is not real provider=copilot persistence; enabling config alone never fakes remote memory.',
+    ].join('\n'));
+  } catch (error) {
+    diagnostics.error('command.error', {
+      command: operation,
+      message: error instanceof Error ? error.message : String(error),
+      elapsedMs: Date.now() - startedAt,
+    });
+    throw error;
+  }
 }

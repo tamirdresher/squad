@@ -224,6 +224,7 @@ async function main(): Promise<void> {
     console.log(`             Flags: --deep (thorough cleanup), --dry-run (preview only)`);
     console.log(`  ${BOLD}memory${RESET}     Governed memory operations (classify, write, search, promote, delete, audit, provider)`);
     console.log(`             Usage: memory write --content "..." --class LOCAL`);
+    console.log(`             Diagnostics: --log-level info|debug or --verbose`);
     console.log(`  ${BOLD}doctor${RESET}     Validate squad setup (check files, config, health)`);
     console.log(`  ${BOLD}consult${RESET}    Enter consult mode with your personal squad`);
     console.log(`             Flags: --status, --check`);
