@@ -140,3 +140,10 @@ If future work claims "real Copilot Memory," must:
 
 **Impact:** Local memory governance unblocked; infrastructure provisioning next step.
 
+
+
+## 2026-05-19T06:33:42.877+03:00 - Memory A/B Gate: Partial Pass
+
+- Approved only scoped claims: controlled harness shows governed local memory improves decision recall in large/compacted contexts.
+- Rejected broader claims: no proof of Copilot CLI/Squad UI value, end-to-end agent improvement, or general product value.
+- n=20 is adequate for the paired controlled signal, but metrics are coupled/scripted and not sufficient for broad user-scope claims.

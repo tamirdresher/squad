@@ -1,6 +1,6 @@
 # Squad Decisions
 
-**Last Updated:** 2026-05-18T23:12:22.380+03:00
+**Last Updated:** 2026-05-19T06:33:42.877+03:00
 
 ## Active Decisions
 
@@ -1123,3 +1123,19 @@ This oracle defines what true E2E behavior looks like for Squads with/without lo
 
 ---
 
+
+
+---
+
+### 2026-05-19T06:33:42.877+03:00: Local Governed Memory A/B Value - Scoped Result
+
+**By:** Scribe (consolidating Seven oracle, Data report, Worf gate)
+**Status:** PARTIAL PASS / SCOPED CLAIMS ONLY
+
+**Decision:** Treat the completed n=20 paired A/B as evidence that Squad's governed local memory improves decision recall in controlled large/compacted contexts. Do not claim this proves Copilot CLI/Squad UI value, end-to-end agent improvement, or broad product value.
+
+**Evidence:** Data ran 20 paired samples (10 slim, 10 large) using the actual Squad CLI init path and local `LocalMemoryStore`. Large/compacted recall improved from 0.000 to 1.000; overall mean recall delta was 0.500. Paired tests showed sign p=0.0020 and Wilcoxon p=0.0051. Slim-context recall had no lift because the prompt already contained the decisions. Build and targeted governed-memory tests passed.
+
+**Boundary:** The non-interactive `copilot -C <repo> --agent squad -p ...` smoke returned status 0 but not the requested sentinel, so it is inconclusive and not full UI E2E evidence. Worf gate: n=20 is adequate for the controlled paired signal, not broad generalization; coupled/scripted metrics do not cleanly satisfy the threshold for user-scope claims.
+
+**Artifacts:** `C:\Users\tamirdresher\.copilot\session-state\memory-ab-20260519T063342\memory-ab-report.md`; inbox oracle/results summarized and cleared.

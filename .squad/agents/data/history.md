@@ -152,3 +152,10 @@ Unified decision in `.squad/decisions.md` combining Data's technical evidence + 
 
 **Known Issue:** test/cli/upgrade.test.ts Vitest queueing hang; real CLI path works. Documented for future test-harness upgrade.
 
+
+## 2026-05-19T06:33:42.877+03:00 — Local governed memory value A/B experiment
+
+- Built and ran a 20-pair A/B harness against `C:\Users\tamirdresher\source\repos\squad-memory-governance` using real `squad init` plus the actual `LocalMemoryStore`; full repo `npm test` was intentionally avoided.
+- Full Copilot CLI + `--agent squad` was smoke-tested non-interactively but returned only `● S`, so the measurable study is a clearly marked direct-layer substitute, not full UI E2E proof.
+- Controlled results: slim-context recall had no lift because decisions were in prompt; large-context/compacted recall improved from 0.000 to 1.000 with 120 distractors, and governed policy rejected forbidden/transient writes with audit evidence.
+- Raw artifacts: `C:\Users\tamirdresher\.copilot\session-state\memory-ab-20260519T063342\`.

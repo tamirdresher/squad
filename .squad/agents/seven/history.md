@@ -90,3 +90,27 @@ Seven responsible for architectural consistency checks: ExternalSquadEvent doesn
 
 **Impact:** Local memory governance bridge unblocked; infrastructure provisioning and live E2E defer to next phase.
 
+## 2026-05-19T06:33:42.877+03:00 — Local Memory A/B Value Oracle Defined
+
+**Assignment:** Define paired A/B experiment design (n=20) with statistical analysis plan to measure whether Squad local governed memory provides observable value beyond mechanical correctness.
+
+**Deliverable:** seven-memory-value-ab-oracle.md (13.8 KB)
+- Paired A/B structure: each sample has same demo app, team roster, universe, tasks; differs only by memory.enabled flag
+- Context conditions: slim (1–10 prior decisions, 0–2 memory items) vs large (10–20 decisions, 10–30 memory items ~200–300 KB)
+- Objective metrics: Task Success, Correction Count, Repeated-Context Reduction, Remembered-Decision Accuracy, Memory Precision/Recall, Safety Violations, Elapsed Time, Turn Count, Context Utilization
+- Statistical tests: Wilcoxon signed-rank (continuous), McNemar/Sign (binary), paired t-test (if normal), all with n=20 paired samples
+- Bonferroni adjustment for ≥5 independent metrics (α = 0.01 per test)
+- Effect sizes: Cohen's d (t-test), r (Wilcoxon), Odds Ratio (McNemar)
+- Evidence threshold: "Provides Value" = ≥3 metrics sig. (p<0.05, medium effect) + coherent narrative + no safety issues
+- Acceptable substitute: Real Copilot CLI runs (not mockable); script all setup/harvest; manually invoke agent per pair
+- Known non-mockable: LLM reasoning, agent routing, genuine context injection, multi-session persistence
+
+**Outcome:** Oracle approved for Data/Worf handoff. Defines rigorous methodology with explicit simulation boundaries. If real Copilot CLI unavailable, experiment halts (mock-reasoning prohibited).
+
+
+
+## 2026-05-19T06:33:42.877+03:00 - Memory A/B Oracle Completed
+
+- Seven's n=20 paired A/B oracle was executed by Data with slim/large strata and paired statistical tests.
+- Final interpretation is narrower than the original value threshold: controlled harness evidence supports governed local memory for large/compacted decision recall, but not Copilot CLI/Squad UI value or general product value.
+- Future claims need real Copilot UI automation or equivalent observable end-to-end evidence.
