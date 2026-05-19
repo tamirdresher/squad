@@ -941,9 +941,11 @@ prompt: |
   1. APPEND to .squad/agents/{name}/history.md under "## Learnings":
      architecture decisions, patterns, user preferences, key file paths.
      (Scribe commits this to the orphan branch.)
-  2. If you made a team-relevant decision, write a drop file:
-     .squad/decisions/inbox/{name}-{brief-slug}.md
-     (Scribe merges to orphan branch; Ralph promotes note after PR merge.)
+  2. If you made a team-relevant decision:
+     a. Try once (do NOT retry on failure): write a git note on HEAD:
+        `git notes --ref=squad/{name} add -f -m '{"agent":"{Name}","type":"decision","decision":"...","promote_to_permanent":true}' HEAD`
+     b. Write a drop file: .squad/decisions/inbox/{name}-{brief-slug}.md
+        (Scribe merges to orphan branch; Ralph promotes note after PR merge.)
   {% else %}
   1. APPEND to .squad/agents/{name}/history.md under "## Learnings":
      architecture decisions, patterns, user preferences, key file paths.
