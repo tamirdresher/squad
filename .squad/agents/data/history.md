@@ -38,3 +38,42 @@ Data is the explicit Squad framework expert for this team. Data should learn fro
 - Copilot CLI smoke evidence improved from prior inconclusive sentinel: from cwd, `copilot --agent squad -p ... --share ...` returned the exact sentinel, and `--resume=<session-id>` worked for turn 2.
 - Important client-compatibility boundary: PowerShell wrapper rejected `-C` and `--name`; harness must set cwd externally and resume by parsed session id. Share files are per-turn, not full resumed transcripts.
 - Feasibility verdict: 50-turn paired sessions are plausible but not yet proven reliable; require 3-turn dry run and 10-turn pilot before scaling. If reliability fails, use the direct Squad CLI/SDK replay path and label it memory-layer evidence only, not Copilot UI proof.
+
+## 2026-05-19T07:55:11.928+03:00 — Expanded memory A/B 3-turn dry run
+
+- Ran only the permitted 3-turn dry-run stage under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\dry-run-3turn-20260519T075511\`; did not run the 10-turn pilot or 50-turn scale-out.
+- Used a tiny fixture copied under the session artifact folder; fixture commit `8961ee9d45a3bbf2929808889e46057283936dcc`, tree `fa25d87e390e3ea48712f6a086ca2ac58f6cc051`; removed `.github/workflows` from both variants.
+- Included blog-post memory concepts in the prompts and B seed: Tamir's two-layer architecture, with git notes for commit-scoped why and an orphan branch for permanent decisions/history.
+- Real Copilot CLI smoke passed for the no-memory orientation turn, but the full paired 3-turn conclusion uses the clearly labeled substitute direct-layer harness; do not treat this as full Copilot UI proof.
+- Substitute A/B result: A returned `NOT_IN_CONTEXT` for seeded recall, B recalled the prior n=20 honesty boundary plus the blog two-layer concept, and forbidden/transient memory was rejected without repeating the synthetic secret.
+- Worf gate readout: HB-1, HB-2, HB-3, HB-4, HB-5, and HB-7 look evidenced for dry-run review; HB-6 and HB-8 need cost accounting and explicit silence telemetry before any 10-turn pilot.
+
+## 2026-05-19T09:00:04.581+03:00 — Memory load guidance tags and supersession simulation
+- Implemented load-guidance semantics in `squad-memory-governance`: `[ALWAYS]` for policy/decision, `[ON-DEMAND]` for retrievable local/semantic entries, `[ARCHIVE]` for superseded/deleted/tombstoned entries, and `[NEVER]` for forbidden/transient rejected memory.
+- Fixed promotion supersession metadata so the archived prior entry links forward with `supersededBy` and the active successor records `supersedes`; tombstones preserve previous status and forward-link metadata.
+- Added CLI `--load-guidance`, docs, tests, and updated expanded-memory A/B scaffold seed/prompts to carry load-guidance tags.
+- Validated with `npm run lint`, targeted Vitest memory/tool tests (59/59), SDK build, CLI build.
+- Ran substitute direct-layer simulation only (not Copilot CLI E2E) under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\autonomous-sim-20260519T090004\`; Worf must re-gate before 10-turn pilot or 50-turn scale-out.
+
+## 2026-05-19T10:12:27.018+03:00 — 10-turn substitute-harness pilot
+
+- Implemented and ran the permitted autonomous 10-turn substitute direct-layer A/B pilot under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\pilot-10turn-20260519T101227\`.
+- Added harness support for R-1 silence detector, R-2 three-hang escalation, and R-3 per-turn token/cost proxy accounting; R-4 load-guidance tags and R-5 superseded forward-link behavior were exercised in the prompts/results.
+- Results: 20 rows / 10 paired turns, byte-identical prompts, overall pass true, A recall 0, B recall 3, forbidden/transient rejection passed, no timeout, no silence hang, no escalation, token proxy total 4605.
+- Boundary preserved: substitute memory-layer evidence only; no Copilot CLI E2E claim; 50-turn scale-out still requires Worf re-gate.
+
+## 2026-05-19T10:12:27.018+03:00 — 50-turn substitute-harness scale-out
+
+- Ran Worf-approved single-repo substitute direct-layer A/B scale-out under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\scaleout-50turn-20260519T101227\`.
+- Scope/constraints passed: 1 fixture repo, 2 variants, exactly 50 paired turns / 100 rows, byte-identical prompts, `realCopilotCliE2E: false`, no statistical/production/ship/release claims.
+- Results: pass=True; A recall=0, B recall=9; task success A=50/50, B=50/50; forbidden rejection turns=2; supersession turns=2; failures=0.
+- Guards retained: redaction=True, forbidden rejection=True, workflow disabled=True, timeouts=0, silence hangs=0, hang escalations=0, token proxy total=26419.
+- Wrote Worf next-gate input to `.squad/decisions/inbox/data-50turn-scaleout-results.md`.
+
+## 2026-05-19T10:12:27.018+03:00 — Multi-repo substitute-harness scale-out
+
+- Ran Worf-conditionally-approved multi-repo substitute direct-layer A/B scale-out under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\multirepo-scaleout-20260519T101227\`.
+- Scope/constraints passed: 3 isolated fixtures/repos, 2 variants each, exactly 150 paired turns / 300 rows, byte-identical prompts within pair, `realCopilotCliE2E: false`, no statistical/production/ship/release claims.
+- Results: pass=True; A recall=0, B recall=27; task success A=150/150, B=150/150; forbidden rejection turns=6; supersession turns=6; forward-link recall=3; failures=0.
+- Guards retained: redaction=True, forbidden rejection=True, workflow disabled/removed=True, timeouts=0, silence hangs=0, hang escalations=0, token proxy total=106665.
+- Wrote Worf next-gate input to `.squad/decisions/inbox/data-multirepo-scaleout-results.md`.
