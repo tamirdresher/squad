@@ -114,3 +114,57 @@ Seven responsible for architectural consistency checks: ExternalSquadEvent doesn
 - Seven's n=20 paired A/B oracle was executed by Data with slim/large strata and paired statistical tests.
 - Final interpretation is narrower than the original value threshold: controlled harness evidence supports governed local memory for large/compacted decision recall, but not Copilot CLI/Squad UI value or general product value.
 - Future claims need real Copilot UI automation or equivalent observable end-to-end evidence.
+
+## 2026-05-19T12:29:41.573+03:00 - Real Copilot CLI E2E Portfolio Design Complete
+
+**Assignment:** Design real Copilot CLI E2E portfolio: realistic repos, prompts, expected evidence, and acceptance criteria that distinguish real runs from substitute/direct-layer harness. Include minimal smoke batch and full multi-repo batch. Keep claims honest.
+
+**Deliverables:**
+- `.squad/decisions/inbox/seven-real-copilot-cli-e2e-portfolio.md` (20.4 KB)
+  - **Smoke Batch (40 min):** 5 turns validating core E2E wiring (real subprocess, file I/O, memory persistence, redaction, session coherence)
+  - **Full Portfolio (7.5–9 hours):** 56 turns (52 real E2E + 4 smoke) with paired A/B memory experiments across 3 repos, statistical significance testing
+  - **Guard Rails:** Deterministic hooks (live redaction, forbidden-memory blocking, content-exclusion compliance, timeout + isolation)
+  - **Honest Boundaries:** Smoke proves wiring; full portfolio proves memory value via A/B (p<0.01 threshold). Neither proves production ADC readiness or VS Code UI productivity.
+
+**Key Insight:** Real E2E differs from substitute in 3 ways: **(1) actual CLI subprocess**, not simulation; **(2) real file I/O + persistent memory across sessions**, not ephemeral context injection; **(3) measurable productivity delta**, not recall metric only. All three require actual execution; none can be faked.
+
+**Evidence Chain:**
+- Smoke: core wiring (process exit codes, file offsets, memory file hash, redaction latency, session chain)
+- Full: productivity delta (paired t-test on 26 samples; 9 metrics; Bonferroni α=0.01; ≥3 significant = "value proven")
+- Audit: immutable, redacted, per-turn logs with file access + decision chain
+
+**Outcomes:**
+- ✅ Smoke batch ready to execute today (zero infrastructure dependency; Worf gate required for security)
+- ✅ Full portfolio ready to plan (execution timeline: 7.5–9 hours after Tamir approval)
+- ✅ Both batches documented with durable artifact schema (JSON + audit trail merge driver)
+- ✅ No overclaim exposure (tags enforced: `realCopilotCliE2E: true/false` + claims boundary documented)
+
+**Worf Gate:** Security guardrails, redaction latency, isolation verification, statistical review (if full portfolio approved)
+
+**Tamir Decision Points:** (1) Approve smoke batch execution today? (2) Approve full portfolio scope? (3) Timeline to ADC E2E (infrastructure-dependent)?
+
+**Status:** DESIGN READY FOR WORF + TAMIR GATE REVIEW. Both batches are runnable contingent on approvals.
+
+---
+
+## 2026-05-19T15:12:10Z — Orchestration Log: Real-Repo Validation Portfolio Design
+
+**Cross-Agent Sync:** Scribe recorded orchestration summary of Seven's portfolio research and proposal design.
+
+**Work Completed:**
+- Researched CLI isolation prior art and best practices
+- Designed Tier-1/Tier-2 portfolio validation framework
+- Created 5 supporting documents (INDEX, executive summary, runbook, design, session history)
+- Task scripts: 37 Tier-1 turns + 84+ Tier-2 turns (fully scripted)
+- Infrastructure roadmap documented with 3-week unblocking timeline
+
+**Portfolio Proposal:**
+- Tier-1: 37 turns across Squad, Node/TS, Python (substitute harness, no infra needed)
+- Tier-2: 84+ turns across eShop, Aspire + real Copilot CLI E2E (real infra required, 3-week wait)
+- All non-negotiable guards embedded (9 deterministic safety controls)
+- Claims framework clearly defined (allowed vs. forbidden per tier)
+
+**Status:** Proposal ready for Tamir GO/NO-GO decision. All prerequisites met for Tier-1 execution. Tier-2 awaits infrastructure provisioning and approval.
+
+**Orchestration log:** .squad/orchestration-log/20260519T151210Z-seven.md
+

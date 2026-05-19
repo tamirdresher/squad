@@ -77,3 +77,86 @@ Data is the explicit Squad framework expert for this team. Data should learn fro
 - Results: pass=True; A recall=0, B recall=27; task success A=150/150, B=150/150; forbidden rejection turns=6; supersession turns=6; forward-link recall=3; failures=0.
 - Guards retained: redaction=True, forbidden rejection=True, workflow disabled/removed=True, timeouts=0, silence hangs=0, hang escalations=0, token proxy total=106665.
 - Wrote Worf next-gate input to `.squad/decisions/inbox/data-multirepo-scaleout-results.md`.
+
+## 2026-05-19T11:58:29.988+03:00 — Real-repo substitute validation readiness
+
+- Read the new user directive, Picard confidence framework, Worf's final multi-repo gate, and prior expanded-memory artifacts.
+- Did not run a real-repo substitute batch because Worf's current final decision says substitute evidence ceiling was reached and further substitute expansion is not approved.
+- Prepared Worf-gated runnable artifacts under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\real-repo-validation-20260519T115829\`.
+- Prepared scope uses isolated copies of `squad-memory-governance` first and optionally `squad`, removes `.github\workflows`, keeps A/B prompts identical, retains all guards, and marks `realCopilotCliE2E: false`.
+- Wrote readiness/blocker note to `.squad/decisions/inbox/data-real-repo-validation-readiness.md`; Worf must reopen Tier 2 real-repo substitute validation before execution.
+
+## 2026-05-19T12:29:41.573+03:00 — Real Copilot CLI E2E readiness harness
+
+- Prepared but did not execute a real Copilot CLI E2E harness under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\real-copilot-cli-e2e-20260519T122941\`.
+- Included manifest/result schemas, runbook, Worf gate placeholder, command allowlist placeholders, timeout/silence/three-hang escalation, redaction policy, quota/cost proxy logging, and honest `realCopilotCliE2E` semantics.
+- Runner uses git-tracked real repo snapshots only and removes `.github\workflows` before any prompt execution; it refuses execution if workflows remain.
+- Minimal smoke and multi-repo plans are prepared but blocked pending Worf's explicit real CLI E2E gate.
+
+## 2026-05-19T13:22:13.782+03:00 — Real Copilot CLI E2E smoke blocked
+
+- Ran the Worf-approved smoke via the prepared artifact runner under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\real-copilot-cli-e2e-20260519T122941\` with `-Plan smoke -WorfGateApproved -MaxTurns 2`.
+- Final run id: `real-cli-smoke-20260519T132057`; artifact root: `real-cli-runs\real-cli-smoke-20260519T132057`.
+- Result: fail/blocked. Standalone `copilot` was launched for the two smoke turns, but both returned CLI argument parse errors before any successful prompt answer; `realCopilotCliE2E` remains `false`.
+- Guards held: no `gh copilot`, no fixture code/workflows, `.github\workflows` absent in snapshot, 120s timeout/60s silence controls, no auth prompt, no timeout/hang, no sentinel-only answer, no secrets in committed report.
+- Filed report: `.squad\decisions\inbox\data-real-copilot-cli-e2e-smoke-results.md`. Full E2E remains blocked pending runner Windows argument-passing fix and re-gate/re-run.
+
+## 2026-05-19T12:29:41.573+03:00 — Standalone yolo/worktree real E2E readiness
+
+- Prepared but did not execute the real Copilot CLI E2E harness update under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\real-copilot-cli-e2e-20260519T122941`.
+- Patched the runner to use standalone `copilot` with prompt passed as one `-p` argument via `ProcessStartInfo.ArgumentList`; removed the prior shell-joined command path that caused `too many arguments`.
+- Added `--yolo` only behind the new Worf gate plus `-YoloGateApproved`; reset the checked-in gate placeholder to blocked because the prior smoke gate is insufficient.
+- Switched from copied snapshots to isolated per-run git worktrees, with `.github\workflows` removed before any prompt/test and source working-tree status hashed before/after setup.
+- Added per-repo allowed test command config and runner enforcement requiring `testsApproved`, exact `approvedTestCommandIds`, and `-RunAllowedTests`; retained timeout/silence/hang escalation, redaction, quota proxy, and transcript boundaries.
+- Wrote readiness note to `.squad\decisions\inbox\data-yolo-worktree-e2e-readiness.md`; blockers remain Worf's new exact yolo/worktree gate and optional test-command approval.
+
+
+
+## 2026-05-19T12:29:41.573+03:00 — YOLO worktree real Copilot CLI smoke failed
+
+- Ran the requested Worf-approved Phase 1 smoke command under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\real-copilot-cli-e2e-20260519T122941` after aligning the session-state gate/plan to the coordinator's tsyringe-only approval.
+- Final run id: `real-cli-smoke-20260519T134008`; artifact path: `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\real-copilot-cli-e2e-20260519T122941\real-cli-runs\real-cli-smoke-20260519T134008`.
+- Result: fail/blocked. One standalone `copilot --yolo -p <prompt>` launch was attempted, then the harness crashed in its PowerShell async output handler before row/manifest creation; Turn 2 and tests were not reached.
+- Guards: max-turn stop held, workflows absent, no `.env` found, pinned SHA held; push remote stripping failed and must be fixed before re-run.
+- Filed summary report: `.squad\decisions\inbox\data-yolo-worktree-real-e2e-smoke-results.md`; raw transcripts were not copied into `.squad`.
+
+
+
+## 2026-05-19T12:29:41.573+03:00 — Real Copilot CLI Phase 2 execution readiness
+
+- Assessed Worf's Phase 1 smoke pass verdict, Geordi's final retry evidence, Data's yolo/worktree readiness note, and the fixed session-state harness artifact.
+- Did not revise the harness and did not execute Phase 2; Worf acknowledgement of a Phase 2 test plan remains a hard precondition.
+- Found the runner code has Phase 2-shaped knobs (`-Plan multirepo`, `-MaxTurns`, `-TurnIds`, exact `-TurnTimeoutSeconds 300`, `-RunAllowedTests`) but the current artifact is still smoke-shaped: gate approves only smoke/max 2, runtime repo config contains only `tsyringe`, and multirepo prompts are only three read-only turns.
+- Concluded full Worf-defined Phase 2 needs harness/config/reporting work for repo matrix setup, memory recall differential, parseability aggregation, guard rollup, tests, and non-tsyringe dependency setup. Filed `.squad\decisions\inbox\data-real-cli-phase2-execution-readiness.md`.
+
+## 2026-05-19T16:51:27.328+03:00 — ADC runner demo status verification
+
+- Verified `C:\Users\tamirdresher\source\repos\adc-squad-runner-demo` after `git fetch origin --prune`: `main` equals `origin/main` with ahead/behind `0 0`, but the eight requested files remain unstaged local modifications.
+- Reviewed README/docs against implementation and fixed a small documentation truth gap: README plus Azure Function runner docs now list all Program.cs ADC auth sources (`ADC_API_KEY`, `ADC_TOKEN`, `ADC_GITHUB_TOKEN`, `GITHUB_TOKEN`, `GH_TOKEN`) and document trusted `/squad/runner-command.json` fallback ownership/mode requirements.
+- Local validation passed after the documentation correction: `node .\sandbox\validate-runner.js` and `dotnet test .\adc-squad-runner-demo.slnx --verbosity quiet` both exited successfully.
+
+## 2026-05-19T15:15:47.992+03:00 — Copilot CLI session-store isolation investigation
+
+- Investigated Phase 2b G-5 session-store isolation without running real Copilot prompts or modifying the rejected harness.
+- Found supported `COPILOT_HOME` override for the entire Copilot CLI config/state root; docs and installed bundle path facts indicate `session-state\` and `session-store.db` live under that root.
+- Found `COPILOT_CACHE_HOME` for cache isolation only; ruled out a dedicated session-store flag, cwd scoping, `--name`/`--resume`, `--log-dir`, and `memory=false` as sufficient isolation fixes.
+- Filed `.squad\decisions\inbox\data-session-store-isolation-investigation.md` recommending per-repo/per-run `COPILOT_HOME` plus Worf-reviewed no-prompt/static and synthetic SQLite partition self-tests before real E2E resumes.
+
+---
+
+## 2026-05-19T15:12:10Z — Orchestration Log: Session-Store Isolation Investigation
+
+**Cross-Agent Sync:** Scribe recorded orchestration summary of Data's session-store isolation research and COPILOT_HOME confirmation.
+
+**Work Completed:**
+- Investigated session-store isolation mechanisms and patterns
+- Confirmed COPILOT_HOME as durable, supported isolation mechanism
+- Analysis informs portfolio isolation strategy
+- Investigation complete; findings documented for future reference
+
+**Portfolio Impact:** Data's research confirms Geordi's COPILOT_HOME implementation is the correct approach. Per-repo isolation via COPILOT_HOME enables Seven's realistic real-repo validation portfolio.
+
+**Status:** Research complete. Portfolio deployment awaits Tamir decision on Tier-1 GO/DEFER/REDIRECT.
+
+**Orchestration log:** .squad/orchestration-log/20260519T151210Z-data.md
+

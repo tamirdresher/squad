@@ -15,6 +15,26 @@ Worf owns security and reliability review for this Squad's work.
 - This team should never commit secrets and should preserve strong reviewer-gating behavior.
 - ADC execution model security review: conditionally approve periodic ephemeral (Model 2, MVP) and webhook (Model 1, future) with 5 mandatory guardrails (G1: no secret interpolation, G2: HMAC validation, G3: Key Vault for secrets, G4: sandbox TTL + auto-suspend, G5: agent execution timeout). Explicitly reject long-lived sandbox loop (Model 3) — unbounded cost, no crash recovery, violates ADC's ephemeral design philosophy. Guardrails G1–G5 are P0-P1 blocking for any production issue processing.
 
+## 2026-05-19T15:15:47+03:00 — Canary Rerun Gate: Blocked by Product Limitation
+
+**Run:** `real-cli-canary-20260519T174719` — 4 real CLI invocations (2 repos × 2 turns). G-5 precision fix validated: 0 false positives, 0 leaks, `g5ScanScope=model-autonomous-output-only`. Filesystem isolation proven (unique env path hashes, disjoint profiles, grep zero cross-repo matches). One click plant turn timed out (556s vs 120s limit; timeout-enforcement drift, subsequently patched). Canary overall FAILED: `store_memory` returned "Unable to store memory. The repository may not exist…" on tsyringe plant; click plant timed out. Neither isolated store contained its own planted anchor (`ownAnchorPresent: false` for both repos). Foreign anchor count was 0 for both — no leakage. Not a safety incident. No harness defect — product limitation: `store_memory` requires repo association that isolated `COPILOT_HOME` cannot provide. Phase 2b BLOCKED. No further real CLI E2E approved. Task marked complete as blocked-by-product-limitation. Geordi not locked out; Data remains locked out of harness revision. Decision filed: `worf-copilot-home-canary-rerun-gate.md`.
+
+---
+
+## 2026-05-19T15:15:47.992+03:00 — Phase 2b Stop Gate Review
+
+**Run:** `real-cli-phase2b-20260519T153211` — stopped after 1 real CLI invocation (tsyringe turn 1).
+
+**Classification:** HARNESS DEFECT. `npm install` preinstall modified tracked files; harness did not re-capture source-mutation baseline after preinstall. CLI was read-only. No safety incident — isolated worktree only, cleaned up, no secrets, no source repo touched.
+
+**Lockouts:** Unchanged. Data locked out of harness revision. Geordi/Seven not locked out.
+
+**Retry:** CONDITIONALLY APPROVED. Geordi must fix baseline timing (re-capture `git status` after preinstall, before first turn), validate with self-test, file P-4 addendum. No Worf re-ack required. No scope narrowing.
+
+**Decision filed:** `worf-real-cli-phase2b-stop-gate.md`.
+
+---
+
 ## 2026-05-17T09:05:10.003+05:30 — ADC Squad Runner Demo Security Review Approved
 
 **Approval Status:** Periodic ephemeral MVP (Model B) and future webhook adapter (Model 1) conditionally approved with mandatory guardrails G1–G5.
@@ -215,6 +235,35 @@ If future work claims "real Copilot Memory," must:
 
 **Gate Decision:** 50-turn substitute scale-out conditionally approved (1 repo, 2 variants, 50 turns exactly, all guards retained, overclaim boundary locked)
 
+## 2026-05-19T12:10:19+03:00 — Realistic 3-Repo Substitute Validation Results Gate: CONDITIONAL PASS
+
+**Verdict:** CONDITIONAL PASS — mechanics/guards pass; value stories insufficient (all seeded-recall, no organic prompts).
+
+**Evidence:** `bounded-realrepo-20260519T091019` run across tsyringe/click/command-line-api. 120 rows, 60 paired turns. All G-R1–G-R11 guards held. Zero failures/timeouts/hangs. Redaction and supersession functioning. Recall 6/60 but only on seeded-recall turns; no organic developer-question recall.
+
+**Allowed Claims:** Mechanical correctness across 3 real repos. Guard compliance. Fixture reproducibility. Seeded-recall differentiation.
+**Forbidden Claims:** "Provides value to developers"; Copilot CLI E2E; statistical/production/ship claims; "memory improves code navigation."
+
+**Next Steps:** Same-shape substitute runs NOT USEFUL (H-2 borderline). Redesigned prompts with organic developer questions conditionally useful (Worf re-gates). Real E2E still blocked (E-1–E-6).
+**Gate written to:** `.squad/decisions/inbox/worf-realistic-validation-results-gate.md`.
+
+## 2026-05-19T12:14:00+03:00 — Organic Real-Repo Value Validation Gate: APPROVED (One Bounded Run)
+
+**Verdict:** APPROVED — one organic-value substitute rerun authorized under bounded constraints.
+
+**Proposal:** `data-organic-value-validation-proposal.md`. Data replaces seeded-recall prompts with organically derived handoff memories (implementation-map, docs/tests-handoff, security/extension-handoff) and natural follow-up questions.
+
+**Key Conditions:**
+- Same 3 pinned repos, same isolation, same guards G-R1–G-R11.
+- Follow-up prompts must not contain "memory"/"recall"/"governed" (H-6).
+- Recalled handoffs must cite real paths in pinned repo (H-5 halts on hallucinated paths).
+- Exactly one run; results require Worf re-gate before claims propagate.
+
+**Allowed Claims (if passes):** Organically derived handoff-recall works across 3 repos; memory-variant provides prior-turn context no-memory lacks; recalled handoffs cite real paths; guards held.
+**Forbidden Claims:** Broad productivity value; Copilot CLI E2E; statistical/production/ship readiness; broad code-navigation improvement.
+
+**Gate written to:** `.squad/decisions/inbox/worf-organic-value-validation-gate.md`.
+
 **Written to:** `.squad/decisions.md` via inbox merge.
 
 ## 2026-05-19T10:12:27.018+03:00 — 50-Turn Substitute-Harness Scale-Out Gate PASSED
@@ -256,11 +305,248 @@ If future work claims "real Copilot Memory," must:
 - Audit logging complete
 
 **Forbidden Claims (Final):**
+
+---
+
+### YOLO Harness Re-Ack — Geordi's Fix (2026-05-19T12:29:41+03:00)
+
+**Context:** Data's harness rejected (runspace crash, push remote present, no structured artifacts). Geordi assigned as revision owner. Data locked out.
+
+**Review of Geordi's Fix:**
+- H-1 (async capture): SATISFIED — replaced with C# `CapturedProcessRunner`, no PowerShell runspace involvement. Static grep confirms zero forbidden patterns.
+- H-2 (push remote): SATISFIED — `Disable-And-AssertNoPushRemotes` sets push URL to `DISABLED_NO_PUSH`, verifies fail-closed. Called at worktree creation AND before every turn.
+- H-3 (artifact production on crash): SATISFIED — `rows.jsonl` created at startup; `catch` writes crash-report + crash row; `finally` always writes manifest + cleanup log. Early-stop test confirmed.
+
+**Verdict:** HARNESS APPROVED. Phase 1 smoke retry authorized with same scope (1 repo, max 2 turns, Geordi executes). Decision filed to `worf-yolo-harness-reack.md`.
 - Real Copilot CLI E2E proof
 - Production-grade recall rates
 - Statistical significance, confidence intervals, effect sizes
+
+---
+
+### Smoke Timeout Disposition (2026-05-19T12:29:41+03:00)
+
+**Context:** First smoke Turn 2 timed out at 120s (exit 124). CLI was actively working (npm install + test start). Classified as timeout tuning issue, not CLI/harness failure. Authorized final retry with 300s timeout + optional preinstall.
+
+**Decision filed:** `worf-yolo-smoke-timeout-gate.md`.
+
+---
+
+### Phase 1 Real CLI E2E Smoke Verdict (2026-05-19T12:29:41+03:00)
+
+**Context:** Combined evidence from two runs: Turn 1 passed (run 20260519T135706, 40.6s, exit 0). Turn 2 timed out at 120s (same run). Turn 2 final retry passed (run 20260519T142115, 79.7s, exit 0, 133 tests / 11 suites). All guards held across 3 real CLI invocations. Zero violations.
+
+**Verdict:** ✅ **PHASE 1 SMOKE PASSED.** Decision filed to `worf-real-cli-phase1-smoke-verdict.md`.
+
+**Allowed claims:** CLI produces parseable output on real repos; `--yolo` executes tool calls in worktree isolation; test execution via CLI produces capturable results; all guards held; preinstall is approved optimization.
+
+**Forbidden claims:** Full E2E validated; production readiness; statistical significance; memory API works; multi-repo capability; conflation with substitute results.
+
+**Phase 2 status:** Conditionally approved. Blocked on: (1) test plan filed by Data/Geordi, (2) Worf acknowledgment. Geordi eligible to execute. Data eligible to execute but locked out of harness revision.
 - Ship/release readiness
 
 **Recommended Next Action:** Scribe record final substitute evidence summary; stop substitute work; await Tamir direction on infrastructure access for real E2E.
 
 **Written to:** `.squad/decisions.md` via inbox merge.
+
+## 2026-05-19T11:58:29.988+03:00 — Realistic Validation Gate: No Ceilings
+
+**Trigger:** User directive: "No ceilings. I want real examples and realistic. Do it all."
+
+**Verdict:** APPROVED — ceiling on substitute expansion removed; real-repo fixtures with realistic prompts approved; value stories required (not just recall counts).
+
+**Key Decisions:**
+1. **Ceiling removed** per owner directive. Practical halt conditions retained (guard violation, signal flatline, hang/timeout, Data's own judgment).
+2. **11 non-negotiable guards (G-R1–G-R11)** survive unconditionally: redaction, forbidden-memory rejection, content-exclusion, timeout, silence detector, hang escalation, audit, overclaim prevention, fixture isolation, workflow disabling, honest labeling.
+3. **First real-repo batch approved:** ≥3 real open-source repos (TS/C#/Python), realistic developer prompts, no turn ceiling, ≥3 value stories required in summary.
+4. **Real Copilot CLI E2E still blocked** on 6 requirements (E-1–E-6). Data may propose a path; Worf gates before execution.
+5. **"Provides value" standard defined:** Value stories from realistic prompts where memory made a material difference. Recall counts alone do not prove value. Synthetic string recall proves mechanism only.
+6. **Data prohibitions (D-1–D-10):** No E2E claims from substitute, no credentialed repos, no source modification, no synthetic-string-as-value, no aggregation without breakdown, no artifacts in repo, no guard skipping, no statistical claims without pre-registration, no workflows, no counts-as-value.
+
+**Gate written to:** `.squad/decisions/inbox/worf-realistic-validation-gate.md`.
+
+## 2026-05-19T12:10:19+03:00 — Realistic Real-Repo Substitute Validation Results Gate
+
+**Run:** `bounded-realrepo-20260519T091019`
+**Verdict:** CONDITIONAL PASS — guards and mechanics pass; value stories insufficient for "provides value" claim.
+
+**Evidence Reviewed:**
+- 3 real open-source repos (tsyringe/TS, click/Python, command-line-api/C#), pinned SHAs, unmodified sources
+- 120 rows, 60 paired turns, prompt-hash-identical, zero failures/timeouts/hangs
+- All G-R1–G-R11 guards held; forbidden canary redacted; supersession forward-links verified
+- Recall: memory 6, no-memory 0 — but all 6 from seeded-recall category only
+
+**Condition:** Value stories are structurally identical (same "recall onboarding decision" prompt across 3 repos). This proves mechanism, not value. Gate §5 required organic developer questions where memory makes a material difference — not met.
+
+**Allowed Claims:** Mechanical correctness across 3 real repos; guard compliance; seeded-recall differentiation.
+**Forbidden Claims:** "Provides value to developers"; Copilot CLI E2E; statistical/production/ship claims; "memory improves code navigation."
+
+**Next Steps:** Same-shape substitute runs NOT USEFUL (H-2 borderline). Redesigned prompts with organic developer questions conditionally useful (Worf re-gates). Real E2E still blocked (E-1–E-6).
+
+**Gate written to:** `.squad/decisions/inbox/worf-realistic-validation-results-gate.md`.
+
+## 2026-05-19T12:20:00+03:00 — Organic Real-Repo Value Validation Results Gate: PASS (Bounded)
+
+**Run:** `bounded-realrepo-20260519T092000`
+**Verdict:** PASS — bounded. Organic handoff recall works across 3 real repos, 3 categories, 3 ecosystems.
+
+**Evidence Reviewed:**
+- Same 3 pinned repos (tsyringe/TS, click/Python, command-line-api/C#), same SHAs, unmodified sources
+- 120 rows, 60 paired turns, prompt-hash-identical, zero failures/timeouts/hangs
+- All G-R1–G-R11 guards held; forbidden canary not leaked; workflows disabled
+- Recall: memory 9, no-memory 0 — across 3 distinct categories (implementation-map, regression/test/docs, security/extension-risk)
+- Halt conditions H-1 through H-6: NONE triggered
+- H-6 verified: follow-up prompts free of "memory"/"recall"/"governed"
+- H-5 verified: all cited paths reference real files in pinned repos
+- Rerun constraints RR-1–RR-4 met (RR-3 minor gap accepted)
+
+**Prior conditional-pass gap resolved:** Organic derivation + 3 distinct value-story categories replace the identical seeded-recall prompts.
+
+**Allowed Claims:** Governed organic handoff recall works on 3 repos; memory-variant provides prior-turn context across 3 categories; recalled handoffs cite real paths; all guards held; fixture reproducible.
+**Forbidden Claims:** Broad value; real Copilot CLI E2E; production/statistical/ship claims; "memory improves arbitrary tasks."
+
+**Next Step:** Real Copilot CLI E2E gate proposal required. Substitute evidence ceiling reached.
+
+**Gate written to:** `.squad/decisions/inbox/worf-organic-value-validation-results-gate.md`.
+
+## 2026-05-19T12:29:41+03:00 — Real Copilot CLI E2E Gate: Two-Phase Approval
+
+**Trigger:** Owner directive: "Do the experiments with real real Copilot CLI E2E."
+
+**Verdict:** TWO-PHASE CONDITIONAL APPROVAL
+
+**E-1–E-6 Assessment:**
+- E-6 (quota/approval): **SATISFIED** — explicit owner directive authorizes API quota consumption.
+- E-1 (parseable output): **SMOKE REQUIRED** — `copilot` CLI v1.0.49 installed. Prior sentinel-only issue needs re-test. Smoke authorized.
+- E-2 (Memory API): **CONDITIONALLY UNBLOCKED** — local provider path satisfies E-2's documented alternative. Real API still nonexistent (GitHub product limitation).
+- E-3 (test plan): **WAIVED FOR SMOKE; REQUIRED FOR FULL E2E.**
+- E-4, E-5: Required and enforced.
+
+**Phase 1 (Smoke): APPROVED NOW.**
+- One `copilot` CLI invocation on one pinned fixture repo.
+- Read-only prompt, no memory operations, 120s hard timeout.
+- Success: parseable structured output. Failure: sentinel-only, hang, crash, or auth prompt.
+- CLI surfaces allowed: `copilot`, `squad` (spawn/cross-comm), `copilot --agent squad`. NOT `gh copilot` (not installed).
+
+**Phase 2 (Full E2E): APPROVED AFTER smoke passes + test plan acknowledged.**
+- ≤100 total CLI invocations across ≥3 repos.
+- All G-R1–G-R11 guards retained. Results labeled `realCopilotCliE2E: true`.
+- Claims bounded: E2E pipeline works, guards hold, recall differential measured. No production/ship/statistical claims.
+
+**Prohibitions:** X-1–X-10 (no credential flags, no fixture code execution, no direct output to `.squad/`, no conflation with substitute results).
+
+**If smoke fails:** Data revises. If CLI fundamentally cannot produce parseable output, Data may propose `squad` CLI as alternative E2E surface (separate gate, adjusted claims).
+
+**Gate written to:** `.squad/decisions/inbox/worf-real-copilot-cli-e2e-gate.md`.
+
+## 2026-05-19T12:29:41+03:00 — Revised E2E Gate: `--yolo` + Worktree Isolation
+
+**Trigger:** Prior Phase 1 smoke FAILED (`too many arguments`). Owner directive: use `copilot --yolo -p "<prompt>"`; run tests in worktrees.
+
+**Verdict:** TWO-PHASE CONDITIONAL APPROVAL (supersedes prior Phase 1 smoke gate)
+
+**Key Changes from Prior Gate:**
+- CLI form: `copilot --yolo -p "<prompt>"` (was positional arg — caused parse error).
+- Test execution: **APPROVED** in worktrees only (was X-4 forbidden).
+- Isolation: git worktree per demo repo in session-state (was clone).
+- `gh copilot`: still forbidden.
+
+**Phase 1 Smoke: APPROVED NOW.** 2 turns, 1 repo (tsyringe recommended). Turn 1: orientation prompt. Turn 2: test execution prompt.
+
+**Phase 2 Full E2E: CONDITIONALLY APPROVED** after smoke passes + test plan filed + Worf ack.
+
+**New Guards:** G-Y1 (worktree boundary), G-Y2 (no push), G-Y3 (source immutability), G-Y4 (process cleanup), G-Y5 (quota proxy logging).
+
+**Prohibitions:** X-1–X-10 retained; X-4 revised (test exec allowed in worktrees). Added X-11 (no CLI outside worktree), X-12 (no orphan processes), X-13 (no squad-squad modification).
+
+**Risk Assessment:** `--yolo` auto-accepts tool calls — mitigated by worktree isolation, workflow disabling, timeout enforcement, and redaction scanning. Risk: ACCEPTABLE.
+
+**Gate written to:** `.squad/decisions/inbox/worf-yolo-worktree-real-e2e-gate.md`.
+
+### Smoke Timeout Disposition — 2026-05-19T12:29:41+03:00
+
+**Context:** Phase 1 smoke retry ran (Geordi's fixed harness). Turn 1 PASSED (exit 0, 40.6s, parseable). Turn 2 TIMED OUT (exit 124, 120.5s — CLI was mid-`npm test` after completing `npm install`).
+
+**Classification:** Timeout tuning issue. NOT harness failure, NOT CLI failure. The 120s budget was insufficient for cold `npm install` + full test suite. Harness correctly enforced timeout and produced all artifacts. Zero guard violations.
+
+**Halt conditions:** None triggered. 1 pass + 1 timeout ≠ 3 consecutive failures (G-R6 threshold).
+
+**Lockout:** Geordi NOT locked out (this was not a harness failure). Data remains locked out of harness revision only (prior cycle), eligible for smoke execution.
+
+**Revised smoke:** APPROVED. Turn 2 only, 300s timeout (up from 120s). Pre-installing `npm install` before CLI invocation recommended. Final retry — if 300s also times out, escalate to user.
+
+**Allowed claims:** Turn 1 CLI invocation works. Turn 2 CLI correctly identified and installed deps autonomously. Timeout was the guard working, not a defect. Phase 1 smoke NOT passed; Phase 2 remains blocked.
+
+**Gate written to:** `.squad/decisions/inbox/worf-yolo-smoke-timeout-gate.md`.
+
+## 2026-05-19T12:29:41.573+03:00 — Phase 2 Real CLI E2E Gate Decision
+
+**Verdict:** Phase 2a CONDITIONALLY APPROVED; Phase 2b BLOCKED on 2a results + Worf re-ack.
+
+**Seven's test plan:** ACCEPTED with 6 modifications (M-1–M-6): 2a scope locked to tsyringe/10 turns, 60% recall threshold for 2a→2b gate (not 70%), preinstall mandatory for all repos, raw transcript redaction enforced, parseability and memory recall rollups must be computed by harness.
+
+**Ownership:** Geordi owns harness revision (R-1–R-5: gate config, parseability rollup, memory recall measurement, guard rollup, transcript redaction). Data locked out of harness revision (reviewer-protocol). Either Geordi or Data may execute turns.
+
+**Execution approval:** Immediate after Geordi completes R-1–R-5 and files revision summary, provided no guards were modified. If guards modified → Worf re-ack mandatory.
+
+**Phase 2b gate:** 7 requirements (G-1–G-7) including ≥60% recall, all guards held, ≥80% parseability, artifact completeness, harness generalized for click+command-line-api, Worf review of 2a results. Worf re-ack mandatory before 2b.
+
+**Claim boundaries:** 2a success = single-repo pilot only. 2a ≠ Phase 2. No multi-repo, production, ship, or statistical claims from 2a.
+
+**Gate written to:** `.squad/decisions/inbox/worf-real-cli-phase2-gate.md`.
+
+## 2026-05-19T12:29:41.573+03:00 — Phase 2a Real CLI E2E Stop Gate Review
+
+**Verdict:** Phase 2a FAILED; one retry approved; Phase 2b remains blocked.
+
+**Evidence:** Run `real-cli-phase2a-20260519T144344`. 4/10 turns executed. Turn 1 succeeded (exit 0, parseable, 72s, 3446 output tokens). Turns 2–4 all silence-hung (exit 125, 0 output tokens, ~60s each). Three-hang escalation guard triggered correctly and stopped execution.
+
+**Classification:** Prompt design + silence timeout tuning failure. NOT product/CLI failure (Turn 1 proves CLI works). Silence timeout (60s) too aggressive — Phase 1 smoke Turn 2 needed 79.7s. Prompts 2–4 progressively shorter (73/61/47 tokens) and may lack context for `--yolo` engagement.
+
+**Guards:** All safety guards HELD. G-R6 three-hang guard triggered correctly (functioning as designed, not a violation). Harness R-1–R-5 operationally validated.
+
+**Lockouts:** Geordi NOT locked out (harness worked correctly). Data prior lockout on harness revision unchanged. No new lockouts.
+
+**Retry:** ONE retry approved (Option A). Geordi owns. Silence timeout 60→180s. Prompt redesign required (filed to inbox before execution). Same Phase 2a constraints (tsyringe, 10 turns, 300s/turn, all guards). If retry also triggers 3-hang stop → STOP and report to user.
+
+**Phase 2b:** Remains blocked on G-1–G-7.
+
+**Allowed claims:** Turn 1 CLI success; all safety guards held; harness validated; prompt/timeout identified as remediation targets.
+**Forbidden claims:** Phase 2a passed; CLI can't do multi-turn (insufficient evidence); memory works/doesn't work (0/1 inconclusive); any Phase 2b/production/ship claims.
+
+**Gate written to:** `.squad/decisions/inbox/worf-real-cli-phase2a-stop-gate.md`.
+
+## 2026-05-19T16:51:27.328+03:00 — ADC Proof Safety Review
+
+Reviewed `adc-squad-runner-demo` local changes for sandbox command security and proof-sharing boundaries. Local proof is shareable only as redacted command/test output tied to commit `bd69cb631b82e986dda3e447a1c96e55170dce18`; no live ADC/E2E claim is acceptable without Geordi-owned live evidence. Command-file fallback is acceptable as POSIX-only for live use with owner/mode validation and Windows dry-run only; do not share raw env, token values, portal secret screens, or unredacted sandbox logs.
+
+## 2026-05-19T15:15:47.992+03:00 — COPILOT_HOME Isolation Gate Decision
+
+Reviewed Seven's research, Data's investigation, and Geordi's self-test plan. **`COPILOT_HOME` conditionally accepted** as candidate isolation mechanism — documented, supported, independently confirmed by two agents. No `--session-store-path` or cwd-scoping exists. **Required self-tests:** (A) static path partitioning proof — unique disjoint per-repo paths, no global profile reference, cleanup; (B) synthetic SQLite partition proof — sentinel in repo A's store absent from repo B's store, default store untouched. Both must pass before any real prompt. **Ownership:** Geordi owns harness revision and self-test implementation. Data remains locked out of harness revision (reviewer-protocol). Seven may assist research. **Canary pre-approved:** after self-tests pass, Geordi may execute a 4-turn (2 repos × 2 turns) synthetic-anchor-only canary without additional Worf re-ack, within strict scope limits (120s timeout, all guards active, cleanup required). Full Phase 2b retry requires separate Worf re-ack after canary passes. **Claims tiered:** no isolation/unblock claims until canary passes; no Phase 2 criteria claims until full retry passes Worf gate. Decision filed to `worf-copilot-home-isolation-gate.md`.
+
+## 2026-05-19T15:15:47.992+03:00 — Phase 2b G-5 Isolation Failure Gate
+
+Run `real-cli-phase2b-20260519T155926` stopped after 28 real CLI invocations (tsyringe 20/20 clean; click stopped at turn 8) when the G-5 cross-repo memory isolation guard fired. **Classification: PRODUCT-LEVEL MEMORY MODEL LIMITATION** — the Copilot CLI's local session store is a shared, machine-level SQLite database without per-repo partitioning. Tsyringe session data was visible in click's `search_index` queries via the CLI's SQL tool. Harness worked correctly. No safety incident: no source mutation, no secrets, no data exfiltration, worktrees cleaned up. **Lockouts:** Data unchanged. Geordi: new execution lockout — may revise harness but may NOT execute further real CLI E2E runs until Worf approves isolation fix. **Further runs: NOT APPROVED** until session store isolation investigated (UB-1), mechanism identified (UB-2), self-test validates (UB-3), and Worf re-ack (UB-4). Prompt-only mitigations and guard weakening rejected. Phase 2 criteria NOT MET. Decision filed to `worf-real-cli-phase2b-isolation-failure-gate.md`.
+
+
+## 2026-05-19T18:15:00+03:00 — Canary G-5 False Positive Gate
+
+Canary run `real-cli-canary-20260519T172913` stopped at turn 3/4 by G-5 guard. **Classification: HARNESS DEFECT — false-positive G-5 trigger.** The G-5 string matcher triggered on the probe prompt's own text containing the expected-absent click anchor, not on model recall. The model correctly reported the anchor as absent; grep found zero matches in the isolated store. `store_memory` failed on both repos ("repository may not exist") confirming isolation prevented write-back. **Not a safety incident:** no cross-repo leakage, no secret exposure, no source mutation, cleanup passed. **Worf spec gap acknowledged:** original G-5 definition in §5 said "cross-repo anchor detected in CLI output" without excluding prompt-injected text — corrected in UB-1. **Further runs: NOT APPROVED** until G-5 guard fixed to scan only model autonomous output (UB-1), fix documented for Worf review (UB-2), same canary re-run and passes (UB-3–UB-4), Worf re-ack (UB-5). **Lockouts:** Geordi NOT locked out — eligible for G-5 fix and canary retry. Data REMAINS locked out of harness revision. **Product changes:** none required now; `store_memory` failure under isolation is expected behavior, future consideration only. **Claims tiered:** may state false positive and isolation confirmed by model behavior; may NOT claim "canary passed" or "isolation validated" until retry. Decision filed to `worf-copilot-home-canary-failure-gate.md`.
+---
+
+## 2026-05-19T15:12:10Z — Orchestration Log: Real Copilot CLI E2E Validation Portfolio
+
+**Cross-Agent Sync:** Scribe recorded orchestration summary for Worf's work on COPILOT_HOME isolation gating, Geordi's per-repo implementation, Data's session-store investigation, and Seven's portfolio design.
+
+**Portfolio Status:** Seven's realistic real-repo validation (Tier-1: 37 turns, 3 ecosystems; Tier-2: 84+ turns, 5 repos + real E2E) awaits Tamir decision (GO/DEFER/REDIRECT).
+
+**Key Context:**
+- Isolation mechanism (COPILOT_HOME per Geordi) ready for portfolio deployment
+- All prerequisites met for Tier-1 (no external dependencies)
+- Tier-2 blocked on Copilot Memory API availability (product limitation)
+- Portfolio decision filed to decisions.md
+
+**Impact on Worf:** Seven's portfolio design accounts for all documented gate constraints (substitute harness, non-negotiable guards, overclaim prevention). Portfolio proposal presents an alternative path forward pending Tamir approval. Real E2E remains blocked by infrastructure.
+
+**Orchestration log:** .squad/orchestration-log/20260519T151210Z-worf.md
+

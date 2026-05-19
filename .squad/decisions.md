@@ -1,6 +1,6 @@
 # Squad Decisions
 
-**Last Updated:** 2026-05-19T07:55:11.928+03:00
+**Last Updated:** 2026-05-19T15:12:10.000Z
 
 ## Active Decisions
 
@@ -1933,9 +1933,109 @@ No agent may proceed to real E2E, additional substitute expansion, or ship/relea
 | 1 — 10-turn pilot | 2026-05-19 | 1 repo, 10 turns | PASSED | 50-turn scale-out |
 | 2 — 50-turn scale-out | 2026-05-19 | 1 repo, 50 turns | PASSED | Multi-repo (≤3 repos, ≤150 turns) |
 | 3 — Multi-repo scale-out | 2026-05-19 | 3 repos, 150 turns | PASSED | **NONE** — substitute ceiling reached; real E2E blocked on infra |
+| 4 — Organic value validation | 2026-05-19 | 3 repos, organic handoff-recall | APPROVED | One bounded run (parent gate) |
+| 5 — Organic rerun (harness bug fix) | 2026-05-19 | Same 3 repos, same organic prompts | APPROVED | One clean rerun; second failure requires new gate |
 
 ---
 
 **Signed:** Worf, Security & Reliability Reviewer  
 **Gate Status:** Multi-repo substitute scale-out PASSED; further substitute expansion NOT APPROVED; real E2E BLOCKED pending infrastructure and user approval.
+
+---
+
+## 7. ADC Runner Demo: Local validation passed, live ADC end-to-end blocked
+
+**Status:** CONDITIONAL — local tests pass; live execution incomplete.
+
+**Date:** 2026-05-19T16:51:27.328+03:00
+
+### Data: ADC runner demo repository status
+
+**Finding:**
+- Repository: `C:\Users\tamirdresher\source\repos\adc-squad-runner-demo`
+- Main branch synchronized with origin (0 0 ahead/behind).
+- Eight files remain as local modifications (unstaged, uncommitted, unpushed).
+- Local validations passed: `node .\sandbox\validate-runner.js` and `dotnet test .\adc-squad-runner-demo.slnx --verbosity quiet`.
+- Documentation corrected by Data: README and docs now document all live ADC auth fallbacks and trusted command-file fallback requirements.
+
+**Remaining gap:** Commit and push the eight-file local change set when ready. Live ADC end-to-end behavior remains unvalidated; local tests prove only the dry-run/contract boundary.
+
+### Worf: ADC proof safety review — conditional approval for local proof only
+
+**Reviewer:** Worf  
+**Target:** `C:\Users\tamirdresher\source\repos\adc-squad-runner-demo` revision `bd69cb631b82e986dda3e447a1c96e55170dce18` + uncommitted working-tree changes on main.
+
+**Decision:** Conditional approval to share local proof with Tamir only. The changed artifacts do not show command injection, token exposure, or silent success. **Reject any live ADC / end-to-end readiness claim until Geordi produces redacted live evidence.**
+
+**Security findings:**
+1. Sandbox runner uses `spawnSync(..., { shell: false })`; no shell string built from issue title/body.
+2. Payload validation constrains branch to `squad/issue-N` and repository before clone/fetch/checkout.
+3. Command-file fallback acceptable for live POSIX sandboxes (regular file only, group/world writable rejected, root/current-user ownership required). Windows command-file fallback is dry-run only, fails in non-dry-run mode.
+4. Placeholder replacement occurs inside argv elements, not shell concatenation.
+5. No broad catch converts runner failure to success; all failure paths fail closed.
+6. ADC/GitHub token names documented as possible auth sources; not a code leak, but public proof must not include raw environment dumps or secret values.
+
+**Safe to share:** Exact commands, pass/fail summaries, commit hash, branch name (note uncommitted), redacted snippets showing fixed entrypoint/shell mode/command-file checks, README denial of live E2E readiness, issue/PR links without tokens.
+
+**Never share:** Raw environment blocks, local.settings.json, token values, Portal Connection secrets, full sandbox logs, or any claim of live ADC verification until Geordi supplies live evidence.
+
+### Geordi: ADC live verification — sandbox Copilot connection incomplete
+
+**Sandbox:** `d67836c2-b7bf-4a16-96d6-b458e1979645`  
+**Finding:** Metadata and connection verification passed, but sandbox-side Copilot execution failed.
+
+**Evidence:**
+| Check | Result | Note |
+|---|---:|---|
+| Local Azure ADC auth token mint | PASS | `az account get-access-token` with metadata-only query; no tokens printed |
+| Sandbox metadata / connection | PASS | Sandbox state `Idle -> Running`; connection ID mapped to `GitHub Copilot` / `github-copilot` / `Ready` |
+| Attached Copilot connection | PASS | Connection metadata verified |
+| MCP config in sandbox | FAIL | `/root/.copilot/mcp-config.json` absent |
+| Sandbox-side Copilot CLI | FAIL | `copilot -p "Say hello..."` exits 1 with `No authentication information found` |
+| Issue-to-PR full dispatcher | BLOCKED | Not attempted after Copilot auth failure; issue #1 open, branch exists, no PR yet |
+
+**Decision / next step:** Do not claim full ADC + Squad/Copilot verification. Ask ADC connector owner to regenerate or propagate GitHub Copilot connector material inside sandbox after resume/restart. Expected proof: `/root/.copilot/mcp-config.json` present or zero-trust placeholder/auth path allowing `copilot -p` to run without real tokens in environment. Once Copilot smoke test exits 0, rerun dispatcher against issue #1 and verify PR creation.
+
+---
+
+### 2026-05-19T15:12:10.000Z: Seven — Real-Repo Validation Portfolio (Tier-1/Tier-2 Proposal)
+
+**By:** Seven (Research & Integration Engineer)  
+**Status:** PROPOSAL READY FOR TAMIR GO/NO-GO DECISION  
+**Confidence:** HIGH ✅
+
+**What:** Realistic multi-tier portfolio validation addressing the directive "No ceilings, I want real examples and realistic. Do it all."
+
+**Tier-1 (GO NOW — 4 hours execution):**
+- Squad: 15 turns (recall, supersession, design, bugs, decisions)
+- Node/TS sample: 12 turns (flow trace, auth, security, refactoring)
+- Python sample: 10 turns (ORM, DI, validation, error handling)
+- Total: 37 turns across 3 ecosystems using substitute harness
+- Preconditions: None (local repos + minimal samples)
+- Artifacts: Recall accuracy (target ≥85%), guard validation (100%), coverage (≥60%), turn transcripts
+
+**Tier-2 (DEFERRED — 14+ hours, 3-week infrastructure wait):**
+- eShop: 18 turns (polyglot .NET/TS/YAML, distributed state)
+- Aspire: 16 turns (orchestration, infrastructure-as-code)
+- Real Copilot CLI E2E testing (84+ turns total)
+- Preconditions: Copilot Memory API callable (blocked per Seven's research), infrastructure provisioning
+
+**Why This Matters:**
+1. **No toy fixtures:** Real frameworks (Squad), production patterns (Node/Python), reference systems (eShop, Aspire)
+2. **Substitute harness proof:** Same architecture proven stable at 50-turn scale
+3. **Non-negotiable guards:** All 9 deterministic guards embedded (redaction, forbidden-memory rejection, content-exclusion, timeout, silence detector, hang escalation, audit logging, overclaim prevention, fixture isolation)
+4. **Claims clarity:** Tier-1 allows "CLI recalls accurately across 37 multi-turn tasks" and "substitute harness readiness"; forbids "real E2E proof" and "productivity claims" until Tier-2
+
+**Tamir Decision Required:** GO (start Tier-1 today), DEFER (wait for Tier-2 infrastructure), or REDIRECT (reprioritize)
+
+**Supporting Documents:** INDEX-READ-ME-FIRST.md, seven-executive-summary.md, seven-tier1-task-batch-runnable.md, seven-realistic-repo-validation-plan.md, seven-session-history.md, MANIFEST-GATES-FULFILLED.md
+
+**Linked Agents:**
+- Worf: Gating decisions on portfolio readiness and isolation verification
+- Geordi: Per-repo COPILOT_HOME isolation implementation (fixture setup)
+- Data: Session-store isolation research (complementary approach)
+
+**Gate Status:** All prerequisites met (no external dependencies for Tier-1). Awaiting Tamir approval.
+
+---
 
