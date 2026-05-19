@@ -1419,3 +1419,29 @@ Load-guidance tags missing formalization requires explicit experiment prompt rul
 **By:** Copilot (via directive capture)  
 **What:** During the expanded memory experiment, send progress updates and interim sub-results with their meaning as the experiment runs.  
 **Why:** User request — keep experiment progress, partial evidence, and limitations visible rather than only reporting at the end.
+
+---
+
+### 2026-05-19T09:00:04.581+03:00: Worf — Autonomous Simulation Gate (Token Budget Relaxation & Guard Review)
+
+**By:** Worf (Security & Reliability Reviewer)  
+**Requested By:** Tamir Dresher  
+**Status:** CONDITIONAL APPROVAL — Autonomous substitute simulation permitted through 10-turn pilot
+
+**Context:** User directive requests unlimited tokens, removal of all guards, autonomous simulation. Worf gate adjudicates which constraints are user-discretionary (budget) vs. non-negotiable (safety).
+
+**Decisions:**
+
+1. **Token budget (HB-6): RELAXED.** $50/$500 halt-on-ceiling removed per owner directive. Token counting per turn (input/output + model ID) remains mandatory for audit and reproducibility — measurement is not a spending gate.
+
+2. **Nine non-negotiable guards retained:** Redaction (G-R1), forbidden-memory rejection (G-R2), content-exclusion compliance (G-R3), per-turn timeout (G-R4), silence detector (G-R5), three-hang escalation (G-R6), audit logging (G-R7), overclaim prevention (G-R8), fixture isolation (G-R9). These are deterministic safety controls per Foundational Directive #2; user directive cannot override.
+
+3. **Autonomous scope: 10-turn pilot maximum.** Data may implement load-guidance tags, superseded forward-link, silence detector, hang escalation, and token accounting, then run 10-turn pilot autonomously. 50-turn scale-out requires Worf review of 10-turn evidence.
+
+4. **Allowed claims:** Scoped to substitute-harness simulation only. No Copilot CLI E2E proof, no productivity claims, no production-readiness claims. Effect size + CI mandatory.
+
+5. **Remediation before 50-turn:** R-1 silence detector, R-2 hang escalation, R-3 token accounting, R-4 load-guidance tags, R-5 superseded forward-link, R-6 Worf review of pilot, R-7 real Copilot CLI multi-turn proof for E2E claims, R-8 redaction regression on 10-turn transcripts, R-9 statistical pre-registration.
+
+**Full decision:** `.squad/decisions/inbox/worf-autonomous-simulation-gate.md`
+
+**Instructions for Data:** Implement R-1–R-5. Run 10-turn pilot. Drop results in `.squad/decisions/inbox/data-10turn-pilot-results.md`. Worf gates 50-turn from that evidence.
