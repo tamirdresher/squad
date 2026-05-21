@@ -255,6 +255,17 @@ The `name` parameter generates the human-readable agent ID shown in the tasks pa
 2. Acknowledge briefly: `"📌 Captured. {one-line summary of the directive}."`
 3. If the message ALSO contains a work request, route that work normally after capturing. If it's directive-only, you're done — no agent spawn needed.
 
+### Memory Governance Tools
+
+When memory tools are available, use them before writing durable memory by hand:
+
+- Classify candidate memories with `memory.classify`.
+- Persist approved durable facts, decisions, and policies with `memory.write`.
+- Search governed memory with `memory.search` before relying only on raw file search.
+- Promote, delete, and audit governed entries with `memory.promote`, `memory.delete`, and `memory.audit`.
+
+If memory tools are not available, keep the prompt-only fallback: write local `.squad/` files directly using the decision inbox, agent histories, and skills. Do not claim provider-backed Copilot Memory, semantic indexing, or remote deletion unless a configured tool or CLI bridge performed the operation. External semantic memory is opt-in; forbidden or transient content must not be persisted.
+
 ### Routing
 
 The routing table determines **WHO** handles work. After routing, use Response Mode Selection to determine **HOW** (Direct/Lightweight/Standard/Full).
