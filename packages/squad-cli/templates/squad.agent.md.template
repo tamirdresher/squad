@@ -243,7 +243,7 @@ The `name` parameter generates the human-readable agent ID shown in the tasks pa
 **When you detect a directive:**
 
 1. Capture the directive with the runtime state tools when available:
-   - Prefer `state.write` to write `decisions/inbox/copilot-directive-{timestamp}.md` using this format:
+   - Prefer `state_write` (MCP alias for runtime `state.write`) to write `decisions/inbox/copilot-directive-{timestamp}.md` using this format:
      ```
      ### {timestamp}: User directive
      **By:** {user name} (via Copilot)
@@ -263,7 +263,7 @@ When memory tools are available, use them before writing durable memory by hand:
 - Search governed memory with `memory.search` before relying only on raw file search.
 - Promote, delete, and audit governed entries with `memory.promote`, `memory.delete`, and `memory.audit`.
 
-If memory tools are not available, use `state.write`/`state.append` for durable Squad state when those tools are present. Only fall back to local `.squad/` file writes when no runtime state tool exists, and never claim provider-backed Copilot Memory, semantic indexing, or remote deletion unless a configured tool or CLI bridge performed the operation. External semantic memory is opt-in; forbidden or transient content must not be persisted.
+If memory tools are not available, use runtime state tools for durable Squad state when present. In MCP sessions these are exposed as `state_read`, `state_write`, `state_append`, `state_delete`, `state_list`, and `state_health` aliases for the runtime `state.*` operations. Only fall back to local `.squad/` file writes when `STATE_BACKEND` is `worktree`/`local` and no runtime state tool exists. For `git-notes`, `orphan`, or `two-layer`, do not hand-write mutable state; report that the `squad_state` MCP/runtime state bridge is missing. Never claim provider-backed Copilot Memory, semantic indexing, or remote deletion unless a configured tool or CLI bridge performed the operation. External semantic memory is opt-in; forbidden or transient content must not be persisted.
 
 ### Routing
 
@@ -376,7 +376,7 @@ prompt: |
   TARGET FILE(S): {exact file path(s)}
 
   Do the work. Keep it focused.
-  If you made a meaningful decision, persist it with `squad_decide` when available, or `state.write` to `decisions/inbox/{name}-{brief-slug}.md`. Do not run git notes, switch branches, or write mutable `.squad/` state by hand.
+  If you made a meaningful decision, persist it with `squad_decide` when available, or `state_write` to `decisions/inbox/{name}-{brief-slug}.md`. Do not run git notes, switch branches, or write mutable `.squad/` state by hand.
 
   ⚠️ OUTPUT: Report outcomes in human terms. Never expose tool internals or SQL.
   ⚠️ RESPONSE ORDER: After ALL tool calls, write a plain text summary as FINAL output.
@@ -501,7 +501,7 @@ When the user gives any task, the Coordinator MUST:
 To enable full parallelism, shared writes use a drop-box pattern that eliminates file conflicts:
 
 **decisions.md** — Agents do NOT write directly to `decisions.md`. Instead:
-- Agents record decisions with `squad_decide` or `state.write` to `decisions/inbox/{agent-name}-{brief-slug}.md`.
+- Agents record decisions with `squad_decide` or `state_write` to `decisions/inbox/{agent-name}-{brief-slug}.md`.
 - The runtime routes that write to the configured state backend. Agents must not run `git notes`, switch to `squad-state`, or hand-roll backend commits.
 - Scribe merges into the canonical `.squad/decisions.md` and clears the inbox
 - All agents READ from `.squad/decisions.md` at spawn time (last-merged snapshot)
@@ -618,7 +618,7 @@ If the user wants to remove someone:
 
 ## Source of Truth Hierarchy
 
-> **State backend note:** Files below marked as "Derived / append-only" are **mutable state** — agents access them with runtime state tools (`state.read`, `state.write`, `state.append`, `state.delete`, `state.list`). The runtime decides whether the configured backend stores them on disk, git-native state, or an external provider. Files marked as "Authoritative" are **static config** and always live on disk regardless of backend.
+> **State backend note:** Files below marked as "Derived / append-only" are **mutable state** — agents access them with runtime state tools (`state_read`, `state_write`, `state_append`, `state_delete`, `state_list`; runtime equivalents: `state.read`, `state.write`, `state.append`, `state.delete`, `state.list`). The runtime decides whether the configured backend stores them on disk, git-native state, or an external provider. Files marked as "Authoritative" are **static config** and always live on disk regardless of backend.
 
 | File | Status | Who May Write | Who May Read |
 |------|--------|---------------|--------------|

@@ -225,6 +225,8 @@ async function main(): Promise<void> {
     console.log(`  ${BOLD}memory${RESET}     Governed memory operations`);
     console.log(`             Usage: memory write --content "..." --class LOCAL`);
     console.log(`             Diagnostics: --log-level info|debug or --verbose`);
+    console.log(`  ${BOLD}state-mcp${RESET}  MCP bridge exposing Squad runtime state tools`);
+    console.log(`             Usage: state-mcp`);
     console.log(`  ${BOLD}doctor${RESET}     Validate squad setup (check files, config, health)`);
     console.log(`  ${BOLD}consult${RESET}    Enter consult mode with your personal squad`);
     console.log(`             Flags: --status, --check`);
@@ -419,6 +421,17 @@ async function main(): Promise<void> {
   if (cmd === 'memory') {
     const { runMemoryCommand } = await import('./cli/commands/memory.js');
     await runMemoryCommand(getSquadStartDir(), args.slice(1));
+    return;
+  }
+
+  if (cmd === 'state-mcp') {
+    if (args.includes('--help') || args.includes('-h')) {
+      const { printStateMcpHelp } = await import('./cli/commands/state-mcp.js');
+      printStateMcpHelp();
+      return;
+    }
+    const { runStateMcp } = await import('./cli/commands/state-mcp.js');
+    await runStateMcp(getSquadStartDir());
     return;
   }
 
