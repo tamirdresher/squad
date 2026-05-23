@@ -79,6 +79,7 @@ describe('GitNotesBackend', () => {
   });
 });
 
+
 describe('OrphanBranchBackend', () => {
   beforeEach(() => { if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); initRepo(); });
   afterEach(() => { clearResolveSquadCache(); if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); });
@@ -566,6 +567,39 @@ describe('downloaded session replay regressions', () => {
   beforeEach(() => { clearResolveSquadCache(); if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); initRepo(); mkdirSync(squadDir(), { recursive: true }); });
   afterEach(() => { clearResolveSquadCache(); if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); });
 
+  async function createRuntimeTools(): Promise<{
+    backend: TwoLayerBackend;
+    registry: ToolRegistry;
+    stateWrite: NonNullable<ReturnType<ToolRegistry['getTool']>>;
+    stateAppend: NonNullable<ReturnType<ToolRegistry['getTool']>>;
+    stateRead: NonNullable<ReturnType<ToolRegistry['getTool']>>;
+    stateList: NonNullable<ReturnType<ToolRegistry['getTool']>>;
+    stateDelete: NonNullable<ReturnType<ToolRegistry['getTool']>>;
+    stateHealth: NonNullable<ReturnType<ToolRegistry['getTool']>>;
+    decide: NonNullable<ReturnType<ToolRegistry['getTool']>>;
+  }> {
+    const backend = new TwoLayerBackend(TMP);
+    const adapter = new StateBackendStorageAdapter(backend, squadDir());
+    const registry = new ToolRegistry(squadDir(), undefined, adapter);
+    return {
+      backend,
+      registry,
+      stateWrite: registry.getTool('state.write')!,
+      stateAppend: registry.getTool('state.append')!,
+      stateRead: registry.getTool('state.read')!,
+      stateList: registry.getTool('state.list')!,
+      stateDelete: registry.getTool('state.delete')!,
+      stateHealth: registry.getTool('state.health')!,
+      decide: registry.getTool('squad_decide')!,
+    };
+  }
+
+  function expectWorktreeUnmoved(initialBranch: string, initialHead: string): void {
+    expect(git('rev-parse --abbrev-ref HEAD')).toBe(initialBranch);
+    expect(git('rev-parse HEAD')).toBe(initialHead);
+    expect(git('status --porcelain')).toBe('');
+  }
+
   it('keeps spawned-agent prompt surfaces on runtime state tools, not manual git state choreography', () => {
     const promptFiles = [
       'templates/spawn-reference.md',
@@ -606,15 +640,7 @@ describe('downloaded session replay regressions', () => {
   });
 
   it('replays the failed two-layer flow through state tools without dirtying or moving the worktree', { timeout: 30_000 }, async () => {
-    const backend = new TwoLayerBackend(TMP);
-    const adapter = new StateBackendStorageAdapter(backend, squadDir());
-    const registry = new ToolRegistry(squadDir(), undefined, adapter);
-    const stateWrite = registry.getTool('state.write')!;
-    const stateAppend = registry.getTool('state.append')!;
-    const stateRead = registry.getTool('state.read')!;
-    const stateList = registry.getTool('state.list')!;
-    const stateDelete = registry.getTool('state.delete')!;
-    const decide = registry.getTool('squad_decide')!;
+    const { backend, stateWrite, stateAppend, stateRead, stateList, stateDelete, decide } = await createRuntimeTools();
     const initialBranch = git('rev-parse --abbrev-ref HEAD');
     const initialHead = git('rev-parse HEAD');
 
@@ -648,8 +674,83 @@ describe('downloaded session replay regressions', () => {
     expect(existsSync(join(squadDir(), 'decisions.md'))).toBe(false);
     expect(existsSync(join(squadDir(), 'agents', 'kobayashi', 'history.md'))).toBe(false);
     expect(existsSync(join(squadDir(), 'log', '2026-01-01T00-00-session.md'))).toBe(false);
-    expect(git('rev-parse --abbrev-ref HEAD')).toBe(initialBranch);
-    expect(git('rev-parse HEAD')).toBe(initialHead);
-    expect(git('status --porcelain')).toBe('');
+    expectWorktreeUnmoved(initialBranch, initialHead);
+  });
+
+  const sessionReplays = [
+    {
+      name: 'directive capture',
+      run: async (tools: Awaited<ReturnType<typeof createRuntimeTools>>) => {
+        expect(await tools.decide.handler({
+          author: 'coordinator',
+          summary: 'Always use runtime state tools',
+          body: 'Capture user directives through squad_decide instead of writing inbox files by hand.',
+        })).toMatchObject({ resultType: 'success' });
+        const inbox = await tools.stateList.handler({ dir: 'decisions/inbox' });
+        expect(inbox.resultType).toBe('success');
+        expect(inbox.textResultForLlm).toContain('coordinator-always-use-runtime-state-tools.md');
+      },
+    },
+    {
+      name: 'spawned agent history update',
+      run: async (tools: Awaited<ReturnType<typeof createRuntimeTools>>) => {
+        expect(await tools.stateWrite.handler({ key: 'agents/data/history.md', content: '# Data\n\n## Learnings\n' })).toMatchObject({ resultType: 'success' });
+        expect(await tools.stateAppend.handler({ key: 'agents/data/history.md', content: '\n### Replay\nSpawn prompt used state.append.\n' })).toMatchObject({ resultType: 'success' });
+        const history = await tools.stateRead.handler({ key: '.squad/agents/data/history.md' });
+        expect(history.resultType).toBe('success');
+        expect(history.textResultForLlm).toContain('Spawn prompt used state.append');
+      },
+    },
+    {
+      name: 'scribe merge and inbox cleanup',
+      run: async (tools: Awaited<ReturnType<typeof createRuntimeTools>>) => {
+        expect(await tools.decide.handler({
+          author: 'scribe',
+          summary: 'Merge inbox through backend',
+          body: 'Scribe reads, writes, and deletes via state tools.',
+        })).toMatchObject({ resultType: 'success' });
+        const inbox = await tools.stateList.handler({ dir: 'decisions/inbox' });
+        expect(inbox.resultType).toBe('success');
+        const inboxEntry = inbox.textResultForLlm.split('\n').find((entry) => entry.endsWith('.md'));
+        expect(inboxEntry).toBeDefined();
+        const decision = await tools.stateRead.handler({ key: `decisions/inbox/${inboxEntry}` });
+        expect(decision.resultType).toBe('success');
+        expect(await tools.stateWrite.handler({ key: 'decisions.md', content: `# Decisions\n\n${decision.textResultForLlm}` })).toMatchObject({ resultType: 'success' });
+        expect(await tools.stateDelete.handler({ key: `decisions/inbox/${inboxEntry}` })).toMatchObject({ resultType: 'success' });
+        expect(tools.backend.list('decisions/inbox')).toEqual([]);
+      },
+    },
+    {
+      name: 'orchestration and session logs',
+      run: async (tools: Awaited<ReturnType<typeof createRuntimeTools>>) => {
+        expect(await tools.stateWrite.handler({ key: 'orchestration-log/2026-05-23T14-00-agent.md', content: 'Agent completed.\n' })).toMatchObject({ resultType: 'success' });
+        expect(await tools.stateWrite.handler({ key: 'log/2026-05-23T14-00-session.md', content: 'Session completed.\n' })).toMatchObject({ resultType: 'success' });
+        expect(tools.backend.list('orchestration-log')).toContain('2026-05-23T14-00-agent.md');
+        expect(tools.backend.list('log')).toContain('2026-05-23T14-00-session.md');
+      },
+    },
+    {
+      name: 'health and missing-key recovery',
+      run: async (tools: Awaited<ReturnType<typeof createRuntimeTools>>) => {
+        const missing = await tools.stateRead.handler({ key: 'agents/missing/history.md' });
+        expect(missing.resultType).toBe('failure');
+        expect(missing.textResultForLlm).toContain('State key not found');
+        const health = await tools.stateHealth.handler({});
+        expect(health.resultType).toBe('success');
+        expect(tools.backend.name).toBe('two-layer');
+        expect(health.textResultForLlm).toContain('StateBackendStorageAdapter');
+      },
+    },
+  ];
+
+  it.each(sessionReplays)('replays $name without dirtying or moving the worktree', { timeout: 30_000 }, async ({ run }) => {
+    const initialBranch = git('rev-parse --abbrev-ref HEAD');
+    const initialHead = git('rev-parse HEAD');
+    const tools = await createRuntimeTools();
+
+    await run(tools);
+
+    expect(existsSync(squadDir())).toBe(true);
+    expectWorktreeUnmoved(initialBranch, initialHead);
   });
 });
