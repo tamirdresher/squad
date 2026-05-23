@@ -376,12 +376,7 @@ prompt: |
   TARGET FILE(S): {exact file path(s)}
 
   Do the work. Keep it focused.
-  {% if STATE_BACKEND == "git-notes" %}
-  If you made a meaningful decision, persist it via:
-  `powershell .squad/scripts/notes/write-note.ps1 -Ref "squad/{name}" -Content '{"decision": {"title": "...", "what": "...", "why": "..."}}'`
-  {% else %}
-  If you made a meaningful decision, write to .squad/decisions/inbox/{name}-{brief-slug}.md
-  {% endif %}
+  If you made a meaningful decision, persist it with `squad_decide` when available, or `state.write` to `decisions/inbox/{name}-{brief-slug}.md`. Do not run git notes, switch branches, or write mutable `.squad/` state by hand.
 
   ⚠️ OUTPUT: Report outcomes in human terms. Never expose tool internals or SQL.
   ⚠️ RESPONSE ORDER: After ALL tool calls, write a plain text summary as FINAL output.
@@ -506,9 +501,9 @@ When the user gives any task, the Coordinator MUST:
 To enable full parallelism, shared writes use a drop-box pattern that eliminates file conflicts:
 
 **decisions.md** — Agents do NOT write directly to `decisions.md`. Instead:
-- **worktree/orphan backend:** Agents write decisions to individual drop files: `.squad/decisions/inbox/{agent-name}-{brief-slug}.md`
-- **git-notes backend:** Agents persist decisions via their git notes ref (see State Protocol). Scribe reads all agent notes and merges decisions.
-- Scribe merges into the canonical `.squad/decisions.md` and clears the inbox (or note entries)
+- Agents record decisions with `squad_decide` or `state.write` to `decisions/inbox/{agent-name}-{brief-slug}.md`.
+- The runtime routes that write to the configured state backend. Agents must not run `git notes`, switch to `squad-state`, or hand-roll backend commits.
+- Scribe merges into the canonical `.squad/decisions.md` and clears the inbox
 - All agents READ from `.squad/decisions.md` at spawn time (last-merged snapshot)
 
 **orchestration-log/** — Scribe writes one entry per agent after each batch:
@@ -553,9 +548,9 @@ Before issue-based spawns, check whether worktree mode is active. If it is, reso
 
 Every domain task MUST be dispatched through the platform tool (`task` on CLI, `runSubagent` on VS Code). Keep `name` and `description` agent-specific, inline the charter, and pass `TEAM_ROOT`, `CURRENT_DATETIME`, `STATE_BACKEND`, requester, and any worktree context into the prompt.
 
-Preserve backend-specific state protocol rules exactly as written; they are contracts, not suggestions.
+Preserve the runtime state tool contract exactly as written; backend-specific git choreography belongs to the runtime, not agent prompts.
 
-**On-demand reference:** Read `.squad/templates/spawn-reference.md` for the full spawn template, Ghost Protocol block, all `STATE_BACKEND` conditionals, and post-work instructions.
+**On-demand reference:** Read `.squad/templates/spawn-reference.md` for the full spawn template, Ghost Protocol block, runtime state protocol, and post-work instructions.
 
 ### ❌ What NOT to Do (Anti-Patterns)
 
@@ -623,7 +618,7 @@ If the user wants to remove someone:
 
 ## Source of Truth Hierarchy
 
-> **State backend note:** Files below marked as "Derived / append-only" are **mutable state** — their storage location depends on the configured `STATE_BACKEND`. On `worktree` (default), they live on disk. On `git-notes`, they live in git notes refs. On `orphan`, they live on the `squad-state` orphan branch. On `two-layer`, commit-scoped annotations live in git notes AND permanent state lives on the orphan branch. Files marked as "Authoritative" are **static config** and always live on disk regardless of backend.
+> **State backend note:** Files below marked as "Derived / append-only" are **mutable state** — agents access them with runtime state tools (`state.read`, `state.write`, `state.append`, `state.delete`, `state.list`). The runtime decides whether the configured backend stores them on disk, git-native state, or an external provider. Files marked as "Authoritative" are **static config** and always live on disk regardless of backend.
 
 | File | Status | Who May Write | Who May Read |
 |------|--------|---------------|--------------|

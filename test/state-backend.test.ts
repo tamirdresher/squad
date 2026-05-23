@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { WorktreeBackend, GitNotesBackend, OrphanBranchBackend, resolveStateBackend, validateStateKey, StateBackendStorageAdapter } from '../packages/squad-sdk/src/state-backend.js';
+import { WorktreeBackend, GitNotesBackend, OrphanBranchBackend, TwoLayerBackend, resolveStateBackend, validateStateKey, StateBackendStorageAdapter } from '../packages/squad-sdk/src/state-backend.js';
 import type { StateBackendType } from '../packages/squad-sdk/src/state-backend.js';
 import { resolveSquadState, clearResolveSquadCache } from '../packages/squad-sdk/src/resolution.js';
 import { ToolRegistry } from '../packages/squad-sdk/src/tools/index.js';
@@ -557,6 +557,99 @@ describe('ToolRegistry state tools with git-native backend', () => {
     expect(result.resultType).toBe('success');
     expect(backend.list('decisions/inbox')).toHaveLength(1);
     expect(existsSync(join(squadDir(), 'decisions', 'inbox'))).toBe(false);
+    expect(git('status --porcelain')).toBe('');
+  });
+});
+
+describe('downloaded session replay regressions', () => {
+  const squadDir = () => join(TMP, '.squad');
+  beforeEach(() => { clearResolveSquadCache(); if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); initRepo(); mkdirSync(squadDir(), { recursive: true }); });
+  afterEach(() => { clearResolveSquadCache(); if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); });
+
+  it('keeps spawned-agent prompt surfaces on runtime state tools, not manual git state choreography', () => {
+    const promptFiles = [
+      'templates/spawn-reference.md',
+      'templates/after-agent-reference.md',
+      'templates/scribe-charter.md',
+      '.squad-templates/spawn-reference.md',
+      '.squad-templates/after-agent-reference.md',
+      '.squad-templates/scribe-charter.md',
+      '.github/agents/squad.agent.md',
+      'templates/squad.agent.md.template',
+      '.squad-templates/squad.agent.md',
+      'packages/squad-cli/templates/squad.agent.md.template',
+      'packages/squad-sdk/templates/squad.agent.md.template',
+    ];
+    const forbiddenFragments = [
+      'write-note.ps1',
+      'git notes --ref',
+      'git checkout squad-state',
+      'git checkout HEAD -- .squad',
+      'git reset HEAD --',
+      "refs/notes/squad/*",
+      'git push origin squad-state',
+      'Scribe handles orphan',
+      'Preserve backend-specific state protocol rules',
+    ];
+
+    for (const relativePath of promptFiles) {
+      const content = readFileSync(join(process.cwd(), relativePath), 'utf-8');
+      for (const fragment of forbiddenFragments) {
+        expect(content, `${relativePath} should not contain transcript-era instruction: ${fragment}`).not.toContain(fragment);
+      }
+    }
+
+    const spawnReference = readFileSync(join(process.cwd(), 'templates/spawn-reference.md'), 'utf-8');
+    expect(spawnReference).toContain('Runtime State Tools');
+    expect(spawnReference).toContain('The runtime routes those calls to the configured backend');
+    expect(spawnReference).toContain('squad_decide');
+  });
+
+  it('replays the failed two-layer flow through state tools without dirtying or moving the worktree', { timeout: 30_000 }, async () => {
+    const backend = new TwoLayerBackend(TMP);
+    const adapter = new StateBackendStorageAdapter(backend, squadDir());
+    const registry = new ToolRegistry(squadDir(), undefined, adapter);
+    const stateWrite = registry.getTool('state.write')!;
+    const stateAppend = registry.getTool('state.append')!;
+    const stateRead = registry.getTool('state.read')!;
+    const stateList = registry.getTool('state.list')!;
+    const stateDelete = registry.getTool('state.delete')!;
+    const decide = registry.getTool('squad_decide')!;
+    const initialBranch = git('rev-parse --abbrev-ref HEAD');
+    const initialHead = git('rev-parse HEAD');
+
+    expect(await stateWrite.handler({ key: 'decisions.md', content: '# Decisions\n' })).toMatchObject({ resultType: 'success' });
+    expect(await stateWrite.handler({ key: 'agents/kobayashi/history.md', content: '# Kobayashi\n\n## Learnings\n' })).toMatchObject({ resultType: 'success' });
+    expect(await stateAppend.handler({ key: 'agents/kobayashi/history.md', content: '\n### Replay\nUsed runtime state tools instead of branch choreography.\n' })).toMatchObject({ resultType: 'success' });
+    expect(await decide.handler({
+      author: 'kobayashi',
+      summary: 'Two-layer state belongs to runtime tools',
+      body: 'The downloaded session failed when prompts exposed git notes and orphan branch internals.',
+    })).toMatchObject({ resultType: 'success' });
+
+    const inbox = await stateList.handler({ dir: 'decisions/inbox' });
+    expect(inbox.resultType).toBe('success');
+    const inboxEntry = inbox.textResultForLlm.split('\n').find((entry) => entry.endsWith('.md'));
+    expect(inboxEntry).toBeDefined();
+
+    const decision = await stateRead.handler({ key: `decisions/inbox/${inboxEntry}` });
+    expect(decision.resultType).toBe('success');
+    expect(decision.textResultForLlm).toContain('Two-layer state belongs to runtime tools');
+    expect(await stateWrite.handler({ key: 'decisions.md', content: `# Decisions\n\n${decision.textResultForLlm}` })).toMatchObject({ resultType: 'success' });
+    expect(await stateDelete.handler({ key: `decisions/inbox/${inboxEntry}` })).toMatchObject({ resultType: 'success' });
+    expect(await stateWrite.handler({ key: 'orchestration-log/2026-01-01T00-00-kobayashi.md', content: 'Kobayashi completed replay work.\n' })).toMatchObject({ resultType: 'success' });
+    expect(await stateWrite.handler({ key: 'log/2026-01-01T00-00-session.md', content: 'Scribe merged replay decision through state tools.\n' })).toMatchObject({ resultType: 'success' });
+    expect(await stateAppend.handler({ key: 'agents/scribe/history.md', content: 'Merged replay decision without touching git state by hand.\n' })).toMatchObject({ resultType: 'success' });
+
+    const decisions = await stateRead.handler({ key: '.squad/decisions.md' });
+    expect(decisions.resultType).toBe('success');
+    expect(decisions.textResultForLlm).toContain('Two-layer state belongs to runtime tools');
+    expect(backend.list('decisions/inbox')).toEqual([]);
+    expect(existsSync(join(squadDir(), 'decisions.md'))).toBe(false);
+    expect(existsSync(join(squadDir(), 'agents', 'kobayashi', 'history.md'))).toBe(false);
+    expect(existsSync(join(squadDir(), 'log', '2026-01-01T00-00-session.md'))).toBe(false);
+    expect(git('rev-parse --abbrev-ref HEAD')).toBe(initialBranch);
+    expect(git('rev-parse HEAD')).toBe(initialHead);
     expect(git('status --porcelain')).toBe('');
   });
 });
