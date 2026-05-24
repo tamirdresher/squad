@@ -61,5 +61,10 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/bradygaster/squad.git"
+  },
+  "pnpm": {
+    "overrides": {
+      "protobufjs": "^8.4.2"
+    }
   }
 }

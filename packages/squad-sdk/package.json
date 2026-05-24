@@ -241,14 +241,14 @@
   },
   "optionalDependencies": {
     "@opentelemetry/api": "^1.9.0",
-    "@opentelemetry/exporter-metrics-otlp-grpc": "^0.57.2",
-    "@opentelemetry/exporter-trace-otlp-grpc": "^0.57.2",
-    "@opentelemetry/resources": "^1.30.0",
-    "@opentelemetry/sdk-metrics": "^1.30.0",
-    "@opentelemetry/sdk-node": "^0.57.2",
-    "@opentelemetry/sdk-trace-base": "^1.30.0",
-    "@opentelemetry/sdk-trace-node": "^1.30.0",
-    "@opentelemetry/semantic-conventions": "^1.28.0",
+    "@opentelemetry/exporter-metrics-otlp-grpc": "^0.217.0",
+    "@opentelemetry/exporter-trace-otlp-grpc": "^0.217.0",
+    "@opentelemetry/resources": "^2.7.0",
+    "@opentelemetry/sdk-metrics": "^2.7.0",
+    "@opentelemetry/sdk-node": "^0.217.0",
+    "@opentelemetry/sdk-trace-base": "^2.7.0",
+    "@opentelemetry/sdk-trace-node": "^2.7.0",
+    "@opentelemetry/semantic-conventions": "^1.37.0",
     "sql.js": "^1.14.1",
     "ws": "^8.18.0"
   },
@@ -275,5 +275,10 @@
     "type": "git",
     "url": "git+https://github.com/bradygaster/squad.git",
     "directory": "packages/squad-sdk"
+  },
+  "pnpm": {
+    "overrides": {
+      "protobufjs": "^8.4.2"
+    }
   }
 }
