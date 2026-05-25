@@ -255,6 +255,22 @@ function normalizeStateToolDir(dir?: string): string {
   return normalized;
 }
 
+function validateMutableStateToolKey(key: string): void {
+  const isMutable =
+    key === 'decisions.md' ||
+    /^decisions\/inbox\/[^/]+\.md$/.test(key) ||
+    /^agents\/[a-zA-Z0-9_-]+\/history(?:-archive)?\.md$/.test(key) ||
+    /^(?:log|orchestration-log)\/[^/]+\.md$/.test(key) ||
+    /^health-report(?:-[^/]+)?\.md$/.test(key) ||
+    /^identity\/(?:now|wisdom)\.md$/.test(key);
+
+  if (!isMutable) {
+    throw new Error(
+      'State mutations are limited to mutable runtime state (decisions, inbox, logs, health reports, identity focus, and agent history). Static config such as config.json, team.md, routing.md, charters, templates, and skills must not be changed with state tools.',
+    );
+  }
+}
+
 // --- Tool Registry ---
 
 export class ToolRegistry {
@@ -648,7 +664,7 @@ export class ToolRegistry {
 
     const stateWrite = defineTool<StateWriteRequest>({
       name: 'state.write',
-      description: 'Write mutable Squad state through the configured state backend. Keys are relative to .squad/; do not use shell git, checkout squad-state, or direct file writes for mutable state.',
+      description: 'Write mutable Squad state through the configured state backend. Always use this tool for mutable state when available. Keys are relative to .squad/; static config such as config.json, team.md, routing.md, charters, templates, and skills is not mutable state.',
       parameters: {
         type: 'object',
         properties: {
@@ -660,6 +676,7 @@ export class ToolRegistry {
       handler: async (args) => {
         try {
           const key = normalizeStateToolKey(args.key);
+          validateMutableStateToolKey(key);
           this.storage.writeSync(path.join(this.squadRoot, key), args.content);
           return {
             textResultForLlm: `State written: ${key}`,
@@ -678,7 +695,7 @@ export class ToolRegistry {
 
     const stateAppend = defineTool<StateAppendRequest>({
       name: 'state.append',
-      description: 'Append to mutable Squad state through the configured state backend. Keys are relative to .squad/.',
+      description: 'Append to mutable Squad state through the configured state backend. Always use this tool for mutable state when available. Keys are relative to .squad/; static config cannot be mutated through this tool.',
       parameters: {
         type: 'object',
         properties: {
@@ -690,6 +707,7 @@ export class ToolRegistry {
       handler: async (args) => {
         try {
           const key = normalizeStateToolKey(args.key);
+          validateMutableStateToolKey(key);
           this.storage.appendSync(path.join(this.squadRoot, key), args.content);
           return {
             textResultForLlm: `State appended: ${key}`,
@@ -708,7 +726,7 @@ export class ToolRegistry {
 
     const stateDelete = defineTool<StateDeleteRequest>({
       name: 'state.delete',
-      description: 'Delete mutable Squad state through the configured state backend. Keys are relative to .squad/.',
+      description: 'Delete mutable Squad state through the configured state backend. Always use this tool for mutable state when available. Keys are relative to .squad/; static config cannot be deleted through this tool.',
       parameters: {
         type: 'object',
         properties: {
@@ -719,6 +737,7 @@ export class ToolRegistry {
       handler: async (args) => {
         try {
           const key = normalizeStateToolKey(args.key);
+          validateMutableStateToolKey(key);
           this.storage.deleteSync(path.join(this.squadRoot, key));
           return {
             textResultForLlm: `State deleted: ${key}`,

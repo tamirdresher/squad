@@ -226,7 +226,6 @@ async function main(): Promise<void> {
     console.log(`             Usage: memory write --content "..." --class LOCAL`);
     console.log(`             Diagnostics: --log-level info|debug or --verbose`);
     console.log(`  ${BOLD}state-mcp${RESET}  MCP bridge exposing Squad runtime state tools`);
-    console.log(`             Usage: state-mcp`);
     console.log(`  ${BOLD}doctor${RESET}     Validate squad setup (check files, config, health)`);
     console.log(`  ${BOLD}consult${RESET}    Enter consult mode with your personal squad`);
     console.log(`             Flags: --status, --check`);
@@ -279,7 +278,6 @@ async function main(): Promise<void> {
     console.log(`  ${BOLD}--team-root${RESET}    Override team root path for resolution`);
     console.log(`\nInstallation:`);
     console.log(`  npm install --save-dev @bradygaster/squad-cli`);
-    console.log(`\nInsider channel:`);
     console.log(`  npm install --save-dev @bradygaster/squad-cli@insider\n`);
     return;
   }

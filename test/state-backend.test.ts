@@ -529,18 +529,30 @@ describe('ToolRegistry state tools with git-native backend', () => {
     const backend = new OrphanBranchBackend(TMP);
     const adapter = new StateBackendStorageAdapter(backend, squadDir());
     const registry = new ToolRegistry(squadDir(), undefined, adapter);
-    const write = registry.getTool('state.write')!;
     const list = registry.getTool('state.list')!;
 
-    const result = await write.handler({ key: '.squadata/runtime-check.md', content: 'not a .squad prefix\n' });
-
-    expect(result.resultType).toBe('success');
+    backend.write('.squadata/runtime-check.md', 'not a .squad prefix\n');
     expect(backend.read('.squadata/runtime-check.md')).toBe('not a .squad prefix\n');
     expect(backend.read('ata/runtime-check.md')).toBeUndefined();
 
     const listResult = await list.handler({ dir: '.squadata' });
     expect(listResult.resultType).toBe('success');
     expect(listResult.textResultForLlm).toContain('runtime-check.md');
+  });
+
+  it('rejects static config mutations through runtime state tools', { timeout: 20_000 }, async () => {
+    const backend = new OrphanBranchBackend(TMP);
+    const adapter = new StateBackendStorageAdapter(backend, squadDir());
+    const registry = new ToolRegistry(squadDir(), undefined, adapter);
+    const write = registry.getTool('state.write')!;
+    const append = registry.getTool('state.append')!;
+    const del = registry.getTool('state.delete')!;
+
+    await expect(write.handler({ key: 'config.json', content: '{}' })).resolves.toMatchObject({ resultType: 'failure' });
+    await expect(append.handler({ key: 'team.md', content: 'bad' })).resolves.toMatchObject({ resultType: 'failure' });
+    await expect(del.handler({ key: 'agents/data/charter.md' })).resolves.toMatchObject({ resultType: 'failure' });
+    expect(backend.read('config.json')).toBeUndefined();
+    expect(backend.read('team.md')).toBeUndefined();
   });
 
   it('routes existing squad_decide writes through configured backend storage', { timeout: 20_000 }, async () => {

@@ -61,8 +61,8 @@ prompt: |
   STATE_BACKEND: {state_backend}
 
   ## State Protocol — Runtime State Tools
-  Mutable squad state is owned by the runtime. Use the `state.*` tools when they are
-  available:
+  Mutable squad state is owned by the runtime. You MUST use the `state.*` tools
+  whenever they are available:
   - `state.read` / `state.list` for decisions, history, logs, and inbox entries
   - `state.write` / `state.append` for durable updates
   - `state.delete` after Scribe merges inbox entries
