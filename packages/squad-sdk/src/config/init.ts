@@ -1153,9 +1153,15 @@ ${projectDescription ? `- **Description:** ${projectDescription}\n` : ''}- **Cre
   if (includeMcpConfig) {
     const mcpConfigPath = join(teamRoot, '.copilot', 'mcp-config.json');
     if (!storage.existsSync(mcpConfigPath)) {
+      const squadStateServer = {
+        command: 'npx',
+        args: ['-y', '@bradygaster/squad-cli', 'state-mcp'],
+        env: { SQUAD_TEAM_ROOT: teamRoot },
+      };
       const mcpSample = isGitHub
         ? {
             mcpServers: {
+              "squad_state": squadStateServer,
               "EXAMPLE-github": {
                 command: "npx",
                 args: ["-y", "@anthropic/github-mcp-server"],
@@ -1167,6 +1173,7 @@ ${projectDescription ? `- **Description:** ${projectDescription}\n` : ''}- **Cre
           }
         : {
             mcpServers: {
+              "squad_state": squadStateServer,
               "EXAMPLE-azure-devops": {
                 command: "npx",
                 args: ["-y", "@azure/devops-mcp-server"],
