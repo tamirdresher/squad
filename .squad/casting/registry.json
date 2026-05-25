@@ -1,0 +1,67 @@
+{
+  "agents": {
+    "picard": {
+      "persistent_name": "Picard",
+      "universe": "Star Trek",
+      "created_at": "2026-05-14T09:22:24.987+05:30",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "data": {
+      "persistent_name": "Data",
+      "universe": "Star Trek",
+      "created_at": "2026-05-14T09:22:24.987+05:30",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "belanna": {
+      "persistent_name": "B'Elanna",
+      "universe": "Star Trek",
+      "created_at": "2026-05-14T09:22:24.987+05:30",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "geordi": {
+      "persistent_name": "Geordi",
+      "universe": "Star Trek",
+      "created_at": "2026-05-14T09:22:24.987+05:30",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "seven": {
+      "persistent_name": "Seven",
+      "universe": "Star Trek",
+      "created_at": "2026-05-14T09:22:24.987+05:30",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "worf": {
+      "persistent_name": "Worf",
+      "universe": "Star Trek",
+      "created_at": "2026-05-14T09:22:24.987+05:30",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "troi": {
+      "persistent_name": "Troi",
+      "universe": "Star Trek",
+      "created_at": "2026-05-14T09:22:24.987+05:30",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "scribe": {
+      "persistent_name": "Scribe",
+      "universe": "system",
+      "created_at": "2026-05-14T09:22:24.987+05:30",
+      "legacy_named": false,
+      "status": "active"
+    },
+    "ralph": {
+      "persistent_name": "Ralph",
+      "universe": "system",
+      "created_at": "2026-05-14T09:22:24.987+05:30",
+      "legacy_named": false,
+      "status": "active"
+    }
+  }
+}

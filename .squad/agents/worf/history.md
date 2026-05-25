@@ -15,6 +15,12 @@ Worf owns security and reliability review for this Squad's work.
 - This team should never commit secrets and should preserve strong reviewer-gating behavior.
 - ADC execution model security review: conditionally approve periodic ephemeral (Model 2, MVP) and webhook (Model 1, future) with 5 mandatory guardrails (G1: no secret interpolation, G2: HMAC validation, G3: Key Vault for secrets, G4: sandbox TTL + auto-suspend, G5: agent execution timeout). Explicitly reject long-lived sandbox loop (Model 3) — unbounded cost, no crash recovery, violates ADC's ephemeral design philosophy. Guardrails G1–G5 are P0-P1 blocking for any production issue processing.
 
+## 2026-05-19T18:44:51+03:00 — Fast E2E Boundary: Substitute Harness GO, Real CLI STOP
+
+**Request:** Tamir directive — run all remaining experiments and tests without further Worf gates. **Verdict: GO** for Tier-1 (37 turns) and Tier-2 (84+ turns) substitute harness experiments. All agents may execute immediately. Conditions: mark all artifacts `realCopilotCliE2E: false`, enforce G-R1–G-R9, no credential material in fixtures, Data remains locked out of harness revision. **STOP** remains on: any real Copilot CLI invocation, guard modifications, isolation boundary changes, overclaims of Phase 2b completion or production readiness. Boundary holds until revised by Worf or overridden by Tamir. Decision filed: `worf-fast-e2e-boundary.md`.
+
+---
+
 ## 2026-05-19T15:15:47+03:00 — Canary Rerun Gate: Blocked by Product Limitation
 
 **Run:** `real-cli-canary-20260519T174719` — 4 real CLI invocations (2 repos × 2 turns). G-5 precision fix validated: 0 false positives, 0 leaks, `g5ScanScope=model-autonomous-output-only`. Filesystem isolation proven (unique env path hashes, disjoint profiles, grep zero cross-repo matches). One click plant turn timed out (556s vs 120s limit; timeout-enforcement drift, subsequently patched). Canary overall FAILED: `store_memory` returned "Unable to store memory. The repository may not exist…" on tsyringe plant; click plant timed out. Neither isolated store contained its own planted anchor (`ownAnchorPresent: false` for both repos). Foreign anchor count was 0 for both — no leakage. Not a safety incident. No harness defect — product limitation: `store_memory` requires repo association that isolated `COPILOT_HOME` cannot provide. Phase 2b BLOCKED. No further real CLI E2E approved. Task marked complete as blocked-by-product-limitation. Geordi not locked out; Data remains locked out of harness revision. Decision filed: `worf-copilot-home-canary-rerun-gate.md`.

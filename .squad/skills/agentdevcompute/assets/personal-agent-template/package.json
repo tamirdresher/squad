@@ -1,0 +1,17 @@
+{
+  "name": "personal-agent",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Personal Agent — OpenClaw-inspired AI gateway powered by Copilot SDK + ADC connectors",
+  "main": "index.js",
+  "scripts": {
+    "setup": "curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && apt-get install -y nodejs && npm config set strict-ssl false && npm install",
+    "start": "node index.js"
+  },
+  "engines": { "node": ">=24.0.0" },
+  "dependencies": {
+    "@github/copilot-sdk": "^0.1.23",
+    "express": "^5.1.0",
+    "node-cron": "^3.0.3"
+  }
+}

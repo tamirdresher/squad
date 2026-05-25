@@ -1,0 +1,16 @@
+{
+  "name": "chatbox",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "ChatBox — ChatGPT-style AI powered by Copilot SDK",
+  "main": "index.js",
+  "scripts": {
+    "setup": "curl -fsSL https://deb.nodesource.com/setup_24.x | bash - && apt-get install -y nodejs && npm config set strict-ssl false && npm install",
+    "start": "node index.js"
+  },
+  "engines": { "node": ">=24.0.0" },
+  "dependencies": {
+    "@github/copilot-sdk": "^0.1.23",
+    "express": "^5.1.0"
+  }
+}
