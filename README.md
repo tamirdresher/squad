@@ -34,11 +34,11 @@ git init
 
 **✓ Validate:** Run `git status` — you should see "No commits yet".
 
-### 2. Install Squad
+### 2. Install Squad and init with defaults
 
 ```bash
 npm install -g @bradygaster/squad-cli
-squad init
+squad init --preset default
 ```
 
 **✓ Validate:** Check that `.squad/team.md` was created in your project.
