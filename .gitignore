@@ -20,3 +20,7 @@ docs/dist/
 
 # Images folder (root only — don't ignore docs/public/images/)
 /images/
+
+bin/
+obj/
+artifacts/
