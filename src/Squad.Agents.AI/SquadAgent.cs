@@ -60,11 +60,23 @@ public sealed class SquadAgent : AIAgent, IAsyncDisposable
 
     private static CopilotClient CreateCopilotClient(SquadAgentOptions options, ILoggerFactory? loggerFactory)
     {
+        // Resolve token: provider takes precedence over direct property
+        string? resolvedToken = null;
+        if (options.GitHubTokenProvider is not null)
+        {
+            // Call provider synchronously (constructor context requires sync)
+            resolvedToken = options.GitHubTokenProvider(CancellationToken.None).GetAwaiter().GetResult();
+        }
+        else
+        {
+            resolvedToken = options.GitHubToken;
+        }
+
         var clientOptions = new CopilotClientOptions
         {
             CliPath = options.CliPath,
             Cwd = options.Cwd ?? options.SquadFolderPath,
-            GitHubToken = options.GitHubToken
+            GitHubToken = resolvedToken
         };
 
         // Copy CLI args

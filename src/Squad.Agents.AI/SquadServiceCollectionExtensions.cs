@@ -11,7 +11,11 @@ namespace Squad.Agents.AI;
 /// </summary>
 public static class SquadServiceCollectionExtensions
 {
-    /// <summary>Register SquadAgent as a scoped AIAgent.</summary>
+    /// <summary>
+    /// Register SquadAgent as a scoped AIAgent.
+    /// Reads connection string from ConnectionStrings:squad and applies parsed values
+    /// to options before the user callback runs. User-supplied callback always wins.
+    /// </summary>
     public static IServiceCollection AddSquadAgent(
         this IServiceCollection services,
         Action<SquadAgentOptions>? configure = null)
@@ -23,6 +27,9 @@ public static class SquadServiceCollectionExtensions
         ServiceLifetime lifetime,
         Action<SquadAgentOptions>? configure = null)
     {
+        // Register connection string configurator FIRST (runs before user callback)
+        services.TryAddEnumerable(ServiceDescriptor.Singleton<IConfigureOptions<SquadAgentOptions>, SquadAgentOptionsConfigurator>());
+
         if (configure is not null)
         {
             services.Configure(configure);
