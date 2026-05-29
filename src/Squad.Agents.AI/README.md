@@ -85,8 +85,7 @@ Squad is an open-source multi-agent CLI framework that orchestrates autonomous a
 
 In your **AppHost**:
 ```csharp
-var squad = builder.AddSquad("squad")
-    .WithTeamRoot("../my-team-root");
+var squad = builder.AddSquad("squad", teamRoot: "../my-team-root");
 ```
 
 In your **consumer service** (Program.cs):
