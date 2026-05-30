@@ -219,7 +219,12 @@ jobs:
           BASE="${{ github.event.pull_request.base.sha }}"
           HEAD="${{ github.event.pull_request.head.sha }}"
           CHANGED=$(git diff --name-only "$BASE"..."$HEAD")
-          SDK_CLI_CHANGED=$(echo "$CHANGED" | grep -E '^packages/squad-(sdk|cli)/src/|^packages/squad-(sdk|cli)/templates/|^\.squad-templates/|^templates/' || true)
+          # Paths whose changes ship behavioral or scaffolding updates and therefore
+          # require a changeset (or CHANGELOG update). The top-level templates/ tree is
+          # a full canonical mirror of .squad-templates/ (see scripts/sync-templates.mjs),
+          # so the entire tree is governed squad scaffolding, not unrelated content.
+          SDK_CLI_PATH_REGEX='^packages/squad-(sdk|cli)/src/|^packages/squad-(sdk|cli)/templates/|^\.squad-templates/|^templates/'
+          SDK_CLI_CHANGED=$(echo "$CHANGED" | grep -E "$SDK_CLI_PATH_REGEX" || true)
           if [ -z "$SDK_CLI_CHANGED" ]; then
             echo "✅ Not applicable (no SDK/CLI source or template changes)" >> $GITHUB_STEP_SUMMARY
             exit 0
