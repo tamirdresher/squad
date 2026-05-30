@@ -236,7 +236,7 @@ jobs:
             echo "✅ CHANGELOG.md updated" >> $GITHUB_STEP_SUMMARY
             exit 0
           fi
-          echo "::error::No changeset or CHANGELOG.md update found, but SDK/CLI source files were changed."
+          echo "::error::No changeset or CHANGELOG.md update found, but SDK/CLI source or template files were changed."
           echo "::error::Run 'npx changeset add' or edit CHANGELOG.md. Escape hatch: add 'skip-changelog' label."
           echo "❌ No changeset or CHANGELOG.md update" >> $GITHUB_STEP_SUMMARY
           exit 1
