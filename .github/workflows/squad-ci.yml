@@ -219,12 +219,12 @@ jobs:
           BASE="${{ github.event.pull_request.base.sha }}"
           HEAD="${{ github.event.pull_request.head.sha }}"
           CHANGED=$(git diff --name-only "$BASE"..."$HEAD")
-          SDK_CLI_CHANGED=$(echo "$CHANGED" | grep -E '^packages/squad-(sdk|cli)/src/' || true)
+          SDK_CLI_CHANGED=$(echo "$CHANGED" | grep -E '^packages/squad-(sdk|cli)/src/|^packages/squad-(sdk|cli)/templates/|^\.squad-templates/|^templates/' || true)
           if [ -z "$SDK_CLI_CHANGED" ]; then
-            echo "✅ Not applicable (no SDK/CLI source changes)" >> $GITHUB_STEP_SUMMARY
+            echo "✅ Not applicable (no SDK/CLI source or template changes)" >> $GITHUB_STEP_SUMMARY
             exit 0
           fi
-          echo "SDK/CLI source files changed:"
+          echo "SDK/CLI source or template files changed:"
           echo "$SDK_CLI_CHANGED"
           CHANGESET_ADDED=$(git diff --diff-filter=AM --name-only "$BASE"..."$HEAD" | grep -E '^\.changeset/[^/]+\.md$' | grep -vxF '.changeset/README.md' || true)
           CHANGELOG_CHANGED=$(echo "$CHANGED" | grep -E '^CHANGELOG\.md$' || true)
