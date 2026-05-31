@@ -608,3 +608,262 @@ Priority order (1–3 are blockers):
 
 
 ---
+
+### 2026-05-31T21:00:00.000+03:00: Data — Branch Verification: Fix Status vs. Actual Code (Issues #1185, #1190, #1194, #1163)
+
+**By:** Data (Squad Framework Expert)
+**Scope:** Static read-only verification of `origin/dev`, `v0.9.6-insider.3`, and all fix branches against known bugs
+**Methodology:** `git show <branch>:<file>` + `Select-String` pattern matching. No code modified, no commits created.
+**Repo verified:** `C:\Users\tamirdresher\source\repos\squad` (remote: `bradygaster/squad`)
+
+---
+
+## TLDR
+
+Five discrete bugs cluster into three failure groups. All five are present in both `v0.9.6-insider.3` and `origin/dev`. Only one has an unmerged fix branch that is actually ready to land. Two bugs have no fix branch at all. One claim in the prior decisions.md triage (Bug D "Fixed in p1 branch") is **contradicted by the actual code** — the p1 branch carries the same stale text.
+
+**Group 1 — Permission Contract (P0):** Copilot CLI v1.0.54+ changed the `onPermissionRequest` handler return value. Squad still returns `{ kind: 'approved' }` which the new CLI ignores — every tool call is blocked. Fix exists in `squad/1191-fix-cli-permission-contract`, not yet merged to `dev`.
+
+**Group 2 — State Backend Selection (P1):** Three compounding bugs: (a) `resolveStateBackend()` hard-throws instead of falling back when an explicitly-configured backend fails; (b) `normalizeBackendType()` silently migrates `"git-notes"` → `"two-layer"` with no user warning; (c) coordinator template still documents deprecated backend names (`"worktree"`, `"git-notes"`) as valid. No complete fix branch exists for any of the three against current `dev`.
+
+**Group 3 — Upgrade Pipeline (P1):** `squad upgrade` does not install git hooks for two-layer, ignores `--state-backend` flag, writes absolute `teamRoot`, and appends duplicate `stateBackend` keys to config.json. `patch-esm-imports.mjs` does not appear in `dev` scripts at all (removed or renamed). No dedicated fix branch found.
+
+---
+
+## Repro Matrix
+
+| ID | Setup | Command | Expected Broken Behavior | Pass Condition |
+|----|-------|---------|--------------------------|----------------|
+| A — Permission P0 | Copilot CLI ≥ v1.0.54 | Any `squad` invocation that exercises a tool | Agent tool calls are silently blocked / "unrecognized permission kind" | `approveAllPermissions` returns `{ kind: 'approve-once' }` |
+| B — Hard Throw P1 | `.squad/config.json`: `"stateBackend": "orphan"`; run from non-git dir | `resolveStateBackend()` (e.g. via `squad watch`) | `Error: State backend 'orphan' failed: ...` — process exits | Falls back with `console.warn`; uses WorktreeBackend |
+| C — Silent Migration P1 | `.squad/config.json`: `"stateBackend": "git-notes"` | `resolveStateBackend()` | Silently creates orphan branch `squad-state`; no warning emitted | `console.warn("git-notes backend has been removed...")` visible in output |
+| D — Stale Template P2 | Fresh `squad init` or `squad upgrade` | `cat .github/agents/squad.agent.md` | Template lists `"worktree" (default)`, `"git-notes"` as valid backends | Template lists `"local" (default)`, `"orphan"`, `"two-layer"` only |
+| E — Upgrade Hooks P1 | v0.9.4 repo; `stateBackend: "orphan"` | `squad upgrade --self --insider --state-backend two-layer` | Hooks not installed; `--state-backend` ignored; `teamRoot` = absolute path; `config.json` has duplicate `stateBackend` key | Hooks installed; `teamRoot: "."` written; no duplicate keys; migration confirmed |
+| F — TEAM_ROOT P2 | Worktree of branch without `.squad/` committed | `squad` (coordinator) invoked in that worktree | False Init Mode entry; may destructively overwrite existing config | Coordinator resolves `TEAM_ROOT` = repo root; Init Mode not triggered |
+
+---
+
+## Branch Status — Verified Against Code
+
+| Bug | `v0.9.6-insider.3` | `origin/dev` | Fix Branch | Fix Merged to dev? |
+|-----|--------------------|--------------|------------|--------------------|
+| A — `approved` → `approve-once` | ❌ broken (`'approved'`) | ❌ broken (`'approved'`) | `origin/squad/1191-fix-cli-permission-contract` | ❌ NOT merged |
+| B — Hard throw on explicit backend | ❌ broken (`explicitBackend` throw) | ❌ broken (`explicitBackend` throw) | `origin/bradygaster/squad-p1-coordinator-bugs` (older; pre-dates bug) | ⚠️ Stale (p1 is ancestor of dev but dev reintroduced the pattern after merge) |
+| C — Silent git-notes migration | ❌ broken (no warn) | ❌ broken (no warn) | None found | ❌ No fix branch |
+| D — Stale coordinator template | ❌ broken (`"worktree"` default) | ❌ broken (`"worktree"` default) | None confirmed | ❌ p1 branch has SAME stale text — prior decisions.md "Fixed in p1" is **incorrect** |
+| E — Upgrade pipeline hooks/teamRoot | ❌ broken | ❌ broken | None found | ❌ No dedicated fix branch |
+| F — TEAM_ROOT dual definition | ❌ broken | ❌ broken | None merged | ❌ ralarcon offered PR; not filed |
+
+---
+
+## Corrections to Prior Triage (Data, 2026-05-31T14:09Z)
+
+**Bug D correction:** Prior triage stated "Fixed in `origin/bradygaster/squad-p1-coordinator-bugs`". Verification of `p1-coordinator-bugs:.github/agents/squad.agent.md` and `p1-coordinator-bugs:packages/squad-cli/templates/squad.agent.md.template` shows **identical stale text** in both files:
+> `Valid values: "worktree" (default), "git-notes", "orphan", "two-layer"`
+
+Bug D is **NOT fixed** in any current branch. The prior assessment was incorrect.
+
+**Bug B nuance:** `bradygaster/squad-p1-coordinator-bugs` is a git ancestor of `origin/dev` (`merge-base --is-ancestor` returns 0). The p1 branch's older `state-backend.ts` never had `explicitBackend` because it predates that code path. The `explicitBackend` conditional throw was introduced to `dev` by a later merge of `feature/coordinator-as-agent` code. The p1 branch fix is therefore **irrelevant to the current dev regression** — the bug needs a new fix targeted at `origin/dev` HEAD.
+
+---
+
+## Key Code Evidence
+
+**Bug A — `packages/squad-cli/src/cli/shell/index.ts` (on dev):**
+```typescript
+// BROKEN — returns deprecated contract value
+const approveAllPermissions: SquadPermissionHandler = () => ({ kind: 'approved' });
+// FIXED (only in squad/1191-fix-cli-permission-contract):
+const approveAllPermissions: SquadPermissionHandler = () => ({ kind: 'approve-once' });
+```
+
+**Bug B — `packages/squad-sdk/src/state-backend.ts` (on dev):**
+```typescript
+// BROKEN — hard throw when user configured a backend explicitly and it fails
+const explicitBackend = cliOverride !== undefined || configBackend !== undefined;
+if (explicitBackend && chosen !== 'local') {
+  throw new Error(`State backend '${chosen}' failed: ${msg}`);
+}
+```
+
+**Bug C — `packages/squad-sdk/src/state-backend.ts` `normalizeBackendType()` (on dev):**
+```typescript
+if (type === 'git-notes') return 'two-layer'; // standalone git-notes removed; migrate to two-layer
+// MISSING: console.warn('git-notes backend removed; migrating to two-layer');
+```
+
+**Bug D — `.github/agents/squad.agent.md` (on dev, insider.3, and p1 branch — all three):**
+```
+Valid values: `"worktree"` (default), `"git-notes"`, `"orphan"`, `"two-layer"`
+// SHOULD BE: Valid values: `"local"` (default), `"orphan"`, `"two-layer"`
+```
+
+---
+
+## Recommended Actions (Updated)
+
+1. **[URGENT — P0]** Cherry-pick `squad/1191-fix-cli-permission-contract` into dev and insider.4 immediately. Single-commit fix; no conflicts expected.
+2. **[HIGH — P1]** Write a new fix for Bug B targeting `origin/dev` HEAD — the p1-coordinator-bugs fix is obsolete. Remove `explicitBackend` conditional throw; always warn+fallback.
+3. **[HIGH — P1]** Add `console.warn` to `normalizeBackendType()` for `git-notes`→`two-layer` path (Bug C). One-line fix.
+4. **[MEDIUM — P2]** Update coordinator template (`squad.agent.md` + `.template` copy): replace `"worktree" (default), "git-notes"` with `"local" (default)`. Applies to Bug D in ALL branches.
+5. **[MEDIUM — P1]** Create a dedicated fix branch for Bug E: upgrade pipeline hooks + teamRoot portability + config merge semantics. No current branch addresses this.
+6. **[MEDIUM — P2]** Track ralarcon's pending PR for Bug F (TEAM_ROOT unification, #1163).
+
+---
+
+### 2026-05-31T21:59:07.099+03:00: Worf — Reliability Gates: State-Backend / Upgrade Issue Cluster
+
+**Date:** 2026-05-31  
+**Author:** Worf (Security & Reliability Reviewer)  
+**References:** bradygaster/squad#1185, #1190, #1194, #1163  
+**Status:** Gate definition — awaiting Data verification  
+
+---
+
+## 1. Summary of the Issue Cluster
+
+Four upstream issues form a single failure chain rooted in `squad upgrade`:
+
+| Issue | Root Problem |
+|-------|-------------|
+| #1185 | `--state-backend` flag silently ignored during upgrade; templates scattered to `.squad/` root; Rai not auto-installed |
+| #1190 | Two-layer `pre-commit`/`post-commit` hooks never installed; ESM patch misses repo-local `node_modules`; `teamRoot` written as non-portable absolute path; duplicate `stateBackend` key appended (not merged) in config.json |
+| #1163 | `TEAM_ROOT` defined contradictorily in two sections of `squad.agent.md`; `teamRoot` path semantics reject valid relative paths; `Worktree Awareness` step 0 undefined resolution order |
+| #1194 | State documentation out of sync with implementation |
+
+**Confirmed by code inspection:**
+
+- `doctor.ts` has NO check for `stateBackend` value, NO check for `pre-commit`/`post-commit` hooks when `stateBackend=two-layer`, NO check for template leakage to `.squad/` root.
+- `upgrade.ts` uses a `MigrationRegistry` but no registered migration handles `orphan → two-layer`.
+- `SEARCH_ROOTS` in `patch-esm-imports.mjs` does not include `join(process.cwd(), 'node_modules')`.
+
+---
+
+## 2. Silent State Loss — Hard Release Blockers
+
+These failures lose committed squad state with no error surfaced to the user. They are **RELEASE BLOCKERS** until gates pass.
+
+### BLOCKER-1: Two-layer state branch never written (missing hooks)
+- **Mechanism:** If `stateBackend=two-layer` is in config.json but `pre-commit`/`post-commit` hooks are absent, the `squad-state` orphan branch receives no writes. Every commit silently discards state deltas. The user sees a healthy repo; the state branch is a stub.
+- **How it happens today:** `squad upgrade` with `--state-backend two-layer` is silently ignored (#1185), so hooks are never installed. `squad doctor` does not flag this (#1190).
+- **Pass criterion:** `squad doctor` must emit `fail` (not `warn`) when `stateBackend=two-layer` is set and either `pre-commit` or `post-commit` hook is absent or does not invoke the squad state writer.
+
+### BLOCKER-2: Duplicate `stateBackend` key written by upgrade
+- **Mechanism:** The upgrade config-write path appends rather than merges keys. A duplicate `stateBackend` produces two keys; JSON spec last-value wins, but any tooling that stops at first occurrence (streaming parsers, jq default mode on some platforms) reads the wrong backend.
+- **Pass criterion:** After `squad upgrade --state-backend <value>`, `config.json` contains exactly one `stateBackend` key. Verified by JSON.parse round-trip and by raw `grep -c stateBackend .squad/config.json == 1`.
+
+---
+
+## 3. Minimum Reliability Gates — Full List
+
+### GATE-1 (Unit — upgrade) — `--state-backend` flag is respected
+**Pass:** `upgrade --state-backend two-layer` from an `orphan` base writes `stateBackend: "two-layer"` to `config.json` and registers the migration. Does NOT throw "upgrade from orphan isn't supported."  
+**Fail:** Command exits with error or leaves `stateBackend` unchanged.  
+**Classification:** Unit test on the upgrade command handler with a mocked filesystem.
+
+### GATE-2 (Unit — upgrade) — config write merges, does not append
+**Pass:** Calling the config-write path twice with the same key produces a config.json with exactly one occurrence of that key.  
+**Fail:** Two or more identical top-level keys exist in the output JSON.  
+**Classification:** Unit test on the config serializer / writer.
+
+### GATE-3 (Unit — upgrade) — templates written only to `.squad/templates/`
+**Pass:** After upgrade, no template file (matching `*-charter.md`, `roster.md`, `copilot-instructions.md`, `mcp-config.md`, etc.) exists directly under `.squad/` (only under `.squad/templates/`).  
+**Fail:** Any template file present at `.squad/<filename>` (not in a subdirectory).  
+**Classification:** Unit test on the template-sync step of the upgrade pipeline.
+
+### GATE-4 (Unit — upgrade) — Rai auto-installed when missing
+**Pass:** After upgrade on a repo that has no `.squad/agents/Rai/` directory, the upgrade creates `.squad/agents/Rai/charter.md`, `.squad/agents/Rai/history.md`, `.squad/rai/policy.md`, `.squad/rai/audit-trail.md`, adds Rai to `team.md` and `routing.md`, and adds the `audit-trail.md merge=union` line to `.gitattributes`.  
+**Fail:** Any of those artifacts missing after upgrade completes.  
+**Classification:** Unit test on the built-in-agent provisioning step.
+
+### GATE-5 (Unit — upgrade) — two-layer hooks installed after state-backend migration
+**Pass:** After `upgrade --state-backend two-layer`, both `.git/hooks/pre-commit` and `.git/hooks/post-commit` exist and contain the squad state-write invocation.  
+**Fail:** Either hook absent, or hook exists but does not invoke squad state logic.  
+**Classification:** Unit test on the hook-installation step, with a mocked `.git/hooks/` directory.
+
+### GATE-6 (Doctor check — new) — two-layer hook presence validated
+**Pass:** `runDoctor()` on a repo with `stateBackend: "two-layer"` and missing `pre-commit` hook returns a check with `status: "fail"` and a message naming the missing hook.  
+**Fail:** Check absent, or `status: "warn"` (insufficient — this is a data-loss condition).  
+**Classification:** Unit test on `runDoctor()` with mocked config and mocked hook directory.
+
+### GATE-7 (Doctor check — existing, strengthened) — absolute teamRoot is a warning
+**Pass:** `runDoctor()` on a repo with `teamRoot: "/absolute/path"` returns `status: "warn"` citing portability. (Already exists in `checkAbsoluteTeamRoot`.) Test must assert `warn`, not `fail` or `pass`.  
+**Fail:** Check absent or wrong severity.  
+**Classification:** Unit test on `runDoctor()` — confirm existing check still fires.
+
+### GATE-8 (Unit — ESM patch) — `process.cwd()/node_modules` in SEARCH_ROOTS
+**Pass:** `patch-esm-imports.mjs` includes `join(process.cwd(), 'node_modules')` in `SEARCH_ROOTS` and patches libraries found there.  
+**Fail:** Only global/sibling paths in `SEARCH_ROOTS`; repo-local `node_modules` not touched.  
+**Classification:** Unit test on the patch script with a mocked filesystem rooted at a fake `process.cwd()`.
+
+### GATE-9 (Integration — upgrade round-trip) — doctor clean after upgrade
+**Pass:** A repo that starts with `stateBackend: "orphan"` and runs `squad upgrade --state-backend two-layer` ends with `squad doctor` reporting 0 failures and 0 warnings (or only known-acceptable warnings unrelated to this cluster).  
+**Fail:** Any `fail` status check, or a `warn` on hook presence, ESM patch, teamRoot portability.  
+**Classification:** Integration test using a temporary git repo on disk, real hook file inspection, real config.json parsing. Must run on both Unix and Windows paths.
+
+### GATE-10 (Manual release check) — worktree false-Init-Mode regression (#1163)
+**Pass:** In a worktree checked out to a branch that has NO committed `.squad/` directory, the coordinator does NOT enter Init Mode. The operator verifies this manually by: (a) creating a worktree from a branch without `.squad/`, (b) starting a session, (c) confirming the coordinator loads team state from the main checkout.  
+**Fail:** Coordinator prompts for init or reports missing team.  
+**Classification:** Manual release check (cannot be unit-tested without running a live LLM session). Block release if failing.
+
+### GATE-11 (Docs check) — state documentation consistency (#1194)
+**Pass:** `docs/src/content/docs/scenarios/team-state-storage.md` describes all three backends (`local`, `two-layer`, `orphan`), hook requirements for two-layer, and notes that `teamRoot` should be a relative path. Reviewed and approved by Scribe before release.  
+**Fail:** Docs still describe a deprecated or partial state model.  
+**Classification:** Manual release check / docs review gate.
+
+---
+
+## 4. Gate Classification Table
+
+| Gate | Type | Blocker? |
+|------|------|---------|
+| GATE-1: `--state-backend` respected | Unit | Yes — silent no-op |
+| GATE-2: config write merges, not appends | Unit | Yes (BLOCKER-2) |
+| GATE-3: templates only in `.squad/templates/` | Unit | No — degraded but not silent |
+| GATE-4: Rai auto-installed | Unit | No — degraded, surfaced by doctor |
+| GATE-5: two-layer hooks installed on upgrade | Unit | Yes (BLOCKER-1) |
+| GATE-6: doctor fails on missing two-layer hooks | Unit | Yes (BLOCKER-1) |
+| GATE-7: absolute teamRoot warns in doctor | Unit | No — portability, not data loss |
+| GATE-8: ESM patch covers repo-local node_modules | Unit | No — breaks ESM loading, visible error |
+| GATE-9: full upgrade round-trip integration | Integration | Yes — regression catch |
+| GATE-10: worktree no false Init Mode | Manual | Yes — silent wrong-mode entry |
+| GATE-11: docs current | Manual/Docs | No — quality gate |
+
+---
+
+## 5. Reproduction Steps (for Data to verify fixes)
+
+### Reproduce BLOCKER-1 (pre/post-commit hooks missing)
+1. Start with a repo containing `.squad/config.json` with `"stateBackend": "orphan"`.
+2. Run `squad upgrade --state-backend two-layer`.
+3. Inspect `.git/hooks/`: `pre-commit` and `post-commit` should exist. **Before fix:** they do not.
+4. Run `squad doctor`: should report `fail` for missing hooks. **Before fix:** doctor is silent.
+5. Make a commit. Inspect `squad-state` orphan branch — it should have a new commit. **Before fix:** it does not.
+
+### Reproduce BLOCKER-2 (duplicate key)
+1. Start with `.squad/config.json` containing `"stateBackend": "orphan"`.
+2. Run `squad upgrade --state-backend two-layer`.
+3. Run `(Get-Content .squad/config.json | ConvertFrom-Json)` and also `Select-String stateBackend .squad/config.json`.
+4. **Before fix:** two `stateBackend` entries appear in raw file.
+
+### Reproduce GATE-1 (--state-backend ignored)
+1. Start with `"stateBackend": "orphan"` in config.
+2. Run `squad upgrade --state-backend two-layer`. **Before fix:** error thrown or value unchanged.
+
+### Reproduce GATE-3 (template scatter)
+1. Run `squad upgrade --self --insider` on a repo.
+2. Run `Get-ChildItem .squad -Depth 0 -Filter "*.md"`. **Before fix:** ~20 template files appear at root.
+
+---
+
+## 6. Worf's Assessment
+
+I am not impressed by "it mostly works." The two-layer state branch silently never receiving writes is the most serious failure in this cluster: it is **undetectable without inspecting the orphan branch directly**, and it means every state mutation since upgrade has been lost. There is no recovery path once the branch diverges. This is an incident-class failure in production repos.
+
+The `doctor` command must be a hard gate, not a diagnostic suggestion. GATE-6 must emit `fail`, not `warn`. If doctor passes, the user must be able to trust it.
+
+GATE-9 (integration round-trip) is the only gate that would have caught all of #1190's findings in one run. It must block merge, not be advisory.
+
+Data: use the reproduction steps above against a clean temporary repo. Report pass/fail per gate. Any blocker gate failing = no ship.
+
+---
