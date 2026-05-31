@@ -9,6 +9,54 @@
 
 Data is the explicit Squad framework expert for this team. Data should learn from `C:\Users\tamirdresher\source\repos\squad`, including the Brady Squad repo's SDK/CLI design, governance files, prompt templates, and existing team decisions.
 
+## 2026-05-31T14:09:11Z — State-backend insider.2→insider.3 triage
+
+**Baseline clarification:** Tag `v0.9.6-insider.2` does not exist in the Squad repo. Only `v0.9.6-insider.3` is tagged (on `origin/feature/coordinator-as-agent`, commit `ce326d56`). Triage used `v0.9.4` as the prior stable baseline.
+
+**Key code locations (insider.3):**
+- State backend implementations: `packages/squad-sdk/src/state-backend.ts` (all 4 backends + adapter)
+- CLI permission handler: `packages/squad-cli/src/cli/shell/index.ts` (`approveAllPermissions`)
+- MCP state command: `packages/squad-cli/src/cli/commands/state-mcp.ts`
+- Upgrade flow (reads config.json): `packages/squad-cli/src/cli/core/upgrade.ts`
+
+**StateBackendType rename (v0.9.4 → insider.3):**
+- `'worktree'` → `'local'` (WorktreeBackend.name also changed)
+- `'git-notes'` removed as standalone type; migrated to `'two-layer'` via `normalizeBackendType()`
+- `'two-layer'` added (orphan permanent + git-notes best-effort annotation layer)
+- Migration is transparent via `normalizeBackendType()` in `resolveStateBackend()`, but users whose config says `"git-notes"` now silently get orphan branch creation — a significant behavioral side-effect
+- `isValidBackendType()` accepts legacy values, so parse-time validation passes
+
+**TwoLayerBackend architecture:** Orphan branch is the permanent read store; git notes are a best-effort commit-scoped annotation. `write/delete/append` all try orphan first (hard), then notes (swallowed catch). `read/list/exists` go to orphan only. `promote_to_permanent` concept: Ralph moves notes to orphan after PR merge.
+
+**GitNotesBackend anchor change:** Old code wrote notes on `HEAD` (lost on branch switch). New code uses `rev-list --max-parents=0 HEAD` (root commit as stable anchor). Caveat: per-instance `cachedAnchor` — if a new instance is created mid-session after HEAD changed, it still uses the cached root commit from that instance. Nondeterministic on repos with multiple root commits (unrelated histories merge).
+
+**P0 bug — permission contract broken (not in insider.3, fix in branch `squad/1191-fix-cli-permission-contract`):**
+- `approveAllPermissions` returns `{ kind: 'approved' }` at insider.3
+- Copilot CLI v1.0.54+ changed the contract to require `{ kind: 'approve-once' }`
+- All spawned agent operations (including state writes) hang or fail on v1.0.54+
+- Single-character fix: `'approved'` → `'approve-once'` in `shell/index.ts`
+
+**P1 bug — `resolveStateBackend` throws on explicit backend failure:**
+- At insider.3, if `stateBackend` is explicitly set to `'orphan'` or `'two-layer'` in config.json AND the backend init fails (not a git repo, or `requireGitRepository` throws), the code rethrows instead of falling back to `'local'`
+- Fix in `bradygaster/squad-p1-coordinator-bugs`: removes the `explicitBackend` throw logic and `requireGitRepository()` entirely
+
+**P2 bugs (not yet merged at insider.3):**
+- Externalized state path resolution broken: `origin/squad/949-fix-externalized-state-paths` not merged
+- State backend hardening (retry + circuit-breaker): `origin/squad/864-state-backend-hardening` not merged
+- Coordinator template still documents `"worktree"` and `"git-notes"` as valid config values (stale docs — fixed in p1 branch)
+
+**`StateBackendStorageAdapter.toRelative()` Windows edge case:** Strips `squadDir` prefix using `path.normalize().slice(normalizedBase.length + 1)` then converts slashes. If absolute path has a different-case drive letter or UNC form, normalization may produce a non-matching prefix and leak an absolute path into the orphan/notes backend, corrupting git notes refs.
+
+**Cross-Agent Note (2026-05-31T14:03:06.842+03:00):**
+Seven independently identified the same P0 permission contract blocker via community issue research (#1191). Her findings corroborate this analysis and validate the urgency of the fix. Seven also mapped 5 dominant problem themes from GitHub issues; Data's bug taxonomy aligns with all 5 themes. Both agents recommend immediate prioritization of the one-line permission contract fix before any further insider.3 user testing.
+
+**Relevant in-flight branches:**
+- `origin/bradygaster/squad-p1-coordinator-bugs` — P1 coordinator + state bugs; also adds State & Team Root Resolution section to coordinator template
+- `origin/squad/1191-fix-cli-permission-contract` — permission contract one-liner fix
+- `origin/copilot/bug-squad-cli-permission-issues` — same permission fix (different branch)
+- `origin/squad/864-state-backend-hardening` — retry + circuit-breaker (not merged)
+- `origin/squad/949-fix-externalized-state-paths` — externalized path resolution (not merged)
+
 ## Learnings
 
 - The `squad` repo's team uses Mission Control roles such as Flight, CAPCOM, CONTROL, FIDO, and others. This project uses Star Trek names, but Data owns equivalent Squad SDK/CLI expertise here.

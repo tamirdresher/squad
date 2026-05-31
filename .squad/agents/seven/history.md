@@ -38,6 +38,19 @@ Seed sources:
 
 ### Squad-Squad Integration Points
 - **Data owns Brady Squad expertise:** Data responsible for learning from `C:\Users\tamirdresher\source\repos\squad` and applying SDK/CLI, coordinator, runtime, template knowledge here.
+
+## 2026-05-31T14:03:06.842+03:00 — State-Backend Insider Triage (Parallel with Data)
+
+**Corroboration Summary:** Performed parallel community research on state-backend regressions. Data independently identified P0 permission contract blocker via code diff analysis in `shell/index.ts`. Seven confirmed same P0 via GitHub Issue #1191 (Copilot CLI v1.0.54+ contract change). Both agents recommend urgent fix before insider.3 user testing.
+
+**Problem Themes Mapped:** 5 dominant themes identified from 13+ GitHub issues/PRs:
+1. Upgrade Pipeline Gaps (P1 — state corruption, ESM patch, hooks missing)
+2. Two-Layer Backend Incomplete (P1 — architectural gap, runtime wiring)
+3. Coordinator State Resolution Inconsistency (P2 — UX/logic)
+4. Permission API Breaking Change (P1 — Copilot CLI v1.0.54+ contract)
+5. State Destruction on Branch Switch (P1 resolved via PR #797)
+
+**Cross-Validation:** Data's 7-bug taxonomy perfectly aligns with Seven's 5 themes. Corroboration strengthens priority assessment and validates architectural gaps identified in both analyses.
 - **Troi owns Tamir voice writing:** Blogs, posts, public writing in Tamir's voice, style, humor. Should study prior patterns from `tamresearch1` before drafting.
 - **Governance Model:** All meaningful changes require team consensus or explicit owner/reviewer path. Decisions focus on shared direction; history focuses on agent-specific learnings. Preserved reviewer rejection lockout.
 
@@ -167,4 +180,74 @@ Seven responsible for architectural consistency checks: ExternalSquadEvent doesn
 **Status:** Proposal ready for Tamir GO/NO-GO decision. All prerequisites met for Tier-1 execution. Tier-2 awaits infrastructure provisioning and approval.
 
 **Orchestration log:** .squad/orchestration-log/20260519T151210Z-seven.md
+
+---
+
+## 2026-05-22T14:45:33Z — State-Backend Community Signal Synthesis Complete
+
+**Assignment:** Surface all community signal on state-backend issues reported after squad-cli insider.2 release. Goal: identify dominant problem themes, affected users, in-flight fixes, and gaps. Outputs to `.squad/decisions/inbox/seven-state-backend-issue-themes.md` and learnings to history.
+
+**Research Methodology:**
+- 11 parallel GitHub searches via gh CLI across state-backend keywords (state backend, git-notes, orphan branch, worktree state, two-layer, insider, permission, history.md, decisions.md, Scribe orphan, upgrade config)
+- Fetched top 10 critical issues + PR details
+- Windows PowerShell redirection fixes (Unix-style `/dev/null` → native pipes)
+- Compiled comprehensive issue/PR signal with Tamir involvement matrix
+
+**Key Findings — Five Dominant Problem Clusters:**
+
+1. **Upgrade Pipeline Gaps** (#1190, #1185, #1098): Post-upgrade state corruption
+   - ESM patch misses repo-local node_modules (postinstall incomplete)
+   - Two-layer hooks not installed despite config (--state-backend ignored during upgrade)
+   - teamRoot written as absolute path (not portable across clones)
+   - Config append bug (duplicate stateBackend keys)
+   - Templates dumped at .squad/ root (duplicate cleanup required)
+   - **Status:** Identified; no fix yet (manual workarounds documented by tamirdresher)
+
+2. **Two-Layer State Backend Incomplete** (#1157, #1013, #1003, #810): Architectural bypass
+   - Two-layer design (git-notes + orphan) exists at SDK level but bypassed at orchestration
+   - Agent prompts still contain manual git choreography (checkout, notes, state branch instructions)
+   - Only wired to watch command; init/history/decisions/skills still use FSStorageProvider directly
+   - **Status:** PR #1158 (tamirdresher, MERGED 6 days ago) routes state through runtime tools; closes #1157
+   - **Gap:** Phase 2–3 of #1003 (global wiring) still pending
+
+3. **Coordinator State Resolution Inconsistency** (#1163, #1127): Logic/UX gap
+   - TEAM_ROOT defined two ways: `.squad/` vs repo root (contradictory)
+   - teamRoot path semantics too restrictive (docs forbid portable relative paths; real usage allows both)
+   - Worktree Awareness lookup ambiguous (step ordering, git root resolution unclear)
+   - **Status:** Identified in #1163 (ralarcon, 5 days old); fix not yet merged; ralarcon offered to PR
+
+4. **Permission API Breaking Change** (#1191): Copilot CLI v1.0.54+ contract
+   - Copilot CLI changed `onPermissionRequest` return contract: `{ kind: 'approved' }` → `{ kind: 'approve-once' }`
+   - Squad code still returns old format; blocks all tool access on v1.0.54+
+   - **Status:** Urgent; no PR yet; simple fix required (type + return value mapping)
+
+5. **State Destruction on Branch Switch** (#643): Resolved
+   - Gitignored .squad/ destroyed when agents ran `git checkout` instead of `git worktree add`
+   - **Status:** ✅ Resolved via PR #797 (squad externalize command); moves .squad/ outside worktree
+
+**Tamir's Active Involvement:**
+- Filed #1190 (upgrade pipeline gaps), #1157 (two-layer bypass), #1013 (architecture), #1003 (wiring)
+- Merged PR #1158 (routes state through runtime; fixes #1157)
+- Commented on #643 with fix reference (PR #797)
+- Rapid turnaround: filed #1157 via pre-release testing; fixed via #1158 before community reports
+- **Pattern:** Tamir owns architectural iteration; community validates edge cases
+
+**Synthesis Artifacts:**
+- `.squad/decisions/inbox/seven-state-backend-issue-themes.md` (16.2 KB): Comprehensive report with 5 themes, root cause analysis, in-flight fixes, gaps, recommendations
+- Includes: executive summary table, detailed findings for each theme, evidence chains, Tamir involvement matrix, known gaps + next steps, research notes
+
+**Learnings for Future Investigation:**
+- **Process Quality:** PowerShell redirection issues resolved; Windows-native piping consistently reliable (no `2>/dev/null` antipattern)
+- **Signal Velocity:** Issues filed 1–3 days post-release; suggests rapid community feedback loop on regression discovery
+- **Cross-Issue Referencing:** Strong pattern of issues linking upstream/downstream; helps trace root cause chains (e.g., #1157 → #1013 → #1003 dependency tree)
+- **Upgrade Integration Gap:** Three systems merged (two-layer backend, state tool API, ESM patch) without coordinated upgrade integration test; gap surfaced post-release
+- **Temporal Pattern:** Insider releases expose infrastructure gaps quickly; stable release engineering should include upgrade E2E validation
+
+**Next Investigation Priorities:**
+- Verify insider.3 release vs insider.2 changelog (if accessible) to confirm fix cadence
+- Trace two-layer wiring flow in Phase 2–3 (init, history, decisions); estimate scope
+- Coordinate with ralarcon on upstream coordinator patch (#1163 PR)
+- Validate permission API fix scope + test coverage requirement
+
+**Research Status:** ✅ COMPLETE — Comprehensive signal synthesis finished. Awaiting Tamir direction on prioritization or follow-up deep dives.
 
