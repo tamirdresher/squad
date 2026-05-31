@@ -505,6 +505,106 @@ Three distinct problem clusters emerged after v0.9.6-insider.2 release (3–5 da
 - Community contributions (ischrei #1185, ralarcon #1163) high quality with clear reproducers
 - Cross-issue referencing strong (issues link upstream/downstream correctly)
 
+---
+
+### 2026-05-31T14:03:06.842+03:00: Worf — Security & Reliability Assessment — squad v0.9.6-insider.3 State Backend
+
+**By:** Worf (Safety & Reliability Gate)
+
+## Executive Summary
+
+insider.3 ships **four distinct failure categories** across the upgrade pipeline and coordinator prompt. Two of them cause silent data-loss-class failures (state never written, hooks never installed). One corrupts repository portability (absolute paths in committed config). One causes false-mode entry for worktrees. None of these are guarded by `squad doctor`. Another insider release without gate fixes to at least the CRITICAL and HIGH items is not defensible.
+
+---
+
+## Classified Findings
+
+### CRITICAL — `pre-commit`/`post-commit` hooks silently not installed for `two-layer` backend
+**Issue:** #1190 (Finding 2), root-caused by #1185 (Finding 3)  
+**Blast radius:** All users who upgraded with `--state-backend two-layer` or who have `stateBackend=two-layer` in config  
+**State corruption risk:** YES — state is silently never written. `squad-state` orphan branch exists but is permanently dormant. Every commit since upgrade has dropped state on the floor with zero error surfaced.  
+**Why CRITICAL:** Data loss without any signal. `squad doctor` does not check for this. User believes two-layer is working; it is not.  
+**Required gate:** `squad doctor` MUST fail (not warn) if `stateBackend=two-layer` and `pre-commit`/`post-commit` hooks are absent. Upgrade MUST install these hooks or hard-error if it cannot.
+
+---
+
+### CRITICAL — `TEAM_ROOT` dual contradictory definition in coordinator prompt
+**Issue:** #1163  
+**Blast radius:** All repos using `squad.agent.md` shipped with insider.3 (`.github/agents/squad.agent.md` and `.squad/templates/squad.agent.md`) — especially satellite repos, external-state configs, and worktrees without `.squad/` committed  
+**State corruption risk:** YES (behavioral) — false Init Mode entry. A worktree that lacks a committed `.squad/` directory evaluates `TEAM_ROOT` from `Worktree Awareness` as `<repo>/`, then probes `<repo>/team.md` which does not exist, and enters Init Mode — destructively overwriting existing config.  
+**Why CRITICAL:** Silently wrong mode selection. Affects the Inditex dual-root pilot (already confirmed). Template shipped with insider.3 carries the bug into every new and upgraded repo.  
+**Required gate:** `squad.agent.md` must have a single unambiguous `TEAM_ROOT` definition. PR #1132 that introduced this must be partially reverted or patched before any further insider release. The file in `.squad/templates/` must be kept in sync.
+
+---
+
+### HIGH — `--state-backend` flag silently ignored during upgrade; `orphan→two-layer` migration throws
+**Issue:** #1185 (Finding 3)  
+**Blast radius:** All users attempting to migrate state backend via `squad upgrade`  
+**State corruption risk:** PARTIAL — upgrade completes without migrating; user believes they are on a new backend but are not. Downstream: hooks not installed (CRITICAL), orphan branch dormant.  
+**Why HIGH:** Silent failure. No error unless backend is `orphan` (then throws), but the message is non-actionable. This is the root cause of the hook gap (CRITICAL) and the ESM path gap (HIGH below).  
+**Required gate:** `squad upgrade --state-backend <value>` must complete the migration or hard-error with a clear migration path. Silent no-op is not acceptable.
+
+---
+
+### HIGH — `postinstall` ESM patch never reaches repo-local `node_modules`
+**Issue:** #1190 (Finding 1)  
+**Blast radius:** All two-layer users + any user where squad-cli is global and repo-local `node_modules` exists  
+**State corruption risk:** NO — fails at runtime (copilot-sdk and vscode-jsonrpc broken), not data corruption  
+**Why HIGH:** `squad doctor` reports two unfixable failures post-install. The fix is a single-line change (`join(process.cwd(), 'node_modules')` in `SEARCH_ROOTS`), yet unshipped. Users must manually patch — not supportable for insider.  
+**Required gate:** Fix `patch-esm-imports.mjs` SEARCH_ROOTS. Verify `squad doctor` ESM checks pass after clean global install before any release.
+
+---
+
+### HIGH — `teamRoot` written as absolute path; `config.json` duplicate key
+**Issue:** #1190 (Finding 3), #1163  
+**Blast radius:** All repos cloned to different path/machine after upgrade  
+**State corruption risk:** NO — fails `squad doctor` with "directory not found"; blocks operation but no data corruption  
+**Why HIGH:** Committed absolute paths break every team member's clone. Duplicate `stateBackend` key indicates structural config-write bug (append vs merge). Non-breaking today (JSON last-value-wins) but fragile.  
+**Required gate:** `squad init`/`squad upgrade` must write `teamRoot: "."` by default. Config writes must use merge strategy, not append.
+
+---
+
+### MEDIUM — Template files dumped at `.squad/` root during upgrade
+**Issue:** #1185 (Finding 1)  
+**Blast radius:** All users who ran `squad upgrade --self --insider` from insider.2 → insider.3  
+**State corruption risk:** NO — cosmetic noise. No functional breakage if deleted.  
+**Why MEDIUM:** Pollutes directory; confuses agents scanning `.squad/` for context. Indicates upgrade copy logic has no deduplication guard.  
+**Required gate:** Upgrade copy step must check destination before writing. Assert `.squad/` root contains only expected files post-upgrade.
+
+---
+
+### MEDIUM — Rai not installed during upgrade
+**Issue:** #1185 (Finding 2)  
+**Blast radius:** All users who upgraded insider.2 → insider.3 (Rai was new built-in in insider.3)  
+**State corruption risk:** NO — Rai's merge driver also missing but no existing data corrupted  
+**Why MEDIUM:** Missing built-in roster member leaves `.gitattributes` incomplete and `team.md`/`routing.md` rows absent. Rai unavailable. Missing merge driver is latent conflict risk on future merges.  
+**Required gate:** Upgrade must idempotently install/repair all built-in roster. Add `squad doctor` check for expected built-ins.
+
+---
+
+### LOW — State documentation out of sync
+**Issue:** #1194  
+**Blast radius:** Documentation readers; no runtime impact  
+**State corruption risk:** NO  
+**Why LOW:** Users may misconfigure but runtime catches or ignores rather than corrupts.  
+**Required gate:** Doc review before stable release. Not a blocker for insider.
+
+---
+
+## Required Gates Before Next Insider Release
+
+Priority order (1–3 are blockers):
+
+1. **[BLOCK]** Fix `squad doctor` to hard-fail when `stateBackend=two-layer` and hooks absent.
+2. **[BLOCK]** Patch `squad.agent.md` (and template) for single unambiguous `TEAM_ROOT`. Verify no false Init Mode.
+3. **[BLOCK]** Fix `--state-backend` migration in `squad upgrade`; no silent no-op.
+4. Fix `patch-esm-imports.mjs` SEARCH_ROOTS; run ESM checks post clean install as CI step.
+5. Fix `teamRoot` default to `"."` and config-write merge strategy.
+6. Fix upgrade copy logic for template deduplication.
+7. Ensure Rai auto-installs during upgrade.
+8. Update state documentation before stable release.
+
+---
 
 
 ---

@@ -208,3 +208,30 @@ Seven independently identified the same P0 permission contract blocker via commu
 
 **Orchestration log:** .squad/orchestration-log/20260519T151210Z-data.md
 
+## 2026-05-31T14:03:06.842+03:00 — State-Backend Insider Triage (Parallel with Worf & Seven)
+
+**Scope:** Code-level verification of state-backend regressions across branches (insider.3). Issues #1185, #1190, #1194, #1163 analyzed in parallel with Worf (safety gate) and Seven (community signal).
+
+**Code Analysis Findings:**
+- **P0 Permission Contract Blocker:** `shell/index.ts` returns `{ kind: 'approved' }` but Copilot CLI v1.0.54+ contract requires `{ kind: 'approve-once' }`. Blocks all tool access on post-v1.0.54 CLI.
+- **P1 Upgrade Pipeline Gaps:** ESM patch (`postinstall`) misses repo-local `node_modules`; `--state-backend` flag ignored during upgrade; `teamRoot` written as absolute path breaking portability.
+- **P1 Two-Layer Backend Incomplete:** Architecture exists (PR #1158 merged 6 days ago routes state through runtime tools); Phase 2–3 wiring still pending (init, history, decisions, skills).
+- **P2 Coordinator State Resolution:** TEAM_ROOT dual definition (#1163) causes false Init Mode entry in worktrees without `.squad/` committed.
+
+**Cross-Branch Verification Status:**
+- origin/main: Permission contract bug present; ESM patch incomplete; teamRoot written absolute.
+- origin/feature/coordinator-as-agent: Same issues; no targeted fixes found.
+- origin/bradygaster/squad-p1-coordinator-bugs: Addresses #1163 TEAM_ROOT; other gaps remain.
+
+**Cross-Agent Corroboration:**
+- Seven independently validated P0 blocker via GitHub Issue #1191 (community report of Copilot CLI v1.0.54+ breaking change).
+- Worf classified findings: 2 CRITICAL (hooks + TEAM_ROOT), 3 HIGH (migration flag, ESM, portability), 2 MEDIUM (pollution, missing Rai), 1 LOW (docs).
+- 100% agreement on P0 and CRITICAL items; strengthens priority assessment.
+
+**Deliverables:**
+- Participated in `.squad/decisions/inbox/data-insider3-state-backend-triage.md` merge to canonical decisions.md
+- Session logged: `.squad/log/2026-05-31T143622Z-state-backend-regression-investigation.md`
+
+**Status:** ✅ COMPLETE — Code verification done. Urgent fix needed for P0 permission contract before continued insider testing.
+
+

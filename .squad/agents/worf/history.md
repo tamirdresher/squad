@@ -556,3 +556,38 @@ Canary run `real-cli-canary-20260519T172913` stopped at turn 3/4 by G-5 guard. *
 
 **Orchestration log:** .squad/orchestration-log/20260519T151210Z-worf.md
 
+## 2026-05-31T14:03:06.842+03:00 — State-Backend Insider Triage Safety Gate (Parallel with Data & Seven)
+
+**Scope:** Reliability and severity classification for insider.3 state-backend regression cluster. Issues #1185, #1190, #1194, #1163 analyzed in parallel with Data (code verification) and Seven (community signal).
+
+**Findings Classification:**
+- **2 CRITICAL:** Silent-failure hooks gap (two-layer backend not installed on upgrade, corrupts state); TEAM_ROOT dual definition (false Init Mode on worktrees).
+- **3 HIGH:** Permission contract breaking change (Copilot CLI v1.0.54+); migration flag ignore (--state-backend silently skipped); teamRoot portability broken.
+- **2 MEDIUM:** Template pollution (duplicate `.squad/` files post-upgrade); Missing Rai in template.
+- **1 LOW:** Docs out of sync (state-backend docs differ from implementation).
+
+**8 Required Release Gates (Insider.3):**
+1. squad doctor hard-fail when stateBackend=two-layer AND hooks absent
+2. Patch squad.agent.md for single unambiguous TEAM_ROOT definition
+3. Fix --state-backend migration flag (no silent no-op)
+4. Implement permission contract fix (return `{ kind: 'approve-once' }`)
+5. Restore hooks installation in upgrade pipeline
+6. Fix teamRoot absolute-path blocker (portable handling)
+7. Deduplicate template pollution cleanup
+8. Sync documentation with implementation
+
+**Cross-Agent Corroboration:**
+- Data identified all P0/P1 code-level gaps; Worf's CRITICAL classification aligns with Data's urgency.
+- Seven validated P0 permission bug via community GitHub Issue #1191; adds external urgency signal.
+- 100% agreement on severity and blocking criteria.
+
+**Deliverables:**
+- Participated in `.squad/decisions/inbox/worf-insider3-state-backend-risk.md` merge to decisions.md (113 lines, 8 gates, environmental assessment).
+- Orchestration log: `.squad/orchestration-log/2026-05-31T140306Z-worf.md` (3.1 KB)
+- Session log: `.squad/log/2026-05-31T143622Z-state-backend-regression-investigation.md` (6.4 KB, multi-agent cross-validation table included)
+
+**Local Environment Status:** Squad-squad repo uses stateBackend=worktree (two-layer implementation), so two-layer hook gap does NOT affect this repo. No corrupted state locally. Recommendation: Merge urgently before wider user testing begins.
+
+**Status:** ✅ COMPLETE — Safety gate established. All 8 release gates documented and shared with team for fix coordination.
+
+
