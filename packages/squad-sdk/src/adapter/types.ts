@@ -592,6 +592,7 @@ export interface SquadPermissionRequest {
 export interface SquadPermissionRequestResult {
   /** Outcome of the permission request */
   kind:
+    | "approve-once"
     | "approved"
     | "denied-by-rules"
     | "denied-no-approval-rule-and-could-not-request-from-user"

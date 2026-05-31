@@ -456,16 +456,24 @@ export class StateBackendStorageAdapter implements StorageProvider {
 
   /** Convert absolute path to relative path for the backend. */
   private toRelative(filePath: string): string {
-    const normalized = filePath.replace(/\\/g, '/');
-    const squadNorm = this.squadDir.replace(/\\/g, '/');
-    if (normalized.startsWith(squadNorm + '/')) {
-      return normalized.slice(squadNorm.length + 1);
+    // Use path.resolve() so drive-letter casing differences on Windows are
+    // normalised before comparison, preventing corrupt git-notes keys.
+    const resolvedFile = path.resolve(filePath);
+    const resolvedSquad = path.resolve(this.squadDir);
+
+    const isWindows = process.platform === 'win32';
+    const fileCmp = isWindows ? resolvedFile.toLowerCase() : resolvedFile;
+    const squadCmp = isWindows ? resolvedSquad.toLowerCase() : resolvedSquad;
+
+    const prefix = squadCmp.endsWith(path.sep) ? squadCmp : squadCmp + path.sep;
+    if (fileCmp.startsWith(prefix)) {
+      return resolvedFile.slice(resolvedSquad.length + 1).replace(/\\/g, '/');
     }
-    if (normalized.startsWith(squadNorm)) {
-      return normalized.slice(squadNorm.length).replace(/^\//, '') || '.';
+    if (fileCmp === squadCmp) {
+      return '.';
     }
-    // Already relative
-    return normalized;
+    // Already relative or outside squadDir — normalise separators only
+    return filePath.replace(/\\/g, '/');
   }
 }
 
@@ -538,10 +546,9 @@ export function resolveStateBackend(squadDir: string, repoRoot: string, cliOverr
     return createBackend(chosen, squadDir, repoRoot);
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    if (explicitBackend && chosen !== 'local') {
-      throw new Error(`State backend '${chosen}' failed: ${msg}`);
-    }
-    console.warn(`Warning: State backend '${chosen}' failed: ${msg}. Falling back to 'local'.`);
+    // Always fall back to local with a warning — a broken backend should not
+    // prevent Squad from starting. Operators can fix config without losing work.
+    console.warn(`Warning: State backend '${chosen}' failed${explicitBackend ? ' (explicit)' : ''}: ${msg}. Falling back to 'local'.`);
     return new WorktreeBackend(squadDir);
   }
 }
@@ -554,7 +561,14 @@ function isValidBackendType(value: string): value is StateBackendType {
 /** Normalize legacy aliases to canonical backend type names. */
 function normalizeBackendType(type: string): StateBackendType {
   if (type === 'worktree') return 'local';
-  if (type === 'git-notes') return 'two-layer'; // standalone git-notes removed; migrate to two-layer
+  if (type === 'git-notes') {
+    console.warn(
+      "Warning: State backend 'git-notes' is deprecated and has been removed. " +
+      "Migrating to 'two-layer'. Update your .squad/config.json to set " +
+      "\"stateBackend\": \"two-layer\" to suppress this warning."
+    );
+    return 'two-layer';
+  }
   return type as StateBackendType;
 }
 
