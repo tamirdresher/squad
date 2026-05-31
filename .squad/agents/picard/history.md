@@ -66,3 +66,8 @@ Seed sources:
 
 **Implication:** Removes ambiguity from "is this ready?". Framework is pre-committed; Tamir doesn't need to arbitrate on-the-fly. Team knows stopping points before starting.
 
+
+
+---
+
+2026-05-31: Final template validation and approval sweep. All 11 gates pass. Approved PR #1200 for upstream merge and release as 0.9.6.

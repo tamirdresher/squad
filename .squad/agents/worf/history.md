@@ -602,3 +602,8 @@ Canary run `real-cli-canary-20260519T172913` stopped at turn 3/4 by G-5 guard. *
 **Key work:** Defined 11 reliability gates (GATE-1 through GATE-11) covering unit, integration, and manual checks. Identified 2 hard release blockers: (1) two-layer state branch silent write failure due to missing hooks, (2) duplicate stateBackend key in upgrade path. Session log: .squad/log/20260531T215907Z-state-backend-repro-gates.md.
 
 **Status:** ✅ COMPLETE — Gates defined; ready for Data to execute repro procedure and report pass/fail.
+
+
+---
+
+2026-05-31: Defined 11 reliability gates for state-backend upgrade. First rejection (gate blockers); second approval after Geordi/B'Elanna revisions and Picard validation.

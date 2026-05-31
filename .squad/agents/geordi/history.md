@@ -260,3 +260,8 @@ Fixed the real Copilot CLI E2E harness G-5 absent-anchor matcher to scan only mo
 ## 2026-05-19T18:44:51.409+03:00 — Real CLI E2E Unblock Path
 
 Reviewed latest Phase 1 smoke PASS, Phase 2a PASS, Phase 2b G-5 stop, COPILOT_HOME isolation self-tests, canary rerun, and Worf's latest product-limitation gate. Determined that `COPILOT_HOME` is safe and effective for filesystem/session-store isolation but is not enough for memory-API E2E because `store_memory` does not persist own anchors in isolated homes without repo association. Filed `.squad/decisions/inbox/geordi-e2e-unblock-path.md` with exact no-prompt validation commands, product-fix canary command, full Phase 2b command after Worf re-ack, and recommendation to require a Copilot CLI product fix before claiming real memory API E2E.
+
+
+---
+
+2026-05-31: Coordinated gate blocker fix with B'Elanna (test regression, doctor hooks, ESM roots). All blockers resolved; 4 new tests passing.
