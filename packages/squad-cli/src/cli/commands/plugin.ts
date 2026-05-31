@@ -58,7 +58,7 @@ export async function runPlugin(dest: string, args: string[]): Promise<void> {
     fatal(pluginUsage());
   }
 
-  const { stateDir } = effectiveSquadDir(dest);
+  const { local: squadDirInfo, stateDir } = effectiveSquadDir(dest);
   const storage = new FSStorageProvider();
   const pluginsDir = join(stateDir, 'plugins');
   const marketplacesFile = join(pluginsDir, 'marketplaces.json');
