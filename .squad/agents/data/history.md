@@ -221,3 +221,17 @@ px -y @bradygaster/squad-cli state-mcp → resolved to 0.9.4 → 0.9.4 has no st
 7. **gh auth dance for cross-account work:** `tamirdresher` for fork pushes (`tamirdresher/squad` — PR head); `tamirdresher_microsoft` for `tamirdresher_microsoft/squad-squad` (decisions/manifest). Always `gh auth switch --user <name>` before each push.
 
 8. **`.squad/decisions/inbox/` is gitignored** — needs `git add -f` to commit decision drops to this repo.
+## 2026-06-02T17:30:00+03:00 — Tarball validation 6/6 (tamir-squad-hq, worst-case retrofit)
+
+Repo: `tamirdresher_microsoft/tamir-squad-hq` (Tamir's personal HQ — heavily pre-squadified).
+Dup (kept): `tamir-squad-hq-tarball-test-20260602T183202`. Twin tarballs at 0.9.6-preview.5.
+
+**Verdict: 🟢 Gap 2 retrofit nailed the worst case.** Pre-existing `.copilot/mcp-config.json` had 5 user-added MCP servers (azure-devops, bitwarden, bitwarden-shadow, EXAMPLE-trello, chrome-devtools), no `squad_state`. Post-upgrade: all 5 preserved untouched + `squad_state` inserted with correct pin `@bradygaster/squad-cli@0.9.6-preview.5`. Zero clobbering.
+
+Upgrade migrated decisions.md (~1 MB) + 17 agent histories to orphan branch in one shot. `stateBackend: two-layer` added cleanly (no Bug E). 6/6 hooks installed; pre-commit actively blocked illegal commits of `.squad/decisions.md`. `--self` exited 1 loudly on EPERM (UPGRADE-EPERM-FALSE-SUCCESS fix confirmed).
+
+4 continuity sessions: agents READ pre-upgrade decisions correctly (session 1 surfaced March 2026 Picard inter-squad protocol + Seven patent assessment). Orphan branch did not grow across any session — Scribe explicitly refused in session 4: *"STATE_BACKEND is two-layer but the squad_state_* runtime tools aren't available in this Copilot CLI session, so Scribe refused to hand-write mutable state."* This is correct governance.
+
+state-mcp server itself works (verified via direct JSON-RPC — all 7 tools register). The runtime MCP loading gap is NOT a regression of this PR and NOT caused by retrofit; it's in Copilot CLI's MCP discovery/loading layer. Recommend separate follow-up.
+
+Reports: `.squad/files/validation/TARBALL-FULL-tamir-squad-hq.md` (full) + inbox drop `.squad/decisions/inbox/data-tarball-full-tamir-squad-hq.md`. Snapshots at `C:\Users\tamirdresher\squad-validation\snapshots-squadhq-20260602T183202\` include PRE/POST of mcp-config.json showing exact retrofit behavior.
