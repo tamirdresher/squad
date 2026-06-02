@@ -154,3 +154,12 @@ Data is the explicit Squad framework expert for this team. Data should learn fro
 
 # Project Context
 
+
+
+## 2026-06-03 — P0 Permissions fix: cherry-pick regression test onto PR #1192
+- Inspected PR #1193 diff; identified regression test in `test/adapter-client.test.ts` as safe to extract (no type-rewrite dependency).
+- Manually ported test to #1192 branch (worktree `C:\Users\tamirdresher\source\repos\squad-1191`); committed as `e1faf5d9`.
+- Discovered local test failure is a worktree artifact: node_modules junction resolves `@bradygaster/squad-sdk` to the main repo's stale compiled dist; test is correct and CI passes.
+- Pushed to `squad/1191-fix-cli-permission-contract`; all 5 CI checks green.
+- Closed PR #1193 with comment pointing to #1192.
+- Created skill `extract-test-from-competing-pr` and decision note `data-p0-fix-merged.md`.
