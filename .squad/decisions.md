@@ -1,6 +1,6 @@
 # Squad Decisions
 
-**Last Updated:** 2026-05-31T22:21:25.823+03:00
+**Last Updated:** 2026-06-02T08:29:11.224Z
 
 ## Active Decisions
 
@@ -1032,3 +1032,38 @@ Executed final validation sweep and approved branch for upstream merge.
 - Picard: Final validation & approval ✅ complete
 
 **Decision:** Merge PR #1200 to upstream main. Release as 0.9.6 production.
+
+---
+
+### 2026-06-02T08:29:11Z: Data — PR Comparison: Permission Contract Fix (#1192 vs #1193)
+
+**By:** Data (Squad Framework Expert)  
+**Date:** 2026-06-02T11:29:11.224+03:00  
+**Context:** Bug A fix requires choosing between PR #1192 (minimal, CI green) and PR #1193 (Copilot bot draft). One must merge today for insider.4.
+
+## Summary
+
+**PR #1192 wins decisively.** Minimal surgical fix (+9/-2), backward compatible, all CI checks pass (CLEAN merge state), authored by core maintainer. PR #1193 is a breaking type rewrite (+25/-13), draft status, zero CI coverage, stale since creation.
+
+## Detailed Comparison
+
+| Criterion | PR #1192 (bradygaster) | PR #1193 (copilot-bot) |
+|-----------|------------------------|------------------------|
+| **Scope** | +9 / −2 — minimal | +25 / −13 — scope creep |
+| **Type Safety** | ✅ Additive: adds 'approve-once' to union, keeps 'approved' and 'denied-*' | ❌ Breaking: replaces interface with type, removes 'approved' and 'denied-*' |
+| **Backward Compat** | ✅ Fully compatible | ❌ Breaking for v1.0.53 users |
+| **CI Status** | ✅ 5/5 checks pass (CLEAN) | ❌ 0 checks, UNSTABLE state |
+| **Test Coverage** | ❌ No regression test | ✅ Adds adapter-client.test.ts |
+| **Reviewer Activity** | ✅ Full file review, 2 actionable suggestions | ❌ No review activity, stale |
+| **Changeset** | ✅ Included | ❌ Missing |
+
+## Recommendation
+
+1. **Merge #1192 immediately** (optionally after cherry-picking test case from #1193)
+2. **Close #1193** — thank contributor, note breaking type change exceeds P0 scope
+3. **Fast-follow:** Add regression test asserting `'approve-once'` in permission handler error guidance
+
+**Rationale:** P0 severity requires minimal, backward-compatible fix with full CI coverage. #1192 meets all three criteria; #1193 introduces breaking API changes and lacks CI verification. The regression test from #1193 is worth capturing, but does not block the merge of the core fix.
+
+---
+
