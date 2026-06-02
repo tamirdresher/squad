@@ -1,14 +1,14 @@
 ---
-updated_at: 2026-06-02T19:55:00+03:00
-focus: "PR #3 R2c Complete — Upstream-Ready (paused pending Tamir decision)"
-blocked_on: "Awaiting Tamir's direction: review push to bradygaster/squad or local iteration"
-next_action: "Tamir reviews PR #3 and decides on next step (upstream push or v0.2 prep)"
+updated_at: 2026-06-02T20:58:00+03:00
+focus: "Tracking issue #1205 posted on bradygaster/squad; PR #3 paused"
+blocked_on: "Brady's signal on squad-agents-ai placement (go:yes, go:no, or needs-research)"
+next_action: "Monitor bradygaster/squad#1205 for Brady's triage decision; open cross-fork PR if go:yes"
 active_agents: []
 ---
 
 ## Current State
 
-PR #3 Round 2c is **COMPLETE** and **UPSTREAM-READY**.
+Tracking issue #1205 is **LIVE** on bradygaster/squad. PR #3 is **PAUSED** pending Brady's signal.
 
 **R2c Milestones (2026-06-02):**
 - **Data (data-5):** Sample co-location restructured from `samples/squad-agents-ai-sample/` to `src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/`. README consolidated; sample contains stub pointer to main docs at `src/Squad.Agents.AI/README.md`. All CI green (Squad.Agents.AI CI ubuntu+windows, Squad CI). Tests: 43/43 pass. Commit: `e214c4fb`.

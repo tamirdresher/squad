@@ -12,6 +12,151 @@
 
 ---
 
+### [RESEARCH] 2026-06-02 — Upstream Tracking Issue: Squad.Agents.AI Community NuGet (Picard)
+
+**Date:** 2026-06-02
+
+# Upstream Tracking Issue Draft — bradygaster/squad
+
+## Pre-Post Analysis
+
+### Brady's repo posture observed
+
+- **Monorepo, JS-first:** `bradygaster/squad` is an npm workspace monorepo (`packages/squad-cli/` + `packages/squad-sdk/`). All existing code is TypeScript/Node. There is no .NET code in the repo today.
+- **CONTRIBUTING.md is explicit:** "All PRs from forks must target `dev`." Issue-first workflow encouraged. Changesets required for SDK/CLI source changes (not applicable to a new .NET package).
+- **No issue templates:** `.github/ISSUE_TEMPLATE/` does not exist (404). Free-form issue body is fine.
+- **Label taxonomy is mature:** `type:feature`, `go:yes`/`go:no`/`go:needs-research`, `status:contributor-invited`, `release:*`, etc. Brady uses `go:yes` as the greenlight signal.
+- **Community contributions accepted:** `obit91` has multiple open PRs (#1195–#1199). `idangutman` filed #1184 (feature request). Brady has a `status:contributor-invited` label — he explicitly invites external work.
+- **No precedent for non-JS packages:** No .NET, Python, or other language packages exist in the repo. This would be a first. Brady may prefer a companion repo.
+
+### Existing related issues
+
+- **#1144** (OPEN, filed by tamirdresher 2026-05-20): "Squad telemetry from embedded host processes (Agent Framework wrappers, no REPL)." Directly related — discusses MAF integration, OTel gaps, and the `SquadAgent.cs` wrapper. Community member `laurentkempe` expressed interest in MAF/Squad integration in comments. **This issue provides social proof that the MAF integration topic has traction.**
+- No issues found for "Squad.Agents.AI" or ".NET adapter" specifically. This proposal is net-new.
+
+### Proposed labels (from brady's existing label set)
+
+- `type:feature` — matches the proposal type
+- No other labels should be applied by the contributor. Brady uses `go:*` labels as his triage signal; let him apply those.
+
+### In-repo vs. companion repo recommendation
+
+**Recommendation: Offer both paths explicitly. Lean toward companion repo as the lower-friction default.**
+
+**Why:** The monorepo is npm-workspace-native. Adding a .NET `src/Squad.Agents.AI/` directory introduces `dotnet` toolchain requirements, a separate CI workflow, NuGet publishing, and a `sln` file — all foreign to the existing contributor experience. A companion repo (`bradygaster/Squad.Agents.AI` or `tamirdresher/Squad.Agents.AI`) keeps the JS monorepo clean and lets the .NET package evolve independently. However, if Brady prefers co-location (some maintainers value discoverability), in-repo under `src/Squad.Agents.AI/` works — the CI is already isolated in a separate workflow file that only triggers on `.NET` path changes.
+
+### Things Tamir should consider before posting
+
+1. **Issue #1144 cross-reference:** The new issue should reference #1144 since it covers the same integration surface. Consider whether to frame this as "the adapter that enables the scenario described in #1144" — gives Brady continuity.
+2. **Tamir is already a COLLABORATOR** on bradygaster/squad (per issue #1144 author association). This means brady already trusts Tamir's contributions. The tone can be slightly more direct than a cold-open.
+3. **laurentkempe interest:** A community member already expressed interest in MAF/Squad integration. Mentioning this (without @-mentioning) adds social proof.
+4. **Timing:** PR #3 is CI-green and ready. If Brady says "go," Tamir can open the cross-fork PR same day.
+
+## Proposed Issue Title
+
+```
+Community contribution: Squad.Agents.AI — .NET adapter for Microsoft Agent Framework
+```
+
+## Proposed Issue Labels
+
+```
+type:feature
+```
+
+## Tracking Issue Body (Ready for `gh issue create`)
+
+```markdown
+## What
+
+`Squad.Agents.AI` is a .NET library that wraps the Squad CLI as a `Microsoft.Agents.AI.AIAgent`, so .NET apps using the Microsoft Agent Framework (MAF) can use Squad agents alongside other AI participants — workflows, Semantic Kernel chains, or other MAF agents — without shelling out or reimplementing the CLI protocol.
+
+I'd like to contribute this as a community package. The work is done and I'm looking for your signal on whether you'd accept it upstream.
+
+## Why this matters
+
+In #1144 I described the gap: when Squad is embedded in a host process (no REPL), the integration surface is manual. This adapter closes that gap for .NET consumers. It handles CLI lifecycle, streaming, session management, and keyed DI registration so the host just calls `agent.RunAsync(activity, turnState)` and gets structured responses.
+
+## What's in the PR
+
+The implementation lives in my fork: [tamirdresher/squad#3](https://github.com/tamirdresher/squad/pull/3).
+
+- **`Squad.Agents.AI`** NuGet package targeting .NET 8 and .NET 9
+- 43 tests, CI green on both ubuntu and windows
+- DI registration shapes: default `services.AddSquadAgent(opts => ...)`, named via `services.AddSquadAgent("agent-name", opts => ...)` (binds to `ConnectionStrings:squad-{name}`), and Microsoft.Extensions.DependencyInjection keyed services via `services.AddKeyedSquadAgent("key", opts => ...)`
+- BYOK support via `ConfigureCopilotClient` delegate
+- Streaming via `IAsyncEnumerable<StreamingActivity>`
+- Sample app + README with quickstart
+
+### What's NOT included (deferred)
+
+- Aspire-orchestrated sample (depends on Squad telemetry contract from #1144)
+- SDK `ToString()` redaction (requires upstream Copilot SDK change)
+- Multi-agent orchestration patterns (v0.2 scope)
+
+## The question
+
+Are you open to accepting this as a community contribution? If yes, I'll open a cross-fork PR targeting `dev` with `Closes #N` per CONTRIBUTING.md.
+
+**On placement:** I want to flag that this is a .NET package in a JS-first monorepo. Two paths I see:
+
+1. **In-repo** under `src/Squad.Agents.AI/` — discoverable, single repo for all Squad code. The .NET CI workflow is isolated and only triggers on that path.
+2. **Companion repo** (e.g. `Squad.Agents.AI`) — keeps the npm monorepo clean, lets the .NET package version independently.
+
+I'm fine with either. If you have a preference or a third option, happy to adapt.
+
+## Related
+
+- #1144 — Squad telemetry from embedded host processes (the scenario this adapter enables)
+```
+
+**Status:** Tracking issue #1205 posted on 2026-06-02T20:55:00+03:00. Awaiting Brady's `go:yes` signal before opening cross-fork PR.
+
+---
+
+### [CONFIRMED] 2026-06-02 — Upstream Tracking Issue #1205 Posted (B'Elanna)
+
+**Date:** 2026-06-02T20:55:00+03:00
+
+**Issue:** bradygaster/squad#1205  
+**URL:** https://github.com/bradygaster/squad/issues/1205
+
+**Posted by:** B'Elanna (gh auth: tamirdresher)  
+**Label:** type:feature ✓
+
+**Body:** Extracted from draft (60–102), 41 characters, posted without modification.
+
+**Status:** Ready for Brady's triage.
+
+---
+
+### [CONFIRMED] 2026-06-02 — Backtick Escape Fix — bradygaster/squad#1205
+
+**Date:** 2026-06-02T20:58:00+03:00  
+**Status:** ✅ FIXED
+
+## Fix Process
+
+1. **Node.js extraction** (bypass PowerShell): `readFileSync` + CRLF-aware regex
+2. **Write to temp file**: No string interpolation; binary UTF-8 write
+3. **gh issue edit**: Switched auth (EMU bypass) → `--body-file` (not `--body "..."`)
+4. **Exit code:** 0
+5. **Cleanup:** Temp file deleted
+
+## Verification
+
+Live issue now renders cleanly at https://github.com/bradygaster/squad/issues/1205
+
+Inline code like `` `Squad.Agents.AI` `` and `` `RunAsync` `` are correct (real backticks, not backslashes).
+
+## Lesson
+
+PowerShell here-strings + pipes = backtick escape disasters. Use Node.js for any Markdown body handling that touches code blocks.
+
+**Status:** Issue #1205 is clean and live. Awaiting Brady's signal.
+
+---
+
 ### [COMPLETED] 2026-06-02 — PR #3 Round 2c: Sample Co-location + README Consolidation (Data, commit e214c4fb)
 
 

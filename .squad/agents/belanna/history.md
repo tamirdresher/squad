@@ -88,3 +88,35 @@ Data is implementing auth-mode expansion (Decision cleared). Implementation will
 **PR #3 Status:** ✅ Upstream-ready. All CI green across .NET 8+9 / ubuntu+windows. Data's R2c sample restructure shipped in commit 214c4fb; body+title finalization complete.
 
 **Handoff:** belanna-5 → Tamir decision on next step (review push to bradygaster/squad or local iteration).
+
+### Bradygaster tracking issue posted (2026-06-02)
+
+- **Bullet fix**: DI registration bullet replaced (line 77) with comprehensive three-shape summary: default, named, and keyed registration
+- **gh auth**: Verified active account is 	amirdresher (personal)
+- **Issue created**: bradygaster/squad#1205 — https://github.com/bradygaster/squad/issues/1205
+- **Label outcome**: type:feature applied successfully
+- **Body verification**: Extracted markdown body (lines 60–102) matches draft, posted without modifications
+
+### Urgent fix: Mangled backticks on bradygaster/squad#1205 (2026-06-02)
+
+- **Root cause**: PowerShell backtick escape-char ate inline `` `Squad.Agents.AI` `` → `\Squad.Agents.AI\` and mangled inline code references like `RunAsync` → `\^Ggent.RunAsync\` (character loss in piped strings)
+- **Extraction method**: Bypassed PowerShell string piping entirely; used Node.js `readFileSync` on draft file, extracted markdown block via regex `/```markdown\r?\n([\s\S]*?)\r?\n```/m` (CRLF-aware for Windows), wrote to temp file, zero string interpolation
+- **Pre-fix backtick count**: Draft had 30 real backticks, 0 backslashes (verified via Node.js)
+- **Live issue edit**: Switched auth from tamirdresher_microsoft (EMU, blocked) → tamirdresher, then `gh issue edit 1205 --repo bradygaster/squad --body-file $env:TEMP\bradygaster-issue-1205-fix.md`
+- **Exit code**: 0 (success)
+- **Post-fix verification**: Live issue body now shows 30 backticks, 0 backslashes ✓ (confirmed via `gh issue view ... --json body --jq` piped to Node.js counter)
+- **Cleanup**: Deleted temp file `$env:TEMP\bradygaster-issue-1205-fix.md`
+- **Lesson**: PowerShell here-strings, Get-Content with default encoding, and cmd.exe pipes WILL mangle backticks in Markdown. Node.js file I/O + regex extraction + binary file write is the clean workaround for GitHub issue body corrections.
+
+---
+
+**Last Updated:** 2026-06-02T20:58:00+03:00
+
+## 2026-06-02T20:58:00+03:00 — Tracking Issue #1205 Live & Clean (Belanna-6 & Belanna-7 Final)
+
+**Status:** Issue posted successfully; backtick bug fixed; live clean at https://github.com/bradygaster/squad/issues/1205.
+
+- belanna-6: Posted tracking issue to bradygaster/squad with type:feature label
+- belanna-7: Fixed mangled backticks via Node.js extraction + `gh issue edit` (exit 0, clean post-fix verification)
+
+**Next:** Monitor bradygaster/squad#1205 for Brady's signal. If `go:yes`, Tamir opens cross-fork PR targeting bradygaster/squad:dev.

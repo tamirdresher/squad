@@ -1,8 +1,41 @@
 # Squad Decisions
 
-**Last Updated:** 2026-06-02T19:39:52Z
+**Last Updated:** 2026-06-02T20:58:00Z
 
 ## Active Decisions
+
+---
+
+### [COMPLETED] 2026-06-02 — 6-Repo Tarball Validation — Final Synthesis Delivered (Data)
+
+**Date:** 2026-06-02T19:39:52+03:00
+
+## Decision
+
+Final synthesis report for PR #1200 (combined fix bundle, `squad/state-backend-upgrade-fixes` @ `a0fa7e3e`) delivered.
+
+## Recommendation
+
+🟡 **MERGE-AFTER-ITER-4** — preferred path; ~70 LOC across 3 files + 3 tests, < 1 day of focused work to close the last user-visible gap (MCP runtime ETARGET on unpublished version pin).
+
+Alternative if release urgency dominates: ✅ **MERGE-NOW + open bradygaster/squad#1204 as P0 day-1 follow-up**. Defensible because end-user state persistence still works via the hook-sync path (Data-11 proof on wasserman).
+
+## Iteration 4 items (concrete, scoped, surgical)
+
+1. **MCP pin ETARGET** — `packages/squad-cli/src/cli/core/upgrade.ts:705`, ~40 LOC, Option A from Data-15's RCA (`MCP-LOADER-ROOT-CAUSE.md`)
+2. **EPERM-doesn't-abort-migration** — `packages/squad-cli/src/cli-entry.ts`, ~20 LOC, split self-upgrade failure from backend migration
+3. **NTFS colon-in-filename sanitizer** — log/decision filename formatter, ~10 LOC
+
+## Artifacts
+
+- **Final report:** `.squad/files/validation/6REPO-TARBALL-VALIDATION-FINAL.md`
+- **Blob (after push):** https://github.com/tamirdresher_microsoft/squad-squad/blob/master/.squad/files/validation/6REPO-TARBALL-VALIDATION-FINAL.md
+- **Raw (after push):** https://raw.githubusercontent.com/tamirdresher_microsoft/squad-squad/master/.squad/files/validation/6REPO-TARBALL-VALIDATION-FINAL.md
+- **Sources synthesized:** 6 per-repo TARBALL-*.md reports, MCP-LOADER-ROOT-CAUSE.md, COMBINED-FIX-BRANCH-MANIFEST.md, TWOLAYER-BASELINE-INSIDER3-CONSOLIDATED.md
+
+## Sign-off
+
+Pending Tamir's read and GO/NO-GO call.
 
 ---
 
