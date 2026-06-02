@@ -252,3 +252,60 @@ px -y @bradygaster/squad-cli state-mcp (unpinned → latest=0.9.4) → returns a
 **Fix path:** Option A — validate pin against npm registry; fall back to @insider dist-tag if unresolvable. ~40 LOC. Architectural enough to NOT auto-implement (per prompt rule). Filed bradygaster/squad#1204 against PR #1200 branch family.
 **Artifacts:** .squad/files/validation/MCP-LOADER-ROOT-CAUSE.md (full RCA with all 3 fix options, recommendation, validation re-test plan); .squad/decisions/inbox/data-mcp-loader-root-cause.md.
 **Tarball/branch:** untouched — no new commit/push; iteration 4 manifest entry NOT created (waiting for Tamir's call on whether to implement Option A in this branch or punt to a successor PR).
+
+## 2026-06-02T17:30:00+03:00 — Tarball validation 4/6 (gh-ai-adoption2026)
+
+**Slice:** 4 of 6 — 	amirdresher/gh-ai-adoption2026 (cross-org personal clone)
+**Tarballs:** radygaster-squad-{sdk,cli}-combined-fixes.tgz @ `0.9.6-preview.5` / branch `squad/state-backend-upgrade-fixes` @ `a0fa7e3e`
+**Dups retained:** `gh-ai-adoption2026-tarball-test-20260602-183150` (fresh-init) + `gh-ai-adoption2026-tarball-upgrade-20260602-190500` (upgrade-path) under `tamirdresher_microsoft`.
+**Install path:** LOCAL prefix (`.npm-prefix-ghai2026`) — global EPERM from parallel-agent race; gh repo create rate-limited mid-run, fell back to `gh api POST /user/repos` (REST).
+
+### Fresh-init two-layer (3 sessions)
+- All 6 hooks installed (WI-1 ✅), orphan branch created, MCP `squad_state` pinned to `@bradygaster/squad-cli@0.9.6-preview.5` (GAP-2 insert path verified — pre-existing `EXAMPLE-github` entry preserved), INSIDER3-INIT-LEAK fixed (9 lifted files inc. 6 pre-existing histories).
+- 3 sessions (Simpsons-team build, Lead architecture, Tester edge cases) → zero `Unknown command` / `tool unavailable` / sync errors in any stdout. GAP-1 mechanical fix verified.
+- **GAP-1 end-to-end: ❌ OPEN.** Orphan SHA stayed at `a230634` (init-lift only) across all 3 sessions. Scribe wrote `decisions.md` + histories + skills to working tree on main → 3 normal main commits accrued; orphan never touched again. Agents used FS write tools, never invoked `squad_state_*` MCP tools.
+
+### Upgrade path (2 baseline + `squad upgrade --state-backend two-layer` + 2 continuity)
+- `squad upgrade --state-backend two-layer` is a **flagship win**: ✓ config rewritten to two-layer, ✓ orphan branch created, ✓ 8 state files migrated (decisions + 7 agent histories), ✓ all 6 hooks installed, ✓ MCP pinned, ✓ single clean ✔ chain (no ⚠️/✅ contradiction). Fixes UPGRADE-FLAG-IGNORED + UPGRADE-NO-MIGRATION + UPGRADE-EPERM-FALSE-SUCCESS + WI-1 simultaneously.
+- Continuity sessions: Scribe halted at MCP pre-check with `NO_SQUAD_STATE_COMMANDS` in both. Decisions reached survive as inbox files on disk; merges and cross-agent notifications did not persist.
+
+### NEW finding — GAP-5
+`npx -y @bradygaster/squad-cli@0.9.6-preview.5 state-mcp` → `npm error code ETARGET / No matching version found`. The GAP-2 pin-to-running-CLI-version is correct for published builds but fatal for tarball/dev installs where the version isn't on npm — bridge can't start, Scribe correctly refuses to hand-write, orphan can never grow from agent activity. Explains the fresh-init Gap-1-end-to-end observation too (not just absence of agent discipline, but absence of a working bridge to discipline against).
+
+### Suggested follow-up (for the CLI team)
+1. When CLI runs from a dev/tarball install, pin MCP server to `latest` (or a `link://` sentinel).
+2. Probe `npm view <spec>` at init/upgrade and fall back to `latest` w/ warning on ETARGET.
+3. Or write a local `node_modules/.bin/squad-state-mcp` shim and reference it absolutely.
+Once preview.5 is published to npm, GAP-5 evaporates; GAP-2 fix remains correct.
+
+### Counts for this slice
+- Fixed: 8 (WI-1, EPERM-FALSE, FLAG-IGNORED, NO-MIGRATION, MCP-BROKEN config-level, INSIDER3-LEAK, GAP-1 mechanical, GAP-2 insert path)
+- Open: 2 (GAP-1 behavioural, GAP-3/#1203 unpublished SDK)
+- New: 1 (GAP-5)
+
+### Artefacts
+- Full report: `.squad/files/validation/TARBALL-FULL-gh-ai-adoption2026.md` (also in each dup as `validation/FRESH-PATH-TARBALL-VALIDATION-gh-ai-adoption2026.md`)
+- Drop to Coordinator: `.squad/decisions/inbox/data-tarball-full-gh-ai-adoption2026.md`
+
+Auth restored to `tamirdresher_microsoft` at end.
+
+## Learnings
+
+### PR #3 R2c — sample co-location + README consolidation (2026-06-02)
+
+**Commit SHA:** `e214c4fb`
+**Final sample path:** `src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/`
+**Sample README disposition:** Stub (Option A) — 3-line redirect to `../../README.md#sample` for discoverability when navigating the directory directly.
+
+**Build/test/sample-run results:**
+- `dotnet build src/Squad.Agents.AI/Squad.Agents.AI.csproj -c Release` ✅ (0 warnings beyond pre-existing)
+- `dotnet build src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/Squad.Agents.AI.Sample.csproj -c Release` ✅
+- `dotnet test test/Squad.Agents.AI.Tests/Squad.Agents.AI.Tests.csproj -c Release` ✅ 43/43 passing, 0 failures
+- Sample sanity-check (`dotnet run --project src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/ -- --flow=1`): clear CLI-not-found error printed to console (no stack trace). UX guarantee confirmed.
+
+**CI status:** Both `Squad.Agents.AI CI` (ubuntu + windows matrix) and `Squad CI` workflows passed green on the push to `feature/squad-agents-ai`.
+
+**Key structural fix required:** Co-locating the sample under `src/Squad.Agents.AI/samples/` causes MSBuild's default `**/*.cs` glob in the library project to pick up `Program.cs`. Fixed by adding `<Compile Remove="samples/**/*.cs" />` to `Squad.Agents.AI.csproj`. Always needed when a sample lives under a library's directory tree.
+
+**Auth note:** push to `tamirdresher/squad` required `gh auth switch --user tamirdresher`; restored to `tamirdresher_microsoft` after push.
+
