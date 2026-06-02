@@ -558,15 +558,25 @@ function isValidBackendType(value: string): value is StateBackendType {
 }
 // Note: 'worktree' and 'git-notes' are accepted for backward compatibility but normalized away
 
+// One-shot flag: warn once per process so repeated resolveStateBackend() calls
+// (e.g. multiple agent startups in the same process) don't spam the console.
+let _warnedGitNotesMigration = false;
+
 /** Normalize legacy aliases to canonical backend type names. */
 function normalizeBackendType(type: string): StateBackendType {
   if (type === 'worktree') return 'local';
   if (type === 'git-notes') {
-    console.warn(
-      "Warning: State backend 'git-notes' is deprecated and has been removed. " +
-      "Migrating to 'two-layer'. Update your .squad/config.json to set " +
-      "\"stateBackend\": \"two-layer\" to suppress this warning."
-    );
+    if (!_warnedGitNotesMigration) {
+      _warnedGitNotesMigration = true;
+      console.warn(
+        "[squad] State backend 'git-notes' is deprecated and has been removed. " +
+        "Your config is being silently migrated to 'two-layer', which creates a " +
+        "'squad-state' orphan branch in your repository. " +
+        "To suppress this warning, update .squad/config.json: " +
+        "set \"stateBackend\": \"two-layer\". " +
+        "See https://github.com/bradygaster/squad/blob/dev/docs/state-backends.md for upgrade instructions."
+      );
+    }
     return 'two-layer';
   }
   return type as StateBackendType;
@@ -588,4 +598,9 @@ function createBackend(type: StateBackendType, squadDir: string, repoRoot: strin
 
 function requireGitRepository(repoRoot: string): void {
   gitExecOrThrow(['rev-parse', '--git-dir'], repoRoot);
+}
+
+/** @internal Reset the one-shot git-notes migration warn flag. Only for use in tests. */
+export function _resetGitNotesMigrationWarnForTesting(): void {
+  _warnedGitNotesMigration = false;
 }

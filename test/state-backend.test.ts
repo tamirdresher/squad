@@ -1,10 +1,10 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { WorktreeBackend, GitNotesBackend, OrphanBranchBackend, TwoLayerBackend, resolveStateBackend, validateStateKey, StateBackendStorageAdapter } from '../packages/squad-sdk/src/state-backend.js';
+import { WorktreeBackend, GitNotesBackend, OrphanBranchBackend, TwoLayerBackend, resolveStateBackend, validateStateKey, StateBackendStorageAdapter, _resetGitNotesMigrationWarnForTesting } from '../packages/squad-sdk/src/state-backend.js';
 import type { StateBackendType } from '../packages/squad-sdk/src/state-backend.js';
 import { resolveSquadState, clearResolveSquadCache } from '../packages/squad-sdk/src/resolution.js';
 import { ToolRegistry } from '../packages/squad-sdk/src/tools/index.js';
@@ -104,7 +104,7 @@ describe('OrphanBranchBackend', () => {
 
 describe('resolveStateBackend()', () => {
   const squadDir = () => join(TMP, '.squad');
-  beforeEach(() => { clearResolveSquadCache(); if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); initRepo(); mkdirSync(squadDir(), { recursive: true }); });
+  beforeEach(() => { clearResolveSquadCache(); _resetGitNotesMigrationWarnForTesting(); if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); initRepo(); mkdirSync(squadDir(), { recursive: true }); });
   afterEach(() => { clearResolveSquadCache(); if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); });
   it('defaults to local', () => { expect(resolveStateBackend(squadDir(), TMP).name).toBe('local'); });
   it('reads stateBackend from config.json (git-notes migrates to two-layer)', () => {
@@ -127,6 +127,19 @@ describe('resolveStateBackend()', () => {
   });
   it('legacy git-notes migrates to two-layer', () => {
     expect(resolveStateBackend(squadDir(), TMP, 'git-notes' as any).name).toBe('two-layer');
+  });
+  it('git-notes deprecation warning fires exactly once per process across repeated calls (Bug C)', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      resolveStateBackend(squadDir(), TMP, 'git-notes' as any);
+      resolveStateBackend(squadDir(), TMP, 'git-notes' as any);
+      resolveStateBackend(squadDir(), TMP, 'git-notes' as any);
+      // Warn should fire on the FIRST call only, never again.
+      expect(warnSpy).toHaveBeenCalledTimes(1);
+      expect(warnSpy.mock.calls[0][0]).toContain("'git-notes' is deprecated");
+    } finally {
+      warnSpy.mockRestore();
+    }
   });
   it('soft-falls-back to local when an explicit git-native backend is unavailable', () => {
     const nonGitRoot = join(tmpdir(), `.squad-state-non-git-${randomBytes(4).toString('hex')}`);
