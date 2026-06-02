@@ -34,5 +34,17 @@ Picard (Lead Architect) owns product architecture decisions, extension-point eva
 Release pipeline now implemented as branch-driven (dev→prerelease, main→stable) per Tamir's directive (2026-06-02T14:15:06+03:00), mirroring Squad CLI patterns. Commit `db05f2a3` completed B'Elanna Phase 2 revision. Docs audit passed (commit `6f8994e5`). PR #3 ready for merge and v0.1 tag pending `NUGET_API_KEY` secret setup (maintainer action).
 
 ---
-**Last Updated:** 2026-06-02T11:23:51Z  
+
+## Learnings
+
+### Workstreams refinement — session-aware concurrency (2026-06-02)
+
+**Binding mechanism:** Env var `SQUAD_WORKSTREAM={slug}` as primary (shell-scoped, per-session by construction), interactive prompt via `ask_user` as fallback when unset. No disk-based session state — session binding is ephemeral; workstream state is durable in per-workstream `now.md`.
+
+**Top concurrency invariant:** Scribe MUST scope `git add` to the active workstream's subtree — never `git add .squad/` globally. This prevents one session from staging another session's concurrent workstream changes.
+
+**Verdict:** APPROVE_WITH_CONDITIONS (7 conditions). Bootstrap one workstream first (`squad-agent-nuget`), validate resume contract, then expand. Advisory lock (`.session-lock`, `.gitignore`d) prevents accidental same-workstream collisions. Agent histories stay global with workstream tags — agents are people with cross-initiative memory.
+
+---
+**Last Updated:** 2026-06-02T15:36:55+03:00  
 **Archive:** `.squad/agents/picard/history-archive.md` (detailed architecture review)

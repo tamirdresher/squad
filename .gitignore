@@ -1,6 +1,12 @@
+# Squad: workstream advisory lock (local-only runtime file — never committed)
+.squad/workstreams/active/*/.session-lock
 # Squad: ignore transient state (inbox, sessions, scratch)
 .squad/decisions/inbox/
 .squad/sessions/
 .squad/.scratch/
 # Squad: SubSquad activation file (local to this machine)
 .squad-workstream
+# Squad: ignore runtime state (logs, inbox, sessions)
+.squad/orchestration-log/
+.squad/log/
+.squad/.cache/

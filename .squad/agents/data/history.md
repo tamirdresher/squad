@@ -25,6 +25,16 @@ Data owns Squad Framework expertise, SDK/CLI research, auth-mode inventory, exte
 
 ## Learnings
 
+### PR #3 Round 1 — Cleanup + multi-named connections (2026-06-02)
+
+- PR body rewrite: before 3,112 chars; after 1,779 chars as read back from GitHub. Initial scrub scan flagged 13 suspect lines; post-edit strict scan found 0 remaining internal/wrong-surface refs.
+- README scrub summary: removed public `.squad/` wording, switched quickstart to ambient signed-in Copilot auth with no token, linked GitHub Copilot SDK auth docs, marked `GitHubTokenProvider`/`GitHubToken` advanced only, and narrowed later-preview language to multi-targeting + Aspire telemetry.
+- XML warnings: baseline `dotnet build src\\Squad.Agents.AI\\Squad.Agents.AI.csproj -c Release` reported 0 CS1591 warnings; final sequential build also had 0 warnings. Added XML docs for the new public named-connection overloads while changing the API.
+- `cliArgs` verdict: already worked end-to-end (`SquadConnectionFactory` parses, options configurator merges, `SquadAgent` copies to `CopilotClientOptions.CliArgs`); added a code comment and regression test `AddSquadAgent_CopiesConnectionStringCliArgsToCopilotClientOptions`.
+- Multi-named connection contract: `AddSquadAgent("research")` reads `ConnectionStrings:squad-research`; default `AddSquadAgent()` keeps `ConnectionStrings:squad`. Tests added: `AddSquadAgent_WithName_BindsNamedConnectionString` and `AddSquadAgent_WithName_UserCallbackOverridesNamedConnectionString`.
+- Verification: final sequential `dotnet build` succeeded with 0 warnings; final `dotnet test` succeeded with 22 tests. 60s PR check watch: ubuntu + docs passed; windows + repo test still pending, no failures observed.
+- Commit: `88424b79d7cc532d8d23b70f80a002dc7800fc05` (`docs+fix: PR #3 review pass — hygiene, XML docs, cliArgs, multi-named connections`) pushed to `origin/feature/squad-agents-ai`.
+
 ### Squad.Agents.AI — Release-readiness docs pass (2026-06-02)
 
 | Doc item | Phase 1 status | Action taken |
@@ -43,8 +53,25 @@ Pack verification observations: `dotnet build` and `dotnet pack` succeeded; `Squ
 
 Push/check observations: local `origin` points at upstream `bradygaster/squad`, so PR #3 push used the `fork` remote for `tamirdresher/squad`; initial push required switching GitHub auth to `tamirdresher`, then auth was restored. The 60s PR check watch ended with no failures; three checks were green and `Squad CI/test` was still pending.
 
+### PR #3 Round 2 — Keyed DI, BYOK, routing gate, security hardening (2026-06-03)
+
+**Commit:** `4ac667cd` on `feature/squad-agents-ai` (pushed to `tamirdresher/squad`)
+
+**Changes implemented:**
+- **ConfigureCopilotClient** (`Action<CopilotClientOptions>`) delegate on `SquadAgentOptions` — BYOK extension point (Picard C2 scope-expanded to v0.1)
+- **Routing gate** (Picard C1): snapshot/restore `Cwd`/`CliPath`/`CliArgs` after delegate runs; LogWarning on changes (SC-3)
+- **Keyed DI**: 4 `AddKeyedSquadAgent` overloads using .NET 8+ `ServiceDescriptor` with `serviceKey`; shared `RegisterOptionsInfrastructure` helper
+- **Environment credential leak fix** (SC-1/SC-2): `[JsonIgnore]` on `Environment`, `GitHubTokenProvider`, `ConfigureCopilotClient`; `ToString()` redacts token-pattern keys
+- **Extensibility seam comment** (Picard C3) in `SquadAgent.CreateCopilotClient`
+- **21 new tests** (43 total): 9 security redaction (SC-7/SC-8), 5 keyed DI, 7 BYOK/routing gate
+- **README**: streaming, keyed DI, BYOK, security sections; updated options table
+
+**Auth gate compliance:** Picard C1-C4 ✅, Worf SC-1 through SC-8 ✅. SC-9 (CopilotClientOptions.ToString) deferred — SDK type; not controllable from Squad wrapper.
+
+**Verification:** `dotnet build` 0 warnings 0 errors; `dotnet test` 43 passed 0 failed. PR body updated with Round 2 section.
+
 ---
-**Last Updated:** 2026-06-02T10:50:37Z  
+**Last Updated:** 2026-06-03  
 **Archive:** `.squad/agents/data/history-archive.md` (detailed research notes)
 
 
@@ -113,3 +140,49 @@ ode -e "import('@bradygaster/squad-cli').then(m => m.startStateMcp())" and verif
 - PowerShell: `grep` not on PATH (use `Select-String`); multi-Filter `Get-ChildItem` fails (use `Where-Object`).
 
 **Artifacts**: manifest at `.squad/files/validation/COMBINED-FIX-BRANCH-MANIFEST.md`; decision at `.squad/decisions/inbox/data-combined-fix-branch.md`.
+
+---
+
+## 2026-06-02 — Bundle iteration 2: both punted P0s fixed
+
+**Outcome**: ✅ MCP-BRIDGE-BROKEN (b987fe67) + INSIDER3-INIT-LEAK (e291b962) committed to squad/state-backend-upgrade-fixes. PR #1200 body updated. Head SHA 8ab9a305. Tarball refreshed (563 KB). 10 new regression tests pass.
+
+**Key technique**: StdioServerTransport (MCP SDK) uses **newline-delimited JSON-RPC**, not LSP-style Content-Length framing. First repro used Content-Length and got silent no-response, hiding the real root cause. Switched to newline framing → all 7 tools registered correctly → proved server was fine.
+
+**MCP-BRIDGE root cause**: 
+pm view @bradygaster/squad-cli dist-tags → latest=0.9.4 / insider=0.9.6-insider.3. Template wrote unpinned 
+px -y @bradygaster/squad-cli state-mcp → resolved to 0.9.4 → 0.9.4 has no state-mcp command. Config-level bug, not server. Fix: embed running CLI version into launch args at both init (SDK) and upgrade (CLI + retrofit via runEnsureChecks).
+
+**INIT-LEAK root cause**: sdkInitSquad() runs BEFORE CLI writes stateBackend to config.json. SDK has no way to know the backend choice. Fix: post-hoc lift in CLI right after installGitHooks, reusing existing collectWorktreeState + writeFilesToOrphanBranch plumbing from migrate-backend.ts. Static files (charters, team.md, ceremonies.md, casting) preserved on disk.
+
+**Gotchas**:
+- uildMcpServerSpecs exists in TWO places (SDK init.ts + CLI upgrade.ts) — both needed the fix.
+- Existing 	est/cli/upgrade.test.ts > 'preserves agent-frontmatter MCP config on upgrade' asserted the broken unpinned spec literally; relaxed to a regex tolerating any version.
+- squad-squad pushes need 	amirdresher_microsoft auth; squad upstream pushes need 	amirdresher auth.
+
+**Artifacts**: manifest updated at `.squad/files/validation/COMBINED-FIX-BRANCH-MANIFEST.md` (commit c4392e3); decision at `.squad/decisions/inbox/data-bundle-iteration-2.md`.
+
+---
+
+## 2026-06-02 — Workstreams Bootstrap: squad-agents-ai as first active workstream
+
+**Mission:** Implement Picard's session-aware workstreams architecture (APPROVE_WITH_CONDITIONS, 7 conditions). Bootstrap `squad-agents-ai` as the first workstream without migrating the flat ledger. Additive-only: new directories, coordinator edits, tombstone `identity/now.md`, update `.gitignore`.
+
+**Completed:**
+- Created `.squad/workstreams/` directory tree: `README.md`, `_template/` (3 files + inbox), `evergreen/global/` (3 files + inbox), `active/squad-agents-ai/` (4 files + inbox).
+- `active/squad-agents-ai/now.md` — live focus pointer (PR #3 R2, ConfigureCopilotClient delegate).
+- `active/squad-agents-ai/decisions.md` — 8 seeded entries covering all R1/R2 work.
+- Updated `.squad/identity/now.md` → tombstone redirecting to workstream path.
+- Added `.squad/workstreams/active/*/.session-lock` to `.gitignore` (Picard condition 2).
+- Edited `.github/agents/squad.agent.md` — 5 surgical changes: session start, session catch-up, directive capture, new Workstream Discovery section, spawn templates.
+
+**Picard conditions:**
+- C1 SQUAD_WORKSTREAM env var as primary binding - done
+- C2 .session-lock gitignored - done
+- C3 Scoped git add in spawn template - done
+- C4 Bootstrap 1 workstream only - done
+- C5 Agent histories remain agent-global - done
+- C6 now.md tombstone at identity/now.md - done
+- C7 Worf security review of advisory lock - DEFERRED
+
+---

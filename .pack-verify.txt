@@ -1,0 +1,1 @@
+Package=Squad.Agents.AI.0.1.0-preview.nupkg HasReadme=True HasLicense=True HasXml=True Authors=Tamir Dresher Tags=squad agents ai copilot maf multi-agent Readme=README.md ProjectUrl=https://github.com/tamirdresher/squad ReadmeLines=80

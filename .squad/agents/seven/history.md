@@ -17,6 +17,10 @@ Seven owns cross-repo learning & signal research. Key focus: state-backend commu
 - State-Backend: 5 dominant problem themes (upgrade gaps P1, two-layer incomplete P1, coordinator inconsistency P2, permission API breaking P1, state destruction on branch switch P1-resolved)
 - Memory Research: E2E oracle + A/B value framework; real Copilot CLI E2E portfolio (smoke 40min + full 7.5-9hr); real subprocess, persistent memory, measurable delta distinguish from substitutes
 
+### Workstreams pattern research (2026-06-02)
+
+Reference files cited: `bradygaster/github-copilot-squad-research` `README.md`, `workstreams/README.md`, `workstreams/_template/README.md`, `workstreams/active/github-integration-surfaces/README.md`, `workstreams/active/repo-native-team-casting/README.md`, `.squad/ceremonies.md`, `.squad/decisions.md`, and `.squad/templates/scribe-charter.md`. A workstream there is a self-contained research folder under `workstreams/{active,closed,evergreen}` with README frontmatter (`status`, `created`, optional `closed`) and standard subfolders for reports, diagrams, artifacts, and drops; coordinator ceremony creates `workstreams/active/{slug}/`, stores findings under that folder, and updates the README, while decisions remain a global Scribe-merged log. Gap delta: squad-squad has rich decision/directive content but root `.squad/decisions.md`, flat `.squad/decisions/inbox/`, and `now.md` prose mix Squad.Agents.AI, state-backend, Durable/ADC/Azure, content, Clawpilot, and governance tracks. Recommended adoption shape: create internal `.squad/workstreams/{active,closed,evergreen,_template}` with per-workstream `decisions.md` and `decisions/inbox/`, keep legacy decisions unmoved, add `global` evergreen for cross-track directives, and teach Coordinator/Scribe to pass and merge by `WORKSTREAM_ID`.
+
 ## Cross-Repo Research Context
 
 PR #3 Squad.Agents.AI provenance split identified: Data track (auth inventory), Reno implementation, Worf token hardening. Prior PoCs catalogued. Four files required per skill in marketplace: SKILL.md, manifest.json, plugin.json, README.md.

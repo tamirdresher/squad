@@ -1,0 +1,24 @@
+# Scribe Commit Message — Decisions + Cross-Agent History Update
+
+## Summary
+Merged two inbox files into canonical decisions.md:
+- Data: Two-Layer Fresh-Path Baseline (insider.3 validation, 6 sessions, 2 new bugs)
+- User Directive: Copilot CLI Test Invocation Standard (--autopilot flag canonical)
+
+## Changes
+- `.squad/decisions/decisions.md`: +2,847 bytes (16,204 → 21,051 bytes)
+- Cross-agent history.md files updated: data, belanna, picard, seven, geordi, worf, troi
+- Autopilot directive learning appended to all copilot-driving agents
+- Session log: 2026-06-02T1008Z-twolayer-fresh-baseline-and-autopilot-directive.md
+- Orchestration log: 2026-06-02T1008Z-data.md
+
+## Notes
+- Inbox files (data-twolayer-fresh-baseline.md, copilot-directive-*) merged and cleared
+- .gitignore blocks .squad/log and .squad/orchestration-log (see note below)
+- Archive hard gate: 6 agent history files exceed 15,360 bytes; archive deferred pending clarification on summarization criteria
+- Decisions.md post-merge: 21,051 bytes (above 20,480 threshold but all entries < 30 days old; no archiving triggered)
+
+## Git Ignore Note
+`.squad/log/` and `.squad/orchestration-log/` are excluded by .gitignore (line 4 excludes `.squad/decisions/inbox/` per coordinator note). Session and orchestration logs written but not staged. Coordinator to resolve .gitignore scope.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
