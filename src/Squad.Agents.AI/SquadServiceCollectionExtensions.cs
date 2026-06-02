@@ -7,21 +7,33 @@ using Microsoft.Extensions.Options;
 namespace Squad.Agents.AI;
 
 /// <summary>
-/// DI extension methods for registering <see cref="SquadAgent"/>.
+/// Extension methods for registering <see cref="SquadAgent"/> in dependency injection.
 /// </summary>
 public static class SquadServiceCollectionExtensions
 {
     /// <summary>
-    /// Register SquadAgent as a scoped AIAgent.
-    /// Reads connection string from ConnectionStrings:squad and applies parsed values
-    /// to options before the user callback runs. User-supplied callback always wins.
+    /// Registers <see cref="SquadAgent"/> and base <see cref="AIAgent"/> with scoped lifetime.
     /// </summary>
+    /// <param name="services">Service collection to update.</param>
+    /// <param name="configure">Optional callback that customizes <see cref="SquadAgentOptions"/> after connection-string binding.</param>
+    /// <returns>The same <paramref name="services"/> instance for chaining.</returns>
+    /// <example>
+    /// <code>
+    /// builder.Services.AddSquadAgent(o => o.SquadFolderPath = @"C:\repo");
+    /// </code>
+    /// </example>
     public static IServiceCollection AddSquadAgent(
         this IServiceCollection services,
         Action<SquadAgentOptions>? configure = null)
         => AddSquadAgent(services, ServiceLifetime.Scoped, configure);
 
-    /// <summary>Register SquadAgent with specified lifetime.</summary>
+    /// <summary>
+    /// Registers <see cref="SquadAgent"/> and base <see cref="AIAgent"/> with the specified lifetime.
+    /// </summary>
+    /// <param name="services">Service collection to update.</param>
+    /// <param name="lifetime">Lifetime used for the concrete and base agent registrations.</param>
+    /// <param name="configure">Optional callback that customizes <see cref="SquadAgentOptions"/> after connection-string binding.</param>
+    /// <returns>The same <paramref name="services"/> instance for chaining.</returns>
     public static IServiceCollection AddSquadAgent(
         this IServiceCollection services,
         ServiceLifetime lifetime,
@@ -47,7 +59,7 @@ public static class SquadServiceCollectionExtensions
             sp => sp.GetRequiredService<SquadAgent>(),
             lifetime));
 
-        // TraceEvents=true outside Development → warn
+        // TraceEvents=true → warn because verbose traces can contain sensitive details
         services.AddOptions<SquadAgentOptions>()
             .PostConfigure<ILoggerFactory>((opts, loggerFactory) =>
             {

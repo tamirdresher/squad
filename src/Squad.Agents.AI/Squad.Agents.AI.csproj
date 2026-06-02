@@ -8,9 +8,10 @@
     <PackageId>Squad.Agents.AI</PackageId>
     <Title>Squad Agents AI</Title>
     <Description>Community SquadAgent for Microsoft Agent Framework. Exposes the Squad multi-agent CLI as an AIAgent that can be composed into any MAF app or workflow.</Description>
-    <Authors>Squad contributors</Authors>
-    <PackageTags>squad;agent-framework;maf;copilot;ai-agent</PackageTags>
-    <RepositoryUrl>https://github.com/bradygaster/squad</RepositoryUrl>
+    <Authors>Tamir Dresher</Authors>
+    <PackageTags>squad;agents;ai;copilot;maf;multi-agent</PackageTags>
+    <PackageProjectUrl>https://github.com/tamirdresher/squad</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/tamirdresher/squad.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
@@ -27,5 +28,6 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="README.md" Pack="true" PackagePath="\" />
+    <None Include="..\..\LICENSE" Pack="true" PackagePath="\" />
   </ItemGroup>
 </Project>
