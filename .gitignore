@@ -1,6 +1,4 @@
-# Squad: ignore runtime state (logs, inbox, sessions)
-.squad/orchestration-log/
-.squad/log/
+# Squad: ignore transient state (inbox, sessions, scratch)
 .squad/decisions/inbox/
 .squad/sessions/
 .squad/.scratch/
