@@ -235,3 +235,20 @@ Upgrade migrated decisions.md (~1 MB) + 17 agent histories to orphan branch in o
 state-mcp server itself works (verified via direct JSON-RPC — all 7 tools register). The runtime MCP loading gap is NOT a regression of this PR and NOT caused by retrofit; it's in Copilot CLI's MCP discovery/loading layer. Recommend separate follow-up.
 
 Reports: `.squad/files/validation/TARBALL-FULL-tamir-squad-hq.md` (full) + inbox drop `.squad/decisions/inbox/data-tarball-full-tamir-squad-hq.md`. Snapshots at `C:\Users\tamirdresher\squad-validation\snapshots-squadhq-20260602T183202\` include PRE/POST of mcp-config.json showing exact retrofit behavior.
+
+
+## 2026-06-02T19:18 — MCP loader root cause (post data-14 follow-up)
+**Mission:** distinguish Theory 1 (Copilot CLI session-reload) vs Theory 2 (unresolvable npx pin) for the MCP-tools-unavailable symptom across all 6 tarball runs.
+**Verdict:** Theory 2 confirmed.
+- 
+pm view @bradygaster/squad-cli versions --json → highest published is  .9.6-insider.3;  .9.6-preview.5 (local tarball version) is NOT on npm.
+- 
+px -y @bradygaster/squad-cli@0.9.6-preview.5 state-mcp → 
+pm error code ETARGET. Server never starts.
+- 
+px -y @bradygaster/squad-cli state-mcp (unpinned → latest=0.9.4) → returns all 7 tools. Server itself is fine.
+- Therefore nsureSquadStateMcpPinned writes a launch spec that resolves on normal installs but is broken for any locally-built / pre-release CLI.
+**Root cause:** packages/squad-cli/src/cli/core/upgrade.ts:705 pins literal getPackageVersion() without validating it exists on npm.
+**Fix path:** Option A — validate pin against npm registry; fall back to @insider dist-tag if unresolvable. ~40 LOC. Architectural enough to NOT auto-implement (per prompt rule). Filed bradygaster/squad#1204 against PR #1200 branch family.
+**Artifacts:** .squad/files/validation/MCP-LOADER-ROOT-CAUSE.md (full RCA with all 3 fix options, recommendation, validation re-test plan); .squad/decisions/inbox/data-mcp-loader-root-cause.md.
+**Tarball/branch:** untouched — no new commit/push; iteration 4 manifest entry NOT created (waiting for Tamir's call on whether to implement Option A in this branch or punt to a successor PR).
