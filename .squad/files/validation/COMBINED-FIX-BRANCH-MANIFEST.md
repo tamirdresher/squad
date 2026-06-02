@@ -2,11 +2,70 @@
 
 **Branch**: `squad/state-backend-upgrade-fixes`
 **PR**: [bradygaster/squad#1200](https://github.com/bradygaster/squad/pull/1200)
-**Head SHA**: `8ab9a305`
-**Tarball**: `C:\Users\tamirdresher\squad-validation\bradygaster-squad-cli-combined-fixes.tgz` (563 KB)
-**Date**: 2026-06-02T15:38:00+03:00
+**Head SHA**: `3b44f45e`
+**Tarballs (TWIN — install BOTH together)**:
+- `C:\Users\tamirdresher\squad-validation\bradygaster-squad-sdk-combined-fixes.tgz` (787 KB)
+- `C:\Users\tamirdresher\squad-validation\bradygaster-squad-cli-combined-fixes.tgz` (564 KB)
+
+**Install pattern**: `npm install -g <sdk-tgz> <cli-tgz>` (both at once — see Gap 3 / #1203)
+
+**Date**: 2026-06-02T16:50:00+03:00
 **Author agent**: Data
-**Iteration**: 2 (both punted P0s now fixed)
+**Iteration**: 3 (smoke-test gaps closed)
+
+## Bugs fixed (P0)
+
+| ID | SHA | Source |
+|---|---|---|
+| (pre-existing) toRelative Windows | `fc406355` | already on branch |
+| (pre-existing) git-notes silent migration warn | `dc2b3f50` | already on branch |
+| (pre-existing) sdk semver workspace | `7a6b013f` | already on branch |
+| #1192 approve-once permission contract | `70a37812` | cherry-pick |
+| #1192 regression test | `e0291f3f` | cherry-pick |
+| UPGRADE-EPERM-FALSE-SUCCESS | `cf99139e` | iteration 1 |
+| WI-1 (commit hooks) | `e2ff8277` | iteration 1 |
+| UPGRADE-FLAG-IGNORED + UPGRADE-NO-MIGRATION | `e010b161` | iteration 1 |
+| MCP-BRIDGE-BROKEN (pin behavior) | `b987fe67` | iteration 2 |
+| INSIDER3-INIT-LEAK | `e291b962` | iteration 2 |
+| **GAP-1 `squad sync` command missing + GAP-2 MCP retrofit INSERT** | **`3b44f45e`** | **iteration 3** |
+
+## Iteration 3 — closes smoke-test gaps
+
+### GAP-1: `squad sync` subcommand never registered (iter-2 smoke surfaced)
+**Root cause**: WI-1 (iter 1) installed `post-commit` + `pre-push` hooks that invoke `squad sync --quiet 2>/dev/null || true`. The `runSync` implementation existed in `packages/squad-cli/src/cli/commands/sync.ts` but was never wired into `cli-entry.ts`. The hook's `|| true` swallowed the "Unknown command: sync" failure silently → 0 commits propagated to the orphan branch across 3 sessions in the multiplayer-sudoku smoke.
+
+**Fix**: register `sync` in `cli-entry.ts` between `state-mcp` and `migrate` (Option A from the directive). Flags: `--push`, `--pull`, `--remote <name>`, `--quiet`. Documented in `squad --help`. New unit test `test/sync-command.test.ts` covers no-op for local backend, no-op for missing config, no-throw for two-layer without remote.
+
+### GAP-2: `ensureSquadStateMcpPinned` no-op when entry absent (iter-2 smoke surfaced)
+**Root cause**: existing implementation bailed early (`if (!server || !Array.isArray(server.args)) return false`). For repos with a pre-existing `.copilot/mcp-config.json` from prior (non-squad) Copilot use, the retrofit was a no-op → bridge stayed unwired → Scribe correctly refused to persist (`squad_state_*` tools unavailable).
+
+**Fix**: ALWAYS construct the expected `{command: 'npx', args: ['-y', '@bradygaster/squad-cli@<cliVersion>', 'state-mcp']}` and insert/overwrite if different. Other configured MCP servers preserved untouched. Two new tests cover (a) insert when entry missing alongside other servers; (b) insert when `mcpServers` key is absent entirely.
+
+## Iteration 3 — Validation
+
+- ✅ `npm run lint` (tsc --noEmit, both packages) clean
+- ✅ `npm run build` clean
+- ✅ 19/19 targeted tests pass: mcp-bridge-pinning (8 — was 7, +1 insert-with-other-servers, +1 insert-no-mcpServers-key, -1 obsolete no-op test), sync-command (3 — NEW), init-leak-mutable-state (3), install-hooks-wi1 (5)
+- 📦 Twin tarballs packed (CLI 564 KB, SDK 787 KB) → mirrored to `C:\Users\tamirdresher\squad-validation\bradygaster-squad-{sdk,cli}-combined-fixes.tgz`
+
+## Follow-up / out-of-scope
+
+- **[bradygaster/squad#1203](https://github.com/bradygaster/squad/issues/1203)** — release-pipeline: squad-cli tarball declares unpublished `@bradygaster/squad-sdk@>=0.9.6-preview` (ETARGET on standalone install). NOT a state-backend bug — filed separately. Real fix: publish SDK + CLI atomically (or vendor SDK into CLI tarball). Workaround for validation: twin-tarball install pattern documented above.
+- Land #1200 → close #1192.
+- Consider unifying the duplicated `buildMcpServerSpecs` between `squad-sdk/init.ts` and `squad-cli/upgrade.ts` in a future PR.
+
+## Files touched
+
+### Iteration 3 (new)
+- `packages/squad-cli/src/cli-entry.ts` — register `sync` subcommand + help text
+- `packages/squad-cli/src/cli/core/upgrade.ts` — `ensureSquadStateMcpPinned` now INSERTS/UPDATES (no longer early-bails when entry absent); other mcpServers preserved
+- `test/mcp-bridge-pinning.test.ts` — replaced obsolete no-op-when-absent test with 2 new insert-path tests
+- `test/sync-command.test.ts` — NEW (3 tests for sync command resolution + backend gating)
+- Version bumps: `package.json`, `packages/squad-cli/package.json`, `packages/squad-sdk/package.json` → `0.9.6-preview.4`
+
+### Iteration 1 + 2 (already on branch)
+See git log; covered in prior manifest entries above.
+
 
 ## Bugs fixed (P0)
 
