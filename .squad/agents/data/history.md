@@ -319,3 +319,33 @@ Auth restored to `tamirdresher_microsoft` at end.
 **PR #3 Status:** ✅ Upstream-ready. Title finalized (eat: Squad.Agents.AI - Microsoft Agent Framework adapter for the Squad CLI), body finalized (4089 bytes, leak check PASS). Ready for Tamir's decision on next step.
 
 **Handoff:** Data → belanna-4/5 completed; PR awaits review push or local iteration decision.
+
+
+---
+
+## 2026-06-02T17:30:00+03:00 — Tarball validation 3/6: holocaust-research-wasserman (research repo)
+
+**Mission**: validate squad/state-backend-upgrade-fixes iter-3 twin tarballs (CLI+SDK @ 0.9.6-preview.5) against a personal-account research repo (	amirdresher/holocaust-research-wasserman — private). Run in parallel with 3 sister agents (gh-ai-adoption2026 / squad-ai-vulns / tamir-squad-hq) without colliding.
+
+**Outcome**: 🟡 mixed PASS. 8 ✅ / 4 ❌ bug-fix verdicts. Fresh-init two-layer works end-to-end (orphan branch created, 6 hooks installed, MCP retrofit INSERTS pin alongside existing servers, INSIDER3-INIT-LEAK closed). **One critical NEW finding:** the GAP-2 retrofit pins `@bradygaster/squad-cli@0.9.6-preview.5` — a version that **does not exist on the npm registry** — so the MCP bridge cannot actually start at runtime. Direct probe: `npx -y @bradygaster/squad-cli@0.9.6-preview.5 state-mcp` → ETARGET. Net effect: S3 Flanders reported `"squad_state runtime bridge isn't available"` and refused to persist; S1 Lead fell back to direct shell git plumbing. GAP-3 (#1203) is therefore not just a standalone-install issue — it strikes at every runtime that uses `npx` to launch the MCP server.
+
+**Upgrade path**: squad upgrade --self --insider --state-backend two-layer hit EPERM on the global npm slot (raced with sister agents); exit was correctly non-zero with ❌ Self-upgrade failed (UPGRADE-EPERM-FALSE-SUCCESS fix verified — no fake ✅). BUT: the EPERM aborted the entire upgrade — stateBackend flag silently ignored, no orphan branch, no hooks, no MCP entry. Recommendation: decouple --self failure from the backend-migration phase so race-losers still get the migration.
+
+**Operational notes**:
+- Local-prefix install (C:\Users\tamirdresher\squad-validation\.npm-prefix-wasserman) — global EPERM'd as predicted on first try; fall-back worked clean in 32 s.
+- Source repo is HUGE (578 MB, 1794 files) — Copy-Item + git push took ~6 min each. The Tee-Object buffer never flushed the in-progress copy banner; had to verify completion by polling disk size.
+- Source already had .squad/ initialised (template-based research project), so init mutations were configuration-only — turned out to be a useful "what does init do when nothing is missing" test.
+- Source 	eamRoot was absolute Windows path C:\\temp\\holocaust-research-squad — that survived the init untouched (Bug #1190 teamRoot-not-portable still in the wild, but out of fix-bundle scope).
+
+**Sessions**:
+1. "build me a team from the Simpsons universe…" (12 m) — ✅ squad-state orphan grew (926948e → 9276687). Agent used shell git plumbing + squad sync --push.
+2. "Lead, propose a citation-tracking architecture" (9 m) — wrote inbox notes to worktree only (no commits, no MCP). Pattern repeated from other validations.
+3. "Tester, list edge cases for citation deduplication" (5.5 m) — Flanders explicitly refused to persist; "squad_state runtime bridge isn't available" message.
+
+**Artifacts**:
+- Fresh-init duplicate: 	amirdresher_microsoft/holocaust-research-wasserman-tarball-test-20260602T1832
+- Upgrade-path duplicate: 	amirdresher_microsoft/holocaust-research-wasserman-upgrade-test-20260602T1832
+- Report: alidation/FRESH-PATH-TARBALL-VALIDATION-holocaust-research-wasserman.md in both, mirrored to .squad/files/validation/TARBALL-FULL-holocaust-research-wasserman.md
+- Decision drop: .squad/decisions/inbox/data-tarball-full-holocaust-research-wasserman.md
+
+**Auth**: ended on 	amirdresher_microsoft active.
