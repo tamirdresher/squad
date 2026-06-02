@@ -1,6 +1,6 @@
 # Squad Decisions
 
-**Last Updated:** 2026-06-02T13:50:37Z
+**Last Updated:** 2026-06-02T11:23:51Z
 
 ## Active Decisions
 
@@ -3004,3 +3004,91 @@ Landed on PR #3 branch `feature/squad-agents-ai` in `tamirdresher/squad` at comm
 - Major updates for `Microsoft.Agents.AI*` and `Microsoft.Extensions.AI` are intentionally tracked because the package must follow upstream AI APIs closely.
 - OpenTelemetry semver-major updates are deferred; patch and minor updates remain allowed. This follows Decision 602 because OpenTelemetry-related transitive audit suppressions are sensitive and need explicit re-audit before major movement.
 
+
+---
+
+## 2026-06-02 — Squad.Agents.AI v0.1 Release Pipeline + Docs Pass
+
+**Date:** 2026-06-02T11:23:51Z  
+**Context:** Data completed docs audit, Tamir issued release-strategy directive (dev→prerelease, main→stable), and B'Elanna iterated the release workflow twice per directive.
+
+### (a) Data — Docs Gap Closure (7 fixes, .nupkg contents verified)
+
+**Agent:** Data (Squad Framework Expert)  
+**Commit:** `6f8994e5`
+
+**Outcome:** v0.1-preview documentation bar met. Seven gaps closed:
+
+1. Package README expanded with purpose, install, prerequisites, DI quickstart, connection strings, key options, package contents, and known preview limitations.
+2. XML documentation completed for four public types and their public/protected preview members.
+3. Root README updated to point .NET consumers to the package README.
+4. CHANGELOG added with `## [0.1.0-preview] - 2026-06-02` entry documenting PR #3 lineage and public surface.
+5. `.csproj` metadata enriched with semantic author, repository, project, and tags values.
+6. `.csproj` now packs README and LICENSE into the package.
+7. Verified `dotnet pack` output: `.nupkg` contains README, LICENSE, and XML docs; nuspec readme metadata points at `README.md`.
+
+**Evidence:** Commit `6f8994e5` verified; `.nupkg` inspection confirmed all metadata present.
+
+**Deferred to v0.2:** Dedicated sample app project, keyed DI, BYOK/session-provider pass-through, richer observability, multi-targeting beyond `net10.0`.
+
+### (b) User Directive — Squad.Agents.AI Release Strategy
+
+**Date:** 2026-06-02T14:15:06+03:00  
+**User:** Tamir Dresher
+
+**Directive:** Squad.Agents.AI publishing now follows branch-driven release model:
+- Merges to `dev` publish prerelease NuGet packages.
+- Merges to `main` publish stable NuGet packages.
+- `workflow_dispatch` remains only as a manual escape hatch with optional explicit version override.
+
+**Rationale:** Mirror Squad CLI release strategy (`squad-release.yml` for stable, `squad-insider-release.yml` for prerelease) to provide predictable, branch-driven versioning.
+
+### (c) B'Elanna — Initial Release Pipeline & Dependabot (commit `5f5293fb`)
+
+**Agent:** B'Elanna (Distributed Workflow & Build Expert)  
+**Mode:** Background  
+**Commit:** `5f5293fb`
+
+**Deliverables:**
+
+1. `.github/workflows/squad-agents-ai-release.yml` — Initial release workflow design:
+   - Trigger: `workflow_dispatch` with optional `explicit_version` input.
+   - Publishes `.nupkg` to NuGet.org with `dotnet nuget push --skip-duplicate`.
+   - Concurrency guard to prevent concurrent publishes of the same version.
+   - `NUGET_API_KEY` secret required (registered maintainer action).
+
+2. `.github/dependabot.yml` — Dependency tracking policy:
+   - NuGet target: `src/Squad.Agents.AI/`, `test/Squad.Agents.AI.Tests/`; weekly check.
+   - GitHub Actions updates: weekly.
+   - Major version auto-allow: `M.A.AI` (Agents.AI stack).
+   - Major version defer: `OpenTelemetry` (Decision 602 deferral).
+   - Pull requests created for version updates.
+
+**Outstanding:** `NUGET_API_KEY` secret setup (maintainer responsibility).
+
+### (d) B'Elanna — Release Triggers Revised per Directive (commit `db05f2a3`)
+
+**Agent:** B'Elanna (Distributed Workflow & Build Expert)  
+**Mode:** Background  
+**Commit:** `db05f2a3`
+
+**Revisions:** Workflow adapted from Squad CLI patterns to implement Tamir's directive:
+
+- **Removed:**
+  - Tag-driven `push.tags: squad-agents-ai-v*` publishing.
+  - Tag-derived package versions.
+  - Tag-triggered GitHub Release creation for `Squad.Agents.AI`.
+
+- **Added:**
+  - Paths-filtered `push` triggers for `dev` and `main` covering `src/Squad.Agents.AI/**`, `test/Squad.Agents.AI.Tests/**`, `Directory.*.props`, `global.json`.
+  - Stable `main` version derivation from `src/Squad.Agents.AI/Squad.Agents.AI.csproj` `<Version>`.
+  - Monotonic `dev` prerelease derivation: `<stable-base>-preview.${{ github.run_number }}` (NuGet semver ordering requirement; short SHA was rejected due to uniqueness without monotonicity).
+  - Branch-scoped concurrency group `squad-agents-ai-release-${{ github.ref }}` with `cancel-in-progress: false`.
+
+- **Mirror Source:**
+  - Stable version derivation: mirrors `.github/workflows/squad-release.yml` (csproj source).
+  - Prerelease derivation: adapts intent of `.github/workflows/squad-insider-release.yml` (short SHA pattern) to NuGet's monotonic prerelease field requirement.
+
+**Outstanding:** `NUGET_API_KEY` secret setup (maintainer responsibility); `dev` branch creation (post-merge step).
+
+---

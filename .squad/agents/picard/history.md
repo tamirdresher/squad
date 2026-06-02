@@ -26,5 +26,13 @@ Picard (Lead Architect) owns product architecture decisions, extension-point eva
 **Status:** Implementation may proceed once Worf clears security.
 
 ---
-**Last Updated:** 2026-06-02T10:50:37Z  
+
+## 2026-06-02 — Release Pipeline Branch-Driven per Strategic Call
+
+**Status:** v0.1 PUBLISH-READY
+
+Release pipeline now implemented as branch-driven (dev→prerelease, main→stable) per Tamir's directive (2026-06-02T14:15:06+03:00), mirroring Squad CLI patterns. Commit `db05f2a3` completed B'Elanna Phase 2 revision. Docs audit passed (commit `6f8994e5`). PR #3 ready for merge and v0.1 tag pending `NUGET_API_KEY` secret setup (maintainer action).
+
+---
+**Last Updated:** 2026-06-02T11:23:51Z  
 **Archive:** `.squad/agents/picard/history-archive.md` (detailed architecture review)

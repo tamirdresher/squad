@@ -25,5 +25,13 @@ Worf (Security & Reliability Reviewer) owns security audits, threat modeling, cr
 **Documentation Required:** 6 security docs (F-DOC-1..F-DOC-6) covering token handling, delegate security, BYOK keys, UseLoggedInUser consent, Environment dict warning, token precedence.
 
 ---
-**Last Updated:** 2026-06-02T10:50:37Z  
+
+## 2026-06-02 — SC-1..SC-9 Conditions Pending Implementation
+
+**Status:** Flagged for next round
+
+The 9 mandatory security conditions (SC-1..SC-9) from the 2026-06-02 auth-extensibility security review remain pending implementation. Next round: when Data picks up auth expansion work (post-v0.1 release), SC-1..SC-9 must be implemented in the same pass. P0 pre-existing bug (`SquadAgentOptions.Environment` not redacted by `ToString()`) must be fixed alongside SC-1.
+
+---
+**Last Updated:** 2026-06-02T11:23:51Z  
 **Archive:** `.squad/agents/worf/history-archive.md` (detailed security review)
