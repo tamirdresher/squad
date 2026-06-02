@@ -14,6 +14,7 @@ import { getPackageVersion, stampVersion } from './version.js';
 import { initSquad as sdkInitSquad, cleanupOrphanInitPrompt, ensurePersonalSquadDir, resolvePersonalSquadDir, clearResolveSquadCache, type InitOptions } from '@bradygaster/squad-sdk';
 import { installGitHooks } from '../commands/install-hooks.js';
 import { liftInitMutableStateOntoOrphan } from '../commands/migrate-backend.js';
+import { ensureSquadStateMcpPinned } from './upgrade.js';
 
 const storage = new FSStorageProvider();
 
@@ -346,6 +347,18 @@ export async function runInit(dest: string, options: RunInitOptions = {}): Promi
           }
         } catch (err) {
           console.warn(`${YELLOW}⚠ Could not lift mutable state onto squad-state branch: ${err instanceof Error ? err.message : err}${RESET}`);
+        }
+
+        // GAP-2 fix: SDK init skips .copilot/mcp-config.json when it already
+        // exists (e.g. partially-squadified repo or pre-existing Copilot setup),
+        // leaving the bridge unwired. Force-insert/pin the squad_state entry so
+        // the MCP server is reachable regardless of pre-existing config.
+        try {
+          if (ensureSquadStateMcpPinned(dest, getPackageVersion())) {
+            success('pinned .copilot/mcp-config.json squad_state to current CLI version');
+          }
+        } catch (err) {
+          console.warn(`${YELLOW}⚠ Could not pin squad_state in mcp-config.json: ${err instanceof Error ? err.message : err}${RESET}`);
         }
       }
     } else {
