@@ -66,6 +66,10 @@ Picard owns architecture & product confidence framework. Key learnings:
 
 2026-05-31: Final template validation and approval sweep. All 11 gates pass. Approved PR #1200 for upstream merge and release as 0.9.6.
 
+## 2026-06-02T11:29:11.224+03:00 — Autopilot Directive (Cross-Agent Update)
+
+2026-06-02: Use `copilot --yolo --autopilot --agent squad -p '<prompt>'` for unattended copilot CLI invocations (per user directive).
+
 ## 2026-06-02T11:29:11.224+03:00 — State-Backend Remaining Work Decomposition
 
 **Context:** Post Data+Seven triage (2026-05-31). Completed a full Phase 1–5 decomposition of remaining state-backend issues against PR #1200 (`squad/state-backend-upgrade-fixes`).

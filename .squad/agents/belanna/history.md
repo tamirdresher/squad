@@ -11,6 +11,8 @@ B'Elanna owns durable/distributed workflow thinking for Squad-related agent syst
 
 ## Learnings
 
+2026-06-02: Use `copilot --yolo --autopilot --agent squad -p '<prompt>'` for unattended copilot CLI invocations (per user directive).
+
 - Tamir wants this team to work on distributed systems that integrate AI and agents, not only local prompt orchestration.
 - Durable workflow designs must cover retries, deduplication, compensation, and restart behavior explicitly.
 - ADC execution model requires explicit failure-mode taxonomy. Eight reliability invariants (claim-before-act, terminal states, stale lease TTL, duplicate immunity, ground truth derivation, cancellation respect, idempotent guards, concurrency cap) are non-negotiable. GitHub labels + `.squad/.schedule-state.json` provide sufficient MVP durability for periodic ephemeral model.

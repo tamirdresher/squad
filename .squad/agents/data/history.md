@@ -113,6 +113,8 @@ This session synthesized five coordinated reports into a single onboarding decis
 
 ## Learnings
 
+2026-06-02: Use `copilot --yolo --autopilot --agent squad -p '<prompt>'` for unattended copilot CLI invocations (per user directive).
+
 ### Squad.Agents.AI NuGet — Technical Onboarding (2026-06-02)
 
 Captured timestamp: 2026-06-02T12:04:38.931+03:00.
@@ -357,3 +359,30 @@ Data is the explicit Squad framework expert for this team. Data should learn fro
 - New tests: 5 routing-boundary tests; local suite moved from 14/14 to 19/19 passing.
 - Commit: `3f5e61d6d15e5c603f76d3a6f34acb7f97ca025e` on `tamirdresher/squad` PR #3 branch `feature/squad-agents-ai`.
 - Surprises: `SquadAgent` exposes routing only through SDK object state, so the tests validate the DI-created wrapper by reflecting the inner `CopilotClientOptions` and `SessionConfig`; `AgentName` is metadata on the inner agent while operational routing remains `CliPath`/`CliArgs`/`Cwd`/`Environment`, matching Decision 447.
+
+## Learnings — 2026-06-02 Fresh-Path Two-Layer Baseline (insider.3)
+
+**Test repo:** https://github.com/tamirdresher_microsoft/twolayer-fresh-test-20260602T1146 (private)
+
+### Driver invocation patterns that worked
+- `copilot --yolo --agent squad -p "<prompt>"` is the canonical non-interactive driver. `--yolo` = `--allow-all-tools --allow-all-paths --allow-all-urls`.
+- `--yolo` auto-approves PERMISSION prompts but does NOT auto-respond to `ask_user`. In this run the Squad coordinator never invoked `ask_user` during Init Mode, so no workaround was needed. If a future build adds `ask_user` to Phase 1 confirmation, the driver will hang and the `--no-ask-user` flag becomes necessary (with attendant behaviour change).
+- 5-minute timeout is plenty for most sessions; complex multi-agent sessions (3 spawns + tests) ran ~8 minutes. Size `initial_wait` accordingly.
+
+### Gotchas with the test driver
+- **`squad <subcommand> --help` EXECUTES the subcommand** instead of printing help. `squad init --help` will (re-)initialise squad in CWD. Always test new subcommand flags in a throwaway scratch dir.
+- Insider builds do not lock to a tagged version — re-install with `npm install -g @bradygaster/squad-cli@<version>` is needed to switch between insiders.
+- `squad init` on a repo where `.squad` already partially exists silently "creates" the new state files (Rai agent dir, memory tree) but skips existing ones. This can pollute a working tree if invoked accidentally.
+
+### Two-layer behaviour on insider.3
+- `--state-backend two-layer` flag IS recognised; config.json gets `"stateBackend": "two-layer"` cleanly with no duplicates.
+- `squad-state` orphan branch IS created at init, pushed to remote on first push via the pre-push hook.
+- Sync hooks installed: `pre-push`, `post-merge`, `post-rewrite`, `post-checkout`.
+- MISSING: `pre-commit` and `post-commit` hooks (matches Picard WI-1 prediction).
+- MISSING: `squad_state_*` MCP tools in `.copilot/mcp-config.json`. Coordinator agents (Scribe especially) explicitly detect this via `squad_state_health` check and refuse to hand-write mutable state — GRACEFUL failure but failure nonetheless.
+- Init Mode itself bypasses the runtime bridge and writes `.squad/` files directly to the working tree. So even with two-layer chosen, the working tree comes out dirty on the very first init. This is INSIDER3-INIT-LEAK (new P1 finding).
+- After 6 sessions of real work, the orphan `squad-state` branch still contains only `README.md` — zero state writes ever land on it. `refs/notes/squad/*` is empty too. Net effect: cross-session memory is broken.
+- Branch-switch test (Phase 5 vs Bug #643) passes the surface symptom because state lives in a dirty working tree (which carries across branches), NOT because the orphan branch holds it. `git stash` or `git clean -fdx` would erase everything.
+
+### Bug A re-examination needed
+- Copilot CLI 1.0.57 (well above the 1.0.54 trigger threshold) under `--yolo` — all agent spawns, file edits, shell commands ran cleanly across 6 sessions. Bug A's "all agent ops fail/hang" symptom did NOT manifest. Either `--yolo` bypasses the per-call permission `kind` handler, or the original repro is environment-specific. Before claiming insider.4 "fixes" Bug A, build a focused regression that reproduces the failure WITHOUT `--yolo` first.

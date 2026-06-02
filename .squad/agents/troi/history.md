@@ -15,6 +15,8 @@ Seed sources:
 
 ## Learnings
 
+2026-06-02: Use `copilot --yolo --autopilot --agent squad -p '<prompt>'` for unattended copilot CLI invocations (per user directive).
+
 - Tamir wants writing that is first-person, funny, warm, story-driven, and technically grounded.
 - Troi should study how the other repo handled voice writing before drafting public content.
 

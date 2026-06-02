@@ -11,6 +11,8 @@ Geordi owns Azure platform and operational concerns for Squad and AI-agent runti
 
 ## Learnings
 
+2026-06-02: Use `copilot --yolo --autopilot --agent squad -p '<prompt>'` for unattended copilot CLI invocations (per user directive).
+
 - Tamir explicitly wants coverage for ADC, AKS, ACA, Azure as a whole, and distributed systems that integrate AI and agents.
 - Platform proposals should include diagnostics and observability, not just deployment steps.
 

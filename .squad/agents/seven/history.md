@@ -33,6 +33,10 @@ Seven owns cross-repo learning & signal research. Key learnings:
 ### Squad-Squad Integration Points
 - **Data owns Brady Squad expertise:** Data responsible for learning from `C:\Users\tamirdresher\source\repos\squad` and applying SDK/CLI, coordinator, runtime, template knowledge here.
 
+## 2026-06-02T10:08:11Z — Autopilot Directive (Cross-Agent Update)
+
+2026-06-02: Use `copilot --yolo --autopilot --agent squad -p '<prompt>'` for unattended copilot CLI invocations (per user directive).
+
 ## 2026-05-31T14:03:06.842+03:00 — State-Backend Insider Triage (Parallel with Data)
 
 **Corroboration Summary:** Performed parallel community research on state-backend regressions. Data independently identified P0 permission contract blocker via code diff analysis in `shell/index.ts`. Seven confirmed same P0 via GitHub Issue #1191 (Copilot CLI v1.0.54+ contract change). Both agents recommend urgent fix before insider.3 user testing.
