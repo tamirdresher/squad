@@ -70,6 +70,81 @@ public static class SquadServiceCollectionExtensions
         Action<SquadAgentOptions>? configure = null)
         => AddSquadAgentCore(services, name, lifetime, configure);
 
+    // ── Keyed DI overloads ───────────────────────────────────────────────────
+
+    /// <summary>
+    /// Registers <see cref="SquadAgent"/> as a keyed service with scoped lifetime. Resolve via
+    /// <c>[FromKeyedServices("myKey")] SquadAgent agent</c> or
+    /// <c>provider.GetRequiredKeyedService&lt;SquadAgent&gt;("myKey")</c>.
+    /// </summary>
+    /// <param name="services">Service collection to update.</param>
+    /// <param name="serviceKey">The DI service key for keyed resolution.</param>
+    /// <param name="configure">Optional callback that customizes <see cref="SquadAgentOptions"/> after connection-string binding.</param>
+    /// <returns>The same <paramref name="services"/> instance for chaining.</returns>
+    /// <example>
+    /// <code>
+    /// builder.Services.AddKeyedSquadAgent("research", o => o.SquadFolderPath = @"C:\research-team");
+    /// builder.Services.AddKeyedSquadAgent("platform", o => o.SquadFolderPath = @"C:\platform-team");
+    ///
+    /// // Resolve in a controller or minimal API:
+    /// app.MapGet("/ask", ([FromKeyedServices("research")] SquadAgent agent) => ...);
+    /// </code>
+    /// </example>
+    public static IServiceCollection AddKeyedSquadAgent(
+        this IServiceCollection services,
+        string serviceKey,
+        Action<SquadAgentOptions>? configure = null)
+        => AddKeyedSquadAgentCore(services, serviceKey, name: null, ServiceLifetime.Scoped, configure);
+
+    /// <summary>
+    /// Registers <see cref="SquadAgent"/> as a keyed service with scoped lifetime using a named connection string.
+    /// </summary>
+    /// <param name="services">Service collection to update.</param>
+    /// <param name="serviceKey">The DI service key for keyed resolution.</param>
+    /// <param name="name">Logical Squad name for connection-string lookup. For example, <c>"research"</c> reads <c>ConnectionStrings:squad-research</c>.</param>
+    /// <param name="configure">Optional callback that customizes <see cref="SquadAgentOptions"/> after connection-string binding.</param>
+    /// <returns>The same <paramref name="services"/> instance for chaining.</returns>
+    public static IServiceCollection AddKeyedSquadAgent(
+        this IServiceCollection services,
+        string serviceKey,
+        string name,
+        Action<SquadAgentOptions>? configure = null)
+        => AddKeyedSquadAgentCore(services, serviceKey, name, ServiceLifetime.Scoped, configure);
+
+    /// <summary>
+    /// Registers <see cref="SquadAgent"/> as a keyed service with the specified lifetime.
+    /// </summary>
+    /// <param name="services">Service collection to update.</param>
+    /// <param name="serviceKey">The DI service key for keyed resolution.</param>
+    /// <param name="lifetime">Lifetime used for the keyed agent registration.</param>
+    /// <param name="configure">Optional callback that customizes <see cref="SquadAgentOptions"/> after connection-string binding.</param>
+    /// <returns>The same <paramref name="services"/> instance for chaining.</returns>
+    public static IServiceCollection AddKeyedSquadAgent(
+        this IServiceCollection services,
+        string serviceKey,
+        ServiceLifetime lifetime,
+        Action<SquadAgentOptions>? configure = null)
+        => AddKeyedSquadAgentCore(services, serviceKey, name: null, lifetime, configure);
+
+    /// <summary>
+    /// Registers <see cref="SquadAgent"/> as a keyed service with the specified lifetime using a named connection string.
+    /// </summary>
+    /// <param name="services">Service collection to update.</param>
+    /// <param name="serviceKey">The DI service key for keyed resolution.</param>
+    /// <param name="name">Logical Squad name for connection-string lookup.</param>
+    /// <param name="lifetime">Lifetime used for the keyed agent registration.</param>
+    /// <param name="configure">Optional callback that customizes <see cref="SquadAgentOptions"/> after connection-string binding.</param>
+    /// <returns>The same <paramref name="services"/> instance for chaining.</returns>
+    public static IServiceCollection AddKeyedSquadAgent(
+        this IServiceCollection services,
+        string serviceKey,
+        string name,
+        ServiceLifetime lifetime,
+        Action<SquadAgentOptions>? configure = null)
+        => AddKeyedSquadAgentCore(services, serviceKey, name, lifetime, configure);
+
+    // ── Core implementation (non-keyed) ──────────────────────────────────────
+
     private static IServiceCollection AddSquadAgentCore(
         IServiceCollection services,
         string? name,
@@ -81,17 +156,7 @@ public static class SquadServiceCollectionExtensions
         var optionsName = GetOptionsName(name);
         var connectionStringName = GetConnectionStringName(name);
 
-        // Register connection string configurator FIRST (runs before user callback)
-        services.AddSingleton<IConfigureOptions<SquadAgentOptions>>(sp =>
-            new SquadAgentOptionsConfigurator(
-                sp.GetRequiredService<IConfiguration>(),
-                optionsName,
-                connectionStringName));
-
-        if (configure is not null)
-        {
-            services.Configure(optionsName, configure);
-        }
+        RegisterOptionsInfrastructure(services, optionsName, connectionStringName, configure);
 
         // Register SquadAgent with specified lifetime
         services.Add(new ServiceDescriptor(
@@ -109,6 +174,68 @@ public static class SquadServiceCollectionExtensions
             sp => sp.GetRequiredService<SquadAgent>(),
             lifetime));
 
+        return services;
+    }
+
+    // ── Core implementation (keyed) ──────────────────────────────────────────
+
+    private static IServiceCollection AddKeyedSquadAgentCore(
+        IServiceCollection services,
+        string serviceKey,
+        string? name,
+        ServiceLifetime lifetime,
+        Action<SquadAgentOptions>? configure)
+    {
+        ArgumentNullException.ThrowIfNull(services);
+        ArgumentException.ThrowIfNullOrWhiteSpace(serviceKey);
+
+        // Use the serviceKey as the options name when no explicit name is given
+        var optionsName = GetOptionsName(name ?? serviceKey);
+        var connectionStringName = GetConnectionStringName(name ?? serviceKey);
+
+        RegisterOptionsInfrastructure(services, optionsName, connectionStringName, configure);
+
+        // Register keyed SquadAgent
+        services.Add(new ServiceDescriptor(
+            typeof(SquadAgent),
+            serviceKey,
+            (sp, _) =>
+            {
+                var options = sp.GetRequiredService<IOptionsMonitor<SquadAgentOptions>>().Get(optionsName);
+                return ActivatorUtilities.CreateInstance<SquadAgent>(sp, options);
+            },
+            lifetime));
+
+        // Keyed AIAgent — forwards to keyed SquadAgent
+        services.Add(new ServiceDescriptor(
+            typeof(AIAgent),
+            serviceKey,
+            (sp, _) => sp.GetRequiredKeyedService<SquadAgent>(serviceKey),
+            lifetime));
+
+        return services;
+    }
+
+    // ── Shared options registration ──────────────────────────────────────────
+
+    private static void RegisterOptionsInfrastructure(
+        IServiceCollection services,
+        string optionsName,
+        string connectionStringName,
+        Action<SquadAgentOptions>? configure)
+    {
+        // Register connection string configurator FIRST (runs before user callback)
+        services.AddSingleton<IConfigureOptions<SquadAgentOptions>>(sp =>
+            new SquadAgentOptionsConfigurator(
+                sp.GetRequiredService<IConfiguration>(),
+                optionsName,
+                connectionStringName));
+
+        if (configure is not null)
+        {
+            services.Configure(optionsName, configure);
+        }
+
         // TraceEvents=true → warn because verbose traces can contain sensitive details
         services.AddOptions<SquadAgentOptions>(optionsName)
             .PostConfigure<ILoggerFactory>((opts, loggerFactory) =>
@@ -121,8 +248,6 @@ public static class SquadServiceCollectionExtensions
                         "not recommended for production use.");
                 }
             });
-
-        return services;
     }
 
     private static string GetOptionsName(string? name)

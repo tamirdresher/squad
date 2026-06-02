@@ -8,10 +8,10 @@
 
 Public surface in this preview:
 
-- `SquadAgent` — sealed `AIAgent` wrapper over the Copilot-backed inner agent.
-- `SquadAgentOptions` — team root, CLI path/args, environment, token, logging, and instruction settings.
+- `SquadAgent` — sealed `AIAgent` wrapper over the Copilot-backed inner agent. Supports both non-streaming and streaming via `RunStreamingAsync`.
+- `SquadAgentOptions` — team root, CLI path/args, environment, token, logging, instruction settings, and a `ConfigureCopilotClient` delegate for advanced SDK customization.
 - `SquadConnectionFactory` — parses PATH or `squad://` connection strings into options.
-- `SquadServiceCollectionExtensions` — registers `SquadAgent` and base `AIAgent` in DI.
+- `SquadServiceCollectionExtensions` — registers `SquadAgent` and base `AIAgent` in DI, with standard and keyed overloads.
 
 Repository: <https://github.com/bradygaster/squad>
 
@@ -56,13 +56,77 @@ var response = await squad.RunAsync("What can this Squad team do?", session);
 Console.WriteLine(response.Text);
 ```
 
+## Streaming
+
+`SquadAgent` supports streaming via the MAF `RunStreamingAsync` method. The inner Copilot-backed agent streams response updates as they arrive from the CLI process:
+
+```csharp
+var squad = host.Services.GetRequiredService<SquadAgent>();
+var session = await squad.CreateSessionAsync();
+
+await foreach (var update in squad.RunStreamingAsync("Summarize the team.", session))
+{
+    Console.Write(update.Text);
+}
+```
+
+## Keyed DI
+
+Register multiple Squad teams in the same DI container using .NET 8+ keyed services:
+
+```csharp
+builder.Services.AddKeyedSquadAgent("research", o =>
+{
+    o.SquadFolderPath = @"C:\research-team";
+});
+
+builder.Services.AddKeyedSquadAgent("platform", o =>
+{
+    o.SquadFolderPath = @"C:\platform-team";
+});
+
+// Resolve in a minimal API endpoint:
+app.MapGet("/ask-research", async ([FromKeyedServices("research")] SquadAgent agent) =>
+{
+    var session = await agent.CreateSessionAsync();
+    var response = await agent.RunAsync("What's the latest?", session);
+    return response.Text;
+});
+```
+
+Keyed registrations include `AddKeyedSquadAgent` overloads for service key, optional connection-string name, and lifetime. Keyed and non-keyed registrations can coexist.
+
+## Advanced: ConfigureCopilotClient (BYOK)
+
+Use `ConfigureCopilotClient` to customize the underlying `CopilotClientOptions` after Squad applies its standard values. This is the extension point for injecting custom environment variables, providing a BYOK token, or tuning SDK settings:
+
+```csharp
+builder.Services.AddSquadAgent(o =>
+{
+    o.SquadFolderPath = @"C:\team";
+    o.ConfigureCopilotClient = clientOpts =>
+    {
+        // Inject a BYOK token from your own credential store
+        clientOpts.GitHubToken = myVault.GetSecret("copilot-token");
+
+        // Add custom environment variables for the CLI process
+        clientOpts.Environment = new Dictionary<string, string>
+        {
+            ["MY_CUSTOM_VAR"] = "value"
+        };
+    };
+});
+```
+
+> **Routing guard:** Squad enforces a hard routing gate — if the delegate changes `Cwd`, `CliPath`, or `CliArgs`, the original values are restored and a warning is logged. Configure these via `SquadAgentOptions` instead.
+
 ## GitHub Copilot authentication
 
 The default path mirrors the base GitHub Copilot SDK examples: leave `GitHubToken` and `GitHubTokenProvider` unset, then run with a locally signed-in GitHub Copilot user. For local development, sign in before running the app, for example with `gh auth login`, the Copilot CLI sign-in flow, or a Copilot-supported local sign-in that the SDK runtime can access.
 
 The SDK documents the credential priority order in [Authenticate Copilot SDK](https://github.com/github/copilot-sdk/blob/main/docs/auth/authenticate.md) and the broader [authentication overview](https://github.com/github/copilot-sdk/blob/main/docs/auth/index.md). Explicit tokens and environment variables are supported by the SDK, but they are not required for the minimal happy path.
 
-Use `GitHubTokenProvider` only when the host owns token retrieval, such as Key Vault, managed identity, or CI secret flow scenarios. Use `GitHubToken` only when you already have a Copilot-supported token in process and cannot use a provider callback. In both cases, treat these as advanced escape hatches and never hardcode tokens.
+Use `GitHubTokenProvider` only when the host owns token retrieval, such as Key Vault, managed identity, or CI secret flow scenarios. Use `GitHubToken` only when you already have a Copilot-supported token in process and cannot use a provider callback. Use `ConfigureCopilotClient` when you need full control over the SDK's `CopilotClientOptions`, including BYOK token injection.
 
 ## Aspire / configuration path
 
@@ -86,17 +150,26 @@ Parsed URI query keys: `teamRoot`, `cliPath`, `cwd`, `cliArgs` (semicolon-separa
 | `SquadFolderPath` | Squad team root; PATH connection strings set this and `Cwd`. |
 | `CliPath` / `CliArgs` | Override the Copilot CLI executable and add extra CLI flags. |
 | `Cwd` | Working directory for the Copilot CLI process; defaults to `SquadFolderPath`. |
-| `Environment` | Additional environment variables for the CLI process. Avoid user-controlled values. |
-| `GitHubToken` | Advanced direct token escape hatch; redacted by `ToString()`. |
+| `Environment` | Additional environment variables for the CLI process. Excluded from JSON serialization; token-pattern keys are redacted in `ToString()`. |
+| `GitHubToken` | Advanced direct token escape hatch; excluded from JSON serialization and redacted by `ToString()`. |
 | `GitHubTokenProvider` | Advanced callback for secure token retrieval; wins over `GitHubToken`. |
+| `ConfigureCopilotClient` | Advanced delegate for customizing `CopilotClientOptions`. Routing properties are guarded; see BYOK section. |
 | `TraceEvents` | Enables verbose SDK logging and emits a startup warning when enabled. |
 | `AgentName` | Display name for the resulting `AIAgent`; defaults to `Squad`. |
 | `Instructions` | Optional system instructions passed to the inner Copilot agent. |
 
+## Security
+
+- **Credential redaction:** `GitHubToken` and `Environment` values whose keys match `*TOKEN*`, `*KEY*`, `*SECRET*`, `*HMAC*`, `*PASSWORD*`, or `*CREDENTIAL*` are always redacted in `ToString()` output.
+- **JSON safety:** `GitHubToken`, `GitHubTokenProvider`, `Environment`, and `ConfigureCopilotClient` are marked `[JsonIgnore]` and will not appear in JSON serialization output.
+- **Routing guard:** The `ConfigureCopilotClient` delegate cannot change `Cwd`, `CliPath`, or `CliArgs` — changes are silently restored to prevent routing the agent to an unintended CLI process.
+- **TraceEvents warning:** Enabling `TraceEvents` logs a startup warning because verbose SDK traces may include sensitive operational details.
+- **Avoid hardcoded tokens:** Never embed tokens in source code. Use `GitHubTokenProvider` for production token retrieval from Key Vault, managed identity, or similar secure stores.
+
 ## Notes for v0.1-preview
 
 - Default DI lifetime is scoped. An overload accepts any `ServiceLifetime`.
-- DI registers both `SquadAgent` and base `AIAgent`.
+- DI registers both `SquadAgent` and base `AIAgent` (non-keyed). Keyed DI registers both `SquadAgent` and `AIAgent` under the same key.
 - Multi-targeting and Aspire telemetry remain candidates for a later preview.
 - The package does not validate that `SquadFolderPath` exists; consumers should validate their deployment paths.
 - `TraceEvents` can log sensitive operational details. Keep it off unless debugging.

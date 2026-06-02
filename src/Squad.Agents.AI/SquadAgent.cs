@@ -65,8 +65,21 @@ public sealed class SquadAgent : AIAgent, IAsyncDisposable
             options.AgentName, options.SquadFolderPath);
     }
 
+    // ── Extensibility seam ──────────────────────────────────────────────
+    // CreateCopilotClient is the single factory method that translates
+    // SquadAgentOptions into a live CopilotClient. Three extension points
+    // feed into it:
+    //   1. GitHubTokenProvider / GitHubToken — credential override.
+    //   2. ConfigureCopilotClient — BYOK delegate for advanced SDK tuning.
+    //   3. Connection-string binding (handled before this method by the
+    //      SquadAgentOptionsConfigurator).
+    // Any future credential-store or model-property hooks should integrate
+    // through SquadAgentOptions and be applied inside this method.
+    // ────────────────────────────────────────────────────────────────────
     private static CopilotClient CreateCopilotClient(SquadAgentOptions options, ILoggerFactory? loggerFactory)
     {
+        var logger = loggerFactory?.CreateLogger<SquadAgent>();
+
         // Resolve token: provider takes precedence over direct property
         string? resolvedToken = null;
         if (options.GitHubTokenProvider is not null)
@@ -108,6 +121,60 @@ public sealed class SquadAgent : AIAgent, IAsyncDisposable
         if (options.TraceEvents && loggerFactory != null)
         {
             clientOptions.Logger = loggerFactory.CreateLogger<CopilotClient>();
+        }
+
+        // ── BYOK / ConfigureCopilotClient delegate ─────────────────────
+        // Allow consumers to customize the CopilotClientOptions after Squad
+        // applies its standard values. After the delegate runs, snapshot and
+        // restore routing-critical properties to prevent accidental or
+        // malicious changes that would route the agent to a different CLI
+        // process. (Picard Condition 1: hard routing gate.)
+        if (options.ConfigureCopilotClient is not null)
+        {
+            // Snapshot routing properties before the delegate runs
+            var snapshotCwd = clientOptions.Cwd;
+            var snapshotCliPath = clientOptions.CliPath;
+            var snapshotCliArgs = clientOptions.CliArgs;
+
+            options.ConfigureCopilotClient(clientOptions);
+
+            // Restore routing properties if changed (SC-3: post-delegate warning)
+            bool restored = false;
+            if (!string.Equals(clientOptions.Cwd, snapshotCwd, StringComparison.Ordinal))
+            {
+                logger?.LogWarning(
+                    "ConfigureCopilotClient delegate changed Cwd from '{Original}' to '{Changed}'; " +
+                    "restoring original value to preserve Squad routing.",
+                    snapshotCwd, clientOptions.Cwd);
+                clientOptions.Cwd = snapshotCwd;
+                restored = true;
+            }
+
+            if (!string.Equals(clientOptions.CliPath, snapshotCliPath, StringComparison.Ordinal))
+            {
+                logger?.LogWarning(
+                    "ConfigureCopilotClient delegate changed CliPath from '{Original}' to '{Changed}'; " +
+                    "restoring original value to preserve Squad routing.",
+                    snapshotCliPath, clientOptions.CliPath);
+                clientOptions.CliPath = snapshotCliPath;
+                restored = true;
+            }
+
+            if (!ReferenceEquals(clientOptions.CliArgs, snapshotCliArgs))
+            {
+                logger?.LogWarning(
+                    "ConfigureCopilotClient delegate replaced CliArgs; " +
+                    "restoring original value to preserve Squad routing.");
+                clientOptions.CliArgs = snapshotCliArgs;
+                restored = true;
+            }
+
+            if (restored)
+            {
+                logger?.LogWarning(
+                    "One or more routing properties were restored after ConfigureCopilotClient delegate ran. " +
+                    "To set Cwd, CliPath, or CliArgs, configure them on SquadAgentOptions instead.");
+            }
         }
 
         return new CopilotClient(clientOptions);
