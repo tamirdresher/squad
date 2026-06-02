@@ -140,3 +140,15 @@ Confirms all 7 tools registered correctly. The bug is **config-level**, not code
 1. Land #1200 → close #1192.
 2. Consider unifying the duplicated `buildMcpServerSpecs` between `squad-sdk/init.ts` and `squad-cli/upgrade.ts` in a future PR — they drift easily.
 3. Iteration 2 has no remaining punted bugs from the original bundle. Any new bugs surfaced during downstream validation should open fresh issues.
+
+
+---
+
+## Iteration 3 final addendum (2026-06-02)
+
+After the iter-3 re-smoke surfaced that the SDK `init.ts` skips `.copilot/mcp-config.json` rewrite via `writeIfNotExists` semantics, the MCP retrofit helper was wired into `squad init` in addition to `runEnsureChecks`.
+
+- **New commit:** `a0fa7e3e` on `squad/state-backend-upgrade-fixes` — ix(init): wire ensureSquadStateMcpPinned into 'squad init' too
+- **Tarballs at:** `0.9.6-preview.5` (twin)
+- **Final re-smoke (travel + sudoku, fresh clones, seeded stale mcp-config):** GAP-1 ✅ closed · GAP-2 ✅ closed (insert path verified on init) · GAP-3 ➖ workaround + #1203 follow-up
+- **Verdict:** 🟢 GO for the remaining 4-repo validation. See `TARBALL-SMOKE-ITERATION-3-VERDICT.md`.
