@@ -4,6 +4,14 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+## [0.1.0-preview] - 2026-06-02
+
+### Added — Squad.Agents.AI NuGet preview
+- Added `Squad.Agents.AI`, a `net10.0` Microsoft Agent Framework package that exposes a Squad team as an `AIAgent`.
+- Public surface: `SquadAgent`, `SquadAgentOptions`, `SquadConnectionFactory`, and `SquadServiceCollectionExtensions`.
+- Added DI registration, PATH/URI connection-string parsing, GitHub token/provider options, and XML documentation for the public preview surface.
+- Documented PR #3 lineage for the v0.1-preview package in `src/Squad.Agents.AI/README.md`.
+
 ## [0.9.0] - 2026-03-23
 
 ### Added — Personal Squad Governance Layer
