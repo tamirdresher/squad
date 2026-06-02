@@ -32,3 +32,44 @@ Data authored 11-auth-mode inventory for Squad.Agents.AI expansion (Decision cle
 ---
 **Last Updated:** 2026-06-02T10:50:37Z  
 **Archive:** `.squad/agents/seven/history-archive.md` (comprehensive baseline + state-backend triage)
+
+## 2026-06-02T22:22:40+03:00 — Copilot CLI MCP config paths verified (issue #3642)
+
+**Question:** Is @caarlos0's claim accurate that project MCP settings are loaded from .mcp.json, not .copilot/mcp-config.json?
+
+**Verdict:** Accurate.
+
+**Sources:**
+- copilot --version -> `GitHub Copilot CLI 1.0.58`
+- copilot mcp --help (run locally 2026-06-02) — authoritative output:
+  ```
+  Configuration is loaded from multiple sources:
+    User       ~/.copilot/mcp-config.json
+    Workspace  .mcp.json
+    Plugin     Installed plugins with MCP servers
+  ```
+
+## 2026-06-02T22:51:18+03:00 — MCP Config Precedence-Order Re-spawn Pending
+
+**Picard requested narrow follow-up** (per Picard's decision in `.squad/decisions/inbox/picard-mcp-json-migration-scope.md` Q3) on precedence-order semantics before Data writes the merge helper's conflict-resolution policy:
+
+**Three empirical questions to resolve:**
+1. Given same server name in both `.mcp.json` (workspace) and `~/.copilot/mcp-config.json` (user), which wins at dispatch time? (Workspace expected)
+2. Are server entries from two files merged (union) or does one source shadow the other entirely?
+3. What does Copilot CLI do if `.mcp.json` is malformed — fall back to user file or hard-fail?
+
+**Deliverable:** 1-page decision at `.squad/decisions/inbox/seven-mcp-config-precedence.md` with three reproducible test commands + outputs on Copilot CLI 1.0.58+. Time-box: 30 min.
+
+**Status:** Pending re-spawn. Picard has Data holding on merge-helper implementation until Seven's results land.
+- https://github.com/github/copilot-cli/issues/3642 — maintainer @caarlos0 reply
+- https://github.com/github/copilot-cli README — documents LSP config paths (~/.copilot/lsp-config.json, .github/lsp.json) but NOT MCP paths; copilot mcp --help is the authoritative source.
+
+**Key findings:**
+- Auto-loaded project-local MCP path: `.mcp.json` at repo root (only one).
+- `.copilot/mcp-config.json` at repo root is NOT auto-loaded — only honored via `--additional-mcp-config`.
+- No `.vscode/mcp.json` / `.cursor/mcp.json` auto-load.
+- User-level: `~/.copilot/mcp-config.json`. Plugin-level: bundled with installed plugins.
+
+**Implication for squad-cli:** Current workaround --additional-mcp-config @./.copilot/mcp-config.json targets a non-standard path. Migration = move file to `./.mcp.json` and drop the flag. Decision written to `.squad/decisions/inbox/seven-mcp-config-paths-verified.md`.
+
+**Caveats:** Verified on 1.0.58 / Windows. Precedence among User/Workspace/Plugin not stated in help; re-verify after CLI upgrades.

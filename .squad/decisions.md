@@ -4974,3 +4974,840 @@ The coordinator will run Workstream Discovery, resolve `WORKSTREAM_PATH`, pass b
 ---
 
 *Handoff complete. Next action: Picard reviews this PR; Tamir activates by setting `SQUAD_WORKSTREAM=squad-agents-ai`.*
+
+--- Inbox Merge Session 2026-06-02T23-50Z ---
+
+---
+
+# Decision: 6-Repo Tarball Validation — Final Synthesis Delivered
+
+**Date:** 2026-06-02T19:39:52+03:00
+**Author:** Data
+**Audience:** Tamir Dresher, Coordinator, downstream Squad leads
+
+## Decision
+
+Final synthesis report for PR #1200 (combined fix bundle, `squad/state-backend-upgrade-fixes` @ `a0fa7e3e`) delivered.
+
+## Recommendation
+
+🟡 **MERGE-AFTER-ITER-4** — preferred path; ~70 LOC across 3 files + 3 tests, < 1 day of focused work to close the last user-visible gap (MCP runtime ETARGET on unpublished version pin).
+
+Alternative if release urgency dominates: ✅ **MERGE-NOW + open bradygaster/squad#1204 as P0 day-1 follow-up**. Defensible because end-user state persistence still works via the hook-sync path (Data-11 proof on wasserman).
+
+## Iteration 4 items (concrete, scoped, surgical)
+
+1. **MCP pin ETARGET** — `packages/squad-cli/src/cli/core/upgrade.ts:705`, ~40 LOC, Option A from Data-15's RCA (`MCP-LOADER-ROOT-CAUSE.md`).
+2. **EPERM-doesn't-abort-migration** — `packages/squad-cli/src/cli-entry.ts`, ~20 LOC, split self-upgrade failure from backend migration.
+3. **NTFS colon-in-filename sanitizer** — log/decision filename formatter, ~10 LOC.
+
+## Artifacts
+
+- **Final report:** `.squad/files/validation/6REPO-TARBALL-VALIDATION-FINAL.md`
+- **Blob (after push):** https://github.com/tamirdresher_microsoft/squad-squad/blob/master/.squad/files/validation/6REPO-TARBALL-VALIDATION-FINAL.md
+- **Raw (after push):** https://raw.githubusercontent.com/tamirdresher_microsoft/squad-squad/master/.squad/files/validation/6REPO-TARBALL-VALIDATION-FINAL.md
+- **Sources synthesized:** 6 per-repo TARBALL-*.md reports, MCP-LOADER-ROOT-CAUSE.md, COMBINED-FIX-BRANCH-MANIFEST.md, TWOLAYER-BASELINE-INSIDER3-CONSOLIDATED.md
+
+## Sign-off
+
+Pending Tamir's read and GO/NO-GO call.
+
+
+---
+
+# Decision — Alias Experiment Verdict (Data-15 Option A is not the fix; deeper config-loading issue uncovered)
+
+**Author:** Data
+**Date:** 2026-06-02T19:39:52.894+03:00
+**Subject:** Empirical proof that the MCP runtime gap is NOT the npx ETARGET pin alone — Copilot CLI 1.0.58 does not auto-load project-level `.copilot/mcp-config.json` at all.
+**Type:** Validation finding (re-frames iter-4 scope)
+**References:** `validation/ALIAS-EXPERIMENT-VERDICT.md`, `validation/MCP-LOADER-ROOT-CAUSE.md` (Data-15), `validation/6REPO-TARBALL-VALIDATION-FINAL.md`, bradygaster/squad PR #1200
+
+## What I tested
+
+Patched the `squad_state` entry in `.copilot/mcp-config.json` on the post-upgrade `tamir-squad-hq-tarball-test-20260602T183202` dup, replacing the npx-pinned launch (`npx -y @bradygaster/squad-cli@0.9.6-preview.5 state-mcp`, which ETARGETs because `0.9.6-preview.5` is unpublished) with the bare alias `squad state-mcp`. Then escalated to absolute path + full config shape. Ran two `copilot --yolo --autopilot --agent squad -p ...` sessions per attempt.
+
+## What I found
+
+1. **Bare alias / absolute path / full shape — none of them made `squad_state_*` tools callable.** Lead reported zero tools, Scribe refused to spawn, orphan stayed at 2 commits.
+2. **Debug-logging Copilot CLI 1.0.58 revealed the real cause:** Only servers from user-level `~/.copilot/mcp-config.json` were loaded. The 3 project-only entries (`squad_state`, `bitwarden-shadow`, `EXAMPLE-trello`) were silently dropped. **The project-level config file is not auto-loaded.**
+3. **Confirmed the fix path** by running copilot with `--additional-mcp-config "<project config json>"` flag. All 7 `squad_state_*` tools registered, Q called `squad_decide`, Scribe persisted everything, **orphan grew 2 → 10 commits in one session**.
+
+## Implication
+
+**Data-15 Option A (ETARGET HEAD-check + dist-tag fallback) is necessary but not sufficient.** Even if the launch spec were valid, Copilot CLI never reads the file containing it. iter-4 needs to do one of:
+
+1. **A1 (recommended):** Have squad wrap copilot invocations with `--additional-mcp-config` carrying the project config. Combine with Data-15 Option A on the launch-spec content. ~60–90 LOC.
+2. **A2:** Write `squad_state` into user-level `~/.copilot/mcp-config.json` instead of project-level. Mechanically simple; bad UX (cross-project pollution, can't be committed).
+3. **A4 (parallel):** File upstream issue at github/copilot-cli asking whether project-level auto-load is intended or a regression in 1.0.58.
+
+Drop Data-15 Option A as a *standalone* fix.
+
+## Side findings
+
+- `squad ensure` command referenced in the prompt does **not exist** (`✗ Unknown command: ensure`). Either renamed or never shipped. Worth adding as an explicit config-only re-pin subcommand for operator scenarios like this.
+- StateBackendStorageAdapter wrote keys as absolute paths rooted at the canonical TEAM_ROOT (`~/tamresearch1`) rather than the dup's `.squad/`. Worked, but keys are non-portable. Separate concern, not blocking.
+
+## Action items
+
+- iter-4 plan: pivot from Data-15 Option A alone to A1 + A4. Re-estimate effort (~60–90 LOC + 1 test file + 1 upstream issue).
+- Add `squad ensure` (config-only re-pin) to backlog.
+- Re-test plan: same 4-session continuity on `tamir-squad-hq-tarball-test-20260602T183202`; pass = `git log squad-state --oneline | wc -l >= 3` AND `squad_state_health` succeeds in agent inventory without the manual `--additional-mcp-config` flag.
+
+## Revert
+
+Manual JSON restore (since `squad ensure` doesn't exist) — diff vs preimage is empty, dup is back to canonical post-upgrade state.
+
+
+---
+
+### 2026-06-02T21-30-00Z: Data — iter-4 combined-fix bundle complete (end-to-end working)
+
+**Author**: Data (under Copilot CLI orchestration)
+**Branch**: `squad/state-backend-upgrade-fixes`
+**Head SHA**: `e839da6f`
+**PR**: [bradygaster/squad#1200](https://github.com/bradygaster/squad/pull/1200)
+**Tarballs**:
+- `C:\Users\tamirdresher\squad-validation\bradygaster-squad-sdk-combined-fixes.tgz` (~787 KB)
+- `C:\Users\tamirdresher\squad-validation\bradygaster-squad-cli-combined-fixes.tgz` (~570 KB)
+**Upstream issue**: [github/copilot-cli#3642](https://github.com/github/copilot-cli/issues/3642)
+**Version shipped**: `0.9.6-preview.8` (build auto-bumped from preview.6)
+
+**6 fixes landed:**
+
+1. **MCP-NOT-AUTOLOADED** — Copilot CLI 1.0.58 silently ignores project `.copilot/mcp-config.json`. Wrapped all 10 `copilot` spawn sites with `--additional-mcp-config @<path>`. New helper `packages/squad-cli/src/cli/core/copilot-invocation.ts`.
+
+2. **REGISTRY-PIN-UNPUBLISHED** — `ensureSquadStateMcpPinned` no longer pins to an unpublished CLI version. New `npm-registry.ts` HEAD-checks the public registry (2s timeout, per-process cache); `resolveSquadStateMcpSpec` falls back to `@insider` when version not published.
+
+3. **EPERM-ABORTS-MIGRATION** — `squad upgrade --self --state-backend two-layer` no longer skips the migration when self-upgrade hits EPERM (Windows). `cli-entry.ts` tracks `selfUpgradeFailed` and runs the migration regardless, then exits non-zero if any step failed.
+
+4. **TIMESTAMP-COLON-LEAK** — Scribe + after-agent templates now explicitly instruct agents to replace `:` with `-` in `{timestamp}` filename portions so emitted filenames are valid on Windows.
+
+5. **CI test repair (3 tests)** — `KNOWN_UNWIRED` emptied; help line-cap 130→150; init.test.ts pinned-args assertion relaxed to regex.
+
+6. **3 new test files** — covering iter-4 helpers and the EPERM control-flow refactor.
+
+**Validation**:
+- ✅ `npm run build` clean
+- ✅ Targeted vitest: 83/83 + 15/15 green
+- ✅ Twin tarballs re-packed and mirrored to validation dir
+- ✅ PR #1200 body updated with iter-4 section
+- ✅ Upstream Copilot CLI bug filed (#3642)
+- ⚠ Policy Gates will reject `0.9.6-preview.8` — `skip-version-check` label needed
+
+**Open follow-ups** (out of scope for this PR):
+- #1203 release pipeline (atomic SDK+CLI publish)
+- Land #1200 → close #1192
+- Future PR: unify `buildMcpServerSpecs` between SDK init.ts and CLI upgrade.ts
+
+
+---
+
+# Decision Drop — Re-validation iter-4 on tamir-squad-hq (WORST-CASE)
+
+**Author:** Data
+**Date:** 2026-06-02T21:50:00+03:00
+**Subject:** End-to-end re-validation of `0.9.6-preview.9` twin tarballs (`squad/state-backend-upgrade-fixes`) against Tamir's actual HQ repo — the worst-case test target.
+
+---
+
+## Decision requested
+
+**Topic:** Ship gate for the build-time fix bundle (twin tarballs `0.9.6-preview.9`) vs. iter-5 scope (close direct-invocation runtime gap).
+
+**Recommendation:**
+
+- 🟢 **MERGE the build-time fix bundle now.** All Gap-2 / Registry-Pin / EPERM / Migration / Hooks / Workflow fixes work end-to-end on the worst-case repo. All 5 pre-existing user MCP servers preserved verbatim; squad_state retrofitted in the iter-4 dist-tag form (`@bradygaster/squad-cli@insider`).
+- 🟡 **OPEN iter-5 ticket** to ship `squad copilot <args...>` wrapper that pre-mixes `--additional-mcp-config @<teamRoot>/.copilot/mcp-config.json`, and document it as the canonical end-user entry point. Without this, the 4-session orphan-growth proof remains failing for end users because they invoke `copilot` directly (not via squad-spawned process). Track in parallel with upstream github/copilot-cli#3642.
+
+---
+
+## Evidence (all on dup https://github.com/tamirdresher_microsoft/tamir-squad-hq-tarball-test-iter4-20260602T213310 under `validation/`)
+
+| Claim | Evidence |
+|---|---|
+| 5 user MCP servers preserved | `pre-mcp-config.json` vs `post-mcp-config.json` — 5 original entries byte-identical; one new `squad_state` block inserted |
+| squad_state in iter-4 form (resolvable) | `"args": ["-y", "@bradygaster/squad-cli@insider", "state-mcp"]` — dist-tag, not pinned to unpublished version |
+| 18 state files migrated (decisions.md + 17 histories) | `upgrade-stdout.log` enumerates all 18; `git ls-tree squad-state` confirms presence; working tree empty of mutable state |
+| EPERM did not abort state-backend migration | `upgrade-stdout.log` shows EPERM at line ~5, then "Continuing with --state-backend migration", then full migration success, then exit 1 reasserting the self-upgrade failure |
+| 6 hooks installed | `git/hooks` listing in `RE-VAL-iter4-tamir-squad-hq.md` |
+| `stateBackend: two-layer` appended, other config preserved | `post-config.json` — `teamRoot`, `peers`, `devbox`, `machineId` all intact |
+| Orphan SHA timeline: 4/4 sessions zero growth | `orphan-timeline.txt` — `deb2d49b` × 8 (pre/post for each of 4 sessions) |
+| MCP-RUNTIME unavailable across sessions | `session{2,3,4}-transcript.log` — explicit "tools unavailable" / "aren't bound" / "no bridge available" messages from coordinator |
+
+---
+
+## What changed since alias experiment (data-16)
+
+The alias experiment patched the live `squad_state` MCP block to bare `squad state-mcp` and proved the deeper bug: Copilot 1.0.58 doesn't load project mcp-config at all. This re-validation runs the **full ship path** (squad upgrade auto-installs iter-4 launch spec) and confirms:
+
+- Build-time gates: iter-4 retrofit produces a **correct, resolvable** spec (vs. the unpublished pin from iter-3 that would ETARGET if npx ever evaluated it).
+- Runtime gate: the fix is necessary-but-still-not-sufficient because the canonical entry point bypasses the wrapper.
+
+This is the **second independent confirmation** of the gap and shifts iter-5 scope from "investigate" to "ship the wrapper subcommand".
+
+
+---
+
+# Decision Drop — Data RE-VAL iter-4 / holocaust-research-wasserman
+
+**Author:** Data (re-val 3/6 parallel batch)
+**Date:** 2026-06-02T21:33:08+03:00
+**Repo:** `tamirdresher/holocaust-research-wasserman` (PRIVATE, cross-org, 578 MB)
+**Tarballs:** `bradygaster-squad-{sdk,cli}-combined-fixes.tgz` @ `0.9.6-preview.8`
+**Status proposed:** `proposed`
+
+## Recommendation
+
+🟢 **GO** on iter-4 for the two bugs this repo originally surfaced:
+- **EPERM-NO-SHORTCIRCUIT** — FIXED & confirmed in the exact failure environment that surfaced it in iter-3. `squad upgrade --self --state-backend two-layer` completes the project upgrade + state migration BEFORE surfacing the self-upgrade EPERM as a deferred non-zero-exit warning. 10 state files migrated; backend flipped to two-layer; hooks installed.
+- **REGISTRY-PIN-UNPUBLISHED** — FIXED. Log line `ensured squad_state pinned to @bradygaster/squad-cli@insider` proves the HEAD-check fallback to `@insider` dist-tag works when the requested preview version isn't published.
+
+⚠️ **HOLD** on declaring MCP-NOT-AUTOLOADED fully fixed:
+- The iter-4 wrapper only injects `--additional-mcp-config` on copilot spawns initiated from inside squad-cli. The **canonical user invocation** (`copilot --yolo --autopilot --agent squad -p "..."`) is not wrapped. Result: orphan grew **0 commits across 3 sessions**, and direct MCP probe returns "no tools prefixed with squad_state_*".
+
+## Orphan SHA timeline (FRESH init)
+
+```
+pre-S1:  2dd3d02655ffea410ee75baf31195f5375ccd8bb
+post-S1: 2dd3d02655ffea410ee75baf31195f5375ccd8bb  (Δ0)
+post-S2: 2dd3d02655ffea410ee75baf31195f5375ccd8bb  (Δ0)
+post-S3: 2dd3d02655ffea410ee75baf31195f5375ccd8bb  (Δ0)
+Net:                                                0
+```
+
+## Bug verdict (iter-4 on this repo)
+
+- ✅ EPERM-NO-SHORTCIRCUIT
+- ✅ REGISTRY-PIN-UNPUBLISHED
+- ⚠️ MCP-NOT-AUTOLOADED (partial — covers squad-cli spawns, not direct user `copilot` invocations)
+- ➖ TIMESTAMP-COLON-LEAK (not triggered this run)
+- ➖ 7 iter-1/2/3 fixes stable / no regression
+
+**Score: 8 ✅ / 1 ⚠️ / 1 ➖**
+
+## Proposed iter-5 work
+
+Pick one of these to close the MCP gap for canonical user invocations:
+
+1. **`squad copilot ...` shim subcommand** that internally execs `copilot --additional-mcp-config @<teamRoot>/.copilot/mcp-config.json "$@"`. Update README + squad.agent.md guidance to recommend it. ~15 LOC.
+2. **Write `squad_state` entry into user-level `~/.copilot/mcp-config.json`** during init/upgrade. Mechanically simplest but cross-project pollution (every Copilot session everywhere would try to start the project's state-mcp). Trade-off documented in Data-16 alias experiment as A2.
+3. **Wait on github/copilot-cli#3642** for upstream auto-load fix; document the workaround as transitional.
+
+Recommendation: **option 1** (shim subcommand). Lowest blast radius, preserves project isolation, can ship in iter-5 same-week.
+
+## Reports
+
+- Per-repo report: `<primary-dup>/validation/RE-VAL-iter4-holocaust-research-wasserman.md`
+- Mirror in squad-squad: `.squad/files/validation/REVAL-ITER4-holocaust-research-wasserman.md`
+- Primary dup: https://github.com/tamirdresher_microsoft/holocaust-research-wasserman-tarball-test-iter4-20260602T213308
+- Upgrade dup: https://github.com/tamirdresher_microsoft/holocaust-research-wasserman-upgrade-test-iter4-20260602T213308
+
+## Auth state
+
+Restored to `tamirdresher_microsoft` on tool exit (verified via `gh auth switch`).
+
+
+---
+
+# Decision drop — Data re-validation iter-4 / gh-ai-adoption2026
+
+**Author:** Data (cohort 4/6)
+**Date:** 2026-06-02T20:30+03:00
+**Bundle under test:** `bradygaster-squad-{sdk,cli}-combined-fixes.tgz` — CLI stamped `0.9.6-preview.9` (re-pack after manifest header was written for preview.8); installed under isolated `.npm-prefix-ghai-iter4`.
+**Target repo:** tamirdresher/gh-ai-adoption2026 (personal — cross-org clone).
+**Dups:**
+- Fresh: https://github.com/tamirdresher_microsoft/gh-ai-adoption2026-tarball-test-iter4-20260602T213308
+- Upgrade: https://github.com/tamirdresher_microsoft/gh-ai-adoption2026-tarball-upgrade-iter4-20260602T213308
+
+## Verdict
+
+🟢 **GO** on build-time fixes — fresh init two-layer + upgrade-to-two-layer both clean. REGISTRY-PIN-UNPUBLISHED fix (iter-4 Option A) empirically verified: mcp-config retrofit fell back to `@bradygaster/squad-cli@insider` because `0.9.6-preview.9` is not on npm. 8 mutable state files lifted onto orphan during upgrade. All 6 hooks installed.
+
+🔴 **MCP-RUNTIME unresolved** for the directive's canonical invocation pattern `copilot --yolo --autopilot --agent squad -p "..."`. Orphan SHA timeline: `f5f7a48f → f5f7a48f → f5f7a48f → f5f7a48f` (0 commits across 3 sessions). Scribe and Coordinator self-reported the bridge missing in two of three sessions; third session refused to spawn Scribe because the pre-check would fail.
+
+## Why
+
+Iter-4 wrap-fix injects `--additional-mcp-config @<teamRoot>/.copilot/mcp-config.json` only on 10 internal spawn sites (watch/index, 6 watch capabilities, loop, copilot-bridge start, start PTY). User-launched `copilot` is **not** one of them. The validation-directive invocation pattern bypasses the wrapper entirely.
+
+## Bug matrix
+
+| Bug | Verdict |
+|---|:-:|
+| UPGRADE-FLAG-IGNORED + UPGRADE-NO-MIGRATION | ✅ |
+| WI-1 commit hooks | ✅ |
+| MCP-BRIDGE-PINNED (init) | ✅ |
+| INSIDER3-INIT-LEAK | ✅ |
+| GAP-1 `squad sync` registered | ✅ |
+| GAP-2 MCP retrofit insert | ✅ |
+| REGISTRY-PIN-UNPUBLISHED (iter-4) | ✅ |
+| UPGRADE-EPERM-FALSE-SUCCESS | n.a. |
+| EPERM-ABORTS-MIGRATION decouple (iter-4) | n.a. |
+| TIMESTAMP-COLON-LEAK (iter-4) | n.a. |
+| **MCP-RUNTIME via direct-copilot pattern** | 🔴 |
+
+## Iter-5 ask (Brady / SDK owner)
+
+1. Add `squad copilot <args>` (or `squad shell`) — thin exec wrapper that pre-mixes `--additional-mcp-config @<teamRoot>/.copilot/mcp-config.json`. ~20 LOC + help text + 1 test. Documented as the recommended user-direct entry point until upstream auto-load lands.
+2. Track github/copilot-cli#3642. If 1.0.59+ auto-loads project mcp-config, the iter-4 wrap + the new subcommand both become no-op compatibility shims.
+3. Until either lands, downstream README/CHANGELOG needs an explicit warning: bare `copilot --agent squad` on two-layer/orphan backends silently no-ops state mutations.
+
+## Artifacts
+
+- Mirror report: `.squad/files/validation/REVAL-ITER4-gh-ai-adoption2026.md`
+- Per-dup artifacts: `<dup-A>/validation/{10..27}-*` (10-init, 11-pre-orphan-sha, 12-mcp-config-iter4, 13/14/15-versions, 20-session1.log, 21-post-session1-sha, 22-session1-orphan-commits, 23-session2.log, 24-post-session2-sha, 25-session3.log, 26-post-session3-sha, 27-orphan-sha-timeline)
+- Upgrade log + sha: `<dup-B>/validation/{30-upgrade.log, 31-post-upgrade-sha.txt}`
+
+## Auth
+
+Restored to `tamirdresher_microsoft` per closing requirement.
+
+
+---
+
+# Decision drop — Data — Re-Val iter-4 on multiplayer-sudoku
+
+**Date:** 2026-06-02T21:33:10+03:00
+**Author:** Data (Squad Framework Expert)
+**Subject:** Iteration-4 tarball validation against `tamirdresher_microsoft/multiplayer-sudoku` (re-val 2/6)
+
+## Recommendation
+
+🟡 **HOLD merge of iter-4 bundle.** Land an iter-5 spin first that mirrors the `resolveSquadStateMcpSpec` registry-fallback helper into the init code path (`squad-sdk/init.ts:buildMcpServerSpecs`), then re-run validation.
+
+## Evidence
+
+| Path | Orphan growth | MCP bridge | Verdict |
+|---|---|---|---|
+| Fresh-init two-layer | 0/3 sessions, SHA pinned at `e5725a96` | server never starts (`npx … @0.9.6-preview.9` is E404) | ❌ REGRESSION |
+| Upgrade `local → two-layer` | +1 in single session, pushed to `origin/squad-state` (`0de57272` → `0f62575f`) | `@insider` fallback fires correctly | ✅ PASS |
+
+## Why iter-5 (not iter-4) ship
+
+- The `REGISTRY-PIN-UNPUBLISHED` fix is one helper (`resolveSquadStateMcpSpec`) wired into one call site (`upgrade.ts`). The init code path was left calling the older `buildMcpServerSpecs` which hard-pins to the running CLI version without a HEAD-check. The fix is asymmetric across paths.
+- For a preview tarball release — by definition unpublished — fresh-init projects ship with an unresolvable npm spec and a non-functional state bridge. That is the user-visible failure mode regardless of how clean the upgrade path is.
+
+## Estimated iter-5 work
+
+1. Mirror `resolveSquadStateMcpSpec` into `squad-sdk/init.ts:buildMcpServerSpecs` (or factor a shared helper in a small lib both packages depend on). ~15 LOC + 2 unit tests (init-pinning-fallback-when-unpublished, init-pinning-uses-literal-when-published).
+2. Fix newly-surfaced **UPGRADE-TEMPLATE-DOC-FLATTEN**: upgrade now copies ~20 template docs/charters into `.squad/` root (`charter.md`, `casting-history.json`, `Rai-charter.md`, `scribe-charter.md`, `fact-checker-charter.md`, `mcp-config.md`, `plugin-marketplace.md`, `roster.md`, etc.) instead of `.squad/templates/` and per-agent dirs. ~20 LOC + 1 test in `upgrade-templates-flatten.test.ts`.
+3. Carry-over (not blocking iter-5): provide an official `squad copilot` (or equivalent) wrapper so the **MCP-NOT-AUTOLOADED** `--additional-mcp-config` codepath actually runs when users follow the canonical command. Today the canonical command `copilot --yolo --autopilot --agent squad -p "…"` bypasses every wrap site in iter-4's `copilot-invocation.ts`.
+
+## What iter-4 unambiguously delivered
+
+- Upgrade end-to-end on a real pre-squadified repo (first iter-4 in-tree pass for multiplayer-sudoku).
+- `squad sync` subcommand wired (`squad --help` lists it).
+- 6 git hooks installed by both init and upgrade.
+- GAP-2 MCP retrofit INSERT continues to work — pre-existing `.copilot/mcp-config.json` gets the entry merged.
+- TIMESTAMP-COLON-LEAK: no colon-named files in either dup.
+
+## What iter-4 did not deliver
+
+- MCP-NOT-AUTOLOADED wrapper unexercised in canonical command (out of scope for this validation, but worth flagging).
+- REGISTRY-PIN-UNPUBLISHED fallback asymmetric (init ❌ / upgrade ✅) — the user-visible regression.
+- New: UPGRADE-TEMPLATE-DOC-FLATTEN.
+
+## Artifacts
+
+- Per-repo report: `C:\Users\tamirdresher\squad-validation\multiplayer-sudoku-tarball-test-iter4-20260602T213310\validation\RE-VAL-iter4-multiplayer-sudoku.md`
+- Orphan timeline: `…\validation\02-orphan-growth.md`
+- Squad mirror: `.squad\files\validation\REVAL-ITER4-multiplayer-sudoku.md`
+- Dups (retained):
+  - https://github.com/tamirdresher_microsoft/multiplayer-sudoku-tarball-test-iter4-20260602T213310
+  - https://github.com/tamirdresher_microsoft/multiplayer-sudoku-upgrade-test-iter4-20260602T213310
+
+
+---
+
+# Data — Re-Val iter-4 travel-assistant
+
+**Submitted:** 2026-06-02T21:32+03:00
+**Agent:** Data (Squad Framework Expert)
+**Tarball iteration:** 4 (actual version on disk: 0.9.6-preview.9; manifest said preview.8)
+**Repo:** tamirdresher/travel-assistant
+**Status:** ❌ Iter-4 bundle does not deliver end-to-end for canonical user invocation
+
+## Bottom line
+
+The runtime MCP bridge (`squad_state_*` tools callable mid-session) is **still broken** when the user runs the documented invocation `copilot --yolo --autopilot --agent squad -p "..."`. Orphan branch grew 0 commits across 4 sessions on 2 dups. Build-time and config-time fixes are confirmed working; the wrap fix in `copilot-invocation.ts` lives at the wrong layer (only wraps squad-spawned copilot subprocesses, not direct user invocations).
+
+## Verdicts
+- ORPHAN-GROWTH-MID-SESSION: ❌ (4/4 sessions stagnant)
+- MCP-RUNTIME: ❌ (0 of 4 logs mention any squad_state tool)
+- REGISTRY-PIN-UNPUBLISHED: ✅ upgrade path / ❌ init path (asymmetric — `dup1` mcp-config still pins literal `@0.9.6-preview.9`; `dup2` correctly falls back to `@insider`)
+- WI-1 hooks: ✅
+- Two-layer migration (upgrade): ✅ 9 files migrated
+- EPERM-NO-SHORTCIRCUIT: n/a (not exercised)
+- NTFS-COLON-SANITIZED: ✅
+- Score: 14 ✅ / 2 ❌ / 1 ⚠ / 1 n/a
+
+## Iter-5 asks
+1. Ship `squad copilot` (or equivalent) wrapper subcommand that pre-mixes `--additional-mcp-config @<teamRoot>/.copilot/mcp-config.json`. Update README + squad.agent.md to recommend it as the canonical invocation. ~30 LOC + docs.
+2. Mirror `upgrade.ts:resolveSquadStateMcpSpec` registry-HEAD-check + `@insider` fallback into `init.ts:buildMcpServerSpecs`. ~15 LOC.
+3. Continue pursuing github/copilot-cli#3642 for upstream project-mcp-config auto-load fix (parallel).
+
+## Artifacts
+- Full report: `.squad/files/validation/REVAL-ITER4-travel-assistant.md`
+- Per-repo: `C:\Users\tamirdresher\squad-validation\iter4-travel\dup1\validation\`
+- Dups retained (private): `tamirdresher_microsoft/travel-assistant-tarball-test-iter4-20260602T2132` + `...-upgrade-test-iter4-20260602T2132`
+
+
+---
+
+# Copilot CLI MCP config: authoritative project-local paths
+
+**Date:** 2026-06-02T22:22:40+03:00
+**Author:** Seven (Research & Integration Engineer)
+**Requested by:** Tamir Dresher
+**Status:** Verified
+
+## What
+
+The GitHub Copilot CLI (v1.0.58) loads MCP server configuration from exactly these
+sources, as documented by `copilot mcp --help`:
+
+1. **User** — `~/.copilot/mcp-config.json`
+2. **Workspace** — `.mcp.json` (at repo / working-directory root)
+3. **Plugin** — installed Copilot CLI plugins that ship MCP servers
+
+There is **no auto-loaded `.copilot/mcp-config.json` at the repo root**. There is
+**no auto-loaded `.vscode/mcp.json` or `.cursor/mcp.json`**. Any non-listed path
+(including `./.copilot/mcp-config.json`) is only honored when passed explicitly
+via `--additional-mcp-config`.
+
+## Why
+
+- **Maintainer reply (issue #3642, @caarlos0):** "Project's MCP settings are loaded
+  from `.mcp.json`. You can see the list of paths in `copilot mcp --help`."
+- **Verified locally** by running `copilot mcp --help` on Copilot CLI 1.0.58
+  (Windows). Exact help text:
+
+  ```
+  Configuration is loaded from multiple sources:
+    User       ~/.copilot/mcp-config.json
+    Workspace  .mcp.json
+    Plugin     Installed plugins with MCP servers
+  ```
+
+- README at https://github.com/github/copilot-cli documents the analogous LSP
+  paths (`~/.copilot/lsp-config.json`, `.github/lsp.json`) but does not document
+  MCP config paths — `copilot mcp --help` is the authoritative source.
+
+## Implications for squad-cli / squad-squad
+
+- Our current workaround `--additional-mcp-config @./.copilot/mcp-config.json`
+  is using a non-standard path. The supported equivalent is to place the same
+  JSON at **`.mcp.json`** in the repo root, which the CLI auto-loads with no
+  flag.
+- Migration is low-risk: move/symlink `./.copilot/mcp-config.json` → `./.mcp.json`,
+  then drop the `--additional-mcp-config` flag from spawn wrappers.
+- Keep the `--additional-mcp-config` escape hatch documented for users who want
+  per-workstream MCP overlays that should not live at repo root.
+
+## Caveats
+
+- Verified on **Copilot CLI 1.0.58 / Windows**. Path list has been stable across
+  recent versions but is not formally version-pinned in docs; re-verify with
+  `copilot mcp --help` after upgrades.
+- Precedence order between User / Workspace / Plugin is not stated explicitly in
+  the help text; behavior should be confirmed empirically if it matters
+  (typical convention: Workspace overrides User overrides Plugin).
+- `~` resolution on Windows uses `$env:USERPROFILE` (i.e.
+  `C:\Users\<user>\.copilot\mcp-config.json`).
+
+## Verdict on @caarlos0's claim
+
+**Accurate.** `.mcp.json` at repo root is the supported project-local path;
+`.copilot/mcp-config.json` at repo root is not auto-loaded by the CLI.
+
+## Source
+
+- Copilot CLI: `GitHub Copilot CLI 1.0.58` (`copilot --version`)
+- Help: `copilot mcp --help` (output captured 2026-06-02T22:22:40+03:00)
+- Issue: https://github.com/github/copilot-cli/issues/3642
+- README: https://github.com/github/copilot-cli (LSP section only; no MCP path docs)
+
+
+---
+
+# Data — MCP Config Migration Audit (`.copilot/mcp-config.json` → `.mcp.json`)
+
+- **Author:** Data (Squad Framework Expert)
+- **Date:** 2026-06-02T22:22:40+03:00
+- **Trigger:** github/copilot-cli#3642 — maintainer @caarlos0 confirmed Copilot CLI auto-loads `.mcp.json` (per `copilot mcp --help`), NOT `.copilot/mcp-config.json`.
+- **Scope:** AUDIT ONLY. Implementation deferred to a follow-up spawn after Picard reviews.
+
+---
+
+## Executive summary
+
+The migration is **smaller than the historical "10 spawn sites" framing suggested**, because the planned `copilot-invocation.ts` wrapper (mentioned in `.squad/files/validation/COMBINED-FIX-BRANCH-MANIFEST.md`) **was never landed** on disk in the upstream squad repo. I searched `C:\Users\tamirdresher\source\repos\squad\packages\squad-cli\src\cli\core\` and the file does not exist. Therefore there is **no `--additional-mcp-config` flag injection in real squad source today**; the only thing the framework ships is the JSON file itself at init.
+
+Concrete blast radius: **1 write site, 1 path constant, 4 user-facing string references, 8 template/doc files (across 3 template copies + 4 generated docs pages), 2 test files, 1 legacy `index.cjs`** in the upstream squad repo; plus **4 template / charter references** in `squad-squad` (this repo) that must move in lockstep when we re-run `squad upgrade`.
+
+Recommended approach: **additive (support both) for one release**, with a `squad upgrade` migration helper that prefers `.mcp.json` going forward and leaves any pre-existing `.copilot/mcp-config.json` intact (Copilot CLI's user-level fallback still reads `~/.copilot/mcp-config.json`, so deleting the project file is safe — but renaming costs us nothing and keeps user trust).
+
+---
+
+## Blast-radius table
+
+| # | File | Repo | Type | Line(s) | Current usage | Migration action |
+|---|---|---|---|---|---|---|
+| 1 | `packages/squad-sdk/src/config/init.ts` | squad | **CODE** | 718 (docstring), 1325–1330 (write site), 656 (`buildMcpConfigJson` helper) | Writes sample `.copilot/mcp-config.json` when `mcpConfigMode === 'copilot-file'` | Rename target path to `.mcp.json` at repo root; rename mode label to `'mcp-json-file'` (or keep `'copilot-file'` for compat and just change the path). Keep `buildMcpConfigJson` shape — Copilot CLI's `.mcp.json` uses the same `{ mcpServers: {...} }` schema. |
+| 2 | `packages/squad-cli/src/cli/core/init.ts` | squad | **CODE** (docstring only) | 114 | Comment: `"...into squad.agent.md frontmatter instead of .copilot/mcp-config.json..."` | Update comment to `.mcp.json`. |
+| 3 | `packages/squad-cli/src/cli/commands/state-mcp.ts` | squad | **CODE** (user-facing string) | 204 | `'.copilot/mcp-config.json. It exposes squad_decide and state.* tools'` | Update string to `.mcp.json`. |
+| 4 | `packages/squad-cli/src/cli/core/templates.ts` | squad | **CODE** | 86–89 | Registers `mcp-config.md` as a copied template. **Path is unchanged** — only the *.md content changes. | NO change to templates.ts. **Policy Gate: not triggered** by this migration. (Changeset still required because template *content* changes — see §Policy Gate below.) |
+| 5 | `packages/squad-cli/templates/mcp-config.md` | squad | **TEMPLATE** (canonical) | 8, 10, 11 | Documents `.copilot/mcp-config.json` as the team-shared path | Rewrite §"Where MCP config lives" to list `.mcp.json` as the team-shared path; keep `~/.copilot/mcp-config.json` for user-level (still supported per maintainer); demote `--additional-mcp-config` to "session override (rarely needed now)". |
+| 6 | `packages/squad-sdk/templates/mcp-config.md` | squad | **TEMPLATE** (mirror) | 8, 10, 11 | Same as #5 | Same as #5 — must stay byte-identical to #5. |
+| 7 | `templates/mcp-config.md` | squad | **TEMPLATE** (root mirror) | 8, 10, 11 | Same as #5 | Same as #5. |
+| 8 | `.squad-templates/mcp-config.md` | squad | **TEMPLATE** (mirror) | 8, 10, 11 | Same as #5 | Same as #5. |
+| 9 | `packages/squad-cli/templates/squad.agent.md.template` | squad | **TEMPLATE** | 452 | `"Add it to .copilot/mcp-config.json"` (Trello onboarding hint) | Replace path. |
+| 10 | `packages/squad-sdk/templates/squad.agent.md.template` | squad | **TEMPLATE** (mirror) | 452 | Same | Same. |
+| 11 | `templates/squad.agent.md.template` | squad | **TEMPLATE** (root mirror) | 452 | Same | Same. |
+| 12 | `.squad-templates/squad.agent.md` | squad | **TEMPLATE** | 452 | Same | Same. |
+| 13 | `index.cjs` | squad | **CODE** (legacy entry) | 1771, 1774, 1791, 1796 | Legacy init that creates `.copilot/mcp-config.json` and logs the path | Decide: (a) delete if `packages/squad-sdk` has fully superseded it, or (b) update path. Confirm with Picard whether `index.cjs` is still on a publish path. |
+| 14 | `test/cli/init.test.ts` | squad | **TEST** | 87, 90, 105 | Asserts `.copilot/mcp-config.json` is created | Update path assertion. |
+| 15 | `test/mcp-config.test.cjs` | squad | **TEST** | 61, 65, 71, 76, 80, 84, 90, 104, 110, 115, 126, 129 | Many assertions on the legacy path | Update; add a parallel test that exercises the new `.mcp.json` path. During the additive-release window, keep both paths covered. |
+| 16 | `docs/src/content/docs/reference/config.md` | squad | **DOC** | 115 | Reference doc lists `.copilot/mcp-config.json` | Update path; flag note that this is a 1.0.59+ requirement. |
+| 17 | `docs/src/content/docs/concepts/portability.md` | squad | **DOC** | 229 | Cross-tool comparison table | Update row. |
+| 18 | `docs/src/content/docs/features/enterprise-platforms.md` | squad | **DOC** | 107 | ADO MCP add hint | Update path. |
+| 19 | `docs/src/content/docs/features/mcp.md` | squad | **DOC** | 32, 47, 52, 56, 59, 172, 361 | Primary MCP onboarding doc | Major rewrite of §"CLI: `.copilot/mcp-config.json`" section. Highest-visibility doc; needs careful copy. |
+| 20 | `docs/src/content/docs/features/notifications.md` | squad | **DOC** | 378 | Sample notification configs | Update lead sentence. |
+| 21 | `.changeset/mcp-frontmatter-init.md` | squad | **DOC** (changeset) | 6 | Refers to `.copilot/mcp-config.json` as the alternative | Either rewrite in place or supersede with the new migration changeset. |
+| 22 | `docs/_internal/proposals/cicd-gitops-prd-cicd-audit.md` | squad | **DOC** (proposal) | 173 | Mentions `test/mcp-config.test.js` filename | Cosmetic; update if convenient. |
+| 23 | `.github/agents/squad.agent.md` | squad-squad | **DOC** (template instance) | 532, 560 | Agent charter for this repo | Update after squad re-init/upgrade — will flow automatically once #9/#10/#11/#12 ship. |
+| 24 | `.squad/templates/mcp-config.md` | squad-squad | **DOC** (template instance) | 8, 10, 11 | Local copy of template #5 | Updated by `squad upgrade` once #5 ships. |
+| 25 | `.squad/templates/squad.agent.md.template` | squad-squad | **DOC** (template instance) | 522, 550 | Local copy of template #9 | Updated by `squad upgrade` once #9 ships. |
+| 26 | `.squad/skills/copilot-yolo-driving/SKILL.md` | squad-squad | **DOC** (project skill) | 149 | `Select-String -Path .copilot/mcp-config.json -Pattern 'squad_state'` verification step | Update to `.mcp.json`. |
+| 27 | `.squad/decisions.md` (multiple lines) | squad-squad | **DOC** (historical record) | 243, 250, 264, 267, 294, 390, 394, 450, 461, 496, 1382, 3441 | Historical decisions referencing the old path | **DO NOT REWRITE.** Decisions log is append-only history. New decision (this file) supersedes by date. |
+| 28 | `.squad/decisions-archive.md` | squad-squad | **DOC** (archive) | 1994, 1998 | Archived findings | DO NOT REWRITE. |
+| 29 | `.squad/skills/agentdevcompute/**` (SKILL.md, personal-agent-template/*) | squad-squad | **DOC** (ADC sandbox contract) | multiple | References `/root/.copilot/mcp-config.json` *inside the ADC sandbox* — that file is written by the ADC Node Agent, **not by squad** | **DO NOT TOUCH.** This is an external contract owned by Agent Dev Compute, not by Copilot CLI. The path inside the ADC sandbox stays the same regardless of upstream Copilot CLI changes. |
+| 30 | `.squad/files/validation/**` and `.squad/agents/data/history-archive.md` | squad-squad | **DOC** (historical evidence) | many | Validation reports and archived agent history | DO NOT REWRITE. Append-only. |
+
+### Subtotals
+
+| Repo | CODE | TEMPLATE | DOC (live) | DOC (historical, do-not-touch) | TEST | Total *actionable* files |
+|---|---|---|---|---|---|---|
+| **squad** (upstream) | 4 (#1, #2, #3, #13) | 8 (#5–#12) | 7 (#16–#22) | — | 2 (#14, #15) | **21 files** |
+| **squad-squad** (this repo) | 0 | 0 | 4 (#23, #24, #25, #26) | 5+ (#27, #28, #29 cluster, #30) | 0 | **4 files** (5+ historical untouched) |
+| **Grand total actionable** | 4 | 8 | 11 | — | 2 | **25 files** |
+
+Note: rows #23–#25 in squad-squad will be auto-rewritten by `squad upgrade` once the upstream templates change, so the only **manual** edit in squad-squad is row #26.
+
+---
+
+## Effort estimate
+
+**Upstream `squad` repo: MEDIUM.**
+- Single write site + helper, well-encapsulated.
+- 4 template copies must stay byte-identical (existing constraint, already enforced by mirror-template policy).
+- Tests need an additive parallel suite for the new path during the deprecation window.
+- Docs rewrite for `features/mcp.md` is the biggest content lift (~30 min of careful copy).
+- Justification: < 1 day implementation + ~½ day for additive-release migration logic + tests.
+
+**`squad-squad` repo: SMALL.**
+- 3 of 4 actionable files flow automatically from `squad upgrade`.
+- Only `.squad/skills/copilot-yolo-driving/SKILL.md:149` needs a manual one-line edit.
+- Justification: < 1 hr, no breaking change.
+
+---
+
+## Recommended migration approach: **Additive (support both) for one release**
+
+1. **`squad init` (and `runEnsureChecks`) write to `.mcp.json` at repo root going forward.** New repos never see `.copilot/mcp-config.json`.
+2. **`squad upgrade` migration helper** detects an existing `.copilot/mcp-config.json`, deep-merges its `mcpServers` into `.mcp.json` (creating `.mcp.json` if absent), and leaves the legacy file in place with a note in the upgrade summary: *"Copilot CLI now reads `.mcp.json`. We merged your existing `.copilot/mcp-config.json` into it. You may delete the legacy file once you've verified the new one works."* No silent delete.
+3. **Templates and docs**: rewrite to lead with `.mcp.json`; demote `.copilot/mcp-config.json` to a "legacy path, still works as a fallback if Copilot CLI ≤ X.Y.Z" footnote.
+4. **Tests**: keep the existing `test/mcp-config.test.cjs` suite green against the legacy path, add a parallel `test/mcp-json.test.cjs` for the new path, and add a migration test that proves `squad upgrade` merges correctly.
+5. **One release later** (after one minor cycle of telemetry / no-issue dwell), remove the legacy write site and rewrite tests to assert only `.mcp.json`. The merge helper stays forever for users skipping a version.
+
+Why additive over rip-and-replace: zero user-visible regression risk, no "your MCP tools stopped working after upgrade" reports, easy rollback if Copilot CLI re-introduces project-level auto-load for the old path.
+
+Why additive over deprecate-and-warn: deprecation warnings on every `squad upgrade` invocation are noisy for users who don't manage MCP at all, and the merge is mechanical enough that we may as well just do it.
+
+---
+
+## Breaking-change risks
+
+| Risk | Likelihood | Mitigation |
+|---|---|---|
+| User has a hand-edited `.copilot/mcp-config.json` with custom servers we don't know about | HIGH (per our own iter-4 telemetry — most real repos have 3–5 custom servers) | Merge helper preserves all unknown `mcpServers` keys verbatim; never deletes. |
+| User has `.mcp.json` already (rare today, common in 6 months) with a *different* version of an overlapping server entry | MEDIUM | On conflict, prefer the existing `.mcp.json` entry and emit a warning naming the conflicting key. Do NOT silently overwrite. |
+| `squad_state` MCP pin in `.copilot/mcp-config.json` (set by `ensureSquadStateMcpPinned`) doesn't make it into `.mcp.json` | HIGH (this is the entire point of the runtime bridge) | `ensureSquadStateMcpPinned` must be updated to target `.mcp.json` AND, during the additive window, also keep the legacy file in sync if present, so that users still on Copilot CLI < the auto-load version aren't broken. |
+| ADC (Agent Dev Compute) sandbox writes `/root/.copilot/mcp-config.json` — Copilot CLI inside the sandbox may now look for `/root/.mcp.json` instead | MEDIUM | OUT OF AUDIT SCOPE. File a parallel issue with the ADC team. Until ADC ships, `~/.copilot/mcp-config.json` user-level fallback remains supported, so the sandbox keeps working. |
+| `--additional-mcp-config` flag invocations in our `.squad/files/validation/**` runbooks become stale | LOW | Those are historical evidence files; do not rewrite. New runbooks should just rely on `.mcp.json` auto-load and not use the flag at all. |
+
+---
+
+## Policy Gate (per repo memory)
+
+> Any change to `packages/squad-cli/src/cli/core/templates.ts` requires a `.changeset/{slug}.md` entry (`"@bradygaster/squad-cli": minor/patch`).
+
+**This migration does NOT change `templates.ts`** — the file only registers `mcp-config.md` as a template name, and that filename is unchanged. **Policy Gate is NOT triggered by this migration's templates.ts touchpoints.**
+
+However, a changeset is still appropriate because:
+1. The *content* of templates `mcp-config.md` and `squad.agent.md.template` changes (user-visible behavior on next `squad upgrade`).
+2. The init write site (`packages/squad-sdk/src/config/init.ts`) changes user-visible filesystem layout.
+
+**Recommended changeset entries** for the implementation PR:
+- `.changeset/mcp-json-migration.md`:
+  ```
+  ---
+  "@bradygaster/squad-cli": minor
+  "@bradygaster/squad-sdk": minor
+  ---
+  Migrate from `.copilot/mcp-config.json` to `.mcp.json` (repo root) to match
+  Copilot CLI's auto-loaded path. Existing files are auto-merged on `squad upgrade`;
+  legacy files are preserved.
+  ```
+
+---
+
+## Open questions for Picard (Lead)
+
+1. **`index.cjs` (row #13):** is this still on a published artefact path, or has `packages/squad-sdk` fully superseded it? If legacy, can we delete the MCP-config block instead of updating it?
+2. **Additive window length:** one minor release feels right to me, but I'm guessing. Want me to look at how we handled the last analogous template path migration?
+3. **Confirm with Seven (Historian)** the exact wording of `copilot mcp --help` output for the current Copilot CLI version — the maintainer said "`.mcp.json`" but didn't say whether it's case-sensitive, whether subdirectory paths are checked, or what the precedence is when both `.mcp.json` and `~/.copilot/mcp-config.json` exist. Audit assumed: repo-root `.mcp.json` > user-level `~/.copilot/mcp-config.json` > `--additional-mcp-config` override. **Need verification before implementation.**
+4. **Worf review needed?** The `squad_state` MCP pin is on the critical path for state-orphan persistence. If the migration drops `squad_state` registration even briefly during `squad upgrade`, Scribe loses state for that session. Worth a safety-critical review of the merge helper.
+5. **ADC parallel work item:** should we open a tracking issue against the Agent Dev Compute team to migrate `/root/.copilot/mcp-config.json` → `/root/.mcp.json` inside their sandbox, or is that on their roadmap already?
+
+---
+
+## Stale-session concern
+
+Per my charter, I flag this: **`.squad/decisions.md` lines 243–3441 contain ~12 active references to `.copilot/mcp-config.json` as the canonical path.** These are historical decisions and MUST NOT be rewritten. After this audit lands, in-flight agents reading older portions of `decisions.md` may continue to write to the legacy path until they see the new decision file. The merge helper (recommendation §2) handles this gracefully — anything written to `.copilot/mcp-config.json` during the additive window gets folded into `.mcp.json` on the next `squad upgrade`.
+
+---
+
+## Sign-off
+
+This is an audit, not an implementation. Do not merge migration code from this decision file alone. The next spawn should:
+1. Verify open question #3 with Seven.
+2. Get Picard's sign-off on the additive approach.
+3. Get Worf's sign-off on the `squad_state` merge safety.
+4. Open the implementation PR with `.changeset/mcp-json-migration.md` included.
+
+
+---
+
+# Picard — MCP-config Migration Scope Decision
+
+- **Date:** 2026-06-02T22:22:40+03:00
+- **Author:** Picard (Lead / Product Architect)
+- **Status:** DECISION — GO
+- **Supersedes:** none. Refines Seven's verification + Data's audit.
+- **Inputs:**
+  - `.squad/decisions/inbox/seven-mcp-config-paths-verified.md`
+  - `.squad/decisions/inbox/data-mcp-config-migration-audit.md`
+  - github/copilot-cli#3642 (maintainer @caarlos0 reply)
+
+---
+
+## Verdict (TL;DR)
+
+**GO** for additive migration `.copilot/mcp-config.json` → `.mcp.json` (repo root)
+in the next minor release of `@bradygaster/squad-cli` and `@bradygaster/squad-sdk`.
+Approach, ownership, and sequencing answered below.
+
+---
+
+## Answers to the 9 questions
+
+### 1. `index.cjs` status (Data Q1)
+**DELETE the MCP-config block, do not update it** — *conditional on Data
+confirming in <5 min that `index.cjs` is not listed in `package.json#files` /
+`package.json#main` of the published `squad-cli` or `squad-sdk` artefacts.*
+History (this repo) records the upstream as a JS-first workspace monorepo with
+`packages/squad-sdk` as the modern entry. If Data finds `index.cjs` IS still
+referenced by `main` / `bin` / `files`, fall back to update-in-place using the
+same path change as row #1. Either way: do not maintain two parallel write paths
+for the new release.
+
+### 2. Additive window length (Data Q2)
+**One minor release.** Concretely:
+- Release N (this migration): both paths supported. `squad init` writes
+  `.mcp.json`. `squad upgrade` runs the merge helper. Legacy file preserved.
+- Release N+1: remove the legacy write site and the legacy assertion in the
+  test suite. The **merge helper stays forever** — users who skip N must still
+  upgrade cleanly from N-1 directly to N+1+.
+
+No need to scan prior analogous migrations — one minor is our default cadence
+and is consistent with how we handled the workstreams refinement (per
+`.squad/decisions.md` history). If telemetry from Release N shows >0 user
+reports of the legacy path mattering, Coordinator may extend by one cycle; that
+is a runtime decision, not an architecture one.
+
+### 3. Precedence order — re-spawn Seven (Data Q3)
+**YES — re-spawn Seven for one narrow follow-up.** Her first pass nailed the
+*list* of paths but explicitly flagged precedence as un-pinned. We need
+empirical answers to exactly three questions before Data writes the merge
+helper's conflict-resolution policy:
+
+  a. Given the SAME server name defined in both `.mcp.json` (workspace) and
+     `~/.copilot/mcp-config.json` (user), which one wins at MCP-tool dispatch
+     time? Workspace expected, but verify.
+  b. Are server entries from the two files **merged** (union of keys) or does
+     one source **shadow** the other entirely?
+  c. What does Copilot CLI do if `.mcp.json` is malformed — fall back to the
+     user file, or hard-fail? Affects merge-helper safety guarantees.
+
+Seven's deliverable: a 1-page decision file with three reproducible test
+commands and their outputs on Copilot CLI 1.0.58+. Time-box: 30 min.
+
+### 4. Worf review (Data Q4)
+**YES — required, blocking.** The `squad_state` MCP pin is on the critical
+path for state-orphan persistence (per `ensureSquadStateMcpPinned`). The merge
+helper must be reviewed by Worf before Data opens the implementation PR. Worf
+must specifically certify:
+
+  1. **Atomicity:** no temporal window during `squad upgrade` where
+     `squad_state` is unregistered from any path the live CLI is reading.
+  2. **Conflict resolution:** if `.mcp.json` already contains a `squad_state`
+     entry with a different command path, the helper MUST NOT silently
+     overwrite — it must warn and prefer the existing entry, exactly like
+     Data's recommendation §"Risks" row 2.
+  3. **Failure mode:** if the merge helper crashes mid-write, the legacy file
+     remains intact and the new file is either absent or complete (no
+     half-written `.mcp.json`).
+
+### 5. ADC parallel work item (Data Q5)
+**NO tracking issue against ADC at this time.** Re-read Seven's verification:
+`~/.copilot/mcp-config.json` is the **supported user-level path** and is
+auto-loaded by Copilot CLI. Inside the ADC sandbox running as root, the file
+at `/root/.copilot/mcp-config.json` IS `~/.copilot/mcp-config.json`, so the
+ADC contract continues to work unchanged after our migration. The ADC sandbox
+is fine.
+
+If, post-migration, we discover ADC users want **project-scoped** MCP overlays
+inside the sandbox (a feature gap, not a regression), we file the issue then.
+Until then, leave ADC alone. Update Data's risk table accordingly.
+
+### 6. Approve / modify the approach (architectural Q6)
+**APPROVE additive (support both for one release).** Trade-offs weighed:
+
+  - **Additive (chosen):** zero user-visible regression risk; slight increase
+    in test surface and merge-helper code for one release; trivial rollback if
+    Copilot CLI ever re-introduces project-root auto-load for the legacy
+    path. **Cost:** +0.5 day on Data's effort estimate. **Worth it.**
+  - **Rip-and-replace:** clean but breaks every user who upgrades `squad` but
+    not yet `copilot` CLI. We do not pin Copilot CLI versions; we cannot
+    assume the user's local CLI auto-loads `.mcp.json`. Hard veto.
+  - **Deprecate-and-warn:** noisy for the ~majority of users who do not edit
+    MCP config and would get a deprecation banner on every `squad upgrade`.
+    Helper-merge is mechanical enough that warning the user adds friction
+    without delivering value.
+
+### 7. Sequencing (architectural Q7)
+**Open the bradygaster/squad tracking issue NOW. Ship the upstream migration
+AFTER.** Reasons:
+
+  - github/copilot-cli#3642 is open on Tamir's account today. The maintainer
+    has answered. Leaving it open with no follow-up signal looks abandoned.
+  - The implementation PR on bradygaster/squad will link back to its tracking
+    issue — opening the issue first gives Brady the triage window and earns
+    a `go:yes` label before the PR lands (same playbook as #1205, per
+    `.squad/agents/picard/history.md`).
+  - Implementation is < 1.5 days. The issue can be open and the PR raised in
+    the same week.
+
+### 8. Ownership (architectural Q8)
+**Primary implementer: Data.** Specifically:
+
+  - **Data** — upstream `squad` PR (rows #1–#22 of audit), including merge
+    helper, parallel test suite, and `.changeset/mcp-json-migration.md`.
+    Data also makes the single squad-squad manual edit (row #26).
+  - **Seven** — narrow precedence-order verification (Q3 above) BEFORE Data
+    writes the merge helper's conflict logic. Time-box 30 min.
+  - **Worf** — security/safety review of the merge helper (Q4 above) BEFORE
+    Data opens the upstream PR. Blocking gate.
+  - **B'Elanna** — NOT engaged. The merge helper is filesystem-only and does
+    not touch durable state-backend invariants. If during implementation Data
+    discovers any interaction with worktree state or `now.md` consistency,
+    re-route to B'Elanna at that point.
+  - **Picard (me)** — final architecture sign-off on Data's PR before merge.
+
+### 9. Public communication (architectural Q9)
+**Confirm Coordinator's plan (c) with one wording constraint.**
+
+  - Close github/copilot-cli#3642 IMMEDIATELY with a thank-you to @caarlos0
+    confirming `.mcp.json` is the correct path. Do NOT commit to a timeline
+    in that comment — issue #3642 lives on a third-party repo; over-promising
+    there creates an external dependency on our release cadence.
+  - In the same close comment, link to the new tracking issue on
+    bradygaster/squad (opened first, per Q7) so anyone arriving from #3642
+    has a path forward.
+  - Option (a) is wrong because there is no upstream squad work to commit to
+    yet in that comment.
+  - Option (b) is wrong because it leaves a third-party issue open against
+    something only we can fix.
+
+---
+
+## Go / No-Go
+
+**GO** — ship the migration in the next minor of `@bradygaster/squad-cli` +
+`@bradygaster/squad-sdk`, gated on the three handoffs below.
+
+---
+
+## Constraints the Coordinator MUST enforce
+
+1. **Seven → Data sequence (information dependency, not code dependency):**
+   Seven's precedence-order verification (Q3) must land before Data writes the
+   merge-helper conflict-resolution code. Data may begin all OTHER work
+   (templates, docs, test scaffolding, init.ts rename) in parallel with
+   Seven.
+2. **Worf gate (blocking):** Worf must review the merge helper PR diff and
+   sign off on the three certifications in Q4 BEFORE the upstream PR is
+   marked ready-for-review on bradygaster/squad. No exceptions.
+3. **No silent file mutation:** the merge helper MUST preserve
+   `.copilot/mcp-config.json` on disk after merging (per Data §Recommended
+   approach point 2). Coordinator rejects any PR that auto-deletes the
+   legacy file.
+4. **Policy Gate confirmation:** Data confirmed `templates.ts` is NOT
+   touched, so the standard changeset policy is not triggered by templates;
+   however, a `.changeset/mcp-json-migration.md` IS still required because
+   user-visible filesystem behavior changes. Coordinator: enforce.
+5. **Decisions log is append-only:** historical references to
+   `.copilot/mcp-config.json` in `.squad/decisions.md` (lines 243–3441) and
+   `.squad/decisions-archive.md` MUST NOT be rewritten. This decision
+   supersedes by date.
+6. **ADC sandbox files (`.squad/skills/agentdevcompute/**`) MUST NOT be
+   touched** by this migration — that path describes an external ADC
+   contract, not Copilot CLI behavior.
+
+---
+
+## Further research asks (Seven re-spawn)
+
+One narrow ping only:
+- **Seven**, please verify precedence/merge/failure semantics per Q3 above.
+  Deliverable: 1-page decision file at
+  `.squad/decisions/inbox/seven-mcp-config-precedence.md` with three
+  reproducible test commands and their outputs on Copilot CLI 1.0.58+.
+  Time-box: 30 min.
+
+No other research required. Data has everything else.
+
+---
+
+## Out of scope (deferred)
+
+- Any change to ADC sandbox MCP paths (see Q5).
+- Any rewrite of historical decisions log entries (see constraint 5).
+- BYOK / `Provider` / `Model` interactions (per the 2026-06-02 Squad.Agents.AI
+  review, deferred to v0.2 and unrelated).
+
+---
+
+## Sign-off
+
+Architecture approved. Coordinator: kick off Seven's narrow re-spawn and
+Data's upstream-PR scoping in parallel. Worf is on the critical path for
+merge-helper review; please schedule him before Data opens the upstream PR
+ready-for-review.
+
+— Picard
+
+
+
+
