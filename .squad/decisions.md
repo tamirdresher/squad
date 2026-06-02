@@ -2897,3 +2897,110 @@ Data's proposal is sound in its analysis and recommendations. The auth-mode inve
 
 *Review complete. Worf re-gates the implementation PR for SC-1 through SC-9 compliance.*
 
+
+---
+
+### 2026-06-02T13:08:11.343+03:00: Data — Two-Layer Upgrade-Path Baseline (insider.3)
+
+# Data — Two-Layer Upgrade-Path Baseline (insider.3)
+
+**Date:** 2026-06-02T13:08:11.343+03:00
+**Owner:** Data
+**Status:** Baseline complete; bug evidence captured for insider.4 work
+
+## Summary
+
+Ran the upgrade-path baseline on insider.3 in a clean GitHub EMU test repo. Three sessions on the worktree-backend default, then `squad upgrade --self --insider --state-backend two-layer`, then three more sessions to test continuity. Result: the upgrade is a **functional no-op for state-backend migration** — strictly worse than fresh init on insider.3 for the same target backend.
+
+## Test repo
+
+https://github.com/tamirdresher_microsoft/twolayer-upgrade-test-20260602T1308 (private, EMU `tamirdresher_microsoft`)
+
+## Sessions completed
+
+| # | When | Prompt | Outcome |
+|---|---|---|---|
+| 1 | pre-upgrade | "build me a team from the Star Trek universe..." | ✅ init OK |
+| 2 | pre-upgrade | "Lead, draft JWT login proposal" | ✅ decision merged |
+| 3 | pre-upgrade | "Backend, scaffold /api/health" | ✅ route built, decision merged |
+| — | upgrade | `squad upgrade --self --insider --state-backend two-layer` | ⚠️ no-op (see below) |
+| 4 | post-upgrade | "Lead, summarize what we decided" | ❌ Spock refused — could not read decisions through new backend |
+| 5 | post-upgrade | "Tester, edge cases for /api/health" | ✅ Stateless reasoning — produced output |
+| 6 | post-upgrade | "Lead, finalize JWT vs session cookie" | ⚠️ Spock decided but Scribe could not persist; SDK fallback partially wrote to orphan branch |
+
+## Key findings
+
+1. **`squad upgrade --state-backend <value>` is silently ignored.** Confirms Seven's #1185 / Finding 1.2 at the upgrade level. Config unchanged, no migration, no hooks, no branch.
+2. **EPERM false-success.** Self-upgrade prints `⚠️ failed` and `✅ Upgraded` in the same run; exit 0; `squad --version` unchanged.
+3. **Strictly worse than fresh init.** Fresh init on two-layer at least sets the config flag, creates the orphan branch, and installs 4 sync hooks. Upgrade does none of that.
+4. **MCP bridge non-functional.** `squad_state` server IS registered in `.copilot/mcp-config.json` (already present from default init since insider.3 — possible reconciliation with Data-2 fresh-path baseline needed), but agents detect `squad_state_read`/`squad_state_list`/`squad_state_health` as unavailable at runtime. Spock refused in session 4; Scribe refused in session 6. Governance correct, runtime broken.
+5. **Pre-existing state stranded.** Without migration, all decisions/history written during sessions 1–3 are invisible to post-upgrade agents reading through the new backend.
+6. **Mid-session SDK fallback works.** Spock's session-6 inline `node` SDK call DID create the orphan branch and write 1 inbox file + 1 history append. So the SDK two-layer code path is functional; only the upgrade path and MCP bridge are broken.
+
+## What insider.4 must fix (priority order — full rationale in report)
+
+1. **P0 — Honour `--state-backend` on `squad upgrade`** (config write + initializer + migration of pre-existing state).
+2. **P0 — Fix EPERM false-success contradictory output / exit code.**
+3. **P0 — Install pre-commit + post-commit hooks when backend is two-layer** (WI-1 — same on both fresh and upgrade).
+4. **P1 — Make `squad_state` MCP bridge actually expose `squad_state_*` tools at runtime.**
+5. **P1 — `squad doctor` cross-checks for backend → branch/hooks/MCP wiring.**
+6. **P1 — Push orphan branch and notes refs to `origin` on init / first write.**
+7. **P2 — Resolve Bug E (duplicate `stateBackend` key) before #1 lands, or fix simultaneously.**
+
+## Comparison to fresh-path baseline (Data-2)
+
+Same insider.3, same target backend, **same downstream failures** (WI-1 pre/post-commit hooks missing, MCP bridge broken at runtime). UPGRADE PATH adds: (a) flag silently ignored, (b) EPERM false-success, (c) no migration of existing state, (d) zero hooks (not even the 4 sync hooks fresh-init installs). Both paths leave the user with an effectively-broken two-layer setup; upgrade leaves them worse off.
+
+## Artifacts
+
+Full report (~17 KB) with verdict table, bug observation matrix, and fresh-vs-upgrade comparison:
+`validation/UPGRADE-PATH-BASELINE-INSIDER3-REPORT.md` in the test repo.
+
+All per-session transcripts, post-state snapshots, the upgrade stdout, and the immutable pre-upgrade `.squad/` snapshot (135 files) are in `validation/` and pushed to `main` on the test repo.
+
+## Recommended next actions for Tamir / coordinator
+
+- Hold off on advertising "two-layer state backend" as user-facing until insider.4 lands fixes 1–4 above.
+- Once insider.4 candidates exist, re-run both baselines (fresh-path AND upgrade-path) and produce a comparison report; same scripts work.
+- Reconcile MCP-registration discrepancy between Data-2 fresh-path baseline ("missing") and this run ("present from default init"). Likely template change between baselines or different inspection method; harmless either way given the runtime tools are still unavailable.
+
+
+---
+
+### 2026-06-02T14:15:06+03:00: User directive — Squad.Agents.AI release strategy
+
+**By:** Tamir Dresher (via Copilot)
+
+**What:** Squad.Agents.AI release pipeline mirrors the Squad CLI's branch-driven publish model:
+- Merges to the `dev` branch → publish a **prerelease** NuGet (e.g., `0.1.0-preview.{build}` or `0.1.0-dev.{n}`).
+- Merges to `main` → publish an **official / stable** NuGet (e.g., `0.1.0`).
+- Manual `workflow_dispatch` should remain available as an escape hatch, but the primary publish trigger is branch-driven, NOT tag-driven.
+
+**Why:** User request — keep release cadence consistent with how the Squad CLI itself ships. Reduces cognitive overhead for the maintainer and gives consumers a predictable "merge → published prerelease" loop on `dev`.
+
+**Status:** Merged from inbox/copilot-directive-20260602T1415.md  
+**Linked to:** B'Elanna Release Pipeline decision below
+
+---
+
+### 2026-06-02T14:00:00Z: B'Elanna — Squad.Agents.AI Release Pipeline and Dependency Tracking
+
+# Decision: Squad.Agents.AI release pipeline and dependency tracking (2026-06-02)
+
+## Status
+Landed on PR #3 branch `feature/squad-agents-ai` in `tamirdresher/squad` at commit `5f5293f`.
+
+## Decision
+- Add `.github/workflows/squad-agents-ai-release.yml` for explicit `workflow_dispatch` SemVer releases and `squad-agents-ai-v*` tag-driven releases.
+- Publish `Squad.Agents.AI` to NuGet.org only after restore, Release build, test, pack, and artifact upload.
+- Add `.github/dependabot.yml` for NuGet updates in `/src/Squad.Agents.AI` and `/test/Squad.Agents.AI.Tests`, plus GitHub Actions updates at `/`, all weekly with `open-pull-requests-limit: 5`.
+
+## Reliability constraints
+- Repository secret `NUGET_API_KEY` is required before first publish; the workflow fails fast if it is missing.
+- NuGet publish uses `--skip-duplicate`, so rerunning the same version after a partial push is safe and idempotent.
+- Per-version concurrency prevents two publishes for the same version from racing and does not cancel in-flight work.
+
+## Dependency policy
+- Major updates for `Microsoft.Agents.AI*` and `Microsoft.Extensions.AI` are intentionally tracked because the package must follow upstream AI APIs closely.
+- OpenTelemetry semver-major updates are deferred; patch and minor updates remain allowed. This follows Decision 602 because OpenTelemetry-related transitive audit suppressions are sensitive and need explicit re-audit before major movement.
+
