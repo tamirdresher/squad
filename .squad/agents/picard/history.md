@@ -151,3 +151,14 @@ The decision also stands down the EMU backstop strategy (Decision 432 context) s
 - **Known consumers:** Are there existing users/teams consuming SquadAgent v0.1 that should be notified of the ownership transition from tamresearch1 → squad-squad? (Informs communication plan.)
 
 **Citation:** tamresearch1/.squad/decisions.md Decisions 437, 438, 439, 440, 441, 443, 447, 448; tamresearch1/.squad/agents/picard/history.md (2026-05-31 learnings).
+
+---
+
+### [2026-06-02 Session] Cross-Reference: Squad.Agents.AI Onboarding Fan-Out
+
+**Session Log:** `.squad/log/2026-06-02T09-04-38Z-squad-agents-ai-onboarding.md`  
+**Decision Entry:** `.squad/decisions.md` section "2026-06-02 — Squad.Agents.AI NuGet Onboarding: 5-Agent Fan-Out"  
+**Coordinating Agents:** Data (technical baseline), Worf (security), B'Elanna (build/CI), Seven (provenance), Picard (this agent).
+
+This session synthesized five coordinated reports into a single onboarding decision batch. Picard's strategic recommendations aligned with Data's technical findings and B'Elanna's release pipeline gaps. Key consensus: v0.1 ready to merge and publish; v0.2 blocked on NuGet CI gate and publish workflow (B'Elanna dependency).
+

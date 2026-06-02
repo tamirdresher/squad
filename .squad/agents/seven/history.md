@@ -288,3 +288,14 @@ Seven responsible for architectural consistency checks: ExternalSquadEvent doesn
 
 **Status:** ✅ COMPLETE — Signal report written. Ready for team review and fix-all execution.
 
+---
+
+### [2026-06-02 Session] Cross-Reference: Squad.Agents.AI Onboarding Fan-Out
+
+**Session Log:** `.squad/log/2026-06-02T09-04-38Z-squad-agents-ai-onboarding.md`  
+**Decision Entry:** `.squad/decisions.md` section "2026-06-02 — Squad.Agents.AI NuGet Onboarding: 5-Agent Fan-Out"  
+**Coordinating Agents:** Seven (this agent, provenance), Picard (strategy), Data (technical baseline), Worf (security), B'Elanna (build/CI).
+
+This session synthesized five coordinated reports into a single onboarding decision batch. Seven's provenance research (PR #3 audit, sister squad inheritance, NuGet suppression baseline) paired with Data's technical findings and Worf's security gate clearance. Key decision: v0.1 release-ready with NuGet suppressions documented; v0.2 requires quarterly audit cycle and CI/CD public-export-checklist SKILL integration per Worf obligations.
+
+

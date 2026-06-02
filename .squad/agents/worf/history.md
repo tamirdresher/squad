@@ -607,3 +607,47 @@ Canary run `real-cli-canary-20260519T172913` stopped at turn 3/4 by G-5 guard. *
 ---
 
 2026-05-31: Defined 11 reliability gates for state-backend upgrade. First rejection (gate blockers); second approval after Geordi/B'Elanna revisions and Picard validation.
+
+
+---
+
+## 2026-06-02T10:00:00+03:00 — Squad.Agents.AI Security Posture Inherited from Sister Squad
+
+**Request:** Inherit security posture for Squad.Agents.AI from tamresearch1 sister squad. Audit B1–B6 blockers, track NEW-1…NEW-4 watch items, review NuGet suppressions, conduct PR #3 security audit, establish ongoing review obligations.
+
+**Sources Reviewed:**
+- Sister squad Decision 439 (B1–B6 blocker re-inventory for squad-agent-framework-demo)
+- Sister squad Decision 602 (5 NuGetAuditSuppress entries for MongoDB, PowerShell SDK, KurrentDB transitives)
+- GitHub PR tamirdresher/squad#3 (diff: .gitignore, pr-body.md, README.md)
+- Sister squad public-export-checklist SKILL (low confidence, validated in practice)
+
+**Verdict: PASS** — All B1–B6 blockers CLEARED in actual demo repo; NEW-1…NEW-4 flagged on ongoing review checklist; PR #3 audit PASS with documentation flags on GitHubToken, TraceEvents, TLS behavior.
+
+**Key Findings:**
+- **B1–B6 Status:** All six original blockers cleared in squad-agent-framework-demo@main. Blockers were documented against different upstream repo; actual demo repo clean or already remediated.
+- **NEW-1 (Personal Blog Link):** README references tamirdresher.com (first-party project, acceptable for M2 sample-wedge; escalate if transferred to corporate org in M4).
+- **NEW-2 (Squad Branding Gate):** Deferred to Tamir A/B directive; not a security issue.
+- **NEW-3 (TLS Toggle):** Not present in PR #3; no NODE_TLS_REJECT_UNAUTHORIZED=0 hardcoded. Clear.
+- **NEW-4 (Vestigial Dir):** Flagged for pre-M4 hygiene cleanup; not blocking.
+- **NuGet Suppressions:** 5 entries for third-party transitives (MongoDB, PowerShell SDK, KurrentDB). All necessary; quarterly review scheduled.
+- **PR #3 Audit:** PASS. No hardcoded tokens, personal data, or path leakage. GitHubToken guidance correct (use GitHubTokenProvider for production). TraceEvents logging secure.
+
+**Ongoing Review Obligations:**
+- Pre-PR checklist: B1/B2 gitignore validation, personal data grep scan, asset inventory, README link audit, NuGet suppression expiry
+- Quarterly review cycle: Audit suppressions, NEW-1…NEW-4 status, TraceEvents/TLS toggles
+- Adopt public-export-checklist SKILL as re-usable artifact; integrate into CI/CD for community-NuGet repos
+
+**Decision filed:** .squad/decisions/inbox/worf-squad-agents-ai-security-baseline.md
+
+---
+
+### [2026-06-02 Session] Cross-Reference: Squad.Agents.AI Onboarding Fan-Out
+
+**Session Log:** `.squad/log/2026-06-02T09-04-38Z-squad-agents-ai-onboarding.md`  
+**Decision Entry:** `.squad/decisions.md` section "2026-06-02 — Squad.Agents.AI NuGet Onboarding: 5-Agent Fan-Out"  
+**Coordinating Agents:** Worf (this agent, security baseline), Picard (strategy), Data (technical baseline), B'Elanna (build/CI), Seven (provenance).
+
+This session synthesized five coordinated reports into a single onboarding decision batch. Worf's security clearance (B1–B6 blockers CLEARED, new watches NEW-1…NEW-4 flagged for ongoing review) paired with Data's technical baseline and B'Elanna's CI findings. Key consensus: v0.1 safe for NuGet publish; v0.2 requires quarterly suppression audit schedule establishment and CI/CD integration of public-export-checklist SKILL.
+
+
+**Who should know:** Tamir (project owner, NEW-1/NEW-2 context), Security Team (quarterly audit suppression review), PR Reviewers (pre-PR checklist confirmation), CI/CD Ops (public-export-checklist SKILL integration).

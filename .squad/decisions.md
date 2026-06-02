@@ -1,8 +1,115 @@
 # Squad Decisions
 
-**Last Updated:** 2026-06-02T08:45:58Z
+**Last Updated:** 2026-06-02T12:04:38Z
 
 ## Active Decisions
+
+---
+
+### 2026-06-02 — Squad.Agents.AI NuGet Onboarding: 5-Agent Fan-Out
+
+**Date:** 2026-06-02T12:04:38.931+03:00  
+**Context:** Coordinator fanned out 5 agents in parallel to onboard squad-squad to the Squad.Agents.AI NuGet work originally driven by tamresearch1 sister squad (PR #3 in tamirdrescher/squad, feature/squad-agents-ai).
+
+**Outcome:** Five coordinated reports synthesized into a single onboarding decision batch. Each agent owns a specific layer: strategic lineage (Picard), technical baseline (Data), security baseline (Worf), build/CI/packaging (B'Elanna), and cross-repo provenance (Seven).
+
+#### Seven — PR #3 Cross-Repo Research & NuGet Provenance
+
+**Agent:** Seven (Research & Integration Engineer)  
+**Task:** Cross-repo research to establish PR #3 provenance and NuGet metadata lineage.
+
+**Findings:**
+- PR #3 (`feature/squad-agents-ai`) is a draft in `tamirdrescher/squad`.
+- `src/Squad.Agents.AI/Squad.Agents.AI.csproj` contains the package source.
+- Commit `8f2679db` is an anchor point in the PR history.
+- Design provenance traces to tamresearch1 Data (Decision 444 / commit `4b608357f`).
+- PR commits authored by "Reno" — identity unclear; recommend clarification with Tamir.
+
+#### Picard — Strategic Lineage & Adoption Framework
+
+**Agent:** Picard (Architect & Product Confidence Lead)  
+**Task:** Strategic context and adoption recommendations for Squad.Agents.AI.
+
+**Key Findings:**
+- Decision 443 represents a **pivot from MAF first-party to community NuGet:** Explicit directive from Tamir (2026-05-28) to ship SquadAgent as community NuGet from Squad's own repo, not as MAF contribution.
+- **v0.1 feature-complete:** Fluent `.AsAIAgent()` wrapper, DI helpers, trace logging, partial Aspire metadata baseline.
+- **Recommendation:** Merge PR #3 → tag v0.1 → publish to NuGet.org → plan v0.2.
+- **Open Q:** Aspire telemetry depth in v0.2 vs v1.0+; repo home long-term (tamirdrescher/squad vs squad-squad).
+
+#### Data — Technical Baseline & API Surface
+
+**Agent:** Data (Squad Framework Expert)  
+**Task:** Establish technical baseline and API surface for Squad.Agents.AI.
+
+**Key Findings:**
+- **Public API:** 4 types: `SquadAgent`, `SquadAgentOptions`, `SquadConnectionFactory`, `SquadServiceCollectionExtensions`.
+- **Pins:** `Microsoft.Agents.AI.GitHub.Copilot` `1.7.0-preview.260526.1`, `Microsoft.Extensions.AI` `10.6.0`.
+- **Target Framework:** `net10.0` only.
+- **Package Identity:** `Squad.Agents.AI`, `Version=0.1.0-preview`, MIT, unpublished.
+- **Top Gaps:**
+  - Prove Squad routing functionally (confirm routing works without explicit `SessionConfig.Agent = "Squad"`).
+  - Add release automation (versioning, NuGet publish workflow).
+  - Harden dependency pins (direct-pin `GitHub.Copilot.SDK`, decide on AOT/trimming readiness).
+
+#### Worf — Security Baseline & Reliability Gates
+
+**Agent:** Worf (Security & Reliability Lead)  
+**Task:** Security posture and reliability assessment for Squad.Agents.AI.
+
+**Key Findings:**
+- **PR #3 Security Review:** **PASS** B1–B6 cleared.
+- **Watch List:** NEW-1 through NEW-4 (token handling, URI parsing, trace logging, direct token storage).
+- **Audit Suppressions:** 5 NuGetAuditSuppress entries verified necessary (MongoDB SharpCompress/Snappier, PowerShell SDK XML crypto x2, KurrentDB OpenTelemetry.Api). Quarterly review cadence proposed.
+- **No blockers to v0.1 release.** Recommend merge and tag.
+
+#### B'Elanna — Build/CI/Packaging Baseline
+
+**Agent:** B'Elanna (Distributed Workflow & Build Expert)  
+**Task:** Establish build/CI/packaging baseline and identify release readiness gaps.
+
+**Key Findings:**
+- **Build Baseline:** `net10.0`, inline pins (no CPM/global.json/nuget.config), local build/pack succeeded, 14/14 tests passed.
+- **CI Status:** PR #3 green BUT only Node/docs gates. **No .NET restore/build/test/pack gate exists** — critical gap.
+- **Audit:** Local audit clean, 5 suppressions verified necessary (inherited from Track B baseline).
+- **Release Readiness Gaps:**
+  1. Add .NET CI gate (SDK setup, restore, vulnerability audit, build, test, pack, artifact upload).
+  2. Add deterministic SemVer release flow (tag- or workflow-input-driven, not ad hoc csproj editing).
+  3. Add NuGet publish workflow with `dotnet nuget push --skip-duplicate`, registry selection, `NUGET_API_KEY`, environment approval.
+  4. Add CHANGELOG/release notes policy for the NuGet package.
+  5. Decide on central package management, `global.json`, NuGetAudit policy, warnings-as-errors.
+  6. Clean XML doc warnings (9 warnings currently; blocker if warnings → errors).
+  7. Decide SourceLink, symbol package, signing/provenance, package validation requirements.
+
+**Reliability Requirements for Publish Pipeline:**
+- Build `.nupkg` once, retain it, publish that exact artifact. Do not rebuild during retry.
+- Use concurrency key (package ID + version) so only one publisher can push a given version.
+- Use `dotnet nuget push --skip-duplicate` and verify registry state after push.
+- Keep NuGet secrets out of PR/fork contexts; publish only from release or approved manual dispatch.
+- Model each registry target as explicit state: pending → pushed → verified. Multi-registry publish must be retry-safe per target.
+
+#### Summary: Onboarding Verdict
+
+**v0.1 Release Readiness (Picard + Worf consensus):** ✓ **READY TO MERGE**
+
+- Technical baseline stable (Data).
+- Security review clear (Worf, B1–B6 PASS).
+- Build/pack verified locally (B'Elanna).
+- Strategic context inherited and documented (Picard).
+- No blockers to tag v0.1 and publish.
+
+**Critical Path for v0.2 / Future Delivery:**
+1. Add .NET CI gate to `.github/workflows/squad-ci.yml` (B'Elanna blocker).
+2. Establish NuGet publish workflow (B'Elanna blocker).
+3. Confirm Squad routing functionally without explicit agent config (Data open question).
+4. Plan Aspire telemetry integration scope (Picard open question).
+
+**Known Open Items for Tamir:**
+- **Reno provenance:** Seven found PR commits authored by "Reno" — clarify identity and authority.
+- **Repo home long-term:** Is tamirdrescher/squad production home or interim? Should we re-home to squad-squad after v0.1 stabilization?
+- **Aspire commitment:** Decide v0.2 scope (full telemetry integration vs defer to v1.0+).
+- **Known consumers:** Are there users/teams consuming v0.1 that should be notified of ownership transition (tamresearch1 → squad-squad)?
+
+**Citations:** Decisions 437–448 (tamresearch1); tamresearch1/.squad/agents/picard/history.md; PR #3 (tamirdrescher/squad); local verification via worktree and .NET SDK 10.0.204.
 
 ---
 

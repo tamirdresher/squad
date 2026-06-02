@@ -13,6 +13,14 @@ Data owns Squad framework expertise. Key learnings:
 - **Gotcha documented:** vitest in junction-linked worktrees resolves SDK dist stale (fails local, passes CI fresh)
 - **Skill created:** `extract-test-from-competing-pr` (PR deduplication pattern)
 
+### [2026-06-02 Session] Cross-Reference: Squad.Agents.AI Onboarding Fan-Out
+
+**Session Log:** `.squad/log/2026-06-02T09-04-38Z-squad-agents-ai-onboarding.md`  
+**Decision Entry:** `.squad/decisions.md` section "2026-06-02 — Squad.Agents.AI NuGet Onboarding: 5-Agent Fan-Out"  
+**Coordinating Agents:** Data (this agent, technical baseline), Worf (security), Picard (strategy), Seven (provenance), B'Elanna (build/CI).
+
+This session synthesized five coordinated reports into a single onboarding decision batch. Data's technical baseline (4 public types, SDK pins, package identity) paired with B'Elanna's build/CI findings and Worf's security gate clearance. Key open: confirm Squad routing functionally without explicit agent config; decide GitHub.Copilot.SDK direct-pin strategy.
+
 ## Recent Sessions (Last 30 days)
 - Wrote readiness/blocker note to `.squad/decisions/inbox/data-real-repo-validation-readiness.md`; Worf must reopen Tier 2 real-repo substitute validation before execution.
 - Prepared scope uses isolated copies of `squad-memory-governance` first and optionally `squad`, removes `.github\workflows`, keeps A/B prompts identical, retains all guards, and marks `realCopilotCliE2E: false`.
@@ -104,6 +112,175 @@ Data owns Squad framework expertise. Key learnings:
 - The `squad` repo's team uses Mission Control roles such as Flight, CAPCOM, CONTROL, FIDO, and others. This project uses Star Trek names, but Data owns equivalent Squad SDK/CLI expertise here.
 
 ## Learnings
+
+### Squad.Agents.AI NuGet — Technical Onboarding (2026-06-02)
+
+Captured timestamp: 2026-06-02T12:04:38.931+03:00.
+
+#### Source base read
+
+- Authoritative PR: `tamirdresher/squad#3`, title `[DRAFT - needs local test] feat: Squad.Agents.AI community NuGet`, state `OPEN`, draft `true`, head branch `feature/squad-agents-ai`, base `main`.
+- PR #3 commits inspected: `8f2679db87c451b0774752e71d2bcc6eee14993a` (initial package), `ad05d3d4342a57b5ae708db38cc2272d33d9c4bd` (PR body), `f5b6c5f0a3dbd1f5e9d7e098360b9f57e5d8ced7` (inherit `AIAgent`, remove `IChatClient` force-cast), `257fc684c96844d55fe786bc1ec01384d0519462` (README rewrite), `d6e59b3392790c548df21429273a4d31c1b0cf6e` (`GitHubTokenProvider` + redacted `ToString()`), `c97fee6bafbb827716a273cf99419f1f541d8487` (README token-provider docs), `2c357c057cae8e66db29640992940e86aa76d1b5` (`ConnectionStrings__squad`/`IConfigureOptions` binding), `db7940a78ee34766794c6cf9fd27cd4d08be73e4` (README removes deleted `WithTeamRoot`).
+- PR #3 file paths: `.gitignore`; `pr-body.md`; `src/Squad.Agents.AI/README.md`; `src/Squad.Agents.AI/Squad.Agents.AI.csproj`; `src/Squad.Agents.AI/SquadAgent.cs`; `src/Squad.Agents.AI/SquadAgentOptions.cs`; `src/Squad.Agents.AI/SquadAgentOptionsConfigurator.cs`; `src/Squad.Agents.AI/SquadConnectionFactory.cs`; `src/Squad.Agents.AI/SquadServiceCollectionExtensions.cs`; `test/Squad.Agents.AI.Tests/Squad.Agents.AI.Tests.csproj`; `test/Squad.Agents.AI.Tests/SquadConnectionFactoryTests.cs`; `test/Squad.Agents.AI.Tests/SquadServiceCollectionExtensionsTests.cs`.
+- PR #3 diff size: 12 files changed, 1025 insertions. `.gitignore` adds root `bin/`, `obj/`, and `artifacts/` ignores. All `src/Squad.Agents.AI/` and `test/Squad.Agents.AI.Tests/` files are new.
+- Local Squad repo: `C:\Users\tamirdresher\source\repos\squad` is currently checked out on `squad/781-watch-verbose-reliability`, not PR #3. The PR branch exists locally as `remotes/fork/feature/squad-agents-ai`; the current worktree does not contain `Squad.Agents.AI` at repo root. Inspect PR files via the remote branch instead of checking out because the local repo has unrelated modified/untracked files.
+- Sample scaffold source: `C:\Users\tamirdresher\tamresearch1\.squad\research\maf-contribution-drafts\03-sample-pr-scaffold\dotnet\samples\02-agents\SquadAgent\` (`SquadAgent.cs`, `SquadAgentOptions.cs`, `Program.cs`, `README.md`, `SquadAgent.csproj`).
+- Working demo comparison: `C:\Users\tamirdresher\source\repos\squad-agent-framework-demo\Squad.AgentFramework.Demo.csproj` and `C:\Users\tamirdresher\source\repos\squad-agent-framework-demo\SquadAgent.cs`.
+- Tamresearch1 source decisions/history read: `C:\Users\tamirdresher\tamresearch1\.squad\decisions.md`, `C:\Users\tamirdresher\tamresearch1\.squad\agents\data\history.md`, and `history-archive.md`.
+
+#### A. Public API surface
+
+| Public type | PR #3 path | Purpose | Key members | Mutability / contract note |
+|---|---|---|---|---|
+| `Squad.Agents.AI.SquadAgent` | `src/Squad.Agents.AI/SquadAgent.cs` | Squad-flavored `Microsoft.Agents.AI.AIAgent` wrapper over a GitHub Copilot `CopilotClient`/inner `AIAgent`. It centralizes Squad-ish options, DI construction, logging, and disposal. | Constructors: `SquadAgent(SquadAgentOptions options, ILoggerFactory? loggerFactory = null)`, `SquadAgent(IOptions<SquadAgentOptions> options, ILoggerFactory? loggerFactory = null)`. Public overrides: `Name`, `Description`. Inherited public agent entry points come from `AIAgent`; protected core overrides delegate to `_inner`: `CreateSessionCoreAsync`, `RunCoreAsync`, `RunCoreStreamingAsync`, `SerializeSessionCoreAsync`, `DeserializeSessionCoreAsync`. Public lifecycle: `ValueTask DisposeAsync()`. | No public settable properties on the agent. Sealed class. Owns a `CopilotClient` when constructed from options. Delegates session and run behavior to `_inner = _copilotClient.AsAIAgent(instructions: options.Instructions, name: options.AgentName ?? "Squad")`. |
+| `Squad.Agents.AI.SquadAgentOptions` | `src/Squad.Agents.AI/SquadAgentOptions.cs` | Options bag for `SquadAgent`, bindable from DI/app configuration and Aspire connection strings. | `SquadFolderPath`, `CliPath`, `CliArgs`, `Cwd`, `Environment`, `GitHubToken`, `GitHubTokenProvider`, `TraceEvents`, `AgentName`, `Instructions`, and redacting `ToString()`. | PR #3 uses mutable options, not init-only: string/bool/function properties are `get; set;`; `CliArgs` is get-only but the `IList<string>` instance is mutable; `Environment` is get-only but the `IDictionary<string,string?>` instance is mutable. `GitHubToken` is `[JsonIgnore]`; `ToString()` prints `GitHubToken = [REDACTED]`. This differs from the sample scaffold, whose `SquadAgentOptions` used init-only properties (`CliPath`, `WorkingDirectory`, `AgentName`, `BoundaryInstructions`). |
+| `Squad.Agents.AI.SquadConnectionFactory` | `src/Squad.Agents.AI/SquadConnectionFactory.cs` | Static parser for connection strings emitted by the Aspire Squad resource or supplied manually. | `public static SquadAgentOptions FromConnectionString(string connectionString)`. Supports literal PATH form and `squad://localhost?...` URI form. URI query parameters parsed today: `teamRoot`, `cliPath`, `cwd`, `cliArgs` (semicolon-separated), `env` (`key=value;key2=value2`). | Static type; no instance state. Throws `ArgumentException` on null/empty/whitespace. Host and `protocol` are ignored/reserved. PATH form sets both `SquadFolderPath` and `Cwd` to the full string. |
+| `Squad.Agents.AI.SquadServiceCollectionExtensions` | `src/Squad.Agents.AI/SquadServiceCollectionExtensions.cs` | DI registration surface for consumers. | `AddSquadAgent(this IServiceCollection services, Action<SquadAgentOptions>? configure = null)` and `AddSquadAgent(this IServiceCollection services, ServiceLifetime lifetime, Action<SquadAgentOptions>? configure = null)`. Registers `SquadAgent` and `AIAgent` with the selected lifetime; default lifetime is scoped. Registers `SquadAgentOptionsConfigurator` as `IConfigureOptions<SquadAgentOptions>` via `TryAddEnumerable`; applies user callback via `services.Configure(configure)`. Adds `PostConfigure<ILoggerFactory>` warning when `TraceEvents` is true. | Static extension type; no instance state. No keyed DI overloads in v0.1. Warning text says production caution, but code currently warns whenever `TraceEvents` is true; it does not inspect `IHostEnvironment`. |
+
+Not public but important: `Squad.Agents.AI.SquadAgentOptionsConfigurator` in `src/Squad.Agents.AI/SquadAgentOptionsConfigurator.cs` is `internal sealed`. It reads `IConfiguration.GetConnectionString("squad")`, parses it with `SquadConnectionFactory`, fills only unset scalar options, appends missing CLI args, and fills only missing environment keys. This is the `ConnectionStrings__squad`/Aspire binding bridge.
+
+Public types that existed in earlier designs but are **not** present in PR #3: `SquadTelemetry`, `SquadDefaults`, `WithTeamRoot`, `AddSquadAgentFromConnectionString`, keyed DI registration types, an `ExtensionSlug` property, and any public session type.
+
+#### B. SDK contract
+
+- Direct package references in `src/Squad.Agents.AI/Squad.Agents.AI.csproj`:
+  - `Microsoft.Agents.AI.GitHub.Copilot` = `1.7.0-preview.260526.1`.
+  - `Microsoft.Extensions.AI` = `10.6.0`.
+  - `Microsoft.Extensions.Options` = `10.0.8`.
+  - `Microsoft.Extensions.DependencyInjection.Abstractions` = `10.0.8`.
+  - `Microsoft.Extensions.Hosting.Abstractions` = `10.0.8`.
+  - `Microsoft.Extensions.Logging.Abstractions` = `10.0.8`.
+- `GitHub.Copilot.SDK` is used by source (`using GitHub.Copilot.SDK;`, `CopilotClient`, `CopilotClientOptions`) but is **not** a direct PR #3 package reference. It is expected transitively through `Microsoft.Agents.AI.GitHub.Copilot`. This is a version-control risk: the package does not directly pin the SDK whose public types it imports.
+- `Microsoft.Agents.AI` core is also used by source (`AIAgent`, `AgentSession`, `AgentRunOptions`, `AgentResponse`, `AgentResponseUpdate`) and likely arrives transitively via the GitHub Copilot MAF package; there is no direct `Microsoft.Agents.AI` package reference in PR #3.
+- `AIAgent` base class contract used by `SquadAgent`: PR #3 subclasses `AIAgent` directly, overrides `Name` and `Description`, and implements the protected core methods by forwarding to `_inner`. It does not force-cast to `IChatClient`; PR body text about `(IChatClient)(object)agent` is stale after commit `f5b6c5f0a3dbd1f5e9d7e098360b9f57e5d8ced7`.
+- `CopilotClientOptions` usage in PR #3: `CliPath = options.CliPath`; `Cwd = options.Cwd ?? options.SquadFolderPath`; `GitHubToken = resolvedToken`; `CliArgs = options.CliArgs.ToArray()` when non-empty; `Environment = Dictionary<string,string>` copied from non-null option values; `Logger = loggerFactory.CreateLogger<CopilotClient>()` when `TraceEvents` is true.
+- Token resolution order: `GitHubTokenProvider(CancellationToken.None).GetAwaiter().GetResult()` wins over `GitHubToken`. That means token retrieval is synchronous during construction and does not receive the per-run cancellation token.
+- `SessionConfig` usage: PR #3 does not construct `SessionConfig` directly. Boundary/system text is passed as `instructions: options.Instructions` to `AsAIAgent`; per tamresearch1 Decision 441 this maps to the underlying `GitHubCopilotAgent` system message/session config. The original sample scaffold did use `SessionConfig.WorkingDirectory`, manual `SquadAgentSession.IsFirstTurn`, and `FormatUserMessage`; Decision 441 said that first-turn preamble should be deleted in favor of `instructions:`.
+- Assumptions and flagged contracts:
+  - The sample scaffold's `SessionConfig.WorkingDirectory` and `CopilotClientOptions.CliPath` assumptions were explicitly flagged for verification by the requested 1054 item. Decision 441 later verified `CopilotClientOptions` operational properties (`CliPath`, `CliArgs`, `Cwd`, `Environment`, `GitHubToken`, etc.). PR #3 avoids direct `SessionConfig.WorkingDirectory` by setting `CopilotClientOptions.Cwd`.
+  - `AsAIAgent(name: ...)` is identity metadata, not routing. Decision 447/Q5 resolved that routing happens through `CopilotClientOptions.CliPath`/`CliArgs`/`Cwd`/`Environment`, not through `name`. PR #3 sets name to `Squad`, but that alone does not route to a Squad Copilot extension.
+  - If invoking the actual Squad extension requires `SessionConfig.Agent = "Squad"` or a specific CLI arg, PR #3 currently does not do that explicitly. `SquadFolderPath` only defaults `Cwd`; it is not included in system instructions and is not validated for `.squad/` existence.
+  - `TraceEvents` does not wire `OnEvent`, `Streaming`, or `IncludeSubAgentStreamingEvents` like the working demo; it only assigns `CopilotClientOptions.Logger`. This is narrower than the demo's trace implementation.
+
+#### C. Packaging metadata
+
+From `src/Squad.Agents.AI/Squad.Agents.AI.csproj`:
+
+| Field | PR #3 value |
+|---|---|
+| SDK | `Microsoft.NET.Sdk` |
+| `TargetFramework` | `net10.0` |
+| `Nullable` | `enable` |
+| `ImplicitUsings` | `enable` |
+| `LangVersion` | `latest` |
+| `IsPackable` | `true` |
+| `PackageId` | `Squad.Agents.AI` |
+| `Title` | `Squad Agents AI` |
+| `Description` | `Community SquadAgent for Microsoft Agent Framework. Exposes the Squad multi-agent CLI as an AIAgent that can be composed into any MAF app or workflow.` |
+| `Authors` | `Squad contributors` |
+| `PackageTags` | `squad;agent-framework;maf;copilot;ai-agent` |
+| `RepositoryUrl` | `https://github.com/bradygaster/squad` |
+| `RepositoryType` | `git` |
+| `PackageLicenseExpression` | `MIT` |
+| `PackageReadmeFile` | `README.md` |
+| `GenerateDocumentationFile` | `true` |
+| `Version` | `0.1.0-preview` |
+| README packing | `<None Include="README.md" Pack="true" PackagePath="\" />` |
+
+Packaging notes/blockers:
+
+- There is no `Directory.Build.props` in the PR #3 file list or `src/Squad.Agents.AI` tree, so no shared .NET metadata/versioning is being imported for this package.
+- `GeneratePackageOnBuild` is absent, so package generation on build is not enabled by the project; the documented path is explicit `dotnet pack -c Release -o ../../artifacts`.
+- `RepositoryUrl` points to `https://github.com/bradygaster/squad`, while the PR and branch live under `tamirdresher/squad`. This is a release metadata blocker unless upstream is the intended final package source.
+- `Authors` is generic (`Squad contributors`); no `PackageProjectUrl`, source link, symbol package settings, changelog, release notes, or NuGet publish workflow are present.
+- NuGet.org flat-container lookup for `squad.agents.ai` returned 404, so the package is not published there under that ID at the time of this onboarding.
+- PR #3 is still draft/open. Root workflows in the branch are existing Squad Node/npm workflows; no workflow references `dotnet`, `nupkg`, `NuGet`, or `Squad.Agents.AI`.
+- The PR body is stale: it says unit tests are deferred, but PR #3 now adds `test/Squad.Agents.AI.Tests/` with xUnit tests.
+
+#### D. Integration patterns
+
+- Standalone DI:
+  ```csharp
+  using Microsoft.Agents.AI;
+  using Microsoft.Extensions.DependencyInjection;
+  using Squad.Agents.AI;
+
+  var services = new ServiceCollection();
+  services.AddLogging();
+  services.AddSquadAgent(options =>
+  {
+      options.SquadFolderPath = @"C:\path\to\team-root";
+      options.Cwd = @"C:\path\to\team-root";
+      options.GitHubToken = Environment.GetEnvironmentVariable("GH_TOKEN");
+      options.Instructions = "You are the repo-local Squad facade.";
+  });
+
+  var provider = services.BuildServiceProvider();
+  var squad = provider.GetRequiredService<AIAgent>();
+  var session = await squad.CreateSessionAsync();
+  var response = await squad.RunAsync("hello squad", session);
+  ```
+- Aspire/config binding:
+  - `AddSquadAgent()` with no callback reads `ConnectionStrings:squad` via `IConfiguration.GetConnectionString("squad")`; in environment-variable form this is `ConnectionStrings__squad`.
+  - PATH connection string (`C:\team-root` or `/Users/me/team-root`) maps to `SquadFolderPath` and `Cwd`.
+  - URI connection string (`squad://localhost?teamRoot=...&cliPath=...&cwd=...&cliArgs=--verbose;--trace&env=KEY=value`) maps to the corresponding options.
+  - The connection-string configurator runs before user callbacks; callbacks can override scalar values and append additional CLI args/environment values.
+- Lifetime and multiple squads:
+  - Default `AddSquadAgent()` lifetime is `Scoped`; overload accepts any `ServiceLifetime`.
+  - Registers both concrete `SquadAgent` and base `AIAgent`, so consumers can resolve either.
+  - No keyed DI exists; multiple teams in one app require manual service-registration workarounds today.
+- Working-directory isolation:
+  - `CopilotClientOptions.Cwd` defaults to `options.Cwd ?? options.SquadFolderPath`.
+  - There is no validation that the directory exists, contains `.squad/`, is a git repo, or is isolated/containerized. Consumer must pick a safe team root and process identity.
+- Session-scoped chat history:
+  - Consumers should create/pass `AgentSession` for multi-turn coherence.
+  - `SquadAgent` delegates session creation, serialization, deserialization, sync run, and streaming run to `_inner`.
+  - The original sample scaffold held a custom `SquadAgentSession` with `IsFirstTurn`; PR #3 removed that in favor of inner MAF session behavior.
+- Boundary/system instructions:
+  - Sample scaffold injected boundary instructions manually into the first user turn via `FormatUserMessage`.
+  - PR #3 passes `SquadAgentOptions.Instructions` into `AsAIAgent(instructions: ...)`, so instructions are expected to become the inner agent's system message/session config.
+  - PR #3 has no default Squad boundary text. If `Instructions` is null, no explicit Squad governance preamble is set by this wrapper.
+- Demo comparison:
+  - `squad-agent-framework-demo\Squad.AgentFramework.Demo.csproj` targets `net9.0`, references `GitHub.Copilot.SDK 1.0.0-beta.2`, `Microsoft.Agents.AI 1.5.0`, `Microsoft.Agents.AI.GitHub.Copilot 1.5.0-preview.260507.1`, and workflow packages.
+  - Demo `SquadAgent.cs` constructs `GitHubCopilotAgent` directly with `SessionConfig { Agent = "Squad", OnPermissionRequest = PermissionHandler.ApproveAll, OnEvent = ..., Streaming = ..., IncludeSubAgentStreamingEvents = ... }`, adds a hard-coded read-only boundary system message, and has richer event tracing.
+  - PR #3 packaging is narrower and cleaner for NuGet, but it drops demo-specific `SessionConfig.Agent`, `PermissionHandler.ApproveAll`, native event tracing, `Capabilities`, `IdCore`, and hard-coded boundary behavior.
+
+#### E. Known v0.1 release risks and v0.2 backlog
+
+From tamresearch1 Decision 453 / requested persona-validation entries:
+
+- Persona validation result: Noob, Senior, and Expert personas found no v0.1 blockers, but identified risks to validate/document and a v0.2 backlog.
+- v0.1 risks to document/validate:
+  - Data: cancellation propagation — prove `CancellationToken` on `RunAsync()`/streaming cancels the CLI subprocess and does not orphan it.
+  - B'Elanna: thread safety under parallel load — profile multiple concurrent `SquadAgent` calls and track process count/resource exhaustion.
+  - Data: CLI error-message clarity — break the team root/auth and verify the wrapper surfaces actionable errors rather than opaque failures.
+  - Data history also tracks AOT/Trimming readiness as a release-risk concern, while the decision table places it in the v0.2 Track A backlog.
+- v0.2 feature backlog by owner:
+  - Data / Track A: keyed DI registration for two or more `SquadAgent` instances with different team roots; session-serialization docs for `GitHubTokenProvider` closures; AOT/Trimming readiness (`DynamicallyAccessedMembers` audit/fixes); cancellation and error-message improvements.
+  - B'Elanna / Track B: parallel concurrency profile; Aspire dashboard resource updates for SquadAgent telemetry.
+  - Worf / Track C: token-provider caching semantics; token source audit trail; URI parsing security to prevent query params from becoming shell injection vectors.
+- Decision 441/447 technical risks still relevant:
+  - `GitHubCopilotAgent` is sealed; wrapper/delegation is correct.
+  - `AsAIAgent(name: ...)` does not route to Squad; routing must be operational (`CliPath`, `CliArgs`, `Cwd`, `Environment`).
+  - `net10.0` honors the locked preference but raises the adoption bar above MAF's broader target floor.
+  - Preview SDK package `Microsoft.Agents.AI.GitHub.Copilot 1.7.0-preview.260526.1` can break before stable.
+
+#### F. What is missing for this squad to continue
+
+Concrete continuation gaps:
+
+1. Publish state: `Squad.Agents.AI` is not published on NuGet.org under that ID; PR #3 remains draft/open.
+2. Release workflow: no dotnet build/test/pack/publish workflow exists in PR #3; existing workflows are Squad Node/npm workflows.
+3. Package metadata hardening: confirm final repository URL (`tamirdresher/squad` vs `bradygaster/squad`), authorship, project URL, source link, symbol package, release notes, and README package rendering.
+4. Versioning/changelog: no package-specific `CHANGELOG.md`, release notes, MinVer/Nerdbank/GitVersion strategy, or preview-to-stable policy.
+5. Dependency pins: direct `GitHub.Copilot.SDK` pin is absent despite source using its public types; confirm transitive version and lock strategy.
+6. Build/test wiring: xUnit tests exist (14 smoke tests) but need CI inclusion and a solution or explicit test command in repo docs.
+7. Behavioral validation: run local `dotnet restore`, `dotnet build -c Release`, `dotnet test`, `dotnet pack`, then a consumer smoke app with a real `.squad/` team root.
+8. Runtime contract validation: verify whether PR #3 actually invokes Squad (not just bare Copilot) without `SessionConfig.Agent = "Squad"` or an explicit CLI arg.
+9. Security validation: token-provider deadlock/blocking behavior, direct token storage, URI env/CLI arg injection, and trace logging content need Worf review.
+10. Documentation/sample apps: README has quick start and troubleshooting, but PR #3 has no dedicated sample app project; the external demo remains separate and targets older package versions.
+11. AOT/trimming/multi-target: no trimming annotations; `net10.0` only; no `net8.0`/`net9.0` compatibility plan in package metadata.
+12. Observability: demo event-tracing/Aspire dashboard behavior is not in PR #3; decide whether v0.1 intentionally excludes it or tracks it for v0.2.
 
 - `origin/squad/949-fix-externalized-state-paths` — externalized path resolution (not merged)
 - `origin/squad/864-state-backend-hardening` — retry + circuit-breaker (not merged)
