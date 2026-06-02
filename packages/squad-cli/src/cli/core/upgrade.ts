@@ -945,14 +945,30 @@ export async function selfUpgradeCli(options: SelfUpgradeOptions = {}): Promise<
   try {
     execSync(cmd, { stdio: 'inherit' });
   } catch (err: unknown) {
-    const isPermission =
-      err instanceof Error &&
-      'code' in err &&
-      (err as NodeJS.ErrnoException).code === 'EACCES';
+    // UPGRADE-EPERM-FALSE-SUCCESS fix: do NOT swallow self-upgrade failures.
+    // Previously this only printed a warning and returned, causing the caller
+    // (cli-entry.ts) to then unconditionally print "✅ Upgraded" and exit 0.
+    // Now we surface the failure as a thrown error so the caller can exit non-zero
+    // and avoid the contradictory success message.
+    const errMsg = err instanceof Error ? err.message : String(err);
+    const code = err instanceof Error && 'code' in err
+      ? ((err as NodeJS.ErrnoException).code ?? '')
+      : '';
+    const isPermission = code === 'EACCES' || code === 'EPERM' || /EACCES|EPERM|permission denied/i.test(errMsg);
+    const isBusy = code === 'EBUSY' || /EBUSY|in use|cannot access|being used by another process/i.test(errMsg);
+
+    let hint: string;
     if (isPermission) {
-      warn(`Permission denied. Try: sudo ${cmd}`);
+      hint = `Permission denied. Try: sudo ${cmd}`;
+    } else if (isBusy) {
+      hint = `A file is in use (likely another squad shell is running). Close other squad CLI processes and retry: ${cmd}`;
     } else {
-      warn(`Upgrade failed. Try running manually: ${cmd}`);
+      hint = `Upgrade failed. Try running manually: ${cmd}`;
     }
+
+    warn(hint);
+    const failure = new Error(`Self-upgrade failed: ${hint}`);
+    (failure as NodeJS.ErrnoException).code = code || undefined;
+    throw failure;
   }
 }

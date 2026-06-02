@@ -392,7 +392,16 @@ async function main(): Promise<void> {
     
     // Handle --self: upgrade the CLI package itself
     if (selfUpgrade) {
-      await selfUpgradeCli({ insider, force: forceUpgrade });
+      try {
+        await selfUpgradeCli({ insider, force: forceUpgrade });
+      } catch (err) {
+        // UPGRADE-EPERM-FALSE-SUCCESS fix: surface the failure clearly and exit
+        // non-zero. Previously the warning from selfUpgradeCli was followed by
+        // an unconditional "✅ Upgraded" + exit 0, producing contradictory output.
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`❌ Self-upgrade failed: ${msg}`);
+        process.exit(1);
+      }
       console.log('✅ Upgraded. Please restart your terminal for changes to take effect.');
       return;
     }
