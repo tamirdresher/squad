@@ -6,6 +6,358 @@
 
 ---
 
+### [COMPLETED] 2026-06-02 — PR #3 R2b Handoff: Sample App 4-Flow Implementation
+
+# B'Elanna PR #3 R2b Handoff
+
+**Date:** 2026-06-02  
+**Branch:** `feature/squad-agents-ai`  
+**Commit:** `b55d6221`  
+**PR:** https://github.com/tamirdresher/squad/pull/3
+
+## What Was Done
+
+Added a runnable sample application to `samples/squad-agents-ai-sample/` demonstrating all four core integration patterns of `Squad.Agents.AI`:
+
+| Flow | Pattern |
+|---|---|
+| 1 | Basic DI (`AddSquadAgent` + `RunAsync`) |
+| 2 | Keyed DI (`AddKeyedSquadAgent` × 2 + `GetRequiredKeyedService<SquadAgent>`) |
+| 3 | BYOK via `ConfigureCopilotClient` delegate |
+| 4 | Streaming via `RunStreamingAsync` + `await foreach` |
+
+Files created:
+- `samples/squad-agents-ai-sample/Squad.Agents.AI.Sample.csproj` — net10.0, project ref to src, Hosting 10.0.0
+- `samples/squad-agents-ai-sample/Program.cs` — all 4 flows, `--flow=N` CLI arg, graceful missing-CLI error handling
+- `samples/squad-agents-ai-sample/README.md` — prerequisites, run commands, per-flow walkthrough, troubleshooting table
+
+Files modified:
+- `.github/workflows/squad-agents-ai-ci.yml` — added sample to `paths` triggers + restore/build steps
+
+PR body updated with a "Round 2b" section.
+
+## Key Technical Note
+
+`CopilotClientOptions.Environment` is `IReadOnlyDictionary<string, string>`. The property setter is available but the indexer is read-only. Use:
+```csharp
+clientOpts.Environment = new Dictionary<string, string> { ["KEY"] = "value" };
+```
+Not:
+```csharp
+clientOpts.Environment["KEY"] = "value";  // compile error
+```
+
+## What's Pending
+
+- **CI result**: Workflow will trigger from the push. Check https://github.com/tamirdresher/squad/actions for status.
+- **Data's SquadAgentOptions auth-mode expansion**: If `SquadAgentOptions` changes, sample may need updates. The CI gate on PR #3 will catch compile-time breaks.
+- **Code review**: PR #3 may receive reviewer feedback on the sample structure.
+
+## No Blockers
+
+Build is clean (0 errors, 0 warnings). Code is pushed and PR body is updated.
+
+---
+### [COMPLETED] 2026-06-02 — Squad CLI Iteration 3 + Re-smoke Validation
+
+# Decision drop — Data, iteration 3 + re-smoke
+
+**Agent:** Data (Squad Framework Expert)
+**Date:** 2026-06-02
+**Status:** complete — awaiting Tamir's review
+
+## Outcome
+
+🟢 **GO** for expanding combined-fix tarball validation to remaining 4 test repos.
+
+## What shipped
+
+| Artifact | Reference |
+|---|---|
+| CLI fix commits | `3b44f45e`, `a0fa7e3e` on `tamirdresher/squad:squad/state-backend-upgrade-fixes` |
+| PR (body updated with iter-3 addendum) | bradygaster/squad#1200 |
+| Gap-3 follow-up issue | bradygaster/squad#1203 |
+| Twin tarballs (v0.9.6-preview.5) | `C:\Users\tamirdresher\squad-validation\bradygaster-squad-{sdk,cli}-combined-fixes.tgz` |
+| Verdict report | `.squad/files/validation/TARBALL-SMOKE-ITERATION-3-VERDICT.md` |
+| Manifest update | `.squad/files/validation/COMBINED-FIX-BRANCH-MANIFEST.md` (squad-squad master) |
+
+## Per-gap status
+
+- **GAP-1** (`squad sync` registered) — ✅ closed (`3b44f45e`)
+- **GAP-2** (`squad_state` insert behavior) — ✅ closed on BOTH init + upgrade paths (`3b44f45e` + `a0fa7e3e`)
+- **GAP-3** (single-tarball ETARGET) — ➖ workaround documented; release-pipeline fix tracked in #1203
+
+## Re-smoke evidence (travel-assistant + multiplayer-sudoku, fresh clones, seeded stale mcp-config)
+
+- After `squad init --state-backend two-layer`: `squad_state` entry **inserted** with pin `@bradygaster/squad-cli@0.9.6-preview.5` on both repos; `EXAMPLE-github` preserved on both.
+- `squad sync --quiet` exits `0` on both (no "Unknown command").
+
+## Key learning to preserve
+
+The SDK's `init.ts` rewrite of `.copilot/mcp-config.json` uses `writeIfNotExists` semantics — it skips when the file already exists. Any future MCP-config retrofit helper MUST be wired into BOTH `runEnsureChecks` AND `squad init`, not just upgrade.
+
+## Recommended next move for Tamir
+
+Proceed to broader 4-repo validation using the v0.9.6-preview.5 twin-install pattern from the verdict report. No further fix-bundle changes required.
+
+---
+### [COMPLETED] 2026-06-02 — MCP Loader Root Cause Analysis
+
+# Decision: MCP loader root cause for tarball validation runs
+
+**Author:** Data
+**Date:** 2026-06-02T19:18:27.631+03:00
+**References:** PR bradygaster/squad#1200, issue bradygaster/squad#1204, `.squad/files/validation/MCP-LOADER-ROOT-CAUSE.md`, `.squad/files/validation/TARBALL-FULL-tamir-squad-hq.md`
+
+## Summary
+
+The "MCP tools unavailable mid-session" finding from all 6 tarball validation runs is caused by **Theory 2 (unresolvable npx version pin)**, not Theory 1 (session reload). `ensureSquadStateMcpPinned` writes `npx -y @bradygaster/squad-cli@0.9.6-preview.5 state-mcp` into `.copilot/mcp-config.json`, but `0.9.6-preview.5` is a local-tarball-only version that does not exist on the npm registry. The MCP host runs the spawn command, npx ETARGETs, the server never starts.
+
+## Which theory matched
+
+**Theory 2.** Evidence:
+
+- `npm view @bradygaster/squad-cli versions --json` highest published: `0.9.6-insider.3`.
+- `npm view @bradygaster/squad-cli dist-tags --json`: `{ "latest": "0.9.4", "insider": "0.9.6-insider.3", "preview": "0.8.17-preview" }`.
+- `npx -y @bradygaster/squad-cli@0.9.6-preview.5 state-mcp` → `npm error code ETARGET — No matching version found`.
+- `npx -y @bradygaster/squad-cli state-mcp` → returns all 7 tools cleanly.
+
+Theory 1 was never reached because Theory 2 fully explains the symptom — even a perfectly fresh Copilot CLI session would spawn the same broken launch spec.
+
+## Fix path
+
+**Option A** (recommended, ~40 LOC):
+- In `packages/squad-cli/src/cli/core/upgrade.ts:705` (`ensureSquadStateMcpPinned`), before writing the pinned spec, HEAD-check `https://registry.npmjs.org/@bradygaster/squad-cli/<cliVersion>`.
+- If the version exists → write the current literal pin (preserves Gap-2 contract).
+- If 404 or offline → fall back to `@bradygaster/squad-cli@insider` dist-tag (current insider has `state-mcp`).
+- Add regression test in `test/mcp-bridge-pinning.test.ts` mocking both code paths.
+- Optionally print a one-line operator hint when the fallback is used.
+
+Belongs in PR #1200 or an immediate follow-up on `squad/state-backend-upgrade-fixes`.
+
+## Was the fix implemented
+
+**No.** Per prompt escalation rule ("If the fix is non-trivial (architectural...) document precisely in the report, DO NOT touch code"), I did not modify `upgrade.ts`. The fix:
+- Touches the contract for what gets baked into the committed `mcp-config.json`.
+- Introduces a network dependency at init/upgrade time (registry HEAD check) with offline-fallback semantics that need design review.
+- Affects how PR validation tarballs interact with the launch spec (i.e., the validation tooling will need to know the fallback path is OK).
+
+These are decisions for the PR #1200 author / coordinator, not a unilateral patch. The full RCA, three fix options with tradeoffs, and the validation re-test plan are in `.squad/files/validation/MCP-LOADER-ROOT-CAUSE.md`. Tracking issue filed at bradygaster/squad#1204.
+
+## What changed in the validation environment
+
+- Created `.squad/files/validation/MCP-LOADER-ROOT-CAUSE.md` (full RCA).
+- No changes to `tamir-squad-hq-dup-20260602T183202` (kept as-is for repro).
+- No new tarball, no branch push, no manifest iteration-4 entry — the next iteration is gated on the PR #1200 owner deciding whether to absorb Option A.
+
+## Recommendation to coordinator
+
+1. Comment on PR #1200 linking to issue #1204 and this RCA.
+2. Decide: roll Option A into #1200 (clean closure of the MCP-BRIDGE-BROKEN saga) vs. ship #1200 as-is and follow up with a separate PR.
+3. If rolling in: implement, rebuild twin tarball, re-run `TARBALL-FULL-tamir-squad-hq.md` Phase 3.5 re-validation steps from the RCA. Pass criteria: `git log squad-state --oneline | wc -l >= 3` after the 4 continuity sessions.
+
+---
+### [COMPLETED] 2026-06-02 — Tarball Validation 4/6 (gh-ai-adoption2026)
+
+# Data → Coordinator — Tarball validation 4/6 (gh-ai-adoption2026)
+
+**Date:** 2026-06-02T17:30:00+03:00
+**Slice:** 4/6 (tarball validation against `tamirdresher/gh-ai-adoption2026`, cross-org personal clone)
+**Tarballs:** `bradygaster-squad-{sdk,cli}-combined-fixes.tgz` @ `0.9.6-preview.5`
+**Branch:** `squad/state-backend-upgrade-fixes` @ `a0fa7e3e` / PR #1200
+
+## Repos provisioned (retained per directive)
+
+- Fresh-init dup: https://github.com/tamirdresher_microsoft/gh-ai-adoption2026-tarball-test-20260602-183150
+- Upgrade-path dup: https://github.com/tamirdresher_microsoft/gh-ai-adoption2026-tarball-upgrade-20260602-190500
+
+## Install path
+
+LOCAL prefix `C:\Users\tamirdresher\squad-validation\.npm-prefix-ghai2026` — global install raced with parallel agent (EPERM on `C:\ProgramData\global-npm\squad`).
+
+## Headline verdicts
+
+| Area | Status |
+|---|---|
+| Twin install + version (`0.9.6-preview.5`) | ✅ |
+| Fresh init `--state-backend two-layer` — all 6 hooks, orphan branch, MCP pinned, INSIDER3 leak fixed | ✅ |
+| `squad sync` registered, post-commit hook silent-pass | ✅ GAP-1 mechanical |
+| `ensureSquadStateMcpPinned` insert path on init AND upgrade | ✅ GAP-2 |
+| 3 fresh sessions — does orphan grow? | ❌ Orphan SHA `a230634` unchanged across all 3 sessions (GAP-1 end-to-end OPEN) |
+| `squad upgrade --state-backend two-layer` migrates state, installs hooks, pins MCP, no contradictory ⚠️/✅ | ✅ flagship win — fixes UPGRADE-FLAG-IGNORED + UPGRADE-NO-MIGRATION + UPGRADE-EPERM-FALSE-SUCCESS + WI-1 |
+| 2 continuity sessions — Scribe persists? | ❌ `NO_SQUAD_STATE_COMMANDS` — MCP bridge could not start because pinned `npx -y @bradygaster/squad-cli@0.9.6-preview.5` ETARGETs (version not on npm) |
+| Auth restored | ✅ `tamirdresher_microsoft` |
+
+## NEW finding — GAP-5
+
+Pin to running CLI version (GAP-2 fix) → `npx -y @bradygaster/squad-cli@0.9.6-preview.5 state-mcp` fails ETARGET because preview.5 is only a tarball, not on npm registry. Bridge can't start → Scribe correctly refuses → orphan never grows from agent activity.
+
+Repro:
+```
+npx -y @bradygaster/squad-cli@0.9.6-preview.5 state-mcp
+# npm error code ETARGET
+```
+
+Suggested fixes (for follow-up PR):
+1. When CLI is itself running from a dev/tarball install, pin to `latest` (or use a `link://` sentinel that resolves locally).
+2. Probe `npm view <spec>` at init/upgrade and fall back to `latest` with warning if ETARGET.
+3. Provide a `node_modules/.bin/squad-state-mcp` shim referenced absolutely in MCP config.
+
+This evaporates the moment the preview is published to npm; it does **not** invalidate the GAP-2 fix.
+
+## Bug count for this slice
+
+- Fixed: 8 (WI-1, EPERM-FALSE, FLAG-IGNORED, NO-MIGRATION, MCP-BROKEN config, INSIDER3-LEAK, GAP-1 mechanical, GAP-2 insert)
+- Open: 2 (GAP-1 behavioural — agents don't use MCP tools they have; GAP-3 / #1203 unpublished SDK)
+- New: 1 (GAP-5 — pin-to-unpublished-version blocks bridge in tarball/dev installs)
+
+## Reports
+
+- Full evidence + matrix: `.squad/files/validation/TARBALL-FULL-gh-ai-adoption2026.md`
+- Duplicate copy in each dup: `validation/FRESH-PATH-TARBALL-VALIDATION-gh-ai-adoption2026.md`
+
+## Recommended next action for Coordinator
+
+- Roll up across 6 tarball validations. If GAP-5 is reported by other agents too, file as a new issue against bradygaster/squad before any preview tag is shipped to testers without publishing.
+- The behavioural Gap-1 (agents not using MCP tools) is the next-most-important investigation: probably needs a prompt-layer enforcement (e.g. Scribe's pre-flight refusing FS writes when stateBackend≠local) rather than another CLI fix.
+
+---
+### [COMPLETED] 2026-06-02 — Tarball Validation 6/6 (tamir-squad-hq)
+
+# Inbox: Data — Tarball validation 6/6 (tamir-squad-hq, worst-case)
+
+**Date:** 2026-06-02T17:30:00+03:00
+**Agent:** Data
+**Repo under test:** `tamirdresher_microsoft/tamir-squad-hq` (Tamir's personal HQ — heavily pre-squadified)
+**Duplicate (kept):** `tamirdresher_microsoft/tamir-squad-hq-tarball-test-20260602T183202`
+**Tarballs:** `bradygaster-squad-{sdk,cli}-combined-fixes.tgz` (twin) → `0.9.6-preview.5`
+**Full report:** `.squad/files/validation/TARBALL-FULL-tamir-squad-hq.md`
+
+## Headline
+- **GAP-2 retrofit: PERFECT on the worst-case repo.** Pre-existing `.copilot/mcp-config.json` had 5 user-added MCP servers (`azure-devops`, `bitwarden`, `bitwarden-shadow`, `EXAMPLE-trello`, `chrome-devtools`) and no `squad_state` entry. Post-upgrade: all 5 preserved untouched + `squad_state` inserted with correct pin `@bradygaster/squad-cli@0.9.6-preview.5`.
+- Upgrade migrated `decisions.md` (≈1 MB) + 17 agent histories to the orphan branch in one shot; `stateBackend: two-layer` added cleanly (no Bug E duplicate keys); all 6 hooks installed; `--self` correctly exited 1 on EPERM (no fake ✅).
+- **One real bug still open** (NOT a regression of this PR): Copilot CLI does not load the `squad_state` MCP server into the agent session at startup, so the orphan branch did not grow across 4 continuity sessions. State-mcp server is healthy when invoked directly (all 7 `squad_state_*` tools register). Recommend a separate follow-up against Copilot CLI's MCP loader.
+
+## Pre/post mcp-config snapshot
+
+Servers PRE (5): `azure-devops, bitwarden, bitwarden-shadow, EXAMPLE-trello, chrome-devtools`
+Servers POST (6): same 5 + `squad_state` (inserted with correct pin)
+Removed: none. Clobbering: none.
+
+## Verdicts
+| Item | Result |
+|---|---|
+| Gap 2 retrofit (worst case) | ✅ pass |
+| Gap 1 (`squad sync` registered) | ✅ pass |
+| UPGRADE-FLAG-IGNORED | ✅ fixed |
+| UPGRADE-NO-MIGRATION | ✅ fixed (18 files migrated) |
+| WI-1 hooks | ✅ all 6 installed; pre-commit actively blocked illegal commits |
+| UPGRADE-EPERM-FALSE-SUCCESS | ✅ fixed (loud exit 1) |
+| MCP-BRIDGE-BROKEN (runtime in Copilot CLI session) | ❌ still open (not config-level) |
+
+## Continuity session orphan growth
+| # | Prompt | Orphan +commits |
+|---|---|---|
+| 1 | "what did the team work on most recently?" | 0 |
+| 2 | "Lead, summarize the squad's current focus" | 0 |
+| 3 | "Tester, propose 2 follow-up validation tasks" | 0 |
+| 4 | "Lead, decide which follow-up is highest priority" | 0 — Scribe explicitly refused (no MCP bridge in session) |
+
+Agents READ pre-upgrade `decisions.md` correctly (session 1 surfaced March 2026 Picard protocol + Seven patent work). The refusal-to-hand-write behavior is correct governance.
+
+## Recommendation
+- This PR is ready to land for state-backend fixes. The remaining Copilot CLI runtime MCP loading issue should be filed separately.
+
+Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>
+
+---
+### [COMPLETED] 2026-06-02 — Tarball Smoke Test 2/2 (multiplayer-sudoku)
+
+# Data — Tarball smoke 2/2 outcome drop (multiplayer-sudoku)
+
+**Date:** 2026-06-02T15:35:00+03:00
+**Author:** Data (Squad Framework Expert)
+**Mission:** validate combined-fix bundle (`bradygaster-squad-cli-combined-fixes.tgz`, head `8ab9a305`) on tamirdresher_microsoft/multiplayer-sudoku as the 2/2 smoke test parallel to travel-assistant.
+
+## Duplicate URLs
+- Fresh-init:  https://github.com/tamirdresher_microsoft/multiplayer-sudoku-tarball-test-20260602T1610
+- Upgrade-path: https://github.com/tamirdresher_microsoft/multiplayer-sudoku-upgrade-test-20260602T1610
+- Report (browsable): https://github.com/tamirdresher_microsoft/multiplayer-sudoku-tarball-test-20260602T1610/blob/main/validation/FRESH-PATH-TARBALL-VALIDATION-multiplayer-sudoku.md
+- Mirrored to squad-squad: `.squad/files/validation/TARBALL-SMOKE-multiplayer-sudoku.md`
+
+## Bug verdict counts
+- ✅ Confirmed FIXED: **6**
+  - WI-1 fresh init (all 6 hooks installed)
+  - WI-1 upgrade retrofit (all 6 hooks installed)
+  - INSIDER3-INIT-LEAK (9 state files lifted to orphan branch; `liftInitMutableStateOntoOrphan` works)
+  - UPGRADE-FLAG-IGNORED (`--state-backend` honoured on upgrade; explicit log lines)
+  - UPGRADE-NO-MIGRATION (decisions.md + 8 agent histories migrated verbatim)
+  - UPGRADE-EPERM-FALSE-SUCCESS (exit 1, no contradictory `✅ Upgraded`, clear `❌ Self-upgrade failed`)
+- ❌ Still failing / new gaps: **2**
+  - MCP-BRIDGE incomplete: `ensureSquadStateMcpPinned` no-ops when `.copilot/mcp-config.json` exists without a `squad_state` entry; init does not add it either. Both fresh-init and post-upgrade sessions had Scribe correctly refuse to mutate (state tools unavailable).
+  - `squad sync` command missing: post-commit hook calls `squad sync --quiet 2>/dev/null || true` but `squad sync` is not a registered command. Result: hooks are installed but working-tree commits never propagate to orphan branch. Across 3 work sessions, `squad-state` accrued **zero** new commits.
+
+## Publishing prerequisite (not a bundle defect, but a release blocker)
+- `@bradygaster/squad-sdk@0.9.6-preview.3` is not on npm. Global `npm install -g <cli.tgz>` fails with ETARGET. Workaround: install the sibling SDK tarball alongside.
+- The MCP pin `npx -y @bradygaster/squad-cli@0.9.6-preview.3 state-mcp` will 404 at runtime until the CLI is published. Insider.4 must publish both packages together.
+
+## Bottom-line
+Two-layer is moved from decoration to mostly-functional. Baseline P0s (init lift, upgrade migration, exit-code correctness, hook install, config integrity) are demonstrably fixed. End-to-end persistence still blocked by (a) missing `squad sync` command, (b) MCP retrofit conservativeness — both must land before insider.4.
+
+## Cross-repo input for synthesis
+- Both gaps are equally relevant to travel-assistant or any repo that already has `.copilot/mcp-config.json` (most realistic repos do).
+- EPERM fix verified under real concurrency with peer agent — meaningful Windows reliability win.
+- Recommend insider.4 test plan include at least one repo with prior partial squad install to catch the MCP retrofit gap.
+
+---
+### [COMPLETED] 2026-06-02 — Tarball Smoke Test 1/2 (travel-assistant)
+
+# Tarball Smoke 1/2 — travel-assistant — Outcome Drop
+
+**Author:** Data (research)
+**Date:** 2026-06-02
+**Tarball:** `bradygaster-squad-cli-combined-fixes.tgz` (squad CLI 0.9.6-preview.3)
+**Baseline:** insider.3
+**Subject repo:** `tamirdresher/travel-assistant`
+
+## Duplicates (PRIVATE, persist for browsing)
+
+- Fresh-path: https://github.com/tamirdresher_microsoft/travel-assistant-tarball-test-20260602T1610
+- Upgrade-path: https://github.com/tamirdresher_microsoft/travel-assistant-upgrade-test-20260602T1610
+
+## Bug verdict counts
+
+| Status | Count | Bugs |
+|---|---|---|
+| ✅ FIXED | 5 | WI-1 hooks, UPGRADE-FLAG-IGNORED, UPGRADE-NO-MIGRATION, UPGRADE-EPERM-FALSE-SUCCESS, A/F-MIGRATION (not manifested) |
+| ⚠️ PARTIAL | 1 | INSIDER3-INIT-LEAK (10 files lifted; new dirs `Rai/`, `memory/`, `rai/` still leak) |
+| ❌ BROKEN | 1 | MCP-BRIDGE-BROKEN (root cause persists: helper PINS but does not INSERT) |
+| 🚫 BLOCKED | 1 | Tarball install ETARGET; SDK-side init-time pinning fix NOT exercised |
+
+## Bottom-line verdict
+
+**The combined-fix bundle substantially improves the insider.3 baseline but does NOT restore end-to-end two-layer functionality on travel-assistant.** Two material blockers remain:
+
+1. **Tarball not installable as-shipped** — `@bradygaster/squad-sdk@>=0.9.6-preview` is unpublished; npm ETARGET. Workaround via `overrides` forces SDK to insider.3, which means the SDK-side init-time pinning fix is bypassed entirely in this smoke test.
+
+2. **MCP-BRIDGE-BROKEN persists on repos with pre-existing `.copilot/mcp-config.json` lacking `squad_state`** — `ensureSquadStateMcpPinned` only pins existing entries; it does not insert a missing one. Post-upgrade Scribe explicitly refused writes citing missing `squad_state_*` MCP tools.
+
+## Recommendation
+
+**HOLD on bulk-rolling the remaining 4 repos for tarball smoke** until:
+
+1. SDK iteration-2 build is republished as a valid `>=0.9.6-preview` (or tarball peerDep is relaxed to accept insider builds). Without this, all tarball smoke tests bypass the SDK fix and produce false-positive INIT-LEAK verdicts.
+2. `ensureSquadStateMcpPinned` is upgraded to INSERT the entry when missing (not just pin existing). Without this, every repo whose Copilot config pre-dates Squad will fail MCP-BRIDGE regardless of backend.
+
+In the interim, smoke 2/2 (multiplayer-sudoku, non-Node project) has been run by a peer agent — see history entry "Tarball smoke 2/2" — and surfaced **6 fixes confirmed, 2 new/incomplete-fix gaps**. The two runs together give Brady enough signal to triage; further repos are unlikely to add new information until the two blockers above are addressed.
+
+## Artifacts
+
+- Stable report copy: `.squad/files/validation/TARBALL-SMOKE-travel-assistant.md`
+- Pattern notes appended to: `.squad/agents/data/history.md` (entry "Tarball smoke 1/2: travel-assistant")
+- Validation captures (10 logs + 1 verdict matrix) committed to both duplicates under `validation/`
+
+---
 ### 2026-06-02 — Squad.Agents.AI NuGet Onboarding: 5-Agent Fan-Out
 
 **Date:** 2026-06-02T12:04:38.931+03:00  
@@ -4469,4 +4821,5 @@ The coordinator will run Workstream Discovery, resolve `WORKSTREAM_PATH`, pass b
 ---
 
 *Handoff complete. Next action: Picard reviews this PR; Tamir activates by setting `SQUAD_WORKSTREAM=squad-agents-ai`.*
+
 

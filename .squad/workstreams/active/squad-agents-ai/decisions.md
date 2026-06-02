@@ -12,6 +12,328 @@
 
 ---
 
+### [COMPLETED] 2026-06-02 — PR #3 Round 2c: Sample Co-location + README Consolidation (Data, commit e214c4fb)
+
+
+
+**Date:** 2026-06-02
+**Commit SHA:** `e214c4fb`
+**Branch:** `feature/squad-agents-ai` → `tamirdresher/squad`
+**CI:** ✅ All checks green (Squad.Agents.AI CI ubuntu + windows, Squad CI)
+
+---
+
+## Final Sample Path + Justification
+
+`src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/`
+
+Plural `samples/` chosen: the squad repo already uses `samples/` (plural) for its collection of TypeScript examples, and a future Aspire sample is queued — plural form accommodates it without restructure.
+
+---
+
+## Files Moved / Modified
+
+| Action | Path |
+|---|---|
+| Moved (git mv, ~98% similarity) | `samples/squad-agents-ai-sample/Program.cs` → `src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/Program.cs` |
+| Moved (git mv, ~90% similarity) | `samples/squad-agents-ai-sample/Squad.Agents.AI.Sample.csproj` → `src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/Squad.Agents.AI.Sample.csproj` |
+| Moved + replaced with stub | `samples/squad-agents-ai-sample/README.md` → `src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/README.md` |
+| Modified | `src/Squad.Agents.AI/Squad.Agents.AI.csproj` — added `<Compile Remove="samples/**/*.cs" />` |
+| Modified | `src/Squad.Agents.AI/README.md` — appended `## Sample` section |
+| Modified | `.github/workflows/squad-agents-ai-ci.yml` — updated paths trigger + restore/build step paths |
+
+`samples/squad-agents-ai-sample/` directory removed (bin/obj untracked, not staged).
+`samples/` directory retained — it contains 13 other TypeScript squad samples.
+
+---
+
+## Build Verification
+
+| Check | Result |
+|---|---|
+| `dotnet build src/Squad.Agents.AI/Squad.Agents.AI.csproj -c Release` | ✅ Build succeeded, 0 errors |
+| `dotnet build src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/Squad.Agents.AI.Sample.csproj -c Release` | ✅ Build succeeded, 0 errors |
+| `dotnet test test/Squad.Agents.AI.Tests/ -c Release` | ✅ 43/43 passed, 0 failures |
+
+---
+
+## Sample Sanity-Check — Captured stdout (flow 1, no CLI installed)
+
+```
+======================================================================================================
+  Squad.Agents.AI v0.1 — sample run (team root: C:\Users\tamirdresher\source\repos\squad-pr3-round1)
+======================================================================================================
+
+
+── Flow 1 — Basic DI registration ──
+Agent name : SampleSquad
+Sending   : "What is 2 + 2?"
+
+┌─────────────────────────────────────────────────────────┐
+│  GitHub Copilot CLI was not found on PATH               │
+│                                                         │
+│  Install it and sign in before running this sample:     │
+│    https://github.com/github/copilot-cli                │
+│                                                         │
+│  See the sample README.md for full prerequisites.       │
+└─────────────────────────────────────────────────────────┘
+[Flow 1 ✓]==================================================
+  All requested flows completed.
+==================================================
+```
+
+Outcome: **clear-error** — friendly box printed, no stack trace, exit 0. UX guarantee confirmed.
+
+---
+
+## Sample README Disposition
+
+**Option A (stub)** selected. `src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/README.md` contains:
+
+```markdown
+# Squad.Agents.AI Sample
+
+For docs see [../../README.md#sample](../../README.md#sample).
+```
+
+Rationale: preserves discoverability when someone navigates the sample directory directly (e.g. via GitHub file browser).
+
+---
+
+## For B'Elanna — PR Body References
+
+**Final sample path to reference in the PR body:**
+```
+src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/
+```
+
+**Exact `dotnet run` invocations that work:**
+```bash
+# Run all four flows
+dotnet run --project src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/
+
+# Run a single flow
+dotnet run --project src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/ -- --flow=1
+dotnet run --project src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/ -- --flow=2
+dotnet run --project src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/ -- --flow=3
+dotnet run --project src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/ -- --flow=4
+```
+
+---
+
+## CI Status
+
+Run IDs on `tamirdresher/squad`:
+- `Squad.Agents.AI CI` (ID 26834411740) — ✅ 2m13s
+- `Squad CI` (ID 26834411663) — ✅ 3m51s
+.Trim()
+
+---
+### [RESEARCH] 2026-06-02 — PR #3 R2c: Brady PR Body Draft & Upstream Conventions (B'Elanna)
+
+**Summary:** Researched bradygaster/squad PR template structure and external contributor patterns to draft an upstream-ready PR body for PR #3. No changeset required (separate .NET package). 
+
+---
+date: 2026-06-02
+changeset_required: false
+changeset_reason: "Squad.Agents.AI is a new .NET package, independent of bradygaster/squad's npm monorepo changesets. Versioning via .NET csproj; release automation is separate."
+upstream_pr_conventions_found:
+  - template_structure: "What / Why / How / Quick Check / PR Readiness Checklist"
+  - required_sections:
+    - summary_what
+    - why_problem_and_issue_link
+    - how_design_decisions
+    - changelog_status
+    - branch_and_commit_quality
+    - build_test_lint_passing
+    - breaking_changes
+  - voice: "Direct, factual, user-benefit-focused; external contributors common; Copilot review workflow standard"
+  - handoff_point: "External contributors mark ready-for-review after CI passes and respond to Copilot suggestions"
+external_contributor_pr_references:
+  - "https://github.com/bradygaster/squad/pull/1181 (paulyuk: README installation instructions)"
+  - "https://github.com/bradygaster/squad/pull/1166 (weinong: MCP frontmatter option)"
+---
+
+# PR Body Draft: Squad.Agents.AI Community NuGet Package
+
+## What
+
+This PR adds `Squad.Agents.AI`, a community .NET package that exposes a Squad agent team as a Microsoft Agent Framework `AIAgent`. Applications using the Microsoft Agents library can now integrate Squad's capabilities via standard `RunAsync` and `RunStreamingAsync` patterns.
+
+## Why
+
+Teams adopting the Microsoft Agent Framework need a way to invoke Squad agent teams directly from their `AIAgent` workloads. This package provides a thin, secure integration layer that composes the Squad CLI through the GitHub Copilot SDK, allowing DI-based registration and streaming support without reimplementing Squad's agent orchestration.
+
+## How
+
+**Public API surface:**
+- `services.AddSquadAgent(options => …)` — Single agent registration via DI
+- `services.AddKeyedSquadAgent("name", options => …)` — Keyed services for multiple agents (.NET 8+)
+- `options.ConfigureCopilotClient = client => …` — Bring-your-own-client delegate for custom Copilot SDK configuration
+- `agent.RunAsync(thread, options, ct)` — Synchronous invocation returning structured response
+- `agent.RunStreamingAsync(thread, options, ct)` — Token-by-token streaming
+
+**Security posture:**
+- Authentication flows through the Squad CLI process; no tokens stored in-package
+- `Environment` option redacted in `ToString()` to prevent credential leaks in logs
+- Routing-affecting options (`Cwd`, `CliPath`, `CliArgs`) are snapshotted before and restored after any `ConfigureCopilotClient` delegate to prevent SDK customizers from pivoting the agent to a different CLI binary; deviations are logged as warnings
+
+**Testing:**
+- 43 tests (all passing) across `net8.0`, `net9.0`, and `net10.0`
+- CI runs on `ubuntu-latest` and `windows-latest` to verify cross-platform compatibility
+
+**Sample application:**
+The repository includes `samples/squad-agents-ai-sample/` — a runnable .NET console app demonstrating all four core patterns:
+
+1. **Basic DI**: `AddSquadAgent` + `RunAsync`
+2. **Keyed DI**: Multiple agents via `AddKeyedSquadAgent` with `GetRequiredKeyedService<AIAgent>`
+3. **Bring-Your-Own-Client (BYOK)**: `ConfigureCopilotClient` delegate for token injection and environment customization
+4. **Streaming**: `RunStreamingAsync` for token-by-token output
+
+Run the sample:
+```bash
+dotnet run --project samples/squad-agents-ai-sample/
+```
+
+To execute a specific flow:
+```bash
+dotnet run --project samples/squad-agents-ai-sample/ -- --flow=1
+```
+
+**Documentation:**
+README at `src/Squad.Agents.AI/README.md` covers:
+- Installation via `dotnet add package Squad.Agents.AI --prerelease`
+- All four DI registration shapes
+- BYOK and streaming usage
+- Security design rationale
+- Complete sample walkthrough
+
+**Breaking changes:** None.
+
+**Out of scope / deferred:** Redaction of `Environment` in the underlying GitHub Copilot SDK's options-base `ToString()` would require an upstream SDK change and is deferred to a follow-up.
+
+---
+
+## ⚠️ Quick Check
+
+- [x] Squad.Agents.AI is a new .NET package (not part of bradygaster/squad). No changeset required.
+- [x] All tests passing: `dotnet test test/Squad.Agents.AI.Tests/ -c Release`
+- [x] Build verified: `dotnet build src/Squad.Agents.AI/Squad.Agents.AI.csproj -c Release`
+- [x] No user-visible breaking changes
+- [x] Documentation (README) updated
+
+## PR Readiness Checklist
+
+- [x] Branch up to date with target remote
+- [x] Build: `dotnet build` passes
+- [x] Tests: `dotnet test` passes (43/43 green)
+- [x] Type check: no errors
+- [x] No merge conflicts
+- [x] Commit history clean
+- [x] Documentation updated
+- [x] No unintended file changes
+
+---
+### [RESEARCH] 2026-06-02 — Brady PR Conventions & Upstream Voice Analysis (B'Elanna)
+
+---
+date: 2026-06-02
+phase: research-summary
+---
+
+# B'Elanna PR #3 Research Summary
+
+## Brady's PR Template Structure
+
+**Found:** `.github/PULL_REQUEST_TEMPLATE.md` (fully templated)
+
+**Required sections:**
+1. **What** — one paragraph, what changes
+2. **Why** — problem being solved, link issue with `Closes #N`
+3. **How** — approach, key design decisions
+4. **Quick Check** — changeset status (if SDK/CLI source changed)
+5. **PR Readiness Checklist** — 15+ items covering branch, commit, build, test, lint, changelog, docs, exports, breaking changes, waivers
+
+External contributors see this same template but cannot directly edit checkboxes on `CHANGELOG.md` (maintainer-protected).
+
+## Changeset Verdict: NOT REQUIRED
+
+**Why:** Squad.Agents.AI is a **new .NET package in a separate repository** (tamirdresher/squad, not bradygaster/squad). The changeset system (`@changesets/cli`) applies only to the npm monorepo at bradygaster/squad. Its `config.json` specifies `baseBranch: "dev"` and changelog automation for npm packages.
+
+Our .NET package uses .NET versioning via `Squad.Agents.AI.csproj` and will have its own release workflow independent of changesets. No changeset file is needed or expected.
+
+## Brady's Voice & Conventions
+
+- **Tone:** Factual, direct, user-benefit-focused
+- **Spam filters:** Repo has automated spam detection; no malicious links, mass-mentions, or crypto scams
+- **Handoff:** External contributors draft → CI passes → mark ready-for-review → Copilot reviewer posts suggestions → contributor applies manually → core team merges
+- **Branch discipline:** Always branch from `dev`, rebase before PR
+- **Commits:** Single squashed commit, clean history
+- **Testing:** ALL tests must pass before draft-to-ready transition
+
+## Key Lesson from External Contributor PRs
+
+paulyuk (#1181) and weinong (#1166) both:
+- Use simple What/Why/How structure
+- Focus on user benefit (paulyuk: "faster init for people…")
+- Link issues with `Closes #N`
+- NO internal jargon, NO project metadata, NO round/condition IDs
+- Professional, technical language
+
+## Upstream-Ready PR Body Sections
+
+Draft includes:
+1. What (1 para elevator pitch)
+2. Why (problem, need, context)
+3. How (API surface, design decisions, security, sample, docs, deferred items)
+4. Quick Check (changeset verdict, test status)
+5. Readiness Checklist (adapted to .NET)
+
+NO internal references, NO agent names, NO condition IDs, NO "Round 2b" language.
+
+**Draft saved to:** `.squad/workstreams/active/squad-agents-ai/decisions/inbox/belanna-pr3-body-draft.md`
+
+**Waiting on:** Data's sample path confirmation (may move from `samples/squad-agents-ai-sample/` to `src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/`).
+
+---
+### [CONFIRMED] 2026-06-02 — PR #3 Title & Body Finalized for Upstream (B'Elanna)
+
+# Finalization Confirmed — PR #3 R2c
+
+**Date:** 2026-06-02T19:51:00Z  
+**Task:** Push final PR body + remove `[DRAFT]` title prefix via single `gh pr edit` call
+
+## Summary
+
+✅ **COMPLETE** — PR #3 title and body finalized for upstream submission.
+
+## Final State
+
+**Title:** `feat: Squad.Agents.AI - Microsoft Agent Framework adapter for the Squad CLI`  
+(Removed `[DRAFT - needs local test]` prefix; matches upstream contributor conventions)
+
+**Body:** 4089 bytes, all sections present (What / Why / How / Quick Check / PR Readiness Checklist)
+
+**Leak Check:** ✅ PASS — Zero internal references (Picard, Worf, Data, B'Elanna, Reno, Round numbers, SC-*, .squad/, commands)
+
+**Verification:**
+- [x] Title updated (no [DRAFT] present)
+- [x] Body fully reconciled (sample path `src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/`)
+- [x] All checklist items ticked
+- [x] No file changes on PR (body + title via `gh pr edit` only)
+- [x] Post-push state confirmed via `gh pr view`
+
+## For Tamir — Manual Review Suggestion
+
+**One item to spot-check:** Verify the 15-item PR Readiness Checklist aligns with brady's exact template expectations. The draft maps to Brady's structure (branch/commit/build/test/type/conflicts/history/docs/files/sample-path/README-stub/cross-platform/security/contributor-best-practices/N/A-changeset), but Brady's automation may apply GitHub Action checks we haven't seen yet.
+
+---
+
+**PR Link:** https://github.com/tamirdresher/squad/pull/3  
+**Commit reference:** `e214c4fb` (Data's sample restructure)  
+**Ready for:** Upstream review push
+
+---
 ### 2026-06-02 — PR #3 Round 1 Cleanup (Data, commit 88424b79)
 
 **Context:** PR #3 review pass — hygiene, XML docs, cliArgs proof, multi-named connections.
@@ -108,3 +430,4 @@
 **Note:** A copy of this directive also lives in `.squad/workstreams/evergreen/global/decisions/inbox/` because it applies to all workstreams, not only squad-agents-ai.
 
 ---
+

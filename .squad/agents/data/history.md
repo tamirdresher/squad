@@ -309,3 +309,13 @@ Auth restored to `tamirdresher_microsoft` at end.
 
 **Auth note:** push to `tamirdresher/squad` required `gh auth switch --user tamirdresher`; restored to `tamirdresher_microsoft` after push.
 
+
+---
+
+## 2026-06-02 — PR #3 R2c Completion & Upstream-Ready Status
+
+**Data Milestone:** Sample co-location restructured (214c4fb), README consolidated, all CI green.
+
+**PR #3 Status:** ✅ Upstream-ready. Title finalized (eat: Squad.Agents.AI - Microsoft Agent Framework adapter for the Squad CLI), body finalized (4089 bytes, leak check PASS). Ready for Tamir's decision on next step.
+
+**Handoff:** Data → belanna-4/5 completed; PR awaits review push or local iteration decision.
