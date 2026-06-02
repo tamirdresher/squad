@@ -1,6 +1,6 @@
 # Squad Decisions
 
-**Last Updated:** 2026-06-02T12:04:38Z
+**Last Updated:** 2026-06-02T13:50:37Z
 
 ## Active Decisions
 
@@ -2096,4 +2096,804 @@ Routing integration tests have been added to PR #3 (`tamirdresher/squad`, branch
 ## Notes
 
 The tests intentionally do not spawn the Copilot CLI. They construct `SquadAgent` through DI with fake CLI settings and verify persona metadata, boundary instructions, working-directory isolation via `CopilotClientOptions.Cwd`, and Decision 447 routing through `CopilotClientOptions` rather than `AsAIAgent(name:)`.
+
+
+---
+
+## 2026-06-02 — Squad.Agents.AI Auth Expansion + Extensibility (proposal + dual reviewer gate)
+
+### (a) Data — Proposal: Auth-Mode Inventory, Gap Analysis, Extension-Point Candidates, Recommendation, Invariants, Open Questions
+
+# Squad.Agents.AI — Auth Modes & SDK Customization Extensibility Proposal
+
+**Author:** Data (Squad Framework Expert)  
+**Date:** 2026-06-02  
+**Status:** PROPOSAL — Awaiting Picard (architecture) and Worf (security) review  
+**Scope:** Squad.Agents.AI NuGet package (PR #3, `tamirdresher/squad`, branch `feature/squad-agents-ai`)  
+**References:** Decision 447 (Q-lock), Decision 443 (pivot), Decision 444 (NuGet design)
+
+---
+
+## A. Auth-Mode Inventory
+
+The GitHub Copilot SDK (as documented in `github/copilot-sdk`, branch `main`, `docs/auth/authenticate.md` and `docs/auth/byok.md`) supports the following authentication modes:
+
+| # | Auth Mode | SDK Option(s) | Required Inputs | Typical Scenarios | Caveats |
+|---|-----------|--------------|-----------------|-------------------|---------|
+| 1 | **GitHub Signed-in User** | Default (no options) | Pre-existing `copilot` CLI login | Desktop apps, dev/test | Requires interactive OAuth device flow beforehand; credentials stored in system keychain |
+| 2 | **OAuth GitHub App** | `CopilotClientOptions.GitHubToken` + `UseLoggedInUser = false` | User access token (`gho_`, `ghu_`, `github_pat_`) | Web apps, SaaS, multi-user | Classic PATs (`ghp_`) NOT supported; token must come from OAuth flow |
+| 3 | **Environment Variables** | Auto-detected: `COPILOT_GITHUB_TOKEN` → `GH_TOKEN` → `GITHUB_TOKEN` | Env var set with valid token | CI/CD, automation, server-to-server | Priority order matters; no code changes needed |
+| 4 | **HMAC Key** | `CAPI_HMAC_KEY` or `COPILOT_HMAC_KEY` env vars | HMAC key | Server-to-server (Copilot API direct) | Underdocumented; enterprise/internal use |
+| 5 | **Direct API Token** | `GITHUB_COPILOT_API_TOKEN` + `COPILOT_API_URL` env vars | API token + endpoint URL | Direct Copilot API access | Bypasses CLI auth chain |
+| 6 | **GitHub CLI** | Auto-detected from `gh auth` | `gh` CLI authenticated | Developer environments | Lowest priority in auth chain |
+| 7 | **BYOK — OpenAI** | `SessionConfig.Provider` (`type: "openai"`) | `baseUrl`, `apiKey` (optional for local) | Direct OpenAI, Ollama, Foundry Local, vLLM | No Copilot subscription required; model param required |
+| 8 | **BYOK — Azure** | `SessionConfig.Provider` (`type: "azure"`) | `baseUrl`, `apiKey` | Azure OpenAI native endpoints | Don't include `/openai/v1` in URL; SDK handles path |
+| 9 | **BYOK — Anthropic** | `SessionConfig.Provider` (`type: "anthropic"`) | `baseUrl`, `apiKey` | Claude models direct | Always uses Anthropic Messages API |
+| 10 | **BYOK — Bearer Token** | `SessionConfig.Provider` with `bearerToken` | `baseUrl`, `bearerToken` | Custom endpoints needing bearer auth | Static token only; no auto-refresh |
+| 11 | **UseLoggedInUser control** | `CopilotClientOptions.UseLoggedInUser = false` | N/A | Disable auto-login for explicit-only auth | Cross-cutting modifier, not a mode itself |
+
+**Auth Priority Order** (from `docs/auth/authenticate.md`, "Authentication priority" section):
+1. Explicit `gitHubToken` → 2. HMAC key → 3. Direct API token → 4. Env var tokens → 5. Stored OAuth → 6. GitHub CLI
+
+**Sources:**
+- `github/copilot-sdk/docs/auth/authenticate.md` (SHA `0c4d7069`) — modes 1-6, 11
+- `github/copilot-sdk/docs/auth/byok.md` (SHA `504602fd`) — modes 7-10
+- `github/copilot-sdk/docs/auth/index.md` (SHA `b09646d5`) — priority overview
+
+---
+
+## B. MAF Sample Audit
+
+The MAF `Agent_With_GitHubCopilot` sample (at ref `a5f355e04a`, `dotnet/samples/02-agents/AgentProviders/Agent_With_GitHubCopilot/`) uses a bare `new CopilotClient()` with zero auth configuration. It relies entirely on default auth (stored OAuth credentials from `copilot` CLI login), exposing no auth knobs whatsoever. The `.csproj` references `GitHub.Copilot.SDK` as a PackageReference and `Microsoft.Agents.AI.GitHub.Copilot` as a ProjectReference. The `Program.cs` constructs a `CopilotClient`, calls `AsAIAgent(sessionConfig, ownsClient: true)`, and the only customization is a `SessionConfig.OnPermissionRequest` handler. The README's "Advanced Usage" section shows `SessionConfig.Model` and `SessionConfig.Streaming` but no auth parameters.
+
+| Auth Mode | MAF Sample Status |
+|-----------|-------------------|
+| GitHub Signed-in User | ✅ Used (implicit default) |
+| OAuth GitHub App | 🔴 Ignored — no `GitHubToken`/`UseLoggedInUser` parameter |
+| Environment Variables | 🟡 Works implicitly (SDK auto-detects) but not documented |
+| HMAC / Direct API | 🔴 Ignored |
+| GitHub CLI | 🟡 Works implicitly but not documented |
+| BYOK (all providers) | 🔴 Ignored — no `Provider` config |
+| UseLoggedInUser | 🔴 Ignored |
+
+**Conclusion:** The MAF sample is a minimal "hello world" that relies on default auth only. It provides no model for auth extensibility.
+
+**Sources:**
+- `microsoft/agent-framework` at SHA `a5f355e04a`, `dotnet/samples/02-agents/AgentProviders/Agent_With_GitHubCopilot/Program.cs` (SHA `149cbbe0`)
+- `dotnet/samples/02-agents/AgentProviders/Agent_With_GitHubCopilot/Agent_With_GitHubCopilot.csproj` (SHA `143998d2`)
+
+---
+
+## C. Squad.Agents.AI Gap Analysis
+
+Current state assessed from `C:\Users\tamirdresher\source\repos\squad\src\Squad.Agents.AI\` on branch `feature/squad-agents-ai`.
+
+| # | Auth Mode | Squad.Agents.AI Status | Notes |
+|---|-----------|----------------------|-------|
+| 1 | GitHub Signed-in User | ✅ Pass through cleanly | Default when no `GitHubToken`/`GitHubTokenProvider` set |
+| 2 | OAuth GitHub App | ✅ Pass through cleanly | `SquadAgentOptions.GitHubToken` maps to `CopilotClientOptions.GitHubToken`; `GitHubTokenProvider` for production |
+| 3 | Environment Variables | ✅ Pass through cleanly | `SquadAgentOptions.Environment` dict can inject `COPILOT_GITHUB_TOKEN` etc.; SDK auto-detects |
+| 4 | HMAC Key | 🟡 Pass through awkwardly | Must manually add `CAPI_HMAC_KEY` to `SquadAgentOptions.Environment` — no first-class property; undocumented |
+| 5 | Direct API Token | 🟡 Pass through awkwardly | Must inject `GITHUB_COPILOT_API_TOKEN` + `COPILOT_API_URL` via `Environment` dict — no first-class property |
+| 6 | GitHub CLI | ✅ Pass through cleanly | Works by default (SDK fallback) |
+| 7 | BYOK — OpenAI | 🔴 **Blocked** | No `ProviderConfig` / `SessionConfig.Provider` surface on `SquadAgentOptions`; `SquadAgent` constructs `SessionConfig` internally with no provider pass-through |
+| 8 | BYOK — Azure | 🔴 **Blocked** | Same — no `Provider` pass-through |
+| 9 | BYOK — Anthropic | 🔴 **Blocked** | Same — no `Provider` pass-through |
+| 10 | BYOK — Bearer Token | 🔴 **Blocked** | Same — no `Provider` pass-through |
+| 11 | UseLoggedInUser | 🔴 **Blocked** | No `UseLoggedInUser` property on `SquadAgentOptions`; `CreateCopilotClient` never sets it on `CopilotClientOptions` |
+
+**Summary:** 4 modes ✅, 2 modes 🟡, 5 modes 🔴. The main gap is BYOK (all 4 variants) and `UseLoggedInUser`.
+
+---
+
+## D. Proposed API Changes to Close the Auth-Mode Gap
+
+### D.1 — UseLoggedInUser (Mode 11)
+
+**Recommended: Option 1 — New property on `SquadAgentOptions`**
+
+Justification: Simple boolean, no complex types leaked. Matches the existing pattern of auth-related properties on `SquadAgentOptions`.
+
+```csharp
+// SquadAgentOptions.cs — add property
+/// <summary>
+/// When set to false, disables auto-detection of stored CLI/GitHub CLI
+/// credentials. Only explicit tokens (GitHubToken, GitHubTokenProvider,
+/// or environment variables) will be used.
+/// Default: null (SDK default behavior — auto-detect enabled).
+/// </summary>
+public bool? UseLoggedInUser { get; set; }
+```
+
+```csharp
+// SquadAgent.cs — CreateCopilotClient, after line 79
+if (options.UseLoggedInUser.HasValue)
+{
+    clientOptions.UseLoggedInUser = options.UseLoggedInUser.Value;
+}
+```
+
+### D.2 — BYOK Provider (Modes 7–10)
+
+**Recommended: Option 2 — Factory delegate on options + new ProviderConfig wrapper**
+
+Justification: BYOK config is a `SessionConfig`-level concern (per-session, not per-client). We need to pass it through to the inner `SessionConfig` that `SquadAgent` constructs. Option 1 (direct property) works but requires us to expose `ProviderConfig` from the Copilot SDK in our public surface. A factory delegate lets us defer construction and keeps the Squad API somewhat SDK-agnostic. However, after analysis, the simplest approach for v0.1 is a direct property — the `ProviderConfig` type is already transitively public via our dependency.
+
+**Primary recommendation: Direct property on SquadAgentOptions**
+
+```csharp
+// SquadAgentOptions.cs — add property
+/// <summary>
+/// BYOK (Bring Your Own Key) provider configuration.
+/// When set, the agent uses this provider instead of GitHub Copilot
+/// authentication. Supports OpenAI, Azure, Anthropic, and
+/// OpenAI-compatible endpoints.
+/// Requires <see cref="Model"/> to also be set.
+/// See https://github.com/github/copilot-sdk/blob/main/docs/auth/byok.md
+/// </summary>
+public ProviderConfig? Provider { get; set; }
+
+/// <summary>
+/// Model identifier for the AI model to use.
+/// Required when <see cref="Provider"/> is set (BYOK mode).
+/// Optional for Copilot-authenticated modes (SDK selects default).
+/// Examples: "gpt-5.2-codex", "claude-opus-4.5", "phi-4-mini"
+/// </summary>
+public string? Model { get; set; }
+```
+
+```csharp
+// SquadAgent.cs — in the SessionConfig construction (RunCoreStreamingAsync path
+// via the _inner's AsAIAgent call), pass Provider through.
+// The actual change is in CreateCopilotClient or the SessionConfig
+// construction. Since SquadAgent passes `instructions` to AsAIAgent()
+// which builds a SessionConfig internally, we need to instead
+// construct the SessionConfig ourselves:
+
+private static SessionConfig BuildSessionConfig(SquadAgentOptions options)
+{
+    var config = new SessionConfig();
+    
+    if (!string.IsNullOrEmpty(options.Instructions))
+    {
+        config.SystemMessage = new SystemMessageConfig
+        {
+            Mode = SystemMessageMode.Append,
+            Content = options.Instructions
+        };
+    }
+
+    if (options.Provider is not null)
+        config.Provider = options.Provider;
+
+    if (!string.IsNullOrEmpty(options.Model))
+        config.Model = options.Model;
+
+    return config;
+}
+```
+
+### D.3 — HMAC Key (Mode 4) and Direct API Token (Mode 5)
+
+**Recommended: No API changes — document the existing Environment workaround**
+
+Justification: These are niche server-side modes used via environment variables. The existing `SquadAgentOptions.Environment` dictionary is the correct injection point. Adding dedicated properties would over-specialize the API for rare use cases.
+
+```csharp
+// USAGE EXAMPLE (for documentation only):
+services.AddSquadAgent(options =>
+{
+    // HMAC authentication (server-to-server)
+    options.Environment["CAPI_HMAC_KEY"] = hmacKey;
+    
+    // Direct API token
+    options.Environment["GITHUB_COPILOT_API_TOKEN"] = apiToken;
+    options.Environment["COPILOT_API_URL"] = "https://api.copilot.example.com";
+});
+```
+
+---
+
+## E. Inner-SDK Customization Extension Point
+
+### Candidate 1: Configure Delegate — `Action<CopilotClientOptions>`
+
+```csharp
+// On SquadAgentOptions:
+/// <summary>
+/// Optional callback to customize the underlying CopilotClientOptions
+/// before the CopilotClient is constructed. Runs after all standard
+/// Squad options have been applied.
+/// </summary>
+public Action<CopilotClientOptions>? ConfigureCopilotClient { get; set; }
+```
+
+**Pros:**
+- Minimal ceremony; one-liner for consumers
+- Covers 100% of SDK options including future additions
+- Familiar pattern (Action delegate on options)
+
+**Cons:**
+- Leaks `CopilotClientOptions` (Copilot SDK type) into Squad's public API surface
+- Consumers could override routing invariants (Cwd, CliArgs) set by Squad
+- Cannot compose multiple configurators from different DI registrations
+
+### Candidate 2: `IConfigureOptions<CopilotClientOptions>` DI Hook
+
+```csharp
+// In SquadServiceCollectionExtensions:
+public static IServiceCollection AddSquadAgent(
+    this IServiceCollection services,
+    Action<SquadAgentOptions>? configure = null)
+{
+    // ... existing registration ...
+    // NEW: Allow IConfigureOptions<CopilotClientOptions> to compose
+    services.TryAddEnumerable(
+        ServiceDescriptor.Singleton<IConfigureOptions<CopilotClientOptions>,
+            SquadCopilotClientOptionsConfigurator>());
+    // ...
+}
+```
+
+**Pros:**
+- Standard .NET pattern; plays well with M.Extensions.Options
+- Multiple configurators compose naturally (Aspire, test, production layers)
+- Clean separation: Squad registers its configurator first; consumer registers theirs
+
+**Cons:**
+- Requires `CopilotClientOptions` to be registered in DI (currently it's constructed inline in `CreateCopilotClient`)
+- More ceremony for simple cases
+- `CopilotClientOptions` is still leaked into the DI surface (consumers must `using GitHub.Copilot.SDK`)
+- Requires significant refactor of `SquadAgent` constructor to defer client creation to DI
+
+### Candidate 3: Client Factory Override
+
+```csharp
+// On SquadAgentOptions:
+/// <summary>
+/// When set, Squad will use this factory to build the CopilotClient
+/// instead of its internal construction logic. The factory receives
+/// the resolved SquadAgentOptions for reference.
+/// ⚠️ Bypasses all Squad routing invariants — use with extreme caution.
+/// </summary>
+public Func<SquadAgentOptions, CopilotClient>? CopilotClientFactory { get; set; }
+```
+
+**Pros:**
+- Maximum power: consumers can build the client any way they want
+- Escape hatch for exotic deployments Squad can't anticipate
+
+**Cons:**
+- **Bypasses ALL Squad invariants** — routing, working directory, env injection, token handling
+- Consumers must replicate Squad's construction logic or accept broken behavior
+- Extremely dangerous for Decision 447 compliance (routing via `CopilotClientOptions`, not `AsAIAgent(name:)`)
+- Testing burden shifts entirely to consumer
+
+### ⭐ Recommendation
+
+**Primary: Candidate 1 (Configure Delegate)** — `Action<CopilotClientOptions>` on `SquadAgentOptions`.
+
+**Rationale:**
+- Lowest friction for consumers who need to tweak one or two SDK options
+- Squad applies its invariants FIRST, then the delegate runs — so we can document which settings consumers should not override (but cannot enforce at compile time)
+- The `CopilotClientOptions` type leak is acceptable for a v0.1/v0.2 preview: our consumers already transitively depend on `GitHub.Copilot.SDK`
+- If we later decide the type leak is unacceptable, we can wrap it in a Squad-owned options class (semver-minor change, not breaking)
+
+**Secondary (defer to v0.3+): Candidate 2** for environments with complex DI composition (Aspire, multi-tenant). Not needed for v0.1.
+
+**Reject: Candidate 3** — Too dangerous for our invariant surface. If someone truly needs full control, they can construct a `CopilotClient` directly and use `AsAIAgent()` without Squad.Agents.AI at all.
+
+### Implementation Sketch
+
+```csharp
+// SquadAgent.cs — CreateCopilotClient, replace line 106:
+// OLD:
+// return new CopilotClient(clientOptions);
+
+// NEW:
+// Let consumer customize before construction
+options.ConfigureCopilotClient?.Invoke(clientOptions);
+return new CopilotClient(clientOptions);
+```
+
+---
+
+## F. Invariants We Must NOT Let Consumers Break
+
+| # | Invariant | Currently Enforced By | Risk Level with Extension Point |
+|---|-----------|----------------------|-------------------------------|
+| F1 | **Routing via `CopilotClientOptions`** (Decision 447 Q5) | `SquadAgent.CreateCopilotClient` sets `CliPath`, `CliArgs`, `Cwd`, `Environment` | 🟡 MEDIUM — Configure delegate runs AFTER Squad sets these, so consumer could override `CliArgs` or `Cwd`. Mitigation: document as "do not override" + post-configure validation. |
+| F2 | **Boundary instructions on first turn** | `SquadAgent` passes `options.Instructions` to `AsAIAgent(instructions:)` which creates `SessionConfig.SystemMessage` | ✅ SAFE — Configure delegate only touches `CopilotClientOptions`, not `SessionConfig`. SessionConfig is constructed separately. |
+| F3 | **Persona pass-through** (`AgentName`) | `SquadAgent` passes `options.AgentName` to `AsAIAgent(name:)` | ✅ SAFE — Agent name is metadata on the MAF `AIAgent`, not on `CopilotClientOptions`. |
+| F4 | **WorkingDirectory isolation** | `CreateCopilotClient` sets `clientOptions.Cwd = options.Cwd ?? options.SquadFolderPath` | 🟡 MEDIUM — Consumer could override `Cwd` in the configure delegate. Same mitigation as F1. |
+| F5 | **GitHubToken redaction** | `SquadAgentOptions.ToString()` redacts; `GitHubToken` has `[JsonIgnore]` | ✅ SAFE — The configure delegate works on `CopilotClientOptions`, not serialized options. However, if consumer logs `CopilotClientOptions.GitHubToken`, that's their responsibility. |
+| F6 | **TraceEvents warning** | `PostConfigure` in `SquadServiceCollectionExtensions` logs warning if `TraceEvents=true` | ✅ SAFE — Unrelated to `CopilotClientOptions`. |
+| F7 | **No `SessionConfig.Agent` routing** (Decision 447 Q5) | Verified by `SquadAgentRoutingTests.AddSquadAgent_RoutesThroughCopilotClientOptionsNotAgentName` — asserts `SessionConfig.Agent` is null/empty | ✅ SAFE — Configure delegate does not touch `SessionConfig`. BYOK `Provider` property on `SquadAgentOptions` constructs `SessionConfig` through our code, not consumer code. |
+| F8 | **Token provider precedence** | `CreateCopilotClient` checks `GitHubTokenProvider` before `GitHubToken` | 🟡 MEDIUM — Consumer could set `clientOptions.GitHubToken` in the configure delegate, bypassing the provider pattern. Document: "Token set via ConfigureCopilotClient takes final precedence." |
+
+**Convention-only invariants (at risk):**
+- F1 and F4 are enforced by construction order (Squad sets values, then delegate runs) but nothing prevents the delegate from overriding them.
+- **Mitigation strategy:** Add a post-delegate validation in `CreateCopilotClient` that logs a warning (not an exception) if the delegate changed `Cwd` or `CliArgs` from what Squad set. This preserves the escape hatch while alerting consumers they're in unsupported territory.
+
+---
+
+## G. Migration / Back-Compat Risk
+
+### Does this break PR #3?
+
+**No.** All proposed changes are additive:
+- New nullable properties on `SquadAgentOptions` (`UseLoggedInUser`, `Provider`, `Model`, `ConfigureCopilotClient`) — all default to `null`, preserving existing behavior.
+- New code in `CreateCopilotClient` is guarded by null checks.
+- Existing tests (`SquadAgentRoutingTests`, `SquadConnectionFactoryTests`, `SquadServiceCollectionExtensionsTests`) continue to pass because they don't set any of the new properties.
+
+### Init-only friendliness
+
+`SquadAgentOptions` is currently a `sealed class` with mutable `{ get; set; }` properties (Decision 447 Q7 locked this as "mutable options"). The proposed new properties follow the same pattern. No `init`-only concerns.
+
+### Semver impact
+
+- **v0.1 is not yet published.** All changes are pre-release preview.
+- Adding new properties to `SquadAgentOptions` is semver-minor (additive, no breaks).
+- The `ConfigureCopilotClient` delegate exposes `CopilotClientOptions` in our public API — this creates a future semver-major risk if we later want to hide it. Acceptable for v0.1-preview; flag for v1.0 review.
+- **Verdict: No semver-major bump needed.** These are all additive changes to an unpublished v0.1-preview package.
+
+### SquadConnectionFactory impact
+
+The connection string parser (`FromConnectionString`) currently doesn't parse auth-related parameters. If we add BYOK support, we may want to extend the URI form:
+```
+squad://localhost?teamRoot=...&provider=openai&baseUrl=...&model=gpt-5.2-codex
+```
+This is a v0.2 consideration, not v0.1.
+
+---
+
+## H. Open Questions for Picard / Tamir
+
+1. **Shipping scope:** Should BYOK support (modes 7-10) ship in v0.1 or be deferred to v0.2? It requires exposing `ProviderConfig` (a `GitHub.Copilot.SDK` type) in our public surface. Picard: does this conflict with the "autonomy on release cadence" benefit from Decision 443?
+
+2. **ConfigureCopilotClient naming:** Is `ConfigureCopilotClient` the right name? Alternatives: `CustomizeSdkClient`, `OnConfiguringSdkClient`, `CopilotClientConfigurator`. The name signals to consumers that they're touching SDK internals.
+
+3. **Type exposure policy:** Should Squad.Agents.AI have a general policy about which upstream SDK types are allowed in its public API surface? Currently `ProviderConfig` and `CopilotClientOptions` are candidates. If we want to insulate consumers from SDK churn, we'd need wrapper types — at the cost of more code and surface area.
+
+4. **Connection string BYOK:** Should `SquadConnectionFactory.FromConnectionString` support BYOK parameters in the URI form? This would enable Aspire resource definitions to carry provider config. Defer to v0.2?
+
+5. **Worf security review:** The `ConfigureCopilotClient` delegate is a new attack surface — consumers could exfiltrate tokens, override security settings, or inject malicious env vars. Worf: what gates/guardrails do we need before shipping this?
+
+6. **Token provider + BYOK interaction:** When both `GitHubTokenProvider` and `Provider` (BYOK) are set, which wins? BYOK mode doesn't use GitHub tokens at all — but should we validate/warn that both are set simultaneously?
+
+7. **Model property vs. SessionConfig:** The proposed `Model` property on `SquadAgentOptions` overlaps with `SessionConfig.Model` that the inner agent receives. Should we consolidate, or is it acceptable to have model selection at both levels (options = default, session = override)?
+
+---
+
+*End of proposal. Awaiting Picard architecture sign-off and Worf security review.*
+
+
+---
+
+### (b) Picard — Architecture Review: APPROVE_WITH_CONDITIONS (6 conditions)
+
+# Picard Architecture Review — Squad.Agents.AI Auth & Extensibility Proposal
+
+**Reviewer:** Picard (Lead / Product Architect)  
+**Date:** 2026-06-02  
+**Proposal under review:** `data-squad-agents-ai-auth-and-extensibility-proposal.md`  
+**Author of proposal:** Data  
+**Verdict:** **APPROVE_WITH_CONDITIONS** (6 conditions)
+
+---
+
+## A. Decomposition
+
+The proposal is cleanly decomposed along the right seams:
+
+1. **Options surface** (SquadAgentOptions) — auth-mode properties (`UseLoggedInUser`, `Provider`, `Model`)
+2. **Extension point** (ConfigureCopilotClient delegate) — consumer escape hatch for CopilotClientOptions
+3. **Invariant protection** (Section F) — explicit enumeration of what can and cannot leak through the delegate
+
+This is a correct separation. One structural concern: Data conflates two distinct SDK surfaces — `CopilotClientOptions` (client-level, construction-time) and `SessionConfig` (session-level, per-turn). The configure delegate touches only the former. BYOK (`Provider`, `Model`) is a `SessionConfig` concern that flows through `AsAIAgent()`. The proposal's `BuildSessionConfig` method (Section D.2) acknowledges this but doesn't draw the seam boundary explicitly. The decomposition should be: **v0.1 = CopilotClientOptions layer; v0.2 = SessionConfig layer.** This gives each release a single, coherent seam to own.
+
+**Grade: SOUND** — with the seam clarification above integrated into implementation.
+
+---
+
+## B. Minimum Coherent Shape
+
+Data's pick of **Candidate 1 (configure delegate)** as the primary extension point is correct. It is the smallest coherent architecture that grows:
+
+- **v0.1:** `Action<CopilotClientOptions>` — covers 100% of client-level customization with zero framework overhead.
+- **v0.2+:** If DI composition demand materializes (Aspire multi-tenant, test layers), Candidate 2 (`IConfigureOptions<CopilotClientOptions>`) can be added as a supplementary registration without breaking the delegate. The delegate remains as the simple-case API.
+- **v1.0+:** If type insulation becomes necessary, a Squad-owned wrapper can replace `CopilotClientOptions` in the delegate signature (semver-major, but that's what v1.0 is for).
+
+Candidate 3 (client factory) is correctly rejected. It bypasses all invariants and shifts the testing burden. Consumers who need that level of control should use bare `CopilotClient` + `AsAIAgent()` directly.
+
+**Grade: CORRECT** — smallest shape that doesn't force a breaking change later.
+
+---
+
+## C. Decision 447 Invariant Protection
+
+Data identifies three medium-risk invariants (F1: routing, F4: Cwd, F8: token precedence) and proposes a **post-delegate warning log** as mitigation. This is insufficient.
+
+**The problem:** Decision 447 Q5 locks routing to `CopilotClientOptions.CliPath/CliArgs`. If a consumer's configure delegate overwrites `CliArgs` — even accidentally — the agent silently routes to the wrong CLI endpoint. A warning log that nobody reads is not a gate; it's a hope.
+
+**Required mitigation (Condition 1):** After the configure delegate runs, `CreateCopilotClient` must **snapshot and re-apply** the three routing-critical fields:
+
+```
+// Pseudo-logic:
+var savedCwd = clientOptions.Cwd;
+var savedCliArgs = clientOptions.CliArgs;
+var savedCliPath = clientOptions.CliPath;
+
+options.ConfigureCopilotClient?.Invoke(clientOptions);
+
+if (clientOptions.Cwd != savedCwd || clientOptions.CliArgs != savedCliArgs || clientOptions.CliPath != savedCliPath)
+{
+    _logger?.LogWarning("ConfigureCopilotClient delegate modified routing-critical fields (Cwd, CliArgs, CliPath). " +
+        "Squad has restored its routing invariants. To use a custom CLI path, set SquadAgentOptions.CliPath instead.");
+    clientOptions.Cwd = savedCwd;
+    clientOptions.CliArgs = savedCliArgs;
+    clientOptions.CliPath = savedCliPath;
+}
+```
+
+This is a **hard gate**, not a warning. The delegate can still customize everything else on `CopilotClientOptions` (logger, environment, timeouts, future SDK additions). But routing invariants are non-negotiable per Decision 447.
+
+**F2 (boundary instructions) and F7 (SessionConfig.Agent routing):** Correctly identified as SAFE — the delegate doesn't touch `SessionConfig`.
+
+**F8 (token precedence):** Warning-only is acceptable here. Token override is a legitimate escape hatch for consumers with exotic auth; it doesn't break routing. Document the precedence order and move on.
+
+**Grade: INSUFFICIENT as proposed — Condition 1 closes the gap.**
+
+---
+
+## D. Scope Call: BYOK in v0.1 vs v0.2
+
+**Decision: Defer BYOK (Provider, Model properties) to v0.2.**
+
+Rationale: BYOK is a `SessionConfig`-level concern. Shipping it requires Data's `BuildSessionConfig` refactor, which replaces the current `AsAIAgent(instructions:, name:)` call pattern in the `SquadAgent` constructor. That refactor touches the core delegation path — it's not a simple additive property. PR #3 is all-green with 19/19 tests passing. Introducing a `SessionConfig` construction refactor into an already-validated PR is unnecessary risk for v0.1-preview.
+
+The configure delegate does NOT provide an escape hatch for BYOK (it touches `CopilotClientOptions`, not `SessionConfig`), which means BYOK consumers cannot use Squad.Agents.AI v0.1 at all for this scenario. That is acceptable: consumers who need BYOK today can use bare `CopilotClient` + `AsAIAgent()` with a `SessionConfig` they construct themselves. Squad.Agents.AI v0.1 does not claim to cover every auth mode — it claims to cover the common DI/routing/instruction-injection value-add for Copilot-authenticated agents. BYOK is a v0.2 feature with its own PR, its own test suite (including provider-type validation and Model-required-when-Provider-set checks), and its own architecture note on the SessionConfig seam.
+
+Additionally, exposing `ProviderConfig` (a `GitHub.Copilot.SDK` type) in Squad's public API surface creates SDK coupling that partially undermines Decision 443's autonomy benefit. v0.2 has time to evaluate whether a Squad-owned wrapper type is warranted, or whether the transitive dependency is acceptable for preview.
+
+**v0.1 ships:** `UseLoggedInUser`, `ConfigureCopilotClient` delegate, documentation for HMAC/DirectAPI via Environment dict.  
+**v0.2 ships:** `Provider`, `Model`, `BuildSessionConfig` refactor, connection-string BYOK extension.
+
+---
+
+## E. Acceptance Criteria for Implementation
+
+### E.1 — UseLoggedInUser (v0.1)
+
+| # | Criterion | Verification |
+|---|-----------|-------------|
+| 1 | `SquadAgentOptions.UseLoggedInUser` property exists, nullable bool, defaults to null | Compilation + unit test |
+| 2 | When set to `false`, `CopilotClientOptions.UseLoggedInUser` is set to `false` | Unit test: construct SquadAgent with `UseLoggedInUser = false`, assert via CopilotClientOptions inspection |
+| 3 | When null (default), `CopilotClientOptions.UseLoggedInUser` is not set (SDK default behavior) | Unit test: construct SquadAgent with default options, assert CopilotClientOptions.UseLoggedInUser is default |
+| 4 | XML doc on property matches proposal | Code review |
+
+### E.2 — ConfigureCopilotClient Delegate (v0.1)
+
+| # | Criterion | Verification |
+|---|-----------|-------------|
+| 1 | `SquadAgentOptions.ConfigureCopilotClient` property exists, `Action<CopilotClientOptions>?`, defaults to null | Compilation |
+| 2 | Delegate is invoked AFTER Squad applies all its standard options | Unit test: delegate captures CopilotClientOptions state, assert Squad values are already applied |
+| 3 | **Routing invariant gate:** If delegate modifies `Cwd`, `CliArgs`, or `CliPath`, Squad restores its values and logs a warning | Unit test: delegate overwrites Cwd, assert Cwd is restored to Squad's value; assert warning logged |
+| 4 | Delegate can modify non-routing fields (e.g., environment, logger) and those modifications survive | Unit test: delegate adds env var, assert it appears on final CopilotClientOptions |
+| 5 | When delegate is null, construction behavior is unchanged | Existing 19/19 tests continue to pass |
+| 6 | XML doc includes "do not override Cwd, CliArgs, or CliPath" warning | Code review |
+
+### E.3 — Documentation (v0.1)
+
+| # | Criterion | Verification |
+|---|-----------|-------------|
+| 1 | README auth section documents all 11 modes with Squad.Agents.AI status (✅/🟡/🔴) | README review |
+| 2 | HMAC and Direct API Token documented with `Environment` dict examples | README review |
+| 3 | ConfigureCopilotClient documented with example and invariant warning | README review |
+| 4 | BYOK explicitly documented as "coming in v0.2" with bare CopilotClient workaround | README review |
+
+### E.4 — Tests (v0.1, minimum)
+
+- 3 new unit tests for `UseLoggedInUser` (null/true/false).
+- 4 new unit tests for `ConfigureCopilotClient` (null/non-routing-mod/routing-mod-restored/warning-logged).
+- Existing 19/19 test suite passes unchanged.
+- Total new tests: ≥7.
+
+---
+
+## F. Rollout Risk
+
+**Risk: LOW.**
+
+1. **PR #3 impact:** All proposed changes are additive (new nullable properties, new delegate, new guard logic in `CreateCopilotClient`). Existing construction paths are untouched when new properties are null. The 19/19 existing test suite serves as a regression gate. This does NOT materially change PR #3 — it extends it.
+
+2. **External coordination:** None required.
+   - **clawpilotsquad / Reno:** No impact. Reno's existing commits remain unchanged. New properties are Squad-layer additions that don't touch MAF or Copilot SDK internals.
+   - **tamresearch1 design:** Fully compatible. Decision 447 invariants are preserved (strengthened, in fact, via the routing gate in Condition 1).
+   - **MAF maintainers:** No contact needed. Squad.Agents.AI is a community package (Decision 443); we don't need MAF approval for our options surface.
+
+3. **Semver:** All changes are additive to an unpublished v0.1-preview. No semver implications.
+
+4. **The one risk to monitor:** The routing invariant gate (Condition 1) requires comparing `CliArgs` arrays. Ensure the comparison handles reference vs. value equality correctly (compare array contents, not references). A faulty comparison could either miss tampering or false-positive on every invocation.
+
+---
+
+## G. Reviewer Verdict
+
+### **APPROVE_WITH_CONDITIONS**
+
+The proposal is architecturally sound. Data's auth inventory is thorough, the gap analysis is accurate, the extension-point selection (Candidate 1) is correct, and the invariant analysis (Section F) demonstrates genuine understanding of what Decision 447 protects. The following **6 conditions** must be met before implementation proceeds:
+
+1. **Hard routing gate (not warning-only):** After the `ConfigureCopilotClient` delegate runs, `CreateCopilotClient` must snapshot and restore `Cwd`, `CliArgs`, and `CliPath` if the delegate modified them. Log a warning, but DO NOT allow the modification to persist. See Section C above for implementation sketch.
+
+2. **Defer BYOK to v0.2:** Do NOT add `Provider`, `Model`, or `BuildSessionConfig` to the v0.1 implementation. BYOK is a SessionConfig-layer concern that deserves its own PR with dedicated tests and architecture documentation on the SessionConfig seam. Document BYOK as "v0.2 planned" in the README with a bare-CopilotClient workaround.
+
+3. **Seam documentation:** Add a one-paragraph comment in `SquadAgent.cs` (above `CreateCopilotClient`) explaining the two-seam model: CopilotClientOptions (client construction, customizable via delegate) vs. SessionConfig (session behavior, managed internally). This helps future contributors understand why BYOK lives in a different extension path.
+
+4. **Naming:** Use `ConfigureCopilotClient` as proposed. It is clear, conventional (.NET `Configure*` pattern), and correctly signals that the consumer is reaching into SDK internals. No rename needed.
+
+5. **Resolve open question H.6 (token provider + BYOK interaction):** Since BYOK is deferred to v0.2, this question is also deferred. Do NOT add validation for simultaneous `GitHubTokenProvider` + `Provider` in v0.1. When BYOK ships in v0.2, the implementation must validate: if `Provider` is set, `GitHubToken`/`GitHubTokenProvider` are ignored (BYOK mode doesn't use GitHub auth). Log a warning if both are configured.
+
+6. **Open question H.7 (Model property overlap):** Deferred with BYOK. When `Model` ships in v0.2, it must be the single source of truth — passed through to `SessionConfig.Model` during `BuildSessionConfig`. Document that per-session model override is not supported through Squad.Agents.AI (consumers who need that should use bare CopilotClient).
+
+**Implementation may proceed once Worf clears security on the `ConfigureCopilotClient` delegate surface.** Data is the correct implementer for this work; the proposal demonstrates sufficient understanding of both the SDK surface and the invariant constraints.
+
+---
+
+*Filed by Picard, 2026-06-02. This review is the team's record of the architecture gate decision for Squad.Agents.AI auth and extensibility.*
+
+
+---
+
+### (c) Worf — Security Review: PASS_WITH_CONDITIONS (9 conditions SC-1..SC-9 + Pre-Existing Environment Leak Finding)
+
+# Worf — Security & Reliability Review: Squad.Agents.AI Auth Surface & Extensibility Proposal
+
+**Reviewer:** Worf (Security & Reliability Reviewer)  
+**Date:** 2026-06-02  
+**Proposal Under Review:** `data-squad-agents-ai-auth-and-extensibility-proposal.md` by Data  
+**Baseline:** PR #3 audit PASS (B1–B6 cleared), watch list NEW-1..NEW-4, quarterly review cadence  
+**Verdict:** **PASS_WITH_CONDITIONS** — 9 mandatory security conditions before/during implementation
+
+---
+
+## A. Secret-Material Handling Per Auth Mode
+
+### Mode 1 — GitHub Signed-in User (Default)
+- **Credential material:** None supplied by consumer. Relies on system keychain (macOS Keychain, Windows Credential Manager, Linux `gnome-keyring`/`pass`).
+- **Exposure surface:** No Squad-controlled credential in memory. The CLI process inherits the local user's stored OAuth refresh token. Squad never sees it.
+- **Rotation:** User runs `copilot auth logout && copilot auth login`. No Squad involvement.
+- **Risk:** LOW. Credential never touches `SquadAgentOptions`.
+
+### Mode 2 — OAuth GitHub App (`GitHubToken` / `GitHubTokenProvider`)
+- **Credential material:** OAuth user access token (`gho_*`, `ghu_*`, `github_pat_*`).
+- **How passed:** `SquadAgentOptions.GitHubToken` (string, in-memory) or `SquadAgentOptions.GitHubTokenProvider` (async delegate, on-demand). Token propagated to `CopilotClientOptions.GitHubToken` in `CreateCopilotClient`.
+- **Exposure:**
+  - `SquadAgentOptions.ToString()` → **REDACTED** ✅ (verified: line 54-58 of SquadAgentOptions.cs).
+  - `[JsonIgnore]` on `GitHubToken` → **safe from System.Text.Json serialization** ✅.
+  - `CopilotClientOptions.GitHubToken` → **UNKNOWN.** We do not control the SDK type's `ToString()` or serialization behavior. If a consumer or library logs `CopilotClientOptions`, the token may leak.
+  - Constructor log (SquadAgent.cs:57-58) logs `AgentName` and `SquadFolderPath` only — does NOT log token ✅.
+  - **Exception messages:** If `CopilotClient` constructor throws, the exception may include the token in inner exception data. UNVERIFIED — SDK-internal behavior.
+- **Rotation:** Consumer's responsibility. No Squad-side revocation API. Acceptable for v0.1.
+- **Risk:** MEDIUM. Watch list item NEW-1 remains relevant.
+
+### Mode 3 — Environment Variables (auto-detected)
+- **Credential material:** Token string in `COPILOT_GITHUB_TOKEN`, `GH_TOKEN`, or `GITHUB_TOKEN` env var.
+- **How passed:** Consumer sets env var at host level, OR injects via `SquadAgentOptions.Environment` dictionary.
+- **Exposure:**
+  - `SquadAgentOptions.ToString()` does NOT redact `.Environment` dictionary entries. **⚠️ FINDING: If consumer places a token in `options.Environment["GH_TOKEN"]`, it WILL appear in `ToString()` output.** This is a gap today, not introduced by Data's proposal.
+  - `Environment` dictionary has no `[JsonIgnore]`, so JSON serialization of `SquadAgentOptions` WILL include token values. **⚠️ FINDING.**
+  - The dictionary is copied into `CopilotClientOptions.Environment` (SquadAgent.cs:91-97) and passed to the CLI process. The token lives in the child process environment — retrievable via `/proc/<pid>/environ` on Linux if attacker has same-user access. Acceptable risk for CLI-based architecture.
+- **Rotation:** Env var rotation is host-level. No Squad involvement.
+- **Risk:** MEDIUM-HIGH due to `ToString()` and serialization gaps on `Environment` dictionary.
+
+### Mode 4 — HMAC Key (via Environment)
+- **Credential material:** HMAC symmetric key in `CAPI_HMAC_KEY` or `COPILOT_HMAC_KEY`.
+- **How passed:** Via `SquadAgentOptions.Environment` dictionary.
+- **Exposure:** Same as Mode 3 — HMAC key subject to `ToString()` and serialization leak. **⚠️ HMAC keys are long-lived symmetric secrets.** Leaking one is worse than leaking a short-lived token.
+- **Risk:** HIGH if used — same `Environment` dict exposure as Mode 3.
+
+### Mode 5 — Direct API Token (via Environment)
+- **Credential material:** `GITHUB_COPILOT_API_TOKEN` + `COPILOT_API_URL`.
+- **How passed:** Via `SquadAgentOptions.Environment` dictionary.
+- **Exposure:** Same as Mode 3/4.
+- **Risk:** MEDIUM-HIGH — same `Environment` dict exposure.
+
+### Mode 6 — GitHub CLI (auto-detected)
+- **Credential material:** None supplied by consumer. CLI finds `gh auth` credentials.
+- **Risk:** LOW. Same as Mode 1.
+
+### Mode 7-10 — BYOK (OpenAI, Azure, Anthropic, Bearer Token)
+- **Credential material:** Third-party API keys (`sk-*` for OpenAI, Azure API keys, Anthropic keys, bearer tokens).
+- **How passed (proposed):** `SquadAgentOptions.Provider` (`ProviderConfig` type from Copilot SDK). The `apiKey` and `bearerToken` fields live as string properties on `ProviderConfig`.
+- **Exposure:**
+  - `SquadAgentOptions.ToString()` does NOT mention `Provider` — **adding it without redaction will leak API keys.** CONDITION REQUIRED.
+  - `ProviderConfig` serialization behavior is SDK-controlled — unknown if `apiKey` is `[JsonIgnore]`. MUST verify before shipping.
+  - The key is passed to `SessionConfig.Provider` which flows to the CLI process.
+  - **No rotation path documented.** Consumer must manually update and restart.
+- **Risk:** HIGH. Third-party API keys are often long-lived and billing-sensitive. An OpenAI key leak can cause direct financial damage.
+
+### Mode 11 — UseLoggedInUser
+- **Credential material:** None directly. Controls whether ambient credentials are used.
+- **Exposure:** Boolean flag. No secret material.
+- **Risk:** See Section E below for identity/consent implications.
+
+---
+
+## B. Configure-Delegate Threat Model (`Action<CopilotClientOptions>`)
+
+### B.1 — Delegate Persistence and Capture
+The delegate is stored as a property (`Action<CopilotClientOptions>?`) on `SquadAgentOptions`, which lives in the DI options snapshot. In scoped lifetime (default), the options snapshot persists for the DI scope lifetime. The delegate itself is a .NET delegate — it captures its enclosing scope's variables (closure). If the enclosing scope contains tokens or other secrets, those are captured by reference and live as long as the delegate.
+
+**Threat:** A delegate assigned in `AddSquadAgent(opts => opts.ConfigureCopilotClient = clientOpts => { ... })` persists in the `IOptions<SquadAgentOptions>` snapshot. It is invoked in `CreateCopilotClient`, which runs in the `SquadAgent` constructor. The delegate outlives the registration call.
+
+### B.2 — Credential Observation / Theft
+The delegate receives a fully-populated `CopilotClientOptions` AFTER Squad has set `GitHubToken`, `Cwd`, `CliPath`, `CliArgs`, and `Environment`. Per Data's proposal (line 289: `options.ConfigureCopilotClient?.Invoke(clientOptions)`), the delegate runs AFTER all Squad-internal population.
+
+**Threat:** The delegate CAN read `clientOptions.GitHubToken`, `clientOptions.Environment` (which may contain HMAC keys, API tokens), and all other populated fields. A malicious delegate can exfiltrate every credential Squad has configured.
+
+**OWASP Reference:** A10:2021 — Server-Side Request Forgery (via custom HttpClient). CWE-522 — Insufficiently Protected Credentials.
+
+### B.3 — Transport Override / Exfiltration
+`CopilotClientOptions` likely contains `HttpClient` or transport configuration (e.g., `HttpMessageHandler` or proxy settings). A malicious delegate could:
+1. Replace the HTTP handler with a man-in-the-middle proxy that logs all requests (including auth headers) to an external endpoint.
+2. Set `CliPath` to a malicious binary that mimics the Copilot CLI but exfiltrates tokens.
+3. Modify `Environment` to inject `HTTP_PROXY` pointing at an attacker-controlled server.
+
+**Mitigation required:** Post-delegate validation (Data proposes warning-only for `Cwd` and `CliArgs` — INSUFFICIENT for `CliPath` and `Environment` security-critical keys).
+
+### B.4 — Invocation Cardinality
+`CreateCopilotClient` is called once per `SquadAgent` construction (verified: constructor chain at SquadAgent.cs:33). The delegate executes exactly once per agent instance. Re-entrant risk is LOW in current design. However, if `SquadAgent` is registered as Scoped and the scope is long-lived, the delegate's closure retains the resolved token for the scope duration.
+
+**Finding:** The delegate is invoked exactly once. No re-entrancy risk. Closure lifetime is the DI scope lifetime.
+
+### B.5 — Summary Threat Rating
+**MEDIUM-HIGH.** The delegate is a power-user escape hatch. It can observe all credentials and override transport. Mitigation is convention-only (documentation). This is architecturally acceptable IF:
+1. The delegate is documented as a security-sensitive extension point.
+2. Post-delegate validation detects `CliPath` and critical `Environment` key changes.
+3. Security docs explicitly warn against logging `CopilotClientOptions` after delegate invocation.
+
+---
+
+## C. Invariant Integrity — Security-Critical Subset
+
+Of the 8 invariants Data lists (F1–F8), the following are **security-critical**:
+
+### F4 — WorkingDirectory Isolation (SECURITY-CRITICAL)
+`Cwd` controls where the CLI process runs. The CLI process executes with the consumer's GitHub Copilot identity and can read/write files in `Cwd`. If the delegate overrides `Cwd` to point at `/`, `C:\`, or a sensitive directory (e.g., `~/.ssh`), the CLI agent has read/write access to that entire tree.
+
+**Blast radius:** Arbitrary file read/write under the consumer's OS user identity, within the Copilot CLI's tool capabilities (file read, file write, shell execution).
+
+**Required mitigation:** Post-delegate validation MUST verify `Cwd` was not changed. If changed, log a `LogWarning` at minimum. Consider `LogError` + throw for non-development environments.
+
+### F1 — Routing via CliArgs (SECURITY-ADJACENT)
+If `CliArgs` is overridden, the consumer could inject `--yolo` or other dangerous CLI flags. This is a convenience/safety tradeoff, not a credential risk.
+
+**Required mitigation:** Post-delegate validation should warn if `CliArgs` was modified.
+
+### F8 — Token Provider Precedence (SECURITY-CRITICAL)
+The delegate runs after token resolution. If the delegate overrides `clientOptions.GitHubToken`, it bypasses `GitHubTokenProvider`. This could:
+1. Replace a production KeyVault-sourced token with a hardcoded test token (misconfiguration).
+2. Exfiltrate the resolved token and replace it with an attacker-controlled one.
+
+**Required mitigation:** Document that `ConfigureCopilotClient` has final authority on `GitHubToken`. If this is unacceptable, apply token AFTER the delegate (but this reduces the escape-hatch value).
+
+### F5 — GitHubToken Redaction (SECURITY-CRITICAL for CopilotClientOptions)
+`SquadAgentOptions.ToString()` redacts, but `CopilotClientOptions.ToString()` is SDK-controlled. After the delegate runs, `CopilotClientOptions` contains the real token. If ANY code path logs `clientOptions.ToString()`, the token leaks.
+
+---
+
+## D. BYOK Provider Keys
+
+### Memory Residency
+BYOK API keys (`apiKey`, `bearerToken`) are set on `ProviderConfig` → copied to `SessionConfig.Provider` → serialized to JSON and passed to the Copilot CLI process via stdin/IPC. The keys live:
+1. In `SquadAgentOptions.Provider` (managed heap, GC-rooted for options lifetime).
+2. In `SessionConfig` (transient, per-session construction).
+3. In the CLI process environment/stdin (child process memory).
+
+### Logging Risk
+- `SessionConfig` may be logged by the SDK's own tracing. If `TraceEvents = true`, the SDK logger receives events that could include session configuration. **MUST verify SDK does not log `SessionConfig.Provider.apiKey`.**
+- Data's proposed `BuildSessionConfig` (proposal line 147-167) does NOT log the config. ✅
+- But downstream SDK code path is opaque to us.
+
+### Recommendation
+- Add `[JsonIgnore]` or custom converter on `SquadAgentOptions.Provider` that redacts `apiKey` and `bearerToken` during serialization.
+- Update `ToString()` to include `Provider = [REDACTED]` if Provider is non-null.
+- Document: "BYOK API keys are passed to the Copilot CLI process. They are not stored persistently by Squad.Agents.AI."
+
+---
+
+## E. `UseLoggedInUser` — Security Implications
+
+### What It Does
+When `UseLoggedInUser` is `true` (default SDK behavior), the SDK uses the local user's stored GitHub OAuth credentials (from `copilot auth login`) to authenticate with the Copilot API. The Copilot CLI process acts AS the local user.
+
+### Security Implications of ALLOWING It (Data's Proposal)
+1. **Identity assumption:** The CLI agent acts under the local user's GitHub identity. All API calls, code suggestions, and telemetry are attributed to that user.
+2. **Consent gap:** The user consented to Copilot CLI usage, not necessarily to a Squad orchestration framework using their credentials programmatically. This is a **consent boundary question**, not a technical vulnerability.
+3. **Audit trail:** GitHub's Copilot usage audit logs will show the local user, not the Squad application. In multi-user server scenarios, this is misleading.
+
+### Security Implications of BLOCKING It (Current State)
+- BYOK and explicit token modes are the only options. This is more explicit and auditable.
+- Desktop/dev scenarios are harder (user must manually provide a token even though they're already logged in).
+
+### Verdict on UseLoggedInUser
+**ALLOW with documentation.** The boolean is a pass-through to the SDK. Blocking it creates friction without improving security (the default SDK behavior already uses it). However:
+- **CONDITION:** Documentation MUST state: "When `UseLoggedInUser` is true (default), Squad.Agents.AI acts under the local user's GitHub identity. Ensure the user has consented to programmatic use of their Copilot credentials."
+- **CONDITION:** For server/multi-user scenarios, documentation MUST recommend `UseLoggedInUser = false` + explicit token.
+
+---
+
+## F. Documentation Requirements (MUST Ship)
+
+The following security documentation MUST ship with or before the implementation:
+
+| # | Document | Content |
+|---|----------|---------|
+| F-DOC-1 | README security section | "Do not log `SquadAgentOptions` in production without redaction. Use `ToString()` which redacts `GitHubToken`. The `Environment` dictionary may contain tokens — treat it as sensitive." |
+| F-DOC-2 | `ConfigureCopilotClient` XML doc | "⚠️ SECURITY: This delegate receives fully-populated `CopilotClientOptions` including resolved tokens. Do not log the options object. Do not capture the token in closures that outlive the agent. Do not override `Cwd` or `CliPath` unless you understand the isolation implications." |
+| F-DOC-3 | BYOK security note | "BYOK API keys are passed to the Copilot CLI process and live in process memory. They are not stored persistently. Rotate keys via your provider's dashboard." |
+| F-DOC-4 | `UseLoggedInUser` consent notice | "When `UseLoggedInUser` is true, Squad.Agents.AI acts under the local user's GitHub identity. For server/multi-user, set `UseLoggedInUser = false` and provide explicit tokens." |
+| F-DOC-5 | Environment dictionary warning | "The `Environment` dictionary is not redacted by `ToString()` or JSON serialization. Do not place tokens in `Environment` unless you control all logging of `SquadAgentOptions`." |
+| F-DOC-6 | Token precedence documentation | "Token resolution order: `GitHubTokenProvider` → `GitHubToken` → `ConfigureCopilotClient` delegate override → SDK auto-detection. The delegate has final authority." |
+
+---
+
+## G. CI / Build-Gate Additions
+
+### Recommended Additions
+
+| # | Gate | Priority | Description |
+|---|------|----------|-------------|
+| G-CI-1 | `ToString()` redaction test | P0 | Unit test that asserts `SquadAgentOptions.ToString()` does not contain any value set on `GitHubToken`. Extend to cover `Provider.apiKey` once BYOK ships. |
+| G-CI-2 | Serialization safety test | P0 | Unit test that JSON-serializes `SquadAgentOptions` with `GitHubToken` set and asserts the token is absent from the JSON output. Extend to cover `Environment` dictionary entries matching known token env var names. |
+| G-CI-3 | `Environment` dict redaction for known token keys | P1 | `ToString()` should redact values for keys matching `*TOKEN*`, `*KEY*`, `*SECRET*`, `*HMAC*`. Add test. |
+| G-CI-4 | Post-delegate invariant assertion test | P1 | Unit test: set `ConfigureCopilotClient` to override `Cwd` → verify warning is logged (or exception thrown). |
+| G-CI-5 | `Provider.apiKey` non-serialization test | P1 | Once BYOK ships: assert `JsonSerializer.Serialize(options)` does not contain the apiKey value. |
+
+### Deferred (v0.2+)
+- Roslyn analyzer for `Console.WriteLine` on `SquadAgentOptions` — low ROI for v0.1 preview.
+- Static analysis for delegate closure capture of token variables — too noisy for preview.
+
+---
+
+## H. Reviewer Verdict
+
+### **PASS_WITH_CONDITIONS**
+
+Data's proposal is sound in its analysis and recommendations. The auth-mode inventory is thorough, the extension-point candidates are correctly evaluated, and Candidate 3 (Client Factory Override) is rightly rejected. The implementation can proceed provided the following **9 mandatory security conditions** are met before or during implementation:
+
+| # | Condition | Blocking? | Owner |
+|---|-----------|-----------|-------|
+| SC-1 | `ToString()` MUST redact `Provider` (show `Provider = [REDACTED]` if non-null) and MUST redact `Environment` values for keys matching `*TOKEN*`, `*KEY*`, `*SECRET*`, `*HMAC*` patterns | **P0 BLOCKING** | Implementer |
+| SC-2 | JSON serialization of `SquadAgentOptions` MUST NOT emit `Provider.apiKey`, `Provider.bearerToken`, or `Environment` values for token-pattern keys. Add `[JsonIgnore]` or custom converter. | **P0 BLOCKING** | Implementer |
+| SC-3 | Post-delegate validation in `CreateCopilotClient` MUST log `LogWarning` if delegate changed `Cwd`, `CliPath`, or `CliArgs` from Squad-set values. | **P1 BLOCKING** | Implementer |
+| SC-4 | `ConfigureCopilotClient` XML doc MUST include security warning per F-DOC-2. | **P1 BLOCKING** | Implementer |
+| SC-5 | `UseLoggedInUser` documentation MUST include consent notice per F-DOC-4. | **P1 BLOCKING** | Implementer |
+| SC-6 | README security section MUST ship per F-DOC-1. | **P1 BLOCKING** | Implementer |
+| SC-7 | Unit test: `ToString()` redaction covers `GitHubToken`, `Provider`, and token-pattern `Environment` keys (G-CI-1 + G-CI-3). | **P0 BLOCKING** | Implementer |
+| SC-8 | Unit test: JSON serialization safety for `GitHubToken` and `Provider` credentials (G-CI-2 + G-CI-5). | **P0 BLOCKING** | Implementer |
+| SC-9 | Verify `CopilotClientOptions` from the SDK does not expose tokens via its own `ToString()`. If it does, file upstream issue and add defensive warning in our docs. | **P1 BLOCKING** | Implementer |
+
+**Lockout:** Data is NOT locked out. This is a PASS_WITH_CONDITIONS, not a rejection. Data may implement with these conditions. Worf re-gates the implementation PR.
+
+---
+
+## Existing Code Finding: `Environment` Dictionary Leak (Pre-Existing)
+
+**⚠️ This is NOT introduced by Data's proposal — it exists in the current merged code.**
+
+`SquadAgentOptions.ToString()` (SquadAgentOptions.cs:54-58) does not redact the `Environment` dictionary. `Environment` has no `[JsonIgnore]`. Data's proposal at line 178-186 explicitly documents placing HMAC keys and API tokens in this dictionary.
+
+**Impact:** Any code path that logs `SquadAgentOptions.ToString()` or serializes it to JSON will leak HMAC keys, API tokens, and any other credential placed in `Environment`.
+
+**Severity:** MEDIUM (no evidence of current logging of `ToString()` with credentials, but the documented usage pattern makes this a latent vulnerability).
+
+**Recommendation:** Fix in the same implementation pass as the auth surface expansion. This is SC-1.
+
+**This does NOT warrant an URGENT filing** — the `Environment` dictionary is not currently documented as a credential store, and no current code path places tokens in it. Data's proposal is the first to recommend it. The fix should ship with the proposal's implementation.
+
+---
+
+*Review complete. Worf re-gates the implementation PR for SC-1 through SC-9 compliance.*
 
