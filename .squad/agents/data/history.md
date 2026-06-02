@@ -190,3 +190,34 @@ px -y @bradygaster/squad-cli state-mcp → resolved to 0.9.4 → 0.9.4 has no st
 - **`squad init` skips existing files** including `.copilot/mcp-config.json`, `team.md`, `casting/`, `routing.md`. This is correct for static files but means partial-init repos won't benefit from any new init-time wiring without `--force` or a separate ensure step. The lift fix (`liftInitMutableStateOntoOrphan`) DOES retroactively work even when init is mostly a no-op — it operates on whatever mutable state exists.
 - **EPERM on `npm install -g` under concurrent agent runs is now exit-1 with no contradictory `✅ Upgraded`** — confirmed under real contention with travel-assistant peer. The fix is verified in the wild, not just in unit tests.
 - **Source repo with pre-existing `squad-state` orphan branch:** when you push a fresh clone+init to a new duplicate, the remote already has the orphan (because the source had it). Local lift then re-creates it; you need `git push origin squad-state --force` to align. Document this in validation runbooks.
+
+
+---
+
+## 2026-06-02 — Iteration 3 (combined-fix tarball) closeout
+
+**Mission:** close iter-2 gaps (sync command missing, MCP retrofit no-op when entry absent, tarball SDK dep unpublished), produce v0.9.6-preview.5 twin tarball, re-smoke, decide GO/NO-GO.
+
+**Result:** 🟢 GO. GAP-1 + GAP-2 both closed; GAP-3 has workaround + tracked follow-up #1203.
+
+### Commits shipped (`squad/state-backend-upgrade-fixes`)
+- `3b44f45e` — registered `squad sync` in `cli-entry.ts` + rewrote `ensureSquadStateMcpPinned` to insert/update when entry missing/wrong
+- `a0fa7e3e` — wired `ensureSquadStateMcpPinned` into `squad init` (in addition to `runEnsureChecks`)
+
+### Key learnings to preserve for future iterations
+
+1. **Recurring pattern: "code exists, wiring missing".** `runSync` was a complete pre-existing implementation in `packages/squad-cli/src/cli/commands/sync.ts` but had never been registered in `cli-entry.ts`. Whenever a command is documented but `Unknown command` happens at runtime, check the entry-point router first before assuming missing implementation.
+
+2. **MCP-config retrofit has TWO call sites, not one.** The SDK `packages/squad-sdk/src/config/init.ts` writes `.copilot/mcp-config.json` via `writeIfNotExists` semantics — if the file already exists (common in real repos with other MCP servers), the SDK skips entirely. So any retrofit helper that ensures a specific entry MUST be called from BOTH `squad init` (CLI `core/init.ts`, after `liftInitMutableStateOntoOrphan`) AND `runEnsureChecks` (upgrade path). Iter-3 missed this initially — re-smoke caught it, requiring 0fa7e3e.
+
+3. **Twin-tarball install pattern** (until #1203 lands): `npm install --prefix <dir> <sdk.tgz> <cli.tgz>` — both side-by-side. Single CLI tarball install fails ETARGET because CLI declares `@bradygaster/squad-sdk@>=0.9.6-preview` and per npm semver pre-release ordering, `insider` < `preview` so no published version satisfies.
+
+4. **Auto-version bumping** — every `npm run build` bumps the patch. Iter-3 went preview.3 → preview.4 → preview.5. PR body, manifest, and tarball filenames all need to track this carefully. Always confirm the actual version with `squad --version` after install before writing reports.
+
+5. **Re-smoke seeded state strategy** — pre-populating `.copilot/mcp-config.json` with only `EXAMPLE-github` (no `squad_state`) before running `squad init` reliably reproduces the GAP-2 insert-behavior condition without needing a full multi-session copilot drive. Useful low-cost validation pattern for MCP-related changes.
+
+6. **`runSync` does NOT lift working-tree state.** It only push/pulls the orphan branch refs. The post-commit hook calling `squad sync --quiet` will be a no-op on local-only repos with no remote — that's expected. The state-accrual mechanism is the **MCP bridge** (which is now reachable because GAP-2 is closed). When reporting on GAP-1, frame it as "hook stops failing silently", not "post-commit propagation works".
+
+7. **gh auth dance for cross-account work:** `tamirdresher` for fork pushes (`tamirdresher/squad` — PR head); `tamirdresher_microsoft` for `tamirdresher_microsoft/squad-squad` (decisions/manifest). Always `gh auth switch --user <name>` before each push.
+
+8. **`.squad/decisions/inbox/` is gitignored** — needs `git add -f` to commit decision drops to this repo.
