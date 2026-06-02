@@ -4,7 +4,7 @@
 
 ## What it does
 
-`Squad.Agents.AI` exposes a Squad team as a Microsoft Agent Framework `AIAgent`. It builds a GitHub Copilot SDK client with Squad-specific options, delegates MAF sessions/runs/streaming to the inner Copilot agent, and gives .NET consumers a DI-friendly wrapper instead of hand-rolling CLI process setup.
+`Squad.Agents.AI` exposes a Squad team as a Microsoft Agent Framework `AIAgent`. `SquadAgent` composes the Squad CLI through the GitHub Copilot SDK, delegates MAF sessions/runs/streaming to the inner Copilot agent, and gives .NET consumers a DI-friendly wrapper instead of hand-rolling CLI process setup.
 
 Public surface in this preview:
 
@@ -13,7 +13,7 @@ Public surface in this preview:
 - `SquadConnectionFactory` — parses PATH or `squad://` connection strings into options.
 - `SquadServiceCollectionExtensions` — registers `SquadAgent` and base `AIAgent` in DI.
 
-Repository: <https://github.com/tamirdresher/squad>
+Repository: <https://github.com/bradygaster/squad>
 
 ## Install
 
@@ -32,8 +32,8 @@ dotnet add package Squad.Agents.AI --prerelease --source ./nupkgs
 
 - .NET 10 SDK.
 - GitHub Copilot CLI available on `PATH` (`copilot --version`).
-- Squad CLI and an initialized team root containing `.squad/`; see the [Squad CLI repo](https://github.com/tamirdresher/squad).
-- GitHub Copilot authentication. Prefer `GitHubTokenProvider`; if passing a token directly, use a Copilot-supported token format (`github_pat_`, `gho_`, or `ghu_`) and never hardcode it.
+- Squad CLI and an initialized Squad team root; see the [Squad CLI repo](https://github.com/bradygaster/squad).
+- GitHub Copilot authentication through the signed-in user. The quickstart below does not require an app key or environment variable.
 
 ## Five-line quickstart
 
@@ -46,8 +46,7 @@ using Squad.Agents.AI;
 var builder = Host.CreateApplicationBuilder(args);
 builder.Services.AddSquadAgent(o =>
 {
-    o.SquadFolderPath = @"C:\path\to\team-root";
-    o.GitHubTokenProvider = _ => ValueTask.FromResult(Environment.GetEnvironmentVariable("GH_TOKEN"));
+    o.SquadFolderPath = @"C:\path\to\your\team-root";
 });
 
 using var host = builder.Build();
@@ -57,9 +56,19 @@ var response = await squad.RunAsync("What can this Squad team do?", session);
 Console.WriteLine(response.Text);
 ```
 
+## GitHub Copilot authentication
+
+The default path mirrors the base GitHub Copilot SDK examples: leave `GitHubToken` and `GitHubTokenProvider` unset, then run with a locally signed-in GitHub Copilot user. For local development, sign in before running the app, for example with `gh auth login`, the Copilot CLI sign-in flow, or a Copilot-supported local sign-in that the SDK runtime can access.
+
+The SDK documents the credential priority order in [Authenticate Copilot SDK](https://github.com/github/copilot-sdk/blob/main/docs/auth/authenticate.md) and the broader [authentication overview](https://github.com/github/copilot-sdk/blob/main/docs/auth/index.md). Explicit tokens and environment variables are supported by the SDK, but they are not required for the minimal happy path.
+
+Use `GitHubTokenProvider` only when the host owns token retrieval, such as Key Vault, managed identity, or CI secret flow scenarios. Use `GitHubToken` only when you already have a Copilot-supported token in process and cannot use a provider callback. In both cases, treat these as advanced escape hatches and never hardcode tokens.
+
 ## Aspire / configuration path
 
-`AddSquadAgent()` also reads `ConnectionStrings:squad` through `IConfiguration.GetConnectionString("squad")`. In environment variables, use `ConnectionStrings__squad`.
+`AddSquadAgent()` reads `ConnectionStrings:squad` through `IConfiguration.GetConnectionString("squad")`. In environment variables, use `ConnectionStrings__squad`.
+
+Named registrations select a named connection string. For example, `AddSquadAgent("research")` reads `ConnectionStrings:squad-research`; in environment variables, use `ConnectionStrings__squad-research`.
 
 Supported connection string forms:
 
@@ -78,8 +87,8 @@ Parsed URI query keys: `teamRoot`, `cliPath`, `cwd`, `cliArgs` (semicolon-separa
 | `CliPath` / `CliArgs` | Override the Copilot CLI executable and add extra CLI flags. |
 | `Cwd` | Working directory for the Copilot CLI process; defaults to `SquadFolderPath`. |
 | `Environment` | Additional environment variables for the CLI process. Avoid user-controlled values. |
-| `GitHubToken` | Direct token for local/dev use; redacted by `ToString()`. |
-| `GitHubTokenProvider` | Preferred callback for secure token retrieval; wins over `GitHubToken`. |
+| `GitHubToken` | Advanced direct token escape hatch; redacted by `ToString()`. |
+| `GitHubTokenProvider` | Advanced callback for secure token retrieval; wins over `GitHubToken`. |
 | `TraceEvents` | Enables verbose SDK logging and emits a startup warning when enabled. |
 | `AgentName` | Display name for the resulting `AIAgent`; defaults to `Squad`. |
 | `Instructions` | Optional system instructions passed to the inner Copilot agent. |
@@ -88,8 +97,8 @@ Parsed URI query keys: `teamRoot`, `cliPath`, `cwd`, `cliArgs` (semicolon-separa
 
 - Default DI lifetime is scoped. An overload accepts any `ServiceLifetime`.
 - DI registers both `SquadAgent` and base `AIAgent`.
-- No keyed DI, multi-targeting, BYOK/session-provider pass-through, or richer native event streaming yet; these are v0.2 candidates.
-- The package does not validate that `SquadFolderPath` exists or contains `.squad/`; consumers should validate their deployment paths.
+- Multi-targeting and Aspire telemetry remain candidates for a later preview.
+- The package does not validate that `SquadFolderPath` exists; consumers should validate their deployment paths.
 - `TraceEvents` can log sensitive operational details. Keep it off unless debugging.
 
 ## Package contents
@@ -102,9 +111,10 @@ Parsed URI query keys: `teamRoot`, `cliPath`, `cwd`, `cliArgs` (semicolon-separa
 
 ## See also
 
-- Root repo: <https://github.com/tamirdresher/squad>
+- Root repo: <https://github.com/bradygaster/squad>
 - Microsoft Agent Framework: <https://github.com/microsoft/agents>
+- GitHub Copilot SDK authentication: <https://github.com/github/copilot-sdk/blob/main/docs/auth/authenticate.md>
 - GitHub Copilot CLI: <https://github.com/github/copilot-cli>
-- Changelog: <https://github.com/tamirdresher/squad/blob/feature/squad-agents-ai/CHANGELOG.md>
+- Changelog: <https://github.com/bradygaster/squad/blob/main/CHANGELOG.md>
 
 License: MIT.

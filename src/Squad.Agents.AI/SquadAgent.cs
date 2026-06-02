@@ -86,7 +86,7 @@ public sealed class SquadAgent : AIAgent, IAsyncDisposable
             GitHubToken = resolvedToken
         };
 
-        // Copy CLI args
+        // Preserve CLI args parsed from connection strings or supplied by user code for the SDK's CLI invocation.
         if (options.CliArgs.Count > 0)
         {
             clientOptions.CliArgs = options.CliArgs.ToArray();

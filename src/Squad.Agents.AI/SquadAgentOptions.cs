@@ -8,7 +8,6 @@ namespace Squad.Agents.AI;
 /// var options = new SquadAgentOptions
 /// {
 ///     SquadFolderPath = @"C:\repo",
-///     GitHubTokenProvider = _ => ValueTask.FromResult(Environment.GetEnvironmentVariable("GH_TOKEN"))
 /// };
 /// options.CliArgs.Add("--yolo");
 /// </code>
@@ -16,7 +15,7 @@ namespace Squad.Agents.AI;
 public sealed class SquadAgentOptions
 {
     /// <summary>
-    /// Gets or sets the Squad team root, normally the repository or directory that contains the `.squad` folder.
+    /// Gets or sets the initialized Squad team root.
     /// </summary>
     public string? SquadFolderPath { get; set; }
 
@@ -41,11 +40,11 @@ public sealed class SquadAgentOptions
     public IDictionary<string, string?> Environment { get; } = new Dictionary<string, string?>();
 
     /// <summary>
-    /// Gets or sets a direct GitHub token for local development scenarios.
+    /// Gets or sets a direct GitHub token for advanced host-controlled authentication scenarios.
     /// </summary>
     /// <remarks>
     /// The value is ignored by JSON serialization and redacted by <see cref="ToString"/>, but still lives in the options object.
-    /// Prefer <see cref="GitHubTokenProvider"/> for production hosts.
+    /// Prefer leaving this unset for local signed-in user authentication; use <see cref="GitHubTokenProvider"/> for production hosts that retrieve tokens dynamically.
     /// </remarks>
     [System.Text.Json.Serialization.JsonIgnore]
     public string? GitHubToken { get; set; }

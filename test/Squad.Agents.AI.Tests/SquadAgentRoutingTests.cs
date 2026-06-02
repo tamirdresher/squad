@@ -13,19 +13,19 @@ public class SquadAgentRoutingTests
     {
         var provider = BuildProvider(options =>
         {
-            options.AgentName = "Data";
+            options.AgentName = "Custom Coordinator";
         });
 
         var agent = provider.GetRequiredService<AIAgent>();
         var squadAgent = Assert.IsType<SquadAgent>(agent);
 
-        Assert.Equal("Data", squadAgent.Name);
+        Assert.Equal("Custom Coordinator", squadAgent.Name);
     }
 
     [Fact]
     public void AddSquadAgent_PassesBoundaryInstructionsToInnerSessionConfig()
     {
-        const string instructions = "You are Data. Stay inside the Squad boundary.";
+        const string instructions = "You are a coordinator. Stay inside the configured boundary.";
         var agent = CreateAgent(options =>
         {
             options.Instructions = instructions;
@@ -70,7 +70,7 @@ public class SquadAgentRoutingTests
     {
         var agent = CreateAgent(options =>
         {
-            options.AgentName = "Data Persona";
+            options.AgentName = "Custom Persona";
             options.CliArgs.Clear();
             options.CliArgs.Add("--extension");
             options.CliArgs.Add("squad");
@@ -83,10 +83,38 @@ public class SquadAgentRoutingTests
         var cliArgs = GetRequiredProperty<string[]>(clientOptions, "CliArgs");
         var environment = GetRequiredProperty<IReadOnlyDictionary<string, string>>(clientOptions, "Environment");
 
-        Assert.Equal("Data Persona", GetRequiredProperty<string>(inner, "Name"));
+        Assert.Equal("Custom Persona", GetRequiredProperty<string>(inner, "Name"));
         Assert.True(string.IsNullOrEmpty(GetProperty<string>(sessionConfig, "Agent")));
-        Assert.DoesNotContain("Data Persona", cliArgs);
+        Assert.DoesNotContain("Custom Persona", cliArgs);
         Assert.Equal("enabled", environment["SQUAD_ROUTE"]);
+    }
+
+    [Fact]
+    public void AddSquadAgent_CopiesConnectionStringCliArgsToCopilotClientOptions()
+    {
+        var services = new ServiceCollection();
+        var configDict = new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:squad"] = "squad://localhost?teamRoot=C:%5Csquad-team-root&cliArgs=--yolo;--model;gpt-5"
+        };
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(configDict)
+            .Build();
+
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddLogging();
+        services.AddSquadAgent(options =>
+        {
+            options.CliPath = @"C:\fake-copilot\copilot.exe";
+            options.GitHubToken = "test-token";
+        });
+
+        var provider = services.BuildServiceProvider();
+        var agent = provider.GetRequiredService<SquadAgent>();
+        var clientOptions = GetCopilotClientOptions(agent);
+        var cliArgs = GetRequiredProperty<string[]>(clientOptions, "CliArgs");
+
+        Assert.Equal(new[] { "--yolo", "--model", "gpt-5" }, cliArgs);
     }
 
     private static SquadAgent CreateAgent(Action<SquadAgentOptions>? configure = null)

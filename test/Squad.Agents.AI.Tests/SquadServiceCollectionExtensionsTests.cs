@@ -47,6 +47,55 @@ public class SquadServiceCollectionExtensionsTests
     }
 
     [Fact]
+    public void AddSquadAgent_WithName_BindsNamedConnectionString()
+    {
+        var services = new ServiceCollection();
+        var configDict = new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:squad"] = @"C:\default-team-root",
+            ["ConnectionStrings:squad-research"] = @"C:\research-team-root"
+        };
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(configDict)
+            .Build();
+
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddLogging();
+        services.AddSquadAgent("research");
+
+        var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptionsMonitor<SquadAgentOptions>>().Get("research");
+
+        Assert.Equal(@"C:\research-team-root", options.SquadFolderPath);
+        Assert.Equal(@"C:\research-team-root", options.Cwd);
+    }
+
+    [Fact]
+    public void AddSquadAgent_WithName_UserCallbackOverridesNamedConnectionString()
+    {
+        var services = new ServiceCollection();
+        var configDict = new Dictionary<string, string?>
+        {
+            ["ConnectionStrings:squad-research"] = @"C:\research-team-root"
+        };
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(configDict)
+            .Build();
+
+        services.AddSingleton<IConfiguration>(configuration);
+        services.AddLogging();
+        services.AddSquadAgent("research", opts =>
+        {
+            opts.SquadFolderPath = @"C:\override-team-root";
+        });
+
+        var provider = services.BuildServiceProvider();
+        var options = provider.GetRequiredService<IOptionsMonitor<SquadAgentOptions>>().Get("research");
+
+        Assert.Equal(@"C:\override-team-root", options.SquadFolderPath);
+    }
+
+    [Fact]
     public void AddSquadAgent_UserCallbackOverridesConnectionString()
     {
         var services = new ServiceCollection();

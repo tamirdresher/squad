@@ -4,22 +4,39 @@ using Microsoft.Extensions.Options;
 namespace Squad.Agents.AI;
 
 /// <summary>
-/// Binds SquadAgentOptions from ConnectionStrings:squad configuration section.
+/// Binds SquadAgentOptions from a configured connection string.
 /// Runs before user-supplied configure lambda; user settings always win.
 /// </summary>
-internal sealed class SquadAgentOptionsConfigurator : IConfigureOptions<SquadAgentOptions>
+internal sealed class SquadAgentOptionsConfigurator : IConfigureNamedOptions<SquadAgentOptions>
 {
     private readonly IConfiguration _configuration;
+    private readonly string _optionsName;
+    private readonly string _connectionStringName;
 
     public SquadAgentOptionsConfigurator(IConfiguration configuration)
+        : this(configuration, Options.DefaultName, SquadServiceCollectionExtensions.DefaultConnectionStringName)
     {
-        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
     }
 
-    public void Configure(SquadAgentOptions options)
+    internal SquadAgentOptionsConfigurator(
+        IConfiguration configuration,
+        string optionsName,
+        string connectionStringName)
     {
-        var connectionString = _configuration.GetConnectionString("squad");
-        
+        _configuration = configuration ?? throw new ArgumentNullException(nameof(configuration));
+        _optionsName = optionsName ?? Options.DefaultName;
+        _connectionStringName = connectionStringName ?? throw new ArgumentNullException(nameof(connectionStringName));
+    }
+
+    public void Configure(SquadAgentOptions options) => Configure(Options.DefaultName, options);
+
+    public void Configure(string? name, SquadAgentOptions options)
+    {
+        if (!string.Equals(name ?? Options.DefaultName, _optionsName, StringComparison.Ordinal))
+            return;
+
+        var connectionString = _configuration.GetConnectionString(_connectionStringName);
+
         if (string.IsNullOrWhiteSpace(connectionString))
             return;
 
