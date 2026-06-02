@@ -58,6 +58,18 @@ Release pipeline now implemented as branch-driven (dev→prerelease, main→stab
 
 **In-repo vs. companion repo recommendation:** Lean companion repo as lower-friction default, but offer both paths. Rationale: adding `dotnet` toolchain to a JS monorepo is foreign to existing contributors; companion repo lets .NET package version independently. If Brady prefers discoverability, in-repo under `src/Squad.Agents.AI/` works since CI is isolated.
 
+### Skill discovery precedence policy (2026-06-02)
+
+**Copilot CLI skill paths:** The CLI supports 5 project skill locations (`.github/skills/`, `.claude/skills/`, `.agents/skills/`, `.copilot/skills/`, plus Squad's `.squad/skills/`) and 2 personal paths (`~/.copilot/skills/`, `~/.agents/skills/`). Squad was only scanning 2 of 5 project paths — skills in `.github/skills/` (the most natural location beside `.github/workflows/` and `.github/agents/`) were invisible to routing.
+
+**Precedence order chosen:** `.squad/skills` > `.copilot/skills` > `.github/skills` > `.claude/skills` > `.agents/skills`. Principle: team-earned > project playbook > generic project. This means a `.squad/skills/X` always overrides `.github/skills/X` — intentional, because the team explicitly specialized the skill.
+
+**Personal skills excluded from routing.** Copilot CLI already injects them ambiently. Re-attaching via `Relevant skill: ...` is duplication. Personal skills are also non-portable across machines and shouldn't appear in team-visible orchestration logs. Users who want a personal skill in Squad routing should promote it to a project path.
+
+**Skill identity = directory name (case-insensitive).** Not SKILL.md frontmatter — too fragile, optional, and divergent from CLI behavior. Dedup on case-normalized directory name, log warning on case-variant collisions.
+
+**Traversal: one-level deep, no symlinks, no caching.** Five `readdir` calls per spawn is <5ms on any filesystem. Symlinks skipped for Windows compat and security. No cache avoids staleness when skills are added mid-session.
+
 **Proposed title:** "Community contribution: Squad.Agents.AI — .NET adapter for Microsoft Agent Framework"
 
 ---

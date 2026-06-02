@@ -28,7 +28,14 @@ Colors are defined as constants at the top of `index.js`: `GREEN`, `RED`, `DIM`,
 - `.squad/templates/` — Template files copied from `templates/` (Squad-owned, overwritten on upgrade)
 - `.github/agents/squad.agent.md` — Coordinator prompt (Squad-owned, overwritten on upgrade)
 - `templates/` — Source templates shipped with the npm package
-- `.squad/skills/` — Team skills in SKILL.md format (user-owned)
+- **Project skill paths** (coordinator scans in precedence order — highest-precedence version wins on name collision):
+  - `.squad/skills/` — Team-earned skills; highest precedence (written by agents, overrides all others; user-owned)
+  - `.copilot/skills/` — Project playbook; human-curated process knowledge
+  - `.github/skills/` — Generic project skills; sits alongside `.github/workflows/`
+  - `.claude/skills/` — Claude-ecosystem skills; vendor-specific path
+  - `.agents/skills/` — Generic agents path; lowest project precedence
+- **Personal skill paths** (`~/.copilot/skills/`, `~/.agents/skills/`): loaded ambiently by Copilot CLI — NOT scanned by Squad routing (avoids context duplication and preserves team-visible boundary)
+- **Symlinks vs hardlinks:** Symlinks are NOT followed during skill discovery (Windows compatibility and security). If you need a skill from another location in a monorepo, use a hardlink instead: `ln {source} {destination}` (not `ln -s`). Hardlinks are indistinguishable from regular files and are discovered normally.
 - `.squad/decisions/inbox/` — Drop-box for parallel decision writes
 
 ### Windows Compatibility

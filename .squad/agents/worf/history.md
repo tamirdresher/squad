@@ -78,5 +78,32 @@ The 9 mandatory security conditions (SC-1..SC-9) from the 2026-06-02 auth-extens
 **Full Report:** `.squad/decisions/inbox/worf-workstreams-security-review.md`
 
 ---
-**Last Updated:** 2026-06-02T15:52:21Z  
+
+## 2026-06-02T21:10:16.324+03:00 — Skill Discovery Design Review (APPROVED WITH RECOMMENDATIONS)
+
+**Workstream:** [ws:skill-discovery-paths]  
+**Reviewed:** Picard's skill-discovery precedence design (Decisions 1–5)
+
+**Verdict:** APPROVED WITH RECOMMENDATIONS (3 non-blocking recommendations)
+
+**Security Review Findings:**
+- **Symlink-skip rationale:** Sound. Windows compatibility + traversal prevention justified. Hardlink alternative suitable for monorepo scenarios.
+- **Path traversal safety:** Safe by design (readdir on fixed paths). Gap: no Unicode normalization rule specified. **R-1 (MEDIUM):** Implement NFC normalization + whitespace trim + explicit denylist of control/separator chars.
+- **Personal-skill exclusion:** Correct. Prevents duplication with CLI ambient loading; respects team-visible boundary; ensures cross-machine reproducibility.
+- **Dedup correctness:** Well-specified. All edge cases (3+ paths, race conditions, case mismatches) correctly handled.
+- **Implementation surface:** 4 files / 6 edit sites identified correctly. Gap: no test/CI gate for 5-path precedence. **R-3 (MEDIUM):** Add test verifying precedence order, dedup, symlink handling.
+
+**Recommendations (3 total):**
+1. **R-1 (MEDIUM):** Unicode normalization (NFC) + whitespace trim + control-char denylist in directory-name handling.
+2. **R-2 (LOW):** Document hardlinks as monorepo alternative in code comments.
+3. **R-3 (MEDIUM):** Add test/CI gate for 5-path precedence + dedup correctness.
+
+**Design Framing:** Picard applied defense-in-depth (fixed paths, no symlinks, explicit precedence, no cache), avoiding trap of premature optimization. Personal-skill exclusion correctly scopes to team reproducibility boundary.
+
+**Implementation:** Design is ready for Data. Recommendations are not blockers; Data should incorporate R-1 + R-3 in same pass, R-2 as concurrent doc update.
+
+**Full Report:** `.squad/workstreams/active/skill-discovery-paths/decisions/inbox/worf-skill-discovery-review.md`
+
+---
+**Last Updated:** 2026-06-02T21:10:16.324+03:00  
 **Archive:** `.squad/agents/worf/history-archive.md` (detailed security review)

@@ -42,6 +42,8 @@ During the **Adding Team Members** flow, AFTER allocating a name but BEFORE gene
 3. If the plugin includes charter-level instructions (role boundaries, tool preferences), merge those into the agent's `charter.md`.
 4. Log the installation in the agent's `history.md`: *"📦 Plugin '{plugin-name}' installed from {marketplace}."*
 
+> **Why `.squad/skills/`?** Plugins are team-earned knowledge — they install to the highest-precedence tier. The coordinator discovers skills from all 5 project paths (`.squad/skills/` → `.copilot/skills/` → `.github/skills/` → `.claude/skills/` → `.agents/skills/`) in precedence order, but marketplace installs always target `.squad/skills/`.
+
 ## Graceful Degradation
 
 - **No marketplaces configured:** Skip the marketplace check entirely. No warning, no prompt.

@@ -6,6 +6,32 @@
 
 ---
 
+### 2026-06-02T18:10:16Z: Skill discovery 5-path coverage — workstream `skill-discovery-paths` [ws:skill-discovery-paths]
+
+**By:** Scribe (summary merge from Picard, Data, Worf)
+
+**What:** Squad's coordinator skill-aware routing now scans all 5 official Copilot CLI project skill paths in precedence order (`.squad/skills` > `.copilot/skills` > `.github/skills` > `.claude/skills` > `.agents/skills`). Personal paths (`~/.copilot/skills`, `~/.agents/skills`) are excluded — Copilot CLI injects them ambiently. Dedup by directory name (NFC Unicode, case-insensitive), skip symlinks, reject path separators and control characters. Implementation includes Worf's R-1 (normalization) + R-2 (hardlinks UX note); R-3 (test gate) deferred.
+
+**Why:** Skills placed in `.github/skills/` — a natural home next to `.github/workflows/` and `.github/copilot-instructions.md` — were invisible to Squad's routing despite being loaded by Copilot CLI. This blocked skill-aware routing for projects using the `.github/` convention. The 5-path precedence order ensures deterministic routing when skill names collide; personal-path exclusion avoids duplication and respects team-visible boundaries.
+
+**Files modified:**
+- `.github/agents/squad.agent.md` (routing section, spawn template, state protocol)
+- `.squad/templates/squad.agent.md.template` (mirror — ships via `squad upgrade`)
+- `.copilot/skills/squad-conventions/SKILL.md` (5-path documentation + hardlinks note)
+- `.squad/templates/plugin-marketplace.md` (install target rationale)
+
+**New assets:**
+- `.squad/workstreams/active/skill-discovery-paths/` (workstream root)
+- `.squad/skills/squad-agent-template-sync/` (new skill for template twin invariant)
+
+**Full detail:** `.squad/workstreams/active/skill-discovery-paths/decisions.md`
+
+**Designed by:** Picard  
+**Implemented by:** Data (2 passes)  
+**Reviewed by:** Worf (APPROVED WITH RECOMMENDATIONS)
+
+---
+
 ### [COMPLETED] 2026-06-02 — 6-Repo Tarball Validation — Final Synthesis Delivered (Data)
 
 **Date:** 2026-06-02T19:39:52+03:00

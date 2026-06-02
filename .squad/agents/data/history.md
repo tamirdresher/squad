@@ -98,3 +98,45 @@ Manually patched squad_state MCP entry on 	amir-squad-hq-tarball-test-20260602T1
 Side findings: `squad ensure` does not exist as a command (revert had to be manual); StateBackendStorageAdapter writes keys as absolute paths rooted at canonical TEAM_ROOT (non-portable but functional).
 
 Full verdict: `.squad/files/validation/ALIAS-EXPERIMENT-VERDICT.md`. Decision drop: `.squad/decisions/inbox/data-alias-experiment-verdict.md`.
+
+---
+
+### 2026-06-02T21:10:16.324+03:00 — 5-Path Skill Discovery Policy Implemented [ws:skill-discovery-paths]
+
+**What shipped:** Picard's skill-discovery design (5-decision policy) implemented across 4 files / 6 edit sites. Squad's coordinator now scans ALL 5 project skill paths in precedence order instead of just 2.
+
+**5-path scan policy — for future reference:**
+- **Scan order (high → low precedence):** `.squad/skills/` > `.copilot/skills/` > `.github/skills/` > `.claude/skills/` > `.agents/skills/`
+- **Personal paths excluded:** `~/.copilot/skills/` and `~/.agents/skills/` are NOT scanned — CLI injects them ambiently. Logging them in team-visible spawn artifacts violates the personal/team boundary.
+- **Traversal:** one level deep only (`{path}/{skill-name}/SKILL.md`). Symlinks skipped. No per-session cache.
+- **Dedup rule:** directory name is the skill identity (case-insensitive). When the same name appears in multiple paths, the highest-precedence version wins. Log a warning on case-mismatch: `⚠ Skill '{name}' found in multiple paths (case-variant); using {winner-path}.`
+
+**squad.agent.md ↔ template sync discipline learned:**
+- `.github/agents/squad.agent.md` and `.squad/templates/squad.agent.md.template` are structural twins — every content change to the coordinator prompt must be mirrored in the template.
+- The template ships via `squad upgrade`; if the two files drift, upgraded projects get inconsistent behavior.
+- Verification step: after editing, check that both files show the same `git diff --stat` line count for the changed sections. The routing section, State Protocol skills note, and spawn template skill-check all changed by identical line deltas (+14/-5) — that's the PASS signal.
+- Gotcha: when replacing a multi-line block in the template, verify the `old_str` doesn't inadvertently include neighboring `{% if %}` blocks. My first attempt accidentally swallowed the orphan-branch section; caught immediately and restored.
+
+**Files changed:**
+- `.github/agents/squad.agent.md` — 3 sites: routing section (5-path + dedup + personal exclusion + HTML sync comment), State Protocol skills note (parenthetical added), spawn template skill-check (single line naming all 5 paths)
+- `.squad/templates/squad.agent.md.template` — same 3 sites mirrored exactly
+- `.squad/templates/plugin-marketplace.md` — 1 site: added "Why `.squad/skills/`?" note after the install steps
+- `.copilot/skills/squad-conventions/SKILL.md` — 1 site: file structure section expanded from single `.squad/skills/` line to full 5-path table with personal-paths exclusion note
+
+**Sync verification:** PASS — both squad.agent.md files show identical +14/-5 delta in the routing and spawn-template sections.
+
+---
+
+### 2026-06-02T21:10:16.324+03:00 — Worf R-1/R-2 landed [ws:skill-discovery-paths]
+
+**R-1 — NFC Normalization + Control-Char Denylist:**
+- Dedup rule now mandates NFC Unicode normalization and trailing-whitespace trim before comparison. Prevents Unicode-confusable attack (NFC vs NFD variants of the same name bypassing dedup).
+- Explicit denylist: skip any skill directory whose name contains null bytes, control characters (`\x00`–`\x1F`, `\x7F`), or path separators (`..`, `/`, `\`). Log: `⚠ Skill name '{name}' in {path} skipped (contains invalid characters).`
+- Edit sites: Dedup rule paragraph in `.github/agents/squad.agent.md` and `.squad/templates/squad.agent.md.template` (both mirrored per twin-file invariant).
+
+**R-2 — Hardlinks over Symlinks (monorepo UX):**
+- Symlinks are NOT followed during discovery (Windows compat + security). For monorepo users who need a skill to appear in multiple logical locations: use a hardlink (`ln {source} {destination}`, not `ln -s`). Hardlinks are regular files from the filesystem's perspective and are discovered normally.
+- Edit site: `.copilot/skills/squad-conventions/SKILL.md` only (user-facing skill-author guidance; does NOT belong in squad.agent.md).
+
+**R-3 — Out of Scope:**
+- Squad's skill discovery is LLM-prompt-driven, not runtime code. No `.squad/test/` exists. No test scaffolding created. Revisit if a CLI scanner is ever introduced.
