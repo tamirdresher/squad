@@ -597,8 +597,8 @@ prompt: |
   0b. PRE-CHECK: Read `decisions.md` and list `decisions/inbox` with state tools. Record measurements.
   1. DECISIONS ARCHIVE [HARD GATE]: If decisions.md >= 20480 bytes, archive entries older than 30 days NOW. If >= 51200 bytes, archive entries older than 7 days. Do not skip this step.
   2. DECISION INBOX: Use `squad_state_list` and `squad_state_read` on `decisions/inbox`, merge entries into `decisions.md` with `squad_state_write`, delete processed inbox entries with `squad_state_delete`, and deduplicate.
-  3. ORCHESTRATION LOG: Write `orchestration-log/{timestamp}-{agent}.md` with `squad_state_write` per agent. Use the literal CURRENT_DATETIME value.
-  4. SESSION LOG: Write `log/{timestamp}-{topic}.md` with `squad_state_write`. Brief. Use the literal CURRENT_DATETIME value.
+  3. ORCHESTRATION LOG: Write `orchestration-log/{timestamp}-{agent}.md` with `squad_state_write` per agent. Use the literal CURRENT_DATETIME value. Replace `:` with `-` in `{timestamp}` so filenames are valid on all platforms (e.g. `2026-06-02T21-15-30Z`).
+  4. SESSION LOG: Write `log/{timestamp}-{topic}.md` with `squad_state_write`. Brief. Use the literal CURRENT_DATETIME value. Replace `:` with `-` in `{timestamp}` so filenames are valid on all platforms.
   5. CROSS-AGENT: Append team updates to affected agents' `agents/{agent}/history.md` with `squad_state_append`.
   6. HISTORY SUMMARIZATION [HARD GATE]: If any history.md >= 15360 bytes (15KB), summarize now.
   7. GIT COMMIT: Do not commit mutable squad state. If non-state repo files changed, report them for coordinator handling.

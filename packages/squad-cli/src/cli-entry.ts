@@ -393,39 +393,79 @@ async function main(): Promise<void> {
       // Continue with regular upgrade after migration
     }
     
-    // Handle --self: upgrade the CLI package itself
+    // Handle --self: upgrade the CLI package itself.
+    //
+    // UPGRADE-EPERM-FALSE-SUCCESS fix (iter-2): surface a failed self-upgrade
+    // instead of printing "✅ Upgraded" after a warning.
+    //
+    // Iter-4 hardening: when BOTH --self and --state-backend are passed and
+    // the self-upgrade fails (e.g. EPERM on a globally-installed CLI that
+    // can't be replaced by the current user), still run the state-backend
+    // migration. The two operations are independent — failing the npm
+    // install must not block the user from upgrading their existing project's
+    // on-disk state layout. Failures are tracked and we exit non-zero at the
+    // end if either step failed.
+    let selfUpgradeFailed: string | null = null;
     if (selfUpgrade) {
       try {
         await selfUpgradeCli({ insider, force: forceUpgrade });
       } catch (err) {
-        // UPGRADE-EPERM-FALSE-SUCCESS fix: surface the failure clearly and exit
-        // non-zero. Previously the warning from selfUpgradeCli was followed by
-        // an unconditional "✅ Upgraded" + exit 0, producing contradictory output.
         const msg = err instanceof Error ? err.message : String(err);
-        console.error(`❌ Self-upgrade failed: ${msg}`);
-        process.exit(1);
+        selfUpgradeFailed = msg;
+        if (upgradeStateBackend) {
+          // Defer the failure: still attempt the state-backend migration so
+          // the user gets at least one of the two operations they asked for.
+          console.error(`⚠️ Self-upgrade failed: ${msg}`);
+          console.error('   Continuing with --state-backend migration. Self-upgrade can be retried separately.');
+        } else {
+          console.error(`❌ Self-upgrade failed: ${msg}`);
+          process.exit(1);
+        }
       }
-      console.log('✅ Upgraded. Please restart your terminal for changes to take effect.');
-      return;
+      if (!selfUpgradeFailed && !upgradeStateBackend) {
+        console.log('✅ Upgraded. Please restart your terminal for changes to take effect.');
+        return;
+      }
+      if (!selfUpgradeFailed) {
+        console.log('✅ Self-upgrade complete. Running --state-backend migration next…');
+      }
     }
 
-    // Run upgrade
-    await runUpgrade(dest, { 
-      migrateDirectory: migrateDir,
-      self: selfUpgrade,
-      force: forceUpgrade
-    });
+    // Run upgrade (skip when --self was successful AND no state-backend asked —
+    // that case returned above). Otherwise we always run a project upgrade so
+    // hooks/templates are refreshed alongside the backend migration.
+    if (!selfUpgrade || upgradeStateBackend) {
+      await runUpgrade(dest, {
+        migrateDirectory: migrateDir,
+        self: selfUpgrade,
+        force: forceUpgrade,
+      });
+    }
 
     // Handle --state-backend: migrate backend after upgrade
     if (upgradeStateBackend) {
       const { migrateStateBackend } = await import('./cli/commands/migrate-backend.js');
-      await migrateStateBackend(dest, upgradeStateBackend);
+      try {
+        await migrateStateBackend(dest, upgradeStateBackend);
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`❌ State-backend migration failed: ${msg}`);
+        process.exit(1);
+      }
     } else {
       // Ensure hooks are installed for existing orphan/two-layer backends
       const { ensureHooksForBackend } = await import('./cli/commands/install-hooks.js');
       ensureHooksForBackend(dest);
     }
-    
+
+    if (selfUpgradeFailed) {
+      // Partial success — state-backend migration completed but self-upgrade
+      // did not. Exit non-zero so callers (CI, wrapper scripts) can detect it.
+      console.error(`❌ Self-upgrade failed earlier: ${selfUpgradeFailed}`);
+      console.error('   The project upgrade and state-backend migration succeeded; retry the self-upgrade manually.');
+      process.exit(1);
+    }
+
     return;
   }
 

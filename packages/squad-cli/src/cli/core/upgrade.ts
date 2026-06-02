@@ -645,7 +645,7 @@ function refreshSquadTemplatesDir(dest: string, templatesDir: string): void {
 /**
  * Run all ensure* checks and skill/template sync — shared by both code paths
  */
-function runEnsureChecks(dest: string, templatesDir: string, filesUpdated: string[]): void {
+async function runEnsureChecks(dest: string, templatesDir: string, filesUpdated: string[]): Promise<void> {
   const attrAdded = ensureGitattributes(dest);
   if (attrAdded.length > 0) {
     success(`ensured .gitattributes (${attrAdded.length} rules added)`);
@@ -689,10 +689,30 @@ function runEnsureChecks(dest: string, templatesDir: string, filesUpdated: strin
   // MCP-BRIDGE-BROKEN fix: ensure squad_state launch spec pins the current CLI
   // version so `npx -y @bradygaster/squad-cli` doesn't resolve to the stale
   // `latest` dist-tag (which may not contain the `state-mcp` command).
-  if (ensureSquadStateMcpPinned(dest, getPackageVersion())) {
-    success('ensured .copilot/mcp-config.json squad_state pinned to current CLI version');
+  //
+  // Iter-4 hardening (Option A): before writing the pin, HEAD-check the npm
+  // registry. If the exact version isn't published yet (common for in-flight
+  // preview builds being validated locally before publish), fall back to the
+  // `@insider` dist-tag so `npx` can still resolve a working binary.
+  const pinnedSpec = await resolveSquadStateMcpSpec(getPackageVersion());
+  if (ensureSquadStateMcpPinned(dest, getPackageVersion(), { argSpec: pinnedSpec })) {
+    success(`ensured .copilot/mcp-config.json squad_state pinned to ${pinnedSpec}`);
     filesUpdated.push('.copilot/mcp-config.json');
   }
+}
+
+/**
+ * Resolve the launch spec to write for the `squad_state` MCP entry. Returns
+ * the version-pinned spec when that version IS published on npm; falls back
+ * to `@bradygaster/squad-cli@insider` when it isn't (so npx can still find a
+ * working binary while a fresh preview build is being validated locally).
+ */
+export async function resolveSquadStateMcpSpec(cliVersion: string): Promise<string> {
+  const pinned = `@bradygaster/squad-cli@${cliVersion}`;
+  if (!cliVersion || cliVersion === '0.0.0') return '@bradygaster/squad-cli@insider';
+  const { isSquadCliVersionPublished } = await import('./npm-registry.js');
+  const published = await isSquadCliVersionPublished(cliVersion);
+  return published ? pinned : '@bradygaster/squad-cli@insider';
 }
 
 /**
@@ -701,8 +721,15 @@ function runEnsureChecks(dest: string, templatesDir: string, filesUpdated: strin
  * `latest` dist-tag. Returns true if the file was updated.
  *
  * Preserves any other configured MCP servers untouched. Idempotent.
+ *
+ * @param options.argSpec  Override the npm spec written into args (e.g. to
+ *   substitute `@insider` when the pinned version isn't published yet).
  */
-export function ensureSquadStateMcpPinned(dest: string, cliVersion: string): boolean {
+export function ensureSquadStateMcpPinned(
+  dest: string,
+  cliVersion: string,
+  options: { argSpec?: string } = {},
+): boolean {
   const mcpConfigPath = path.join(dest, '.copilot', 'mcp-config.json');
   if (!storage.existsSync(mcpConfigPath)) return false;
   if (!cliVersion || cliVersion === '0.0.0') return false;
@@ -724,7 +751,7 @@ export function ensureSquadStateMcpPinned(dest: string, cliVersion: string): boo
   }
   const server = config.mcpServers.squad_state;
 
-  const pinnedSpec = `@bradygaster/squad-cli@${cliVersion}`;
+  const pinnedSpec = options.argSpec ?? `@bradygaster/squad-cli@${cliVersion}`;
   const desiredArgs = ['-y', pinnedSpec, 'state-mcp'];
 
   // INSERT or UPDATE: if entry missing/unpinned/wrong-pinned, write the expected.
@@ -848,7 +875,7 @@ export async function runUpgrade(dest: string, options: UpgradeOptions = {}): Pr
     }
 
     // Run infrastructure ensure checks even when already current
-    runEnsureChecks(dest, templatesDir, filesUpdated);
+    await runEnsureChecks(dest, templatesDir, filesUpdated);
 
     return {
       fromVersion: oldVersion,
@@ -933,7 +960,7 @@ export async function runUpgrade(dest: string, options: UpgradeOptions = {}): Pr
   }
 
   // Run infrastructure ensure checks
-  runEnsureChecks(dest, templatesDir, filesUpdated);
+  await runEnsureChecks(dest, templatesDir, filesUpdated);
 
   console.log();
   info(`Upgrade complete: v${fromLabel} → v${cliVersion}`);

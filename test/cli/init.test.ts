@@ -110,7 +110,10 @@ describe('CLI: init command', () => {
     expect(content).toContain('mcp-servers:');
     expect(content).toContain('  squad_state:');
     expect(content).toContain('    type: local');
-    expect(content).toContain("    args: ['-y', '@bradygaster/squad-cli', 'state-mcp']");
+    // args may be pinned (`@bradygaster/squad-cli@<version>`) or unpinned
+    // depending on whether getPackageVersion() resolved a real version at
+    // test time. Either shape is acceptable here.
+    expect(content).toMatch(/args:\s*\['-y',\s*'@bradygaster\/squad-cli(@[^']+)?',\s*'state-mcp'\]/);
     expect(content).toContain('    tools: ["*"]');
     const frontmatterEnd = content.indexOf('\n---', 4);
     expect(frontmatterEnd).toBeGreaterThan(0);

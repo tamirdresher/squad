@@ -14,6 +14,7 @@ import { FSStorageProvider } from '@bradygaster/squad-sdk';
 import { effectiveSquadDir } from '../../core/effective-squad-dir.js';
 import { fatal } from '../../core/errors.js';
 import { GREEN, RED, DIM, BOLD, RESET, YELLOW } from '../../core/output.js';
+import { withAdditionalMcpConfig } from '../../core/copilot-invocation.js';
 import {
   parseRoutingRules,
   parseModuleOwnership,
@@ -616,7 +617,7 @@ export function buildAgentCommand(
   }
   const args = ['-p', prompt];
   if (options.copilotFlags) args.push(...options.copilotFlags.trim().split(/\s+/));
-  return { cmd: 'copilot', args };
+  return { cmd: 'copilot', args: withAdditionalMcpConfig('copilot', args, teamRoot) };
 }
 
 export async function selfPull(teamRoot: string): Promise<void> {
