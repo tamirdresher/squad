@@ -461,4 +461,88 @@ npm view @bradygaster/squad-cli dist-tags → latest=0.9.4 / insider=0.9.6-insid
 --autopilot is a real Copilot CLI flag (copilot --help); auto-continues up to 5 messages by default (--max-autopilot-continues 5). Combined with --yolo produced no hangs and no sk_user blocks. Use both per Tamir's directive.
 
 ### EVIDENCE-FIRST rule
-Without post-upgrade observability capture (config.json diff, hook listing, branch listing), "✅ Upgraded" stdout would have been the only signal — and it was wrong. Full picture only emerged after running capture script. Bake into every upgrade test.
+Without post-upgrade observability capture (config.json diff, hook listing, branch listing), "✅ Upgraded" stdout would have been the only signal — and it was wrong. Full picture only emerged after running capture script. Bake into every upgrade test.# Data Agent History Archive
+
+**Archived:** 2026-06-02T19:39:52Z  
+**Reason:** Main history.md exceeded 15360 byte threshold (36878 bytes). Archiving completed sections.
+
+## Completed Projects (2026-06-02)
+
+### Auth Expansion Proposal (CLEARED)
+- 11-mode auth inventory; Candidate 1 configure-delegate recommended
+- Picard + Worf gated; implemented in PR #3 R2 (4ac667cd)
+- Full research notes archived here
+
+### Upgrade-Path Baseline (insider.3) Analysis
+- squad upgrade --self --insider --state-backend two-layer issues documented
+- Contradictory ⚠️/✅ status, all-or-nothing failure mode identified
+- Fix strategy: 5 required upgrade actions, proper separation of concerns
+
+### Combined Fix Branch (Iteration 1)
+- Cherry-picked 4 PRs, fixed 3 major bugs (EPERM, WI-1, FLAG-IGNORED+MIGRATION)
+- Lint clean, build clean, 16/16 new tests pass
+- Tarball: 574 KB, pushed to fork
+
+### Bundle Iteration 2 (Both Punted P0s Fixed)
+- MCP-BRIDGE-BROKEN: root cause identified (unpinned CLI → 0.9.4 → no state-mcp command)
+  Fix: embed running version in launch args at init + upgrade
+- INSIDER3-INIT-LEAK: SDK runs before CLI config written
+  Fix: post-hoc lift in CLI, reuse migrate-backend.ts plumbing
+- 10 new tests pass; both fixes cross-wired to SDK + CLI
+- Tarball refreshed (563 KB)
+
+### Workstreams Bootstrap
+- Created .squad/workstreams/ tree: active/squad-agents-ai, evergreen/global, _template
+- squad-agents-ai live focus + 8 seeded decisions
+- .squad/identity/now.md tombstoned
+- 7 Picard conditions: C1-C6 completed, C7 deferred
+
+### Tarball Smoke 1/2 (travel-assistant)
+- Node project patterns: 5✅/1⚠️/1❌/1🚫
+- 6 fixes confirmed, 2 new gaps (MCP-BRIDGE SDK pin unexercised, post-commit no-op on local-only)
+- Twin tarball pattern documented, EPERM race workaround, orphan tree path correction
+
+### Tarball Smoke 2/2 (multiplayer-sudoku)
+- Non-Node project patterns: 6 fixes confirmed, 2 incomplete fixes
+- MCP pin requires npm registry version; local tarball insufficient for 
+px resolve
+- ensureSquadStateMcpPinned no-ops on missing entry (new finding for iteration 3)
+- Pre-existing squad-state on remote requires --force push
+
+### Iteration 3 Closeout
+- Registered squad sync command (3b44f45e)
+- Rewrote ensureSquadStateMcpPinned to insert entry when missing (3b44f45e + a0fa7e3e)
+- Wired retrofit into BOTH squad init AND runEnsureChecks
+- Key learning: MCP retrofit has TWO call sites, both needed
+- Twin-tarball install pattern: npm install --prefix <dir> <sdk.tgz> <cli.tgz>
+
+### PR #3 R2c Completion
+- Sample co-location under src/Squad.Agents.AI/samples/
+- MSBuild fix: added <Compile Remove="samples/**/*.cs" /> to prevent glob collision
+- All CI workflows green (ubuntu + windows matrix)
+- Upstream-ready status achieved
+
+### Tarball Validation 6/6 Outcomes
+- 5 agents (data-11 through data-15) + Scribe completed batch
+- 6 repos tested: tamir-squad-hq, gh-ai-adoption2026, holocaust-research-wasserman, squad-ai-vulns, travel-assistant smoke, multiplayer-sudoku smoke
+- Build-time: 8 fixes confirmed across all repos
+- Runtime: MCP bridge unreachable (separate iteration-4 scope)
+- Key: first proof Gap-1 hook-sync works end-to-end (data-11 orphan grew 926948e→9276687)
+
+### Key Learnings to Preserve
+1. Recurring pattern: "code exists, wiring missing" (sync command not in router)
+2. MCP-config retrofit TWO call sites (SDK init + CLI upgrade)
+3. Twin-tarball install pattern necessary until #1203 lands
+4. Auto-version bumping on every build (preview.3 → preview.4 → preview.5)
+5. Re-smoke seeded state strategy (pre-populate mcp-config without squad_state entry)
+6. squad sync does NOT lift working-tree state (only push/pull orphan refs)
+7. gh auth dance: tamirdresher for fork, tamirdresher_microsoft for squad-squad
+8. .squad/decisions/inbox gitignored, needs -f to commit
+
+## Current Focus (Ongoing)
+
+**6-Repo Tarball Validation Batch (2026-06-02 active):**
+- Real-time validation of 0.9.6-preview.5 twin tarballs
+- 5 parallel agents testing diverse repos + codebases + MCP configurations
+- MCP root-cause analysis to distinguish session-reload vs version-pin theories
+- Waiting: iteration 4 decision on whether to implement MCP pin validation in #1200
