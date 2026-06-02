@@ -3092,3 +3092,1381 @@ Landed on PR #3 branch `feature/squad-agents-ai` in `tamirdresher/squad` at comm
 **Outstanding:** `NUGET_API_KEY` secret setup (maintainer responsibility); `dev` branch creation (post-merge step).
 
 ---
+
+---
+
+## 2026-06-02 Session — Inbox consolidation (Scribe merge)
+
+> 12 of 13 files merged. `data-pr3-r2-handoff.md` listed in task but not present on disk; omitted.
+
+
+---
+
+### 2026-06-02T14:59:33.169+03:00: User directive — single integration branch for bundled fixes
+
+**By:** Tamir Dresher (via Copilot)
+
+**What:** All bundled bugfix work follows this pattern:
+1. **ONE integration branch** with ALL fixes (not separate PRs per bug class)
+2. **Build locally** from that branch (`npm pack` produces tarball)
+3. **Validate end-to-end** by installing the locally-built tarball into real test scenarios
+4. **Only THEN merge** — sign-off from validation is the merge gate
+
+Do NOT wait for a published release tag (insider.4, etc.) before testing. The locally-built artifact from the integration branch IS what gets tested. Validation against an unfixed version is half the value — gold standard is local-build → install → e2e.
+
+**Why:** User wants confidence that merging the bundle actually delivers the user-visible fix, not just "the unit tests pass". Captured for team memory and propagation to all future bugfix coordination.
+
+
+---
+
+# Decision: Combined fix branch for state-backend P0 bugs
+
+**Date**: 2026-06-02T14:59:33.169+03:00
+**Author**: Data
+**Status**: proposed
+
+## Context
+
+Multiple critical state-backend bugs (cherry-picked #1192, WI-1, UPGRADE-FLAG-IGNORED, UPGRADE-NO-MIGRATION, UPGRADE-EPERM-FALSE-SUCCESS) needed to ship together to give validators a single artifact to test. Two further bugs (MCP-BRIDGE-BROKEN, INSIDER3-INIT-LEAK) require architectural work and are punted with documented reasoning.
+
+## Decision
+
+Bundle all P0 state-backend fixes into a single integration branch `squad/state-backend-upgrade-fixes` (PR #1200 on bradygaster/squad), produce a local tarball, and publish a manifest in squad-squad.
+
+## Outcome
+
+- **Branch**: `squad/state-backend-upgrade-fixes` @ `e010b161` pushed to `tamirdresher/squad` (head of PR #1200)
+- **PR**: https://github.com/bradygaster/squad/pull/1200 — title + body updated to reflect bundled scope
+- **Superseded**: #1192 (commented; cherry-picks `70a37812` + `e0291f3f` included here)
+- **Tarball**: `C:\Users\tamirdresher\squad-validation\bradygaster-squad-cli-combined-fixes.tgz` (574 KB, 527 files, from `npm pack` of `packages/squad-cli`)
+- **Manifest**: `.squad/files/validation/COMBINED-FIX-BRANCH-MANIFEST.md`
+
+## Commits (in branch order)
+
+| SHA | Summary |
+|---|---|
+| `70a37812` | fix(permissions): approve-once for Copilot CLI 1.0.54+ (cherry-pick of #1192) |
+| `e0291f3f` | test(permissions): approve-once regression (cherry-pick of #1192) |
+| `cf99139e` | fix(upgrade): surface self-upgrade failures (EPERM-FALSE-SUCCESS) |
+| `e2ff8277` | fix(hooks): install pre/post-commit hooks for two-layer/orphan (WI-1) |
+| `e010b161` | fix(upgrade): honour --state-backend and migrate working-tree state |
+
+## Punted (documented in manifest)
+
+- MCP-BRIDGE-BROKEN — needs reproduction
+- INSIDER3-INIT-LEAK — needs `init.ts` audit + SDK routing refactor
+
+## Validation
+
+- Lint + build clean
+- 16/16 new tests pass + existing self-upgrade tests
+- 95 pre-existing full-suite failures unrelated to changes (environment-dependent path tests)
+
+
+---
+
+### 2026-06-02T15:10:29+03:00: User directive — No internal `.squad/` references in public artifacts
+
+**By:** Tamir Dresher (via Copilot)
+
+**What:** Never include references to `.squad/` files, internal decision numbers (e.g. "Decision 441", "Q1-Q7 design lock"), agent names, or other team-internal metadata in any artifact that gets published to a public surface. This includes (non-exhaustive): PR descriptions, commit messages on public branches, README files shipped in NuGet packages, GitHub Release notes, CHANGELOG entries, any file inside `src/`, `samples/`, `docs/`, `test/`, or anything outside `.squad/` itself. Internal references stay in `.squad/`; public artifacts use neutral, externally-meaningful language ("design discussion", "internal review", or just stripped entirely).
+
+**Why:** User caught leaked internal references in PR #3 body and existing commit messages. The `.squad/` directory is committed but is internal team-process state — public consumers have no context for "Decision 441" and should not be exposed to internal squad terminology.
+
+**Applies to:** All future PR descriptions, commits intended for public branches/repos, NuGet README, GitHub Release bodies, blog content, docs. Worf should audit any new PR before merge for compliance.
+
+---
+
+### 2026-06-02T15:10:29+03:00: User directive — v0.1 scope expansion (BYOK, keyed DI, richer streaming)
+
+**By:** Tamir Dresher (via Copilot)
+
+**What:** Pull the following features from v0.2 → v0.1 of Squad.Agents.AI. The current PR (#3) is expanded to include them. This is a USER OVERRIDE of Picard's prior architecture verdict (Decision 443 / auth-extensibility reviewer gate, which deferred BYOK to v0.2 on the grounds it belonged on the SessionConfig seam rather than the v0.1 CopilotClientOptions seam):
+- **Keyed DI support** — multiple `SquadAgent` registrations per app, addressable by key
+- **Multi-named connection strings** — allow multiple `Squad:{Name}` connection strings in one host and resolve by name
+- **BYOK pass-through** — bring-your-own-key support (the 4 BYOK auth modes Data inventoried)
+- **Richer native event streaming** — beyond the current basic surface; align with what consumers expect from an `AIAgent` per Microsoft.Agents.AI conventions
+- **GitHub Copilot ambient auth** — examples must run with NO key set, just the locally-logged-in GitHub Copilot (same pattern as the base Copilot SDK examples)
+
+**Why:** User explicit override — these belong in v0.1, not v0.2. The previously approved 15 conditions (Picard 6 + Worf SC-1..SC-9) from the auth-extensibility review STILL APPLY and must be honored during implementation; only the scope (what ships in v0.1) is expanded, not the security/architecture invariants.
+
+**Implementation owner:** Data, with the 15-condition gate respected.
+
+---
+
+# 🚨 URGENT — PR #3 NuGet Leak Assessment (2026-06-02)
+
+**Status:** GREEN — No 🔴 shipped artifacts identified.
+
+**Reason:** Target repo `tamirdresher/squad` is Node.js/TypeScript. PR #3 describes a *future* .NET `Squad.Agents.AI` package but does not contain actual `.csproj` files, package metadata, or build artifacts in the current state.
+
+**Implication:** Leaked internal metadata (Decision 441/443/444/447, "Q1-Q7 design lock", "tamresearch1") are exposed in PR body and commit messages (🟠 severity) but NOT packaged into any NuGet that consumers have downloaded.
+
+**Action:** Fix PR body immediately (Priority 1). Consider commit-message scrub if rebase is acceptable (Priority 2). Monitor when actual .NET implementation is added to the repository.
+
+**Next Audit Trigger:** When `src/Squad.Agents.AI/Squad.Agents.AI.csproj` is added to tamirdresher/squad.
+
+---
+
+**Report Date:** 2026-06-02  
+**Auditor:** Worf
+
+
+---
+
+# Worf — PR #3 Public-Leak Audit (2026-06-02)
+
+**Audit Date:** 2026-06-02T15:10:29+03:00  
+**Auditor:** Worf (Security & Reliability Reviewer)  
+**Target:** tamirdresher/squad PR #3 (branch: `feature/squad-agents-ai`)  
+**Directive:** copilot-directive-20260602T1510-public-hygiene.md
+
+---
+
+## Executive Summary
+
+**Finding Counts:**
+- 🔴 SHIPPED IN .NUPKG: 0 (no .NET project files; PR is draft describing future package)
+- 🟠 PUBLIC ON GITHUB: 9 findings (PR body + 5 commits with leaks)
+- 🟡 INSIDE PR BUT NOT PACKAGED: 0
+
+**Critical Issue:** PR description and commit messages expose internal squad-process metadata (Decision numbers 441, 443, 444, 447, 602, 452a, internal terminology "Q1-Q7 design lock", "Track A", internal repo "tamresearch1") to all public viewers of the PR.
+
+**Recommendation:** Edit PR body immediately; consider interactive rebase + force-push to scrub commit messages before merge.
+
+---
+
+## A. PR Description Scan
+
+**Severity:** 🟠 PUBLIC ON GITHUB  
+**File:** PR #3 body (GitHub PR view)  
+**Findings:** 4 distinct leaks
+
+| Line | Leak Type | Leaked Content | Severity |
+|------|-----------|-----------------|----------|
+| "## Design refs" para | Decision numbers | "Decisions 441, 443, 444, 447" | 🟠 |
+| "## Design refs" para | Internal terminology | "full Q1–Q7 design lock" | 🟠 |
+| "Decision 441" bullet | Decision number + internal reference | "Decision 441 SDK probe" | 🟠 |
+| "Decision 447" bullet | Decision number + internal terminology | "Decision 447 Q1–Q7 lock" | 🟠 |
+| "## Design refs" para | Internal repo reference | "tamirdresher_microsoft/tamresearch1" | 🟠 |
+
+**Exact Location (PR body):**
+```
+- `.squad/decisions.md` Decisions 441, 443, 444, 447 — full Q1–Q7 design lock
+- Decision 441 SDK probe — `GitHubCopilotAgent` is sealed → compose via `AsAIAgent`; `CopilotClientOptions` exposes all needed knobs
+- Decision 447 Q1–Q7 lock — TFM net10, naming `Squad.Agents.AI`, no `ExtensionSlug`, Hybrid PATH+URI wire format
+```
+
+**Context:** Replaces `[INTERNAL METADATA]` with neutral: "design review identified X and Y constraints" or strip entirely.
+
+---
+
+## B. Commit Message Scan
+
+**Severity:** 🟠 PUBLIC ON GITHUB  
+**File:** Git commit messages on `feature/squad-agents-ai` branch  
+**Findings:** 5 commits with leaks
+
+| Commit SHA | Subject | Leaked Content | Severity |
+|------------|---------|-----------------|----------|
+| `8f2679db` | feat: Squad.Agents.AI community NuGet for MAF integration | "Track A of the Q1-Q7 design lock", "tamresearch1", "Decisions 441, 443, 444, 447" | 🟠 |
+| `3f5e61d6` | test(squad-agents-ai): add routing integration tests | "Decision 452a", "Decision 447" | 🟠 |
+| `5f5293fb` | ci(squad-agents-ai): switch release triggers to dev/main branch-driven | "Decision 602" (reference to decisions.md) | 🟠 |
+| `12d803bf` | ci(squad-agents-ai): add .NET build/test/pack workflow | ".squad/decisions.md" path reference + adoption record context | 🟠 |
+| `db05f2a3` | ci(squad-agents-ai): NuGet publish workflow + Dependabot config | "Decision 602" (reference to decisions.md) | 🟠 |
+
+**Exact Locations:**
+
+**Commit `8f2679db87c451b0774752e71d2bcc6eee14993a`** (most critical)
+```
+Closes Track A of the Q1-Q7 design lock (see tamresearch1 .squad/decisions.md
+Decisions 441, 443, 444, 447).
+```
+
+**Commit `3f5e61d6d15e5c603f76d3a6f34acb7f97ca025e`**
+```
+WorkingDirectory isolation (Decision 452a),
+and CopilotClientOptions-based routing (Decision 447).
+```
+
+**Commit `5f5293fba1d831fa47955626b2d9c8d94c9e452e`** (Dependabot mention)
+```
+Per Tamir's release-strategy directive (decisions.md 2026-06-02):
+... per Decision 602)
+```
+
+**Commit `12d803bf25faa3b8bac329d671d0e07b405282d8`**
+```
+squad-squad onboarding (see .squad/decisions.md adoption record, 2026-06-02).
+```
+
+**Commit `db05f2a3b19e48649e9595ed0313caa98a9d5690`** (release workflow)
+```
+Per Tamir's release-strategy directive (decisions.md 2026-06-02):
+... (per Decision 602)
+```
+
+---
+
+## C. README + Docs Scan
+
+**Result:** ✓ PASS — No leaks found.
+
+README.md contains standard `.squad/` documentation (e.g., "Check that `.squad/team.md` was created", "Decision logging: Every decision is recorded in `.squad/decisions.md`"). These are legitimate framework documentation, not internal squad-process leaks.
+
+---
+
+## D. .csproj Metadata Scan
+
+**Result:** N/A — Not a .NET project in the current repo.
+
+Target repo `tamirdresher/squad` is Node.js/TypeScript. No `.csproj` files exist. PR describes a *future* .NET package; the actual implementation is not yet in the repository.
+
+---
+
+## E. Findings Categorization
+
+### 🔴 SHIPPED IN .NUPKG
+**Count:** 0  
+**Status:** N/A (no package artifacts in current PR; draft stage)
+
+### 🟠 PUBLIC ON GITHUB
+**Count:** 9 findings
+
+**PR Body (4):**
+1. `Decisions 441, 443, 444, 447`
+2. `Q1–Q7 design lock`
+3. `Decision 441 SDK probe`
+4. `Decision 447 Q1–Q7 lock`
+5. `tamirdresher_microsoft/tamresearch1`
+
+**Commit Messages (5):**
+1. commit `8f2679db`: Track A, Q1-Q7, tamresearch1, Decisions 441/443/444/447
+2. commit `3f5e61d6`: Decision 452a, Decision 447
+3. commit `5f5293fb`: Decision 602
+4. commit `12d803bf`: `.squad/decisions.md`
+5. commit `db05f2a3`: Decision 602
+
+**Visibility:** Every person who views PR #3 on GitHub or checks the public branch history sees these leaks.
+
+### 🟡 INSIDE PR BUT NOT PACKAGED
+**Count:** 0
+
+---
+
+## F. Remediation Recommendations
+
+### Priority 1: PR Body (Fix Immediately)
+
+**Action:** `gh pr edit 3 --repo tamirdresher/squad --body="[REVISED BODY]"`
+
+**Replace this:**
+```
+- `.squad/decisions.md` Decisions 441, 443, 444, 447 — full Q1–Q7 design lock
+- Decision 441 SDK probe — `GitHubCopilotAgent` is sealed → compose via `AsAIAgent`; `CopilotClientOptions` exposes all needed knobs
+- Decision 447 Q1–Q7 lock — TFM net10, naming `Squad.Agents.AI`, no `ExtensionSlug`, Hybrid PATH+URI wire format
+```
+
+**With this (or similar neutral language):**
+```
+- **Design constraints:** The design review identified three technical constraints:
+  1. `GitHubCopilotAgent` from the SDK is sealed; we compose via `AsAIAgent()` wrapper, exposing `CopilotClientOptions` for configuration.
+  2. Target framework: `net10.0`; package name: `Squad.Agents.AI`.
+  3. Wire format: Hybrid PATH+URI scheme (no ExtensionSlug).
+```
+
+**Removes:** Decision numbers, "Q1-Q7 design lock", internal repo "tamresearch1", ".squad/" paths.
+
+---
+
+### Priority 2: Commit Messages (Consider Force-Push)
+
+**Decision:** Only if Tamir wants to fully scrub history before merge.
+
+**Option A (Recommended if PR not yet merged):** Interactive rebase + force-push
+```powershell
+cd C:\Users\tamirdresher\source\repos\squad
+git rebase -i $(git merge-base main feature/squad-agents-ai)
+# Edit each leak commit; rewrite message to remove Decision NNN, Track A, tamresearch1, .squad/ paths
+git push --force-with-lease origin feature/squad-agents-ai
+```
+
+**Option B (If rebase is too risky):** Document for post-merge audit
+- These 5 commits are now part of public history; cannot be cleanly removed without rewriting.
+- Document in CHANGELOG that these were internal references not intended for public audiences.
+- Plan for v0.2 cleanup to remove leaked commits from squash/release branches if needed.
+
+**Leak Summary for Rebase (if chosen):**
+- `8f2679db`: Remove "Track A of the Q1-Q7 design lock (see tamresearch1 .squad/decisions.md Decisions 441, 443, 444, 447)" → "Closes implementation of MAF integration feature."
+- `3f5e61d6`: Remove "Decision 452a", "Decision 447" references → Generic descriptions.
+- `5f5293fb`: Remove "Decision 602" → Generic "Per release-strategy directive".
+- `12d803bf`: Remove ".squad/decisions.md adoption record" → "Per onboarding requirements".
+- `db05f2a3`: Remove "Decision 602" → Generic "Per release-strategy directive".
+
+---
+
+### Priority 3: Backlog (v0.2 Polish)
+
+- [ ] Audit all other PRs/branches for similar leaks.
+- [ ] Add CI check to block PR body/commit messages with regex: `\.squad|Decision \d+|Q\d-Q\d|Track [AB]|design lock|Q-lock|orchestration log|clawpilot|tamresearch`.
+- [ ] Document public-hygiene policy in CONTRIBUTING.md.
+
+---
+
+## Remediation Checklist for Data (Round 1 Follow-Up)
+
+- [ ] Edit PR #3 body to remove Decision numbers, internal terminology.
+- [ ] (Optional) Force-push to rewrite commit messages if rebase is acceptable.
+- [ ] Tag PR with `public-hygiene` label for tracking.
+- [ ] Verify no other PRs contain similar leaks.
+- [ ] Add pre-commit hook or GitHub Action to enforce policy on future PRs.
+
+---
+
+**Report prepared:** 2026-06-02  
+**Auditor:** Worf
+
+
+---
+
+### 2026-06-02: Data PR #3 Round 1 cleanup record
+
+**By:** Data
+
+**What shipped:** PR #3 Round 1 cleanup commit `88424b79d7cc532d8d23b70f80a002dc7800fc05` on `feature/squad-agents-ai`.
+
+**cliArgs status:** Worked already. Connection-string `cliArgs` flowed from `SquadConnectionFactory.FromConnectionString(...)` into `SquadAgentOptions.CliArgs`, through DI configuration, and into `CopilotClientOptions.CliArgs`. Round 1 added an explicit code comment plus regression test `AddSquadAgent_CopiesConnectionStringCliArgsToCopilotClientOptions`.
+
+**Multi-named connection contract:** Keep default `AddSquadAgent()` behavior on `ConnectionStrings:squad`. New overloads accept a logical name, e.g. `AddSquadAgent("research")`, and resolve `ConnectionStrings:squad-research`. This intentionally stops short of keyed DI; keyed resolution builds on the same name in Round 2.
+
+**Round 2 queue:** BYOK pass-through, keyed DI, richer native streaming, and sample app work remain queued for the next implementation round under the expanded v0.1 scope.
+
+
+---
+
+### 2026-06-02T15:36:55+03:00: User directive — Workstreams must be session-aware and concurrent
+
+**By:** Tamir Dresher (via Copilot)
+
+**What:** The workstreams pattern (proposed by Seven, `.squad/decisions/inbox/seven-workstreams-adoption-proposal.md`) must support these properties:
+1. **Per-session workstream awareness** — Each Copilot session, on start, must know which workstream it is working on. The coordinator must surface this at session start ("You're on workstream X") so the user always knows the active scope.
+2. **Multiple concurrent sessions on different workstreams** — The user can have multiple Copilot sessions open at the same time (multiple terminals/machines/clients), each bound to a DIFFERENT workstream. There is NO single global "current workstream" — that concept is per-session.
+3. **Pause/resume across sessions** — A workstream's state must be self-contained enough that one session can leave it idle, and a later session (different time, possibly different machine, possibly different agent batch) can pick it up cleanly without losing context.
+
+**Why:** Today our `.squad/identity/now.md` captures a single "current focus" — that model collides as soon as Tamir has two parallel sessions on SquadAgent and Durable Tasks. The workstreams design needs to evolve from "shared focus pointer" to "per-session binding + per-workstream resumable state."
+
+**Applies to:** The workstreams adoption design (Seven's proposal needs a refinement pass), the coordinator's session-start behavior, the Scribe's commit semantics, and `.squad/identity/` schema.
+
+---
+
+**Status: SUPERSEDED** by Picard's session-aware refinement (see below). Retained for archival reference.
+
+# Seven — Workstreams Adoption Proposal (2026-06-02)
+
+Requested by: Tamir Dresher  
+Author: Seven, Research & Integration Engineer
+
+## A. Workstreams pattern summary
+
+In `bradygaster/github-copilot-squad-research`, a workstream is a durable folder for one bounded research initiative. The reference definition says: "All research work is organized into **workstreams** — self-contained folders that track a specific research initiative from hypothesis through validated findings" (`workstreams/README.md:3`). The documented shape is root-level `workstreams/{active,closed,evergreen,_template}/`, with each workstream carrying a `README.md` and optional `docs/`, `diagrams/`, `reports/`, `artifacts/`, and `drop/` subfolders (`workstreams/README.md:5-14`, `workstreams/README.md:56-68`). Each workstream README has YAML frontmatter with at least `status`, `created`, and optionally `closed`; the template adds overview, executive summary, architecture, related workstreams, drop history, and the standard folder layout (`workstreams/README.md:32-40`, `workstreams/_template/README.md:1-51`). Actual examples include `github-integration-surfaces`, whose README has `status: active`, a `created` field, overview, executive summary, key findings, related workstreams, drop history, and folder layout (`workstreams/active/github-integration-surfaces/README.md:1-66`), and `repo-native-team-casting`, whose README adds `title`, `issue`, `branch`, research question, status, key findings, and team roster (`workstreams/active/repo-native-team-casting/README.md:1-34`). Several other active folders currently contain only `reports/` and no README, so the documented contract is stronger than the current repo's complete conformance.
+
+The coordinator process creates a workstream at research initiation: "Garfield creates a GitHub issue scoped to the research question", the squad creates branch `research/{issue-number}-{slug}`, and creates `workstreams/active/{slug}/` (`.squad/ceremonies.md:35-38`). Analyst findings go to `workstreams/active/{slug}/reports/`, diagrams to `diagrams/`, and Garfield updates the workstream README with summary and key findings (`.squad/ceremonies.md:41-52`). Lifecycle is location-based: `active` is currently researched, `closed` is complete/archived, and `evergreen` is living reference (`workstreams/README.md:22-30`), with close steps to move the folder and update frontmatter (`workstreams/README.md:50-54`). Decisions/directives remain global in the reference: `.squad/decisions.md` is the canonical shared log and `.squad/decisions/inbox/` is the drop-box (`.squad/templates/scribe-charter.md:14-18`, `.squad/templates/scribe-charter.md:89-92`). Cross-workstream links are handled by each README's `Related Workstreams` section (`workstreams/_template/README.md:23-28`) plus global decisions such as the rule to create per-workstream `ws:*` issue/PR labels (`.squad/decisions.md:47-50`).
+
+## B. Comparison table
+
+| Concern | Reference approach | Our current approach | Gap delta |
+|---|---|---|---|
+| Scoping a track | A folder per initiative under `workstreams/active/{slug}/`; folder has README metadata and artifacts (`workstreams/README.md:7-14`, `workstreams/active/github-integration-surfaces/README.md:1-66`). | No `workstreams/` or `.squad/workstreams/` exists; active focus is prose in `.squad/identity/now.md` (`.squad/identity/now.md:7-22`). | We have focus, not durable track identity. |
+| Scoping a directive | Reference decisions are global, but workstream docs and `ws:*` labels give a per-workstream handle (`.squad/decisions.md:47-50`). | Directives land in `.squad/decisions/inbox/` as flat files; current inbox contains unrelated state-backend, public hygiene, and Squad.Agents.AI directives. | Directives cannot be queried by track without content scanning. |
+| Querying state of one track | Read `workstreams/active/{slug}/README.md`, `reports/`, and related issue/branch. | Need scan `.squad/decisions.md`, `.squad/decisions/inbox/`, agent histories, and `now.md`. Example: Squad.Agents.AI state spans onboarding (`.squad/decisions.md:9-112`), auth expansion (`.squad/decisions.md:2103-2450`), release strategy (`.squad/decisions.md:2970-3092`), and inbox directives. | High retrieval cost and high risk of missing recent directives. |
+| Handoff between tracks | Reference branch/folder/issue conventions line up: `research/{issue-number}-{slug}` and `workstreams/active/{slug}/` (`.squad/ceremonies.md:91-98`). | Handoff is agent-history prose plus root decision log; no single destination for "give me the SquadAgent track." | Handoffs depend on memory and scanning, not durable structure. |
+| Cross-workstream concerns | Related-workstreams section plus global decisions and `ws:*` labels (`workstreams/_template/README.md:23-28`, `.squad/decisions.md:47-50`). | Global directives are mixed with track directives; public-hygiene directive applies broadly but is stored as one flat inbox file (`.squad/decisions/inbox/copilot-directive-20260602T1510-public-hygiene.md:1-9`). | Need explicit `global` / `applies_to` handling. |
+| Coordinator behavior | Creates workstream folder during initiation and updates README during assembly (`.squad/ceremonies.md:35-52`). | Coordinator reads `.squad/identity/now.md`, passes TEAM_ROOT/CURRENT_DATETIME/STATE_BACKEND, but not a workstream id (`.github/agents/squad.agent.md:108-110`). | Add active-workstream inference and propagation. |
+| Scribe behavior | Flat merge: read `.squad/decisions/inbox/`, append to `.squad/decisions.md`, delete inbox files (`.squad/templates/scribe-charter.md:89-92`). | Same flat merge rules in our Scribe charter (`.squad/templates/scribe-charter.md:89-104`). | Scribe must route inbox entries to per-workstream logs before merge. |
+| Public/private boundary | Reference uses root `workstreams/` because research artifacts are project deliverables. | We just captured a directive forbidding internal `.squad/` references in public artifacts (`.squad/decisions/inbox/copilot-directive-20260602T1510-public-hygiene.md:1-9`). | Our internal workstream state should live under `.squad/workstreams/` unless a track explicitly produces public docs elsewhere. |
+
+## C. Buckets that exist in our current decisions
+
+Estimated counts are decision/directive/report blocks, not exact line counts. Evidence comes from current `.squad/decisions.md`, `.squad/decisions/inbox/`, agent histories, and archived histories where active histories point there.
+
+- **`squad-agent-nuget` / Squad.Agents.AI v0.1-v0.2** — about 15 current entries. Evidence: onboarding fan-out (`.squad/decisions.md:9-112`), adoption decision (`.squad/decisions.md:1283-1299`), gap closure and routing tests (`.squad/decisions.md:2028-2099`), auth expansion (`.squad/decisions.md:2103-2450`), release strategy and pipeline (`.squad/decisions.md:2970-3092`), plus current inbox v0.1 scope expansion and public-hygiene directives (`.squad/decisions/inbox/copilot-directive-20260602T1510-v01-scope-expansion.md:1-14`, `.squad/decisions/inbox/copilot-directive-20260602T1510-public-hygiene.md:1-9`).
+- **`squad-cli-state-backend` / Squad CLI runtime, two-layer/orphan backend, upgrade fixes** — about 14 current entries. Evidence: state-backend triage (`.squad/decisions.md:116-124`), community signal report (`.squad/decisions.md:292-598`), Worf review and reliability gates (`.squad/decisions.md:617-916`), outcomes and approvals (`.squad/decisions.md:980-1104`), permission contract comparison (`.squad/decisions.md:1145-1173`), two-layer baseline (`.squad/decisions.md:2903-2965`), single-integration-branch directive and Data combined-fix inbox (`.squad/decisions/inbox/copilot-directive-20260602T145933-single-integration-branch.md:1-14`, `.squad/decisions/inbox/data-combined-fix-branch.md:1-43`).
+- **`memory-governance` / Copilot memory provider, governed memory, A/B experiments** — about 25-30 archived/current entries. Evidence: `.squad/decisions/decisions.md` starts with "Copilot Memory Provider Governance" and multiple Seven/Data/Worf entries (`.squad/decisions/decisions.md:5-140`); archive contains memory governance/API/gate entries from Seven, Worf, and Data (`.squad/decisions-archive.md:481-774`) and expanded memory experiment protocol/results (`.squad/decisions-archive.md:1063-2002`).
+- **`adc-azure-runner` / AgentDevCompute, Azure runner, Ralph loop, Aspire/AKS/ACA integrations** — about 11 entries. Evidence: team mission includes Azure Developer CLI, AKS, Azure Container Apps, and Azure integrations (`.squad/team.md:37`); archive has ADC execution model, Ralph-style runner, Geordi dry-run, Worf guardrails, Data Azure timer emulation, and eShop architecture reference (`.squad/decisions-archive.md:151-473`, `.squad/decisions-archive.md:928-1028`); Troi has tutorial structure for ADC runner (`.squad/agents/troi/history.md:36-88`).
+- **`durable-tasks-dtd` / durable workflow design** — about 5-8 entries, some overlapping ADC. Evidence: team scope names Durable Tasks/DTD (`.squad/team.md:3`, `.squad/team.md:37`), B'Elanna's active mission is Durable Tasks/DTD and restart/retry/compensation design (`.squad/agents/belanna/history.md:1-17`), and archive includes durable lease/state-machine design (`.squad/decisions-archive.md:445-473`).
+- **`content-blog-public-artifacts` / Troi voice, public writing, public hygiene** — about 6 entries. Evidence: Troi owns Tamir voice writing and public-risk review (`.squad/agents/troi/history.md:20-34`), archive has Troi voice decisions (`.squad/decisions-archive.md:23-31`, `.squad/decisions-archive.md:115-127`), and current public-hygiene directive applies to PR descriptions, commits, NuGet README, GitHub Releases, blog content, and docs (`.squad/decisions/inbox/copilot-directive-20260602T1510-public-hygiene.md:1-9`).
+- **`clawpilot-repo-m` / Clawpilot research boundary** — about 2 entries. Evidence: team mission includes Clawpilot/m (`.squad/team.md:37`), and current ownership-boundary directive says clawpilotsquad owns clawpilot/repo m, not Squad.Agents.AI (`.squad/decisions.md:2032-2039`).
+- **`team-governance` / coordinator, Scribe, routing, skills, operating rules** — about 12 entries. Evidence: foundational directives, routing discipline, PR deduplication, skills marketplace, and framework-contract decisions in archive (`.squad/decisions-archive.md:31-115`); coordinator currently treats `.squad/decisions.md` as an input and `now.md` as focus state (`.github/agents/squad.agent.md:14-16`, `.github/agents/squad.agent.md:108-110`); Scribe merges one flat inbox into one flat log (`.squad/templates/scribe-charter.md:89-104`).
+
+**Distinct tracks visible:** 8. The first two currently dominate `.squad/decisions.md`; the others are visible through agent histories and archives but still share the same namespace when new directives arrive.
+
+## D. Minimal-viable adoption proposal for squad-squad
+
+### D1. File-system shape
+
+Adopt the reference lifecycle (`active`, `closed`, `evergreen`, `_template`) but place it under `.squad/` because our workstreams scope internal coordination state, not public research deliverables:
+
+```text
+.squad/
+  workstreams/
+    README.md
+    _template/
+      README.md
+      decisions.md
+      decisions/
+        inbox/
+      directives/
+      handoffs/
+      reports/
+      artifacts/
+    evergreen/
+      global/
+        README.md
+        decisions.md
+        decisions/inbox/
+        directives/
+    active/
+      squad-agent-nuget/
+        README.md
+        decisions.md
+        decisions/inbox/
+        directives/
+        handoffs/
+        reports/
+        artifacts/
+      squad-cli-state-backend/
+        README.md
+        decisions.md
+        decisions/inbox/
+        directives/
+        handoffs/
+        reports/
+        artifacts/
+    closed/
+```
+
+Workstream README frontmatter:
+
+```yaml
+---
+id: squad-agent-nuget
+name: Squad.Agents.AI NuGet
+status: active        # active | closed | evergreen
+created: 2026-06-02
+closed:
+owner: data           # primary agent or "picard" for architecture-led tracks
+reviewers: [picard, worf]
+scope: "Squad.Agents.AI package, PR #3, v0.1/v0.2 decisions"
+related: [global, content-blog-public-artifacts]
+public_surface: true  # means Worf/Troi public-hygiene gates apply
+---
+```
+
+Inbox/frontmatter for every new decision or directive:
+
+```yaml
+---
+workstream: squad-agent-nuget
+applies_to: [squad-agent-nuget]
+type: directive       # directive | decision | report | handoff
+status: proposed      # proposed | active | superseded | archived
+date: 2026-06-02
+author: Tamir Dresher
+source: user
+---
+```
+
+Rationale for `.squad/workstreams/` instead of root `workstreams/`: Brady's repo uses root workstreams because the research artifacts are the repo product. Our immediate problem is internal decision/directive scoping, and the new public-hygiene directive says internal `.squad/` metadata should stay out of public artifacts (`.squad/decisions/inbox/copilot-directive-20260602T1510-public-hygiene.md:1-9`).
+
+### D2. Coordinator + Scribe behavior changes
+
+Coordinator changes for `.github/agents/squad.agent.md`:
+
+1. **Infer active workstream before spawning.** Use this order: explicit user phrase (`workstream: X`, "SquadAgent track", "state-backend"), GitHub issue/PR/branch names, changed files, `.squad/identity/now.md`, then `global`.
+2. **Pass `WORKSTREAM_ID` and `WORKSTREAM_PATH` to every spawned agent.** Existing spawn context already includes TEAM_ROOT, CURRENT_DATETIME, and STATE_BACKEND (`.github/agents/squad.agent.md:108-110`); add workstream fields beside those.
+3. **Require spawned agents to write decisions/directives to the active workstream inbox.** Default path: `.squad/workstreams/active/{id}/decisions/inbox/`. Cross-cutting items go to `.squad/workstreams/evergreen/global/decisions/inbox/` with `applies_to` listing touched tracks.
+4. **Update `.squad/identity/now.md` with `current_workstream:`.** Keep `focus_area` for human prose, but add durable machine-readable track state.
+5. **Do not let the coordinator do migrations inline.** If active workstream cannot be inferred with confidence, spawn Seven for classification or ask Tamir if the task is ambiguous.
+
+Scribe changes for `.squad/templates/scribe-charter.md`:
+
+1. **Merge per-workstream inboxes.** Instead of only reading `.squad/decisions/inbox/` and appending to `.squad/decisions.md` (`.squad/templates/scribe-charter.md:89-92`), read all `.squad/workstreams/{active,evergreen}/*/decisions/inbox/*.md`.
+2. **Append to that workstream's `decisions.md`.** Preserve root `.squad/decisions.md` as a compatibility index and migration bridge, not the only canonical store.
+3. **Validate metadata.** Reject or quarantine inbox files without `workstream`, `type`, and `date` frontmatter.
+4. **Handle global/cross-track directives once.** Store them in `evergreen/global/decisions.md` with `applies_to`. Do not duplicate the same directive into every touched workstream unless Tamir explicitly wants duplication.
+5. **Maintain a compact root index.** Root `.squad/decisions.md` should eventually contain: active workstream list, global decisions pointer, and legacy note. It should not receive every new scoped decision.
+
+### D3. Migration plan
+
+Do not rewrite history in the first PR. The current root `.squad/decisions.md` and `.squad/decisions-archive.md` are already a factual audit trail. Reclassifying 100+ historical blocks now would create churn and risk losing context.
+
+Minimal migration:
+
+1. Create `.squad/workstreams/` structure and seed `evergreen/global`, `active/squad-agent-nuget`, and `active/squad-cli-state-backend`.
+2. Mark pre-adoption material as `workstream: legacy` by policy, not by moving every block.
+3. Add a root `.squad/workstreams/README.md` section: "Historical decisions before 2026-06-02 remain in `.squad/decisions.md` and `.squad/decisions-archive.md`; new scoped decisions go to per-workstream logs."
+4. Move only current unmerged inbox files into the correct new inboxes as the pilot, if Tamir approves. Good pilot set: public hygiene and v0.1 scope expansion into `squad-agent-nuget`; single integration branch and Data combined fix into `squad-cli-state-backend`; public-hygiene may also live in `evergreen/global` with `applies_to: [squad-agent-nuget, content-blog-public-artifacts]`.
+5. Later, if useful, Seven can create a non-destructive `legacy-index.md` mapping old decision headings to workstream ids without moving original content.
+
+## E. Open questions / things that need Tamir's call
+
+1. **Naming:** Prefer kebab-case ids (`squad-agent-nuget`, `squad-cli-state-backend`) or short codes (`sqa`, `sb`)? I recommend kebab-case.
+2. **Global directives:** Does a directive spanning many tracks live only in `evergreen/global` with `applies_to`, or also get copied into each workstream's decision log? I recommend single source in `global`.
+3. **Pilot migration:** Should we retrofit the current inbox directives from 2026-06-02 into the new structure as the first pilot, or leave even those as legacy and start only with future directives?
+4. **Root vs internal path:** Is `.squad/workstreams/` acceptable, or does Tamir want root `workstreams/` to match Brady exactly? I recommend `.squad/workstreams/` for internal coordination state.
+5. **`now.md`:** Should `.squad/identity/now.md` add `current_workstream` and `active_workstreams`, or should the coordinator infer entirely from workstream README statuses?
+6. **Closed lifecycle:** When a track pauses but is likely to resume, should it move to `closed/`, remain `active`, or use `status: paused`? Reference only defines `active`, `closed`, and `evergreen`.
+7. **Canonical root decisions:** Should root `.squad/decisions.md` become a compatibility index immediately, or should Scribe continue dual-writing root + workstream logs for one transition period?
+
+## F. Recommended next step if Tamir says "go"
+
+Spawn **Data** for one implementation PR: "Implement MVP `.squad/workstreams` scaffolding and coordinator/Scribe routing rules." Data should change only:
+
+- `.squad/workstreams/README.md`
+- `.squad/workstreams/_template/README.md`
+- `.squad/workstreams/evergreen/global/README.md`
+- `.squad/workstreams/active/squad-agent-nuget/README.md`
+- `.squad/workstreams/active/squad-cli-state-backend/README.md`
+- `.github/agents/squad.agent.md` (add active-workstream inference and spawn variables)
+- `.squad/templates/scribe-charter.md` (add per-workstream inbox merge rules)
+- `.squad/identity/now.md` (add `current_workstream`)
+
+Picard should review the PR for architecture/operating-model fit; Worf should review only the public/private boundary if any public-facing docs are touched. No existing historical decisions should be moved in this PR unless Tamir explicitly approves the pilot migration.
+
+
+---
+
+# Data — bundle iteration 2 outcome
+
+**Date**: 2026-06-02T15:40:00+03:00
+**Branch**: squad/state-backend-upgrade-fixes
+**PR**: bradygaster/squad#1200
+**Head SHA**: 8ab9a305
+
+## Decision
+
+Both previously-punted P0 bugs in the combined-fix bundle have been fixed in this iteration. The branch is now complete and ready for downstream validation.
+
+## What changed
+
+- **MCP-BRIDGE-BROKEN** → `b987fe67` (`fix(mcp): pin @bradygaster/squad-cli@<version>...`)
+  - Root cause: `npm view @bradygaster/squad-cli dist-tags` → `latest: 0.9.4 / insider: 0.9.6-insider.3`. Init-template wrote `npx -y @bradygaster/squad-cli state-mcp` which resolves to 0.9.4 (latest), and 0.9.4 has **no** `state-mcp` command. Copilot was launching the wrong CLI and seeing zero `squad_state_*` tools.
+  - Fix: pin the launch spec to the running CLI version at both init (SDK) and upgrade time (CLI). Existing installs are retrofitted via new `ensureSquadStateMcpPinned` invoked from `runEnsureChecks`.
+
+- **INSIDER3-INIT-LEAK** → `e291b962` (`fix(init): lift mutable state onto squad-state branch...`)
+  - Root cause: `sdkInitSquad()` writes mutable files (`decisions.md`, `agents/<n>/history.md`) before the CLI even reads `--state-backend`. They always land in the working tree.
+  - Fix: post-hoc lift in the CLI immediately after `installGitHooks` for orphan/two-layer. Reuses existing `collectWorktreeState` + `writeFilesToOrphanBranch` git-plumbing helpers from `migrate-backend.ts`. Static files (charters/team.md/ceremonies.md/casting) preserved on disk.
+
+- **Version bump** → `8ab9a305` (`chore(release): bump to 0.9.6-preview.3...`)
+
+## Validation
+
+- Lint clean, build clean
+- 26/26 targeted tests pass (16 prior iteration 1 + 10 new iteration 2)
+- New tests: `test/mcp-bridge-pinning.test.ts` (7), `test/init-leak-mutable-state.test.ts` (3)
+- 95 pre-existing failures elsewhere unchanged
+- Tarball: `bradygaster-squad-cli-combined-fixes.tgz` (563 KB) refreshed at `C:\Users\tamirdresher\squad-validation\`
+- PR body updated to reflect both bugs moved from PUNTED → Fixed (P0)
+- Manifest in `tamirdresher_microsoft/squad-squad` master updated and pushed (commit `ec4392e3`)
+
+## Key technique discovered
+
+`StdioServerTransport` from `@modelcontextprotocol/sdk` uses **newline-delimited JSON-RPC**, not LSP-style Content-Length framing. First repro attempt used Content-Length and got silent no-response, masking the real root cause. Once switched to newline framing, all 7 tools registered correctly — proving the server code was fine and pointing at the npm dist-tag mismatch as the actual culprit.
+
+## Follow-up
+
+1. Land PR #1200 → close #1192.
+2. Consider unifying duplicated `buildMcpServerSpecs` between SDK init.ts and CLI upgrade.ts (drift risk).
+3. No bugs remain punted from the bundle.
+
+
+---
+
+**Status: PROPOSED — design-of-record. Adoption PENDING Tamir greenlight.**
+
+# Picard — Workstreams Session-Aware Refinement (2026-06-02)
+
+**Supersedes:** `seven-workstreams-adoption-proposal.md` (same inbox batch)
+**Author:** Picard, Lead / Product Architect
+**Date:** 2026-06-02
+**Status:** Proposed — design-of-record pending Tamir approval
+**Addresses:** Tamir's session-aware concurrency constraint (`copilot-directive-20260602T1536-session-aware-workstreams.md`)
+**Audiences:** Tamir (approve/reject), Worf (security review), Data (implementation)
+
+---
+
+## A. Session-Workstream Binding Mechanism
+
+### Candidates evaluated
+
+| Mechanism | Pros | Cons |
+|-----------|------|------|
+| **Env var `SQUAD_WORKSTREAM`** | Explicit, shell-scoped (dies with terminal), zero file I/O, works on any machine, composable with shell aliases/profiles, familiar Unix pattern | User must set it before launching Copilot; forgotten env var = no binding |
+| **Per-CWD file `.squad/.session-workstream`** | No user action needed if CWD is workstream-specific | CWD is shared across sessions in the same checkout — NOT session-scoped. Two terminals in the same repo see the same file. Violates the concurrency constraint. |
+| **Coordinator state file `.squad/sessions/{session-id}.json`** | Clean model; session ID is the key | Copilot CLI does not expose a stable, persistent session ID across tool calls today. The `CURRENT_DATETIME` timestamp is the closest proxy but is not guaranteed unique across simultaneous launches. Fragile foundation. |
+| **Interactive prompt at session start** | Works with zero setup on any machine; user explicitly confirms | Adds friction on every session start; poor for "I just want to continue where I left off" |
+| **Most-recent-touch heuristic** | Zero config | Ambiguous when two workstreams have recent activity (which is the NORMAL case under concurrency). Wrong default = silent scope pollution. |
+
+### Recommendation
+
+**Primary: Env var `SQUAD_WORKSTREAM={slug}`**
+**Fallback: Interactive prompt via `ask_user`**
+
+Rationale:
+1. The env var is the ONLY mechanism that is truly per-session by construction — it lives in the shell process, not on disk. Two terminals each set their own value. This directly satisfies Tamir's concurrency constraint.
+2. It composes with shell profiles: `alias sq-nuget='export SQUAD_WORKSTREAM=squad-agent-nuget && copilot'` makes launching a workstream-scoped session a single command.
+3. On a brand-new machine with no prior state, the user either sets the env var (they know what they're working on) or omits it and gets the interactive prompt fallback.
+4. The interactive prompt fallback reads `.squad/workstreams/active/*/README.md` frontmatter to list active workstreams. If only one workstream is active, it auto-selects with confirmation. If zero workstreams exist (fresh repo), the coordinator offers to create one.
+
+**New machine scenario:** User clones repo, opens terminal, runs Copilot. `SQUAD_WORKSTREAM` is unset. Coordinator reads `active/*/README.md`, finds workstream slugs, presents: "Active workstreams: squad-agent-nuget, squad-cli-state-backend. Which are you working on?" User picks one. Coordinator stores the choice in the session context (in-memory only — no file write needed because the env var or the prompt answer is authoritative for this session's lifetime).
+
+**What the coordinator does NOT do:** It never writes a "current workstream" pointer to disk that would be visible to other sessions. The binding is ephemeral and session-local.
+
+### Detection algorithm (for squad.agent.md)
+
+```
+1. Read env var SQUAD_WORKSTREAM
+2. If set and matches an active workstream slug → use it
+3. If set but slug not found in active/ → error: "Workstream '{slug}' not found. Active: [list]"
+4. If unset → list active workstreams from .squad/workstreams/active/*/README.md
+   a. If exactly 1 → auto-select, confirm: "Continuing on {slug}. Correct?"
+   b. If >1 → ask_user: "Which workstream? [list + 'create new']"
+   c. If 0 → ask_user: "No active workstreams. Create one? What's the initiative name?"
+5. Store resolved slug as SESSION_WORKSTREAM (in-memory, passed to all spawns)
+```
+
+---
+
+## B. Concurrent Session Safety
+
+### Invariants
+
+| # | Invariant | Mechanism |
+|---|-----------|-----------|
+| B1 | **Inbox segregation:** A session operating on workstream A MUST only read/write files under `.squad/workstreams/active/A/`. It MUST NOT touch `active/B/` state. | Coordinator passes `WORKSTREAM_PATH=.squad/workstreams/active/{slug}` to all spawns. Agents resolve inbox as `{WORKSTREAM_PATH}/decisions/inbox/`. Scribe validates that every file it processes belongs to the workstream it was told to process. |
+| B2 | **No cross-pollination on merge:** Scribe MUST NOT process workstream B's inbox files when operating in a session bound to workstream A. | Scribe receives `SESSION_WORKSTREAM` from coordinator. It processes ONLY `{WORKSTREAM_PATH}/decisions/inbox/` for the active workstream, plus `evergreen/global/decisions/inbox/` (global items are always in scope). It ignores other workstreams' inboxes entirely. |
+| B3 | **Git index safety:** Two concurrent sessions committing `.squad/` state MUST NOT corrupt the git index. | Each Scribe commit is scoped to files under the active workstream's subtree. Commit message includes `[ws:{slug}]` prefix for traceability. Use `git add {WORKSTREAM_PATH}/...` (not `git add .squad/`) to avoid staging another session's changes. If `git commit` fails due to index lock, retry once after 2-second delay. If retry fails, leave changes unstaged and warn: "Scribe commit deferred — another session holds the git lock." |
+| B4 | **Same-workstream collision prevention:** Two sessions MUST NOT bind to the SAME workstream simultaneously. | Advisory lock file: `.squad/workstreams/active/{slug}/.session-lock` containing `{"session_start": "2026-06-02T15:36:55+03:00", "user": "Tamir Dresher", "pid": 12345}`. Coordinator checks this file on workstream bind. If lock exists AND `session_start` is within the last 4 hours AND process at `pid` is running (best-effort check), warn: "Workstream {slug} appears active in another session (started {time}). Proceed anyway? [Yes / Pick different workstream]". This is advisory, not blocking — the user can override. Stale locks (>4h or dead PID) are auto-cleared. |
+| B5 | **Worst-case data loss prevention:** The absolute worst case is two sessions writing to the same workstream's `now.md` simultaneously, causing one write to be silently overwritten. | Mitigation: `now.md` updates use read-modify-write with `updated_at` timestamp in frontmatter. Scribe checks `updated_at` before writing; if it changed since read, Scribe appends rather than overwrites (append-only safety net). Combined with B4's advisory lock, this makes silent data loss require deliberate user override of the lock warning AND a sub-second race — acceptable risk. |
+
+### Global state files (cross-workstream)
+
+These files are touched by ANY session regardless of workstream:
+- `.squad/decisions.md` — root compatibility index (append-only, `merge=union`)
+- `.squad/identity/wisdom.md` — evergreen knowledge (rarely written)
+- `.squad/workstreams/evergreen/global/decisions/inbox/` — global directives
+
+For these, the existing `merge=union` `.gitattributes` strategy applies. Append-only semantics mean concurrent appends merge cleanly. The Scribe appends to root `decisions.md` only a one-line pointer when merging a workstream-scoped decision — not the full decision body — minimizing conflict surface.
+
+---
+
+## C. Pause/Resume Contract Per Workstream
+
+A workstream is **resumable** when a fresh session can read its directory and know: (1) what's the current focus, (2) what's pending, (3) what to do next — without any prior session context.
+
+### File schema for `.squad/workstreams/active/{slug}/`
+
+| File | Role | Category | Schema |
+|------|------|----------|--------|
+| `README.md` | Workstream identity, scope, owner, related workstreams | **AUTHORITATIVE** | YAML frontmatter (id, name, status, created, owner, reviewers, scope, related, public_surface) + prose overview |
+| `now.md` | Current focus, active blockers, next concrete action | **AUTHORITATIVE** for resume | YAML frontmatter (updated_at, focus, blocked_on, next_action) + prose context. This is what a resuming session reads FIRST. |
+| `decisions/inbox/*.md` | Unmerged proposals, directives, reports | **AUTHORITATIVE** | Standard inbox frontmatter (workstream, applies_to, type, status, date, author, source) |
+| `decisions.md` | Merged decision log for this workstream | **AUTHORITATIVE** (audit trail) | Append-only, same format as root decisions.md but scoped |
+| `handoffs/` | Inter-agent or inter-session handoff notes | **OPTIONAL CONTEXT** | Free-form markdown. Useful but not required for resume. |
+| `reports/` | Research findings, analysis outputs | **OPTIONAL CONTEXT** | Free-form. Can be regenerated by re-running the analysis. |
+| `artifacts/` | Produced deliverables (diagrams, specs) | **OPTIONAL CONTEXT** | Binary or markdown artifacts. |
+| `directives/` | Active directives scoped to this workstream | **DERIVED** | Can be rebuilt from decisions.md by filtering type=directive, status=active |
+
+### `now.md` schema (the resume contract)
+
+```yaml
+---
+updated_at: 2026-06-02T15:36:55+03:00
+focus: "Auth expansion v0.1 — ConfigureCopilotClient delegate"
+blocked_on: "Worf security review of credential surface"
+next_action: "Once Worf clears, Data implements configure delegate in SquadAgentOptions"
+active_agents: [data, worf]
+---
+```
+
+```markdown
+## Current State
+
+Brief prose capturing what happened in the most recent session(s) and where things stand.
+Written by the coordinator at session end (or by Scribe during commit).
+
+## Open Threads
+
+- Thread 1: description + who owns it + status
+- Thread 2: ...
+
+## Recently Completed
+
+- Item A (completed 2026-06-02)
+```
+
+### Resume algorithm (for coordinator)
+
+```
+1. Read {WORKSTREAM_PATH}/now.md → know the focus, blockers, next action
+2. Read {WORKSTREAM_PATH}/decisions/inbox/ → count pending items
+3. Read {WORKSTREAM_PATH}/README.md → confirm scope and owner
+4. Present to user: "Resuming workstream {name}. Focus: {focus}. 
+   {N} pending inbox items. Next action: {next_action}. 
+   Blocked on: {blocked_on or 'nothing'}. Ready to continue?"
+5. If user confirms → proceed with next_action context
+6. If user redirects → update now.md focus and proceed
+```
+
+---
+
+## D. Refined `.squad/identity/` Schema
+
+### Current state (broken under concurrency)
+
+```
+.squad/identity/
+  now.md          ← single global focus pointer (PROBLEM)
+  wisdom.md       ← evergreen team knowledge (FINE)
+```
+
+### Proposed state
+
+```
+.squad/identity/
+  wisdom.md                     ← unchanged, evergreen team knowledge
+```
+
+**`now.md` is REMOVED from `.squad/identity/`.** It is replaced by per-workstream `now.md` files:
+
+```
+.squad/workstreams/active/{slug}/now.md    ← per-workstream focus (one per active workstream)
+```
+
+There are NO per-session state files on disk. Session-workstream binding is ephemeral (env var or in-memory from prompt). This is a deliberate design choice: session state is transient; workstream state is durable. Mixing them on disk creates garbage-collection problems and stale-state bugs.
+
+### What lives where
+
+| File | Contents | Lifecycle |
+|------|----------|-----------|
+| `.squad/identity/wisdom.md` | Team-wide evergreen knowledge: conventions, patterns, lessons. NOT workstream-specific. | Updated rarely, by any agent via Scribe. Append-only. |
+| `.squad/workstreams/active/{slug}/now.md` | Per-workstream durable focus state. What's active, what's blocked, what's next. Updated at session end or on focus shift. | Created with workstream. Updated by coordinator/Scribe. Moves with workstream to `closed/` when done. |
+| `.squad/workstreams/active/{slug}/.session-lock` | Advisory lock: which session currently holds this workstream. | Created on session bind. Deleted on clean session exit. Auto-expires after 4h. NOT committed to git — add to `.gitignore`. |
+
+### Garbage collection
+
+- `.session-lock` files: auto-expire after 4 hours. Coordinator clears stale locks on workstream bind. These are `.gitignore`d and local-only.
+- No other session-specific files exist on disk, so there is nothing else to garbage-collect. This is by design.
+
+### Migration from current `now.md`
+
+The current `.squad/identity/now.md` content becomes the `now.md` of whichever workstream is bootstrapped first (likely `squad-agent-nuget`). The file at `.squad/identity/now.md` is then replaced with a tombstone:
+
+```markdown
+# Deprecated — see per-workstream now.md
+
+This file is no longer the active focus pointer. Each workstream maintains its own focus state at:
+`.squad/workstreams/active/{slug}/now.md`
+
+To see what the team is working on, list active workstreams:
+`ls .squad/workstreams/active/`
+```
+
+---
+
+## E. Coordinator Behavior Changes (squad.agent.md edits)
+
+### E1. "On every session start" (line 108)
+
+**Current:** "Check `.squad/identity/now.md` if it exists — it tells you what the team was last focused on. Update it if the focus has shifted."
+
+**New:** Replace with:
+"Determine the active workstream (see Workstream Discovery). Read `.squad/workstreams/active/{slug}/now.md` for the workstream's current focus. Store `SESSION_WORKSTREAM` and `WORKSTREAM_PATH` in session context. Pass both into every spawn prompt alongside `TEAM_ROOT`, `CURRENT_DATETIME`, and `STATE_BACKEND`."
+
+### E2. NEW section: "Workstream Discovery" (insert after Worktree Awareness)
+
+Add a new section documenting the detection algorithm from section A above. This section defines:
+- Env var check → active workstream list scan → interactive prompt
+- `SESSION_WORKSTREAM` and `WORKSTREAM_PATH` variables
+- Resume presentation (from section C's resume algorithm)
+- Advisory lock creation/check
+
+### E3. Session catch-up logic (line 114-121)
+
+**Current:** Scans `.squad/orchestration-log/` globally.
+
+**New:** Scope catch-up to the active workstream:
+"When triggered, scan `.squad/orchestration-log/` for entries tagged with the active workstream (entries contain `[ws:{slug}]` in their headers). Present only workstream-relevant activity. If the user asks for cross-workstream status, scan all workstreams' `now.md` files and present a summary table."
+
+### E4. Directive Capture (line 211-239)
+
+**Current:** Writes to `.squad/decisions/inbox/copilot-directive-{timestamp}.md`
+
+**New:** "Write directives to the active workstream's inbox: `.squad/workstreams/active/{SESSION_WORKSTREAM}/decisions/inbox/copilot-directive-{timestamp}.md`. Include `workstream: {SESSION_WORKSTREAM}` in frontmatter. Exception: if the directive is explicitly cross-cutting (user says 'for all workstreams', 'team-wide', 'always', or the content clearly applies globally), write to `.squad/workstreams/evergreen/global/decisions/inbox/` with `applies_to: [all]`."
+
+### E5. Spawn templates (line 328-360, line ~800+)
+
+**Current:** Templates include `TEAM_ROOT`, `CURRENT_DATETIME`, `WORKTREE_PATH`, `STATE_BACKEND`.
+
+**New:** Add to all spawn templates:
+```
+SESSION_WORKSTREAM: {session_workstream}
+WORKSTREAM_PATH: {workstream_path}
+```
+And add instruction block:
+```
+**WORKSTREAM:** You are working on workstream `{SESSION_WORKSTREAM}`.
+- Write decisions/directives to `{WORKSTREAM_PATH}/decisions/inbox/`
+- Read workstream context from `{WORKSTREAM_PATH}/now.md`
+- Do NOT read or write other workstreams' state
+```
+
+### E6. Worktree Awareness (line 626-665)
+
+**No structural change needed.** The worktree pattern (branch-local `.squad/` state) is analogous to and compatible with the workstream pattern (per-workstream subdirectories within `.squad/`). The existing `worktree-local` strategy already isolates `.squad/` state per branch. Workstreams add a second dimension of isolation (by initiative) within a single branch's `.squad/` tree.
+
+**Add a note:** "Workstream isolation is orthogonal to worktree isolation. A worktree isolates by git branch; a workstream isolates by initiative within the `.squad/workstreams/` tree. Both can be active simultaneously."
+
+### E7. Context caching (line 112)
+
+**Add:** "Cache `SESSION_WORKSTREAM` and `WORKSTREAM_PATH` after first resolution. Do NOT re-resolve the workstream on subsequent messages within the same session — the binding is fixed for the session's lifetime. If the user explicitly says 'switch to workstream X', re-resolve and update cached values."
+
+---
+
+## F. Scribe Behavior Changes
+
+### F1. Inbox processing scope
+
+**Current:** Scribe reads `.squad/decisions/inbox/` and appends to `.squad/decisions.md`.
+
+**New:** Scribe receives `SESSION_WORKSTREAM` from the coordinator. It processes:
+1. `{WORKSTREAM_PATH}/decisions/inbox/*.md` — workstream-scoped items → append to `{WORKSTREAM_PATH}/decisions.md`
+2. `.squad/workstreams/evergreen/global/decisions/inbox/*.md` — global items → append to `.squad/workstreams/evergreen/global/decisions.md`
+
+It does NOT scan other workstreams' inboxes. Cross-workstream processing only happens in a dedicated "housekeeping" session (coordinator explicitly asks Scribe to process all inboxes).
+
+### F2. Commit granularity
+
+Each Scribe commit covers ONE workstream plus any global items touched in the same session. Commit message format:
+
+```
+[ws:{slug}] scribe: merge {N} inbox items into {slug}/decisions.md
+
+- {brief description of each merged item}
+```
+
+If the session also touched global items:
+```
+[ws:{slug}+global] scribe: merge {N} items ({M} workstream, {K} global)
+```
+
+This ensures `git log --grep='ws:squad-agent-nuget'` shows only that workstream's decision history.
+
+### F3. Orchestration log
+
+Orchestration log entries include a `workstream:` field in their header:
+
+```markdown
+### {timestamp} — {agent} — {task summary}
+**Workstream:** {slug}
+**Requested by:** {user}
+...
+```
+
+Log files remain in `.squad/orchestration-log/` (flat, not per-workstream) because orchestration is a cross-cutting team concern. The `workstream:` tag enables filtering.
+
+### F4. now.md update at session end
+
+Scribe updates `{WORKSTREAM_PATH}/now.md` as part of its session-end commit:
+- `updated_at` ← current timestamp
+- `focus` ← coordinator's summary of what was worked on
+- `next_action` ← whatever the coordinator or agents identified as the next step
+- `blocked_on` ← any identified blockers
+
+This is the primary mechanism that enables pause/resume across sessions.
+
+---
+
+## G. Migration & Rollout
+
+### G1. Agent history: global with workstream tags
+
+Agent `history.md` files stay at `.squad/agents/{name}/history.md` — they are NOT split per workstream. Agents are people with cross-workstream memory. Their history entries gain a `**Workstream:**` tag:
+
+```markdown
+## 2026-06-02 — Auth expansion APPROVE_WITH_CONDITIONS
+**Workstream:** squad-agent-nuget
+...
+```
+
+This lets any agent recall what they did on a specific workstream without fragmenting their institutional knowledge. When an agent is spawned in a workstream context, the coordinator's prompt says "Review your history for entries tagged `ws:{slug}` for prior context on this workstream."
+
+### G2. Bootstrapping the first workstream
+
+**Smallest viable cut (one PR, no big-bang migration):**
+
+1. Create directory structure:
+   ```
+   .squad/workstreams/
+     README.md
+     _template/README.md, now.md, decisions.md, decisions/inbox/
+     evergreen/global/README.md, decisions.md, decisions/inbox/
+     active/squad-agent-nuget/README.md, now.md, decisions.md, decisions/inbox/
+   ```
+
+2. Populate `active/squad-agent-nuget/now.md` from current `.squad/identity/now.md` content (it's already focused on Squad.Agents.AI).
+
+3. Populate `active/squad-agent-nuget/README.md` with frontmatter from Seven's proposal (id, name, status, created, owner, etc.).
+
+4. Move the public-hygiene directive to `evergreen/global/decisions/inbox/` (it applies to all workstreams).
+
+5. Move the v0.1-scope-expansion directive to `active/squad-agent-nuget/decisions/inbox/`.
+
+6. Replace `.squad/identity/now.md` with the tombstone (section D).
+
+7. Add `.session-lock` to `.gitignore`.
+
+8. Update `squad.agent.md` with the Workstream Discovery section and modified spawn templates.
+
+9. Update `.squad/templates/scribe-charter.md` with per-workstream inbox processing rules.
+
+**DO NOT in this PR:**
+- Move any existing decisions from root `decisions.md` — they stay as legacy
+- Create all 8 workstreams from Seven's bucket analysis — only `squad-agent-nuget` for validation
+- Modify agent charters or histories — only add workstream tags going forward
+
+**Second workstream** (`squad-cli-state-backend`) is created in a follow-up PR after the first workstream validates the design. This prevents a half-baked migration from corrupting multiple initiative tracks.
+
+### G3. Compatibility bridge
+
+Root `.squad/decisions.md` remains the append-only compatibility index. During transition:
+- Scribe writes full decisions to `{WORKSTREAM_PATH}/decisions.md`
+- Scribe writes a one-line pointer to root `decisions.md`: `### {date} — [ws:{slug}] {title} (see .squad/workstreams/active/{slug}/decisions.md)`
+- Root `decisions.md` header gains a note: "New scoped decisions are in per-workstream logs. This file contains legacy decisions and cross-references."
+
+After all active workstreams are bootstrapped (future PR), the root file becomes read-only (new decisions never written directly to it).
+
+---
+
+## H. Open Questions for Tamir
+
+1. **Workstream IDs:** Kebab-case slug only (e.g., `squad-agent-nuget`), or also a short numeric code? Picard recommends kebab-case only — short codes add a mapping layer with no clear benefit.
+
+2. **Global directives storage:** Does a directive spanning many tracks live ONLY in `evergreen/global/` with `applies_to`, or also get copied into each workstream's decision log? Picard recommends single source in `global` with cross-references. (Restated from Seven's proposal — still needs Tamir's call.)
+
+3. **Agent history split:** Should `agents/{name}/history.md` split per-workstream (separate files) or stay agent-global with `**Workstream:**` tags? Picard recommends tags (section G1). This preserves agents' cross-workstream institutional memory.
+
+4. **Cross-workstream dependencies:** Should a workstream's `now.md` include a `blocked_on_workstream:` field that names other workstreams? Example: `squad-agent-nuget` blocked on `squad-cli-state-backend` for a shared API change. Picard recommends yes — it makes cross-workstream dependencies visible during resume.
+
+5. **Env var naming:** Is `SQUAD_WORKSTREAM` acceptable, or should it be `SQUAD_WS` (shorter) or `COPILOT_WORKSTREAM` (Copilot-branded)? Picard recommends `SQUAD_WORKSTREAM` for consistency with the `SQUAD_NO_PERSONAL` kill switch pattern already in squad.agent.md.
+
+6. **Workstream pause status:** When a track pauses but will resume, should it stay in `active/` with `status: paused` in frontmatter, or move to a `paused/` directory? Picard recommends `status: paused` in frontmatter, staying in `active/` — moving directories changes paths and breaks any hardcoded references.
+
+7. **Greenlight for implementation:** Does Tamir approve spawning Data for the bootstrapping PR (section G2) after Worf's security review?
+
+---
+
+## I. Reviewer Verdict
+
+**APPROVE_WITH_CONDITIONS**
+
+The workstreams initiative (Seven's structural proposal + this session-aware concurrency refinement) is architecturally sound and solves a real scaling problem: today's single-focus model in `now.md` cannot support concurrent sessions on different initiatives.
+
+### Conditions for Data's implementation
+
+1. **Env var binding MUST be the primary mechanism.** Do not implement CWD-file or session-state-file alternatives in v1. The interactive prompt fallback is sufficient for the unset case.
+
+2. **Advisory lock (`.session-lock`) MUST be `.gitignore`d.** These are local-only runtime files. Committing them would create merge conflicts and stale state on other machines.
+
+3. **Scribe MUST scope `git add` to the active workstream's subtree.** Never `git add .squad/` — this would stage another concurrent session's changes. Use `git add .squad/workstreams/active/{slug}/ .squad/workstreams/evergreen/global/` explicitly.
+
+4. **Bootstrap only ONE workstream (`squad-agent-nuget`) in the first PR.** Validate the resume contract works before creating additional workstreams. The second workstream (`squad-cli-state-backend`) follows in a separate PR.
+
+5. **Agent histories stay agent-global with workstream tags.** Do NOT create per-workstream agent history files unless Tamir explicitly overrides.
+
+6. **The `now.md` tombstone in `.squad/identity/` MUST exist.** Any agent or tool that reads the old `now.md` path must get a clear redirect to the new per-workstream paths, not a missing file error.
+
+7. **Worf MUST review the advisory lock mechanism for security surface.** Multiple sessions = multiple credential contexts. Worf should confirm that workstream isolation does not create a privilege-escalation path (e.g., session A's agent reading session B's workstream state that contains sensitive directives).
+
+### Risk assessment
+
+- **Rollout risk:** LOW. The bootstrapping PR is additive (new directories, new files, updated coordinator rules). No existing decisions are moved. Rollback = delete `.squad/workstreams/` and revert squad.agent.md changes.
+- **Concurrency risk:** MEDIUM. The advisory lock is not a hard lock — two sessions CAN work on the same workstream if the user overrides the warning. This is acceptable for a single-user project but would need hardening for multi-user squads.
+- **Migration risk:** LOW. Legacy decisions stay in place. The compatibility bridge (root `decisions.md` gets pointers) means no existing tooling breaks.
+
+
+---
+
+**Status: REVIEW_VERDICT — PASS_WITH_CONDITIONS. 9 binding + 5 advisory conditions. Adoption gated on conditions being addressed.**
+
+# Worf — Workstreams Multi-Session Security Review (2026-06-02)
+
+**Review Date:** 2026-06-02  
+**Reviewer:** Worf, Security & Compliance Lead  
+**Target:** `picard-workstreams-session-aware-refinement.md` (Picard's session-aware workstreams design)  
+**Scope:** Multi-session credential surface, cross-workstream information disclosure, concurrency integrity, bootstrap security, public artifact hygiene  
+**Prior Art:** SC-1..SC-9 (auth-extensibility review), `worf-pr3-public-leak-audit.md`, `copilot-directive-20260602T1510-public-hygiene.md`
+
+---
+
+## A. Multi-Session Credential Surface
+
+### SC-Wn.1 — Workstream slug in env var as information leak vector
+
+**Threat:** `SQUAD_WORKSTREAM` is an environment variable. Environment variables are visible in `/proc/{pid}/environ` on Linux, via `Get-Process` + WMI on Windows, in crash dumps, in child process inheritance, and in CI logs that dump `env`. If a workstream is named with PII or secret-suggestive content (e.g., `bank-creds-rotation`, `patient-data-migration`, `aws-prod-key-rollover`), the slug itself becomes a metadata leak.
+
+**Attack scenario:** A CI pipeline or crash-reporting tool captures environment variables and sends them to an external logging service. The slug `prod-api-key-rotation` tells an attacker which system is undergoing key rotation and when.
+
+**Assessment:** LOW severity for the current single-user, local-machine use case. MEDIUM if workstreams are ever used in CI or shared compute.
+
+**Mitigation (REQUIRED):**
+- Document in `.squad/workstreams/README.md`: "Workstream slugs MUST be initiative names, never credential or secret references. Slugs are treated as public-safe metadata. Bad: `aws-prod-key-rollover`. Good: `infrastructure-hardening`."
+- The coordinator SHOULD validate slug format on creation: kebab-case, no tokens matching `*key*`, `*secret*`, `*token*`, `*cred*`, `*password*` (case-insensitive).
+
+**Verdict:** PASS_WITH_CONDITIONS — condition above must be documented before rollout.
+
+---
+
+### SC-Wn.2 — Cross-session state leakage via `~/.copilot/` or shared caches
+
+**Threat:** Two terminal sessions on the same OS user and machine, bound to different workstreams, share `~/.copilot/` (Copilot CLI session state, logs, transcripts). Session A working on workstream `squad-agent-nuget` may generate logs/transcripts that contain file paths, agent prompts, or content references from that workstream. Session B on workstream `squad-cli-state-backend` can read those same logs.
+
+**Attack scenario:** A developer working on a sensitive workstream closes the session. A later session on a different workstream reads `~/.copilot/` logs/transcripts and finds sensitive file paths, credential-adjacent references, or design details from the first workstream.
+
+**Assessment:** LOW for single-user scenarios (the user is the same person). MEDIUM for multi-user shared machines (e.g., shared dev VMs, pair-programming setups, jump boxes).
+
+**Mitigation (ADVISORY — not blocking):**
+- Picard's design correctly avoids writing ANY session-specific state to `.squad/` on disk. The env-var binding is ephemeral. This is the right call.
+- `~/.copilot/` state is owned by the Copilot CLI, not the squad framework. The squad design cannot mitigate CLI-level log leakage.
+- Document the assumption: "Cross-workstream isolation applies to `.squad/` state only. Copilot CLI logs in `~/.copilot/` are NOT workstream-scoped; they may contain content from any session. Users on shared machines should be aware."
+
+**Verdict:** PASS — the design does not worsen the baseline. Documentation advisory recommended but not blocking.
+
+---
+
+### SC-Wn.3 — Credential reference in `now.md` exposed via accidental workstream activation
+
+**Threat:** Workstream A's `now.md` contains `blocked_on: "Waiting for API key from Azure Key Vault (vault: prod-squad-kv)"`. A different session accidentally activates workstream A (typo in `SQUAD_WORKSTREAM`, or auto-select when only one workstream is active). The user (or an agent) now sees this credential-adjacent reference.
+
+**Attack scenario:** An intern opens a terminal, forgets to set `SQUAD_WORKSTREAM`, and the auto-select picks the only active workstream — which happens to contain sensitive infrastructure references in `now.md`. The intern's session transcript (which may be stored in `~/.copilot/`) now contains vault names and key identifiers.
+
+**Assessment:** LOW for single-user (same person sees their own data). MEDIUM for multi-user squads.
+
+**Mitigation (REQUIRED):**
+- Document in workstream conventions: "`now.md` MUST NOT contain verbatim credentials, API keys, vault URIs with key names, or other secret material. Use abstract references: `blocked_on: 'infrastructure team credential delivery'` — NOT `blocked_on: 'API key from vault prod-squad-kv, secret name squad-api-token'`."
+- This is the same principle as SC-1's redaction requirement for `ToString()`, applied to human-written state files.
+
+**Verdict:** PASS_WITH_CONDITIONS — documentation convention required.
+
+---
+
+## B. Cross-Workstream Information Disclosure via Filesystem
+
+### SC-Wn.4 — Session A reading Session B's workstream files
+
+**Threat:** `.squad/workstreams/active/` is a shared filesystem directory readable by any process running as the same OS user. Session A bound to workstream `alpha` can trivially `cat .squad/workstreams/active/beta/now.md` or have an agent read it.
+
+**Assessment:** This is by design and acceptable for the current threat model. The `.squad/` directory is a shared team state store. Workstream isolation is a SCOPING mechanism (which session writes where), not an ACCESS CONTROL mechanism (who can read what). The design explicitly states agents should NOT read other workstreams' state, enforced by coordinator instructions, not filesystem permissions.
+
+**Mitigation (ADVISORY):**
+- Document the threat model assumption: "Workstream isolation is advisory, not enforced at the filesystem level. All workstream state is readable by any session on the same user account. Do not store secrets in workstream files."
+- If future multi-user requirements arise, consider per-workstream POSIX permissions or encrypted state. Not needed now.
+
+**Verdict:** PASS — acceptable risk for single-user, correctly documented threat model.
+
+---
+
+### SC-Wn.5 — Picard's scoped `git add` mitigation bypass via manual staging
+
+**Threat:** Picard's condition #3 says Scribe MUST use `git add .squad/workstreams/active/{slug}/` (scoped add). But what if the developer manually ran `git add .squad/workstreams/active/beta/now.md` before Scribe runs? Scribe's scoped `git add` adds workstream A's files, but beta's file is ALREADY staged. Scribe's `git commit` commits both.
+
+**Attack scenario:** Developer is debugging workstream `beta`, manually stages a `now.md` with sensitive blockers. Switches to workstream `alpha`, Scribe runs, commits both alpha's decisions AND beta's `now.md` in a single commit tagged `[ws:alpha]`. The commit message misleads auditors — it says `ws:alpha` but contains `beta` state.
+
+**Assessment:** MEDIUM — this is a realistic developer workflow mistake that silently cross-contaminates commits.
+
+**Mitigation (REQUIRED):**
+- Scribe MUST run `git diff --cached --name-only` before committing and WARN (not silently proceed) if any staged files are outside the active workstream's subtree and `evergreen/global/`.
+- If extraneous files are staged, Scribe SHOULD `git reset HEAD {file}` those files before committing, or abort and warn the user.
+- Add to Scribe charter: "Before every commit, verify the staged changeset contains ONLY files under `{WORKSTREAM_PATH}/` and `.squad/workstreams/evergreen/global/`. If other paths are staged, unstage them and log a warning: 'Unstaged {N} files outside active workstream scope.'"
+
+**Verdict:** PASS_WITH_CONDITIONS — staged-file validation required in Scribe.
+
+---
+
+### SC-Wn.6 — Per-workstream inbox files and the public-hygiene directive
+
+**Threat:** Workstream inboxes multiply the number of inbox files. Each inbox file may contain agent prompts/outputs with redacted-but-still-informative content (I identified this pattern in the PR #3 leak audit: Decision numbers, internal terminology, `.squad/` paths). More inbox files = more content that could accidentally leak if referenced in public artifacts.
+
+**Additional vector:** A workstream slug like `squad-agent-nuget` might appear in a public PR body if someone writes "Implements the squad-agent-nuget workstream deliverable." The slug itself is not secret, but the reference pattern reveals internal process structure.
+
+**Assessment:** LOW incremental risk. The public-hygiene directive already prohibits `.squad/` references in public artifacts. Workstreams don't change this rule; they just create more files it applies to.
+
+**Mitigation (REQUIRED):**
+- Confirm the public-hygiene directive applies uniformly: "No `.squad/` paths, workstream slugs, decision numbers, or agent names in public PR bodies, commit messages on public branches, README files, NuGet metadata, or release notes." This was already stated but must be re-affirmed for the workstreams expansion.
+- Workstream slugs in INTERNAL commit messages (on private branches, within `.squad/` state) are ACCEPTABLE — the `[ws:{slug}]` prefix pattern is scoped to `.squad/` state commits only.
+- Add to the hygiene directive: "Workstream slugs (e.g., `squad-agent-nuget`) are permitted in `.squad/`-internal commit messages using the `[ws:{slug}]` prefix. They MUST NOT appear in public-facing commit messages, PR descriptions, or release notes."
+
+**Verdict:** PASS_WITH_CONDITIONS — hygiene directive clarification required.
+
+---
+
+## C. Concurrency-Driven Race Conditions Affecting Integrity
+
+### SC-Wn.7 — Advisory lock stale-lock and lock-holder identification
+
+**Threat:** Session A crashes mid-operation (e.g., terminal killed, power loss, `kill -9`). The `.session-lock` file persists. Next session cannot bind to the workstream without manual intervention or a timeout wait.
+
+**Picard's mitigation:** Lock expires after 4 hours; stale locks (dead PID) are auto-cleared.
+
+**Assessment of Picard's mitigation:**
+
+- **4-hour timeout:** Acceptable for a single-user project. A developer is unlikely to wait 4 hours. But: what if the crash happens at end of day and the developer resumes next morning (>4h later)? The lock auto-clears. Good.
+- **Dead-PID detection:** Best-effort. On the same machine, `kill(pid, 0)` works. On a different machine (user cloned repo, `.session-lock` is `.gitignore`d so this scenario shouldn't occur), PID is meaningless. Picard correctly `.gitignore`s the lock file, eliminating the cross-machine stale lock scenario. Good.
+- **Lock content:** `{"session_start": "...", "user": "...", "pid": 12345}`. Missing: hostname. On a shared machine with multiple OS users (or containers), PID alone is ambiguous. Add hostname.
+
+**Mitigation (REQUIRED):**
+- Lock content MUST include `hostname` for disambiguation: `{"session_start": "...", "user": "...", "pid": 12345, "hostname": "DESKTOP-ABC"}`.
+- Lock cleanup algorithm: If lock exists AND (`session_start` > 4h ago OR process at `pid` on `hostname` is not running), auto-clear the lock.
+- Verify `.session-lock` is in `.gitignore` — if this is missed, stale locks will propagate to all clones and block ALL users.
+
+**Verdict:** PASS_WITH_CONDITIONS — add hostname to lock, verify `.gitignore` entry.
+
+---
+
+### SC-Wn.8 — Git-level commit races and force-push risk
+
+**Threat:** Two sessions commit to `.squad/` simultaneously. Session A commits `[ws:alpha]` changes. Session B tries to commit `[ws:beta]` changes. If both are on the same branch:
+
+- **Best case:** `git commit` succeeds for both (different files, no index lock contention). Both commits land cleanly.
+- **Realistic case:** Git index lock (`/.git/index.lock`) prevents concurrent `git add`/`git commit`. One session gets `fatal: Unable to create '.../.git/index.lock': File exists.` Picard's design says retry once after 2s, then warn.
+- **Worst case:** NOT force-push. The design never uses `git push --force`. Both sessions commit locally; push is a separate concern (likely manual or CI-driven). Local commits to different subtrees merge cleanly.
+
+**Assessment:** LOW risk. Picard's retry-once-then-warn is adequate. The scoped `git add` ensures the two sessions' commits touch disjoint file sets (different workstream subtrees), so even if they serialize through the index lock, the resulting commits are independent.
+
+**Can a hostile/buggy session corrupt another workstream's history?** Only if it violates the scoped `git add` rule (SC-Wn.5 addresses this). A session that correctly scopes its `git add` cannot corrupt another workstream's committed state.
+
+**Mitigation (ADVISORY):**
+- The retry-once-then-warn is adequate. No additional mitigation needed beyond SC-Wn.5's staged-file validation.
+
+**Verdict:** PASS.
+
+---
+
+### SC-Wn.9 — Scribe cross-workstream inbox mis-routing
+
+**Threat:** Scribe in session A (bound to workstream `alpha`) accidentally processes session B's workstream `beta` inbox files and appends them to `alpha/decisions.md`.
+
+**Attack scenario:** A bug in Scribe's inbox path resolution causes it to glob `.squad/workstreams/active/*/decisions/inbox/*.md` instead of `.squad/workstreams/active/alpha/decisions/inbox/*.md`. All inboxes get processed into alpha's decision log. Workstream beta's decisions are silently consumed (inbox files deleted) and misattributed.
+
+**Assessment:** MEDIUM — this is the most dangerous data-integrity threat in the design. If Scribe mis-routes, decisions are lost from their correct workstream AND incorrectly attributed to another.
+
+**Mitigation (REQUIRED):**
+- Scribe MUST construct inbox paths using `WORKSTREAM_PATH` variable, NOT by globbing `active/*/`.
+- Scribe MUST validate that every inbox file's `workstream:` frontmatter field matches `SESSION_WORKSTREAM`. If mismatch: skip the file, log a warning: "Inbox file {filename} has workstream={X} but session is bound to {Y}. Skipping."
+- Add a guard in the Scribe charter: "NEVER glob across workstream directories. Always use the explicit `WORKSTREAM_PATH` provided by the coordinator."
+
+**Verdict:** PASS_WITH_CONDITIONS — frontmatter validation and explicit path construction required.
+
+---
+
+## D. Bootstrap / Migration Security
+
+### SC-Wn.10 — Credential/sensitive content duplication during bootstrap
+
+**Threat:** During bootstrap, root `.squad/decisions.md` (which contains the full SC-1..SC-9 security review, including discussion of credential handling patterns, `ToString()` redaction, and `Environment` dict leak findings) co-exists with the new `active/squad-agent-nuget/decisions.md`. If bootstrap copies these entries, credential-adjacent content exists in TWO files instead of one. This doubles the surface area for accidental exposure if either file is referenced in a public artifact.
+
+**Assessment:** LOW incremental risk. Both files are inside `.squad/`, which is already internal state. The public-hygiene directive applies to both. Having the content in two locations doesn't change who can read it (same user, same filesystem).
+
+**Mitigation (ADVISORY):**
+- Picard's design already says "DO NOT move any existing decisions from root `decisions.md` — they stay as legacy" (G2, step 8). The new workstream `decisions.md` starts empty or with a small seed. This is correct.
+- The seed content (5-10 entries from the flat ledger, per Seven's proposal) SHOULD NOT include security-review entries (like the SC-1..SC-9 block) that discuss credential patterns in detail. Seed with scope/identity entries only.
+- Document: "When seeding a workstream's `decisions.md`, include only non-sensitive scope-defining decisions. Do not copy security reviews, credential-handling discussions, or leak-audit findings into workstream decision logs. Those remain in the root legacy ledger."
+
+**Verdict:** PASS_WITH_CONDITIONS — seeding guidance must exclude security-review content.
+
+---
+
+### SC-Wn.11 — Bootstrap elevating non-sensitive content into more visible position
+
+**Threat:** Content that was buried at line 2400 of a 3000-line `decisions.md` is now the top entry in a fresh 10-entry workstream `decisions.md`. This makes it more visible in `git diff`, agent context windows, and casual browsing.
+
+**Assessment:** LOW risk. Visibility is not the same as exposure. The content is still within `.squad/`. The primary risk is if elevated content contains references that violate the public-hygiene directive — but that directive already applies regardless of file location.
+
+**Mitigation (ADVISORY):**
+- The bootstrapper (Data) SHOULD review seeded entries for public-hygiene compliance before committing. This is standard practice, not a new requirement.
+
+**Verdict:** PASS.
+
+---
+
+## E. Public Artifact Hygiene Under Workstreams
+
+### SC-Wn.12 — Workstream slugs in commit messages as information leak
+
+**Threat:** Scribe uses `[ws:squad-agent-nuget]` prefix in commit messages. If these commits land on a public branch, the slug is visible.
+
+**Assessment:** ACCEPTABLE by design. Workstream slugs are initiative names (e.g., `squad-agent-nuget`), not secrets. They describe what the team is working on, which is already evident from the repository's public content (PR titles, file paths, etc.). The slug `squad-agent-nuget` reveals no more than the existence of `src/Squad.Agents.AI/` in the repo.
+
+**Exception:** Slugs that contain internal-only terminology (e.g., `adc-ralph-loop`, `clawpilot-m`) might reveal codenames. If a slug is considered confidential, it should not be used on public branches.
+
+**Mitigation (REQUIRED):**
+- Add to workstream conventions: "Workstream slugs are treated as public-safe. Do not create workstream slugs that contain confidential codenames, internal project identifiers, or PII. If a slug must reference an internal initiative, use a neutral alias."
+- The `[ws:{slug}]` prefix in commit messages is permitted in `.squad/`-internal commits. For commits that touch public code (outside `.squad/`), the `[ws:{slug}]` prefix MUST be omitted.
+
+**Verdict:** PASS_WITH_CONDITIONS — public-safe slug convention required.
+
+---
+
+### SC-Wn.13 — Workstream-scoping effect on accidental paste of inbox content into PR bodies
+
+**Threat:** A developer or agent accidentally pastes workstream inbox content (agent prompts, decision proposals, security-review excerpts) into a public PR body.
+
+**Assessment:** Workstream-scoping makes this LESS likely, not more:
+- **Before workstreams:** All directives are in one flat `decisions/inbox/`. Any agent or session sees all content, increasing the chance of accidental cross-reference in a public artifact.
+- **After workstreams:** Each session only reads its own workstream's inbox. The cognitive and programmatic surface for accidental paste is narrower.
+
+The risk still exists — an agent could still paste from its own workstream's inbox into a PR body. But the scoping reduces the blast radius: only one workstream's content can leak per session, not all workstreams'.
+
+**Mitigation (ADVISORY):**
+- The existing public-hygiene directive is sufficient. No additional mitigation needed.
+- Worf continues to audit PRs pre-merge for compliance (as stated in the hygiene directive).
+
+**Verdict:** PASS — workstreams reduce this risk vs flat state.
+
+---
+
+## F. Verdict
+
+### PASS_WITH_CONDITIONS
+
+Picard's session-aware workstreams design is architecturally sound from a security perspective. The env-var binding is the correct choice — it avoids on-disk session state, eliminates cross-session file conflicts, and is ephemeral by construction. The advisory lock mechanism is reasonable for a single-user project. The scoped `git add` rule is critical and well-specified.
+
+However, the following **9 conditions** must be addressed before implementation rollout:
+
+| Condition | Category | Severity | Acceptance Criterion |
+|-----------|----------|----------|---------------------|
+| **SC-Wn.1** | Credential surface | MEDIUM | Workstream slug naming convention documented: no PII, no secret-suggestive names. Coordinator validates slug format on creation. |
+| **SC-Wn.3** | Credential surface | MEDIUM | Convention documented: `now.md` MUST NOT contain verbatim credentials, vault URIs with key names, or secret material. Abstract references only. |
+| **SC-Wn.5** | Filesystem integrity | MEDIUM | Scribe validates staged files before commit — warns and unstages files outside active workstream subtree and `evergreen/global/`. |
+| **SC-Wn.6** | Public hygiene | LOW | Public-hygiene directive updated to address workstream slugs in internal vs public commit messages. `[ws:{slug}]` prefix restricted to `.squad/`-internal commits. |
+| **SC-Wn.7** | Concurrency | LOW | `.session-lock` includes hostname. `.session-lock` is confirmed in `.gitignore`. |
+| **SC-Wn.9** | Data integrity | **HIGH** | Scribe validates inbox file `workstream:` frontmatter matches `SESSION_WORKSTREAM`. Scribe constructs inbox paths from `WORKSTREAM_PATH`, never globs across workstreams. |
+| **SC-Wn.10** | Bootstrap | LOW | Seeding guidance documented: do not copy security reviews, credential-handling discussions, or leak-audit findings into workstream decision logs. |
+| **SC-Wn.12** | Public hygiene | LOW | Workstream slug public-safe convention documented. `[ws:{slug}]` prefix omitted from commits touching public code outside `.squad/`. |
+| **SC-Wn.1 (slug validation)** | Credential surface | LOW | Coordinator rejects slugs matching `*key*`, `*secret*`, `*token*`, `*cred*`, `*password*` patterns (case-insensitive). |
+
+### Top 3 conditions by severity
+
+1. **SC-Wn.9 (HIGH)** — Scribe cross-workstream inbox mis-routing. This is the worst integrity threat: a glob bug in Scribe could silently consume another workstream's inbox and misattribute decisions. Frontmatter validation is the hard mitigation.
+2. **SC-Wn.5 (MEDIUM)** — Staged-file cross-contamination. A realistic developer workflow mistake can silently include another workstream's state in a scoped commit.
+3. **SC-Wn.1 + SC-Wn.3 (MEDIUM)** — Information in env vars and state files. Convention documentation prevents credential-suggestive metadata from entering the workstream namespace.
+
+### Conditions that are NOT blocking (advisory only)
+
+- SC-Wn.2 (cross-session `~/.copilot/` leakage — outside squad's control)
+- SC-Wn.4 (cross-workstream filesystem read — by design, acceptable threat model)
+- SC-Wn.8 (git-level commit races — adequately mitigated by Picard's retry design)
+- SC-Wn.11 (bootstrap content elevation — low risk, standard review process)
+- SC-Wn.13 (accidental paste — workstreams reduce this risk)
+
+### Relationship to prior SC-1..SC-9 conditions
+
+The workstreams design does not alter the attack surface covered by SC-1..SC-9 (auth-extensibility). Those conditions remain independently applicable to the Squad.Agents.AI implementation. The SC-Wn.* conditions are additive — they cover the multi-session coordination layer, not the SDK credential surface.
+
+---
+
+**Review complete. Worf re-gates the workstreams implementation PR for SC-Wn.1 through SC-Wn.12 compliance (9 binding conditions). Data and Picard should address all binding conditions in the bootstrapping PR or document deferral rationale.**
+
+**Reviewer:** Worf  
+**Date:** 2026-06-02  
+**Verdict:** PASS_WITH_CONDITIONS (9 binding conditions, 5 advisory recommendations)
+
+
+---
+
+**Status: COMPLETED on disk (workstreams tree created, committed in aff4b9c3). ACTIVATION (routing inbox drops to per-workstream paths) PENDING Tamir greenlight.**
+
+---
+type: handoff
+author: data
+date: 2026-06-02T15:52:21+03:00
+subject: Workstreams bootstrap — squad-agents-ai as first workstream
+status: complete
+---
+
+# Workstreams Bootstrap Handoff — Data → Team
+
+## What Was Done
+
+Picard's session-aware workstreams architecture (APPROVE_WITH_CONDITIONS, 7 conditions) has been bootstrapped. This is additive — no existing files were deleted or migrated. The flat ledger (`.squad/decisions.md`) is untouched.
+
+### Files Created
+
+```
+.squad/workstreams/
+  README.md                                          ← directory overview + active workstream table
+  _template/README.md                                ← starter frontmatter for new workstreams
+  _template/now.md                                   ← now.md starter
+  _template/decisions.md                             ← decisions.md starter
+  _template/decisions/inbox/.gitkeep                 ← preserves empty inbox dir
+  evergreen/global/README.md                         ← cross-cutting decisions store identity
+  evergreen/global/decisions.md                      ← public hygiene + bootstrap entries
+  evergreen/global/decisions/inbox/.gitkeep
+  active/squad-agents-ai/README.md                   ← workstream identity (YAML + scope prose)
+  active/squad-agents-ai/now.md                      ← live focus: PR #3 R2, blocked_on, next_action
+  active/squad-agents-ai/decisions.md                ← 8 seeded entries from PR #3 work
+  active/squad-agents-ai/decisions/inbox/.gitkeep
+```
+
+### Files Modified
+
+| File | Change |
+|------|--------|
+| `.squad/identity/now.md` | Replaced with tombstone; redirects to `active/squad-agents-ai/now.md` |
+| `.gitignore` | Added `.squad/workstreams/active/*/.session-lock` (Picard condition 2) |
+| `.github/agents/squad.agent.md` | 5 surgical edits (session start, catch-up, directive capture, Workstream Discovery section, spawn templates) |
+| `.squad/agents/data/history.md` | Appended workstreams bootstrap session |
+
+## Picard Conditions Status
+
+| # | Condition | Status |
+|---|-----------|--------|
+| 1 | `SQUAD_WORKSTREAM` env var as primary binding | ✅ Documented in Workstream Discovery section |
+| 2 | `.session-lock` must be `.gitignore`d | ✅ Added `.squad/workstreams/active/*/.session-lock` |
+| 3 | Scribe must scope `git add` to active workstream subtree | ✅ Documented in spawn template WORKSTREAM block |
+| 4 | Bootstrap only ONE workstream first | ✅ Only `squad-agents-ai` created |
+| 5 | Agent histories stay agent-global | ✅ Only this handoff appended; no splits |
+| 6 | `now.md` tombstone at `.squad/identity/now.md` | ✅ Tombstone in place with redirect |
+| 7 | Worf reviews advisory lock mechanism | ⏳ Deferred — noted in Workstream Discovery section |
+
+## Slug Decision
+
+Task instructions specified `squad-agents-ai`. Picard's section G2 and Seven's proposal both use `squad-agent-nuget`. The workstream was created as **`squad-agents-ai`** per task instructions, which is the authoritative source.
+
+If Picard or Tamir want to rename to `squad-agent-nuget`, the rename is:
+1. `mv .squad/workstreams/active/squad-agents-ai .squad/workstreams/active/squad-agent-nuget`
+2. Update `workstreams/README.md` active workstream table
+3. Update `SQUAD_WORKSTREAM` env var guidance
+
+## What Still Needs Doing
+
+1. **Worf advisory lock review** (Picard condition 7) — spawn Worf with `.squad/workstreams/README.md` and the Workstream Discovery section of `squad.agent.md` as input.
+2. **`squad-cli-state-backend` second workstream** — when that track resumes, copy `_template/` and create `active/squad-cli-state-backend/`.
+3. **Scribe integration** — Scribe should be updated to read `SESSION_WORKSTREAM`/`WORKSTREAM_PATH` from spawn prompt and scope commits accordingly. For now it is documented in the spawn template block.
+4. **Future: migrate `decisions.md` flat ledger** — when the flat ledger exceeds usefulness, run a migration pass to bucket historical decisions into workstreams. Out of scope for this PR.
+
+## How to Use
+
+Start a session scoped to this workstream:
+
+```powershell
+$env:SQUAD_WORKSTREAM = "squad-agents-ai"
+# Then invoke Copilot as usual
+```
+
+The coordinator will run Workstream Discovery, resolve `WORKSTREAM_PATH`, pass both variables into every spawn, and read `active/squad-agents-ai/now.md` as the focus pointer.
+
+---
+
+*Handoff complete. Next action: Picard reviews this PR; Tamir activates by setting `SQUAD_WORKSTREAM=squad-agents-ai`.*
+

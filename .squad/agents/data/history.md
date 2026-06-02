@@ -9,72 +9,13 @@
 
 Data owns Squad Framework expertise, SDK/CLI research, auth-mode inventory, extension-point design evaluation, and proposal-first research workflow. Lead researcher for Squad.Agents.AI auth expansion.
 
-## 2026-06-02 — Squad.Agents.AI Auth Expansion Proposal (CLEARED)
+## 2026-06-02 — Squad.Agents.AI Auth Expansion Proposal (CLEARED → see archive)
 
-**Verdict:** PROPOSAL (Decision merged to `.squad/decisions.md`)
+11-mode auth inventory; Candidate 1 configure-delegate recommended; Picard + Worf gated; implemented in PR #3 R2 (`4ac667cd`). Full research notes archived in `history-archive.md`.
 
-**Research Outcome:**
-- 11-auth-mode inventory (5 pass-through, 2 awkward, 4 blocked) from Copilot SDK auth surface
-- Gap analysis: 4 modes currently supported; 5 modes blocked (BYOK + UseLoggedInUser)
-- 3 extension-point candidates evaluated; Candidate 1 (configure delegate `Action<CopilotClientOptions>`) recommended
-- 8 invariants (F1–F8) identified for routing protection; convention-only enforcement proposed
-- Open questions for Picard (BYOK scope, naming) and Worf (security gates) answered via reviewer gates
-- Migration risk: LOW (all changes additive to unpublished v0.1-preview)
+## Learnings — 2026-06-02 Upgrade-Path Two-Layer Baseline (insider.3) → see archive
 
-**Next:** Data will implement; Picard and Worf will gate implementation PR.
-
-## Learnings
-
-### PR #3 Round 1 — Cleanup + multi-named connections (2026-06-02)
-
-- PR body rewrite: before 3,112 chars; after 1,779 chars as read back from GitHub. Initial scrub scan flagged 13 suspect lines; post-edit strict scan found 0 remaining internal/wrong-surface refs.
-- README scrub summary: removed public `.squad/` wording, switched quickstart to ambient signed-in Copilot auth with no token, linked GitHub Copilot SDK auth docs, marked `GitHubTokenProvider`/`GitHubToken` advanced only, and narrowed later-preview language to multi-targeting + Aspire telemetry.
-- XML warnings: baseline `dotnet build src\\Squad.Agents.AI\\Squad.Agents.AI.csproj -c Release` reported 0 CS1591 warnings; final sequential build also had 0 warnings. Added XML docs for the new public named-connection overloads while changing the API.
-- `cliArgs` verdict: already worked end-to-end (`SquadConnectionFactory` parses, options configurator merges, `SquadAgent` copies to `CopilotClientOptions.CliArgs`); added a code comment and regression test `AddSquadAgent_CopiesConnectionStringCliArgsToCopilotClientOptions`.
-- Multi-named connection contract: `AddSquadAgent("research")` reads `ConnectionStrings:squad-research`; default `AddSquadAgent()` keeps `ConnectionStrings:squad`. Tests added: `AddSquadAgent_WithName_BindsNamedConnectionString` and `AddSquadAgent_WithName_UserCallbackOverridesNamedConnectionString`.
-- Verification: final sequential `dotnet build` succeeded with 0 warnings; final `dotnet test` succeeded with 22 tests. 60s PR check watch: ubuntu + docs passed; windows + repo test still pending, no failures observed.
-- Commit: `88424b79d7cc532d8d23b70f80a002dc7800fc05` (`docs+fix: PR #3 review pass — hygiene, XML docs, cliArgs, multi-named connections`) pushed to `origin/feature/squad-agents-ai`.
-
-### Squad.Agents.AI — Release-readiness docs pass (2026-06-02)
-
-| Doc item | Phase 1 status | Action taken |
-|---|---|---|
-| Package README | 🟡 partial | Rewrote to a tight 80-line NuGet README with purpose, install, quickstart, prereqs, config, links, package contents, and v0.2 deferrals. |
-| XML docs on four public types/members | 🟡 partial | Added concise summaries, params, returns, and examples across `SquadAgent`, `SquadAgentOptions`, `SquadConnectionFactory`, and DI extensions without changing executable code. |
-| Repo-root README mention | 🔴 missing | Added a short `.NET package preview` section linking to `src/Squad.Agents.AI/README.md`. |
-| CHANGELOG v0.1-preview entry | 🟡 partial | Added `## [0.1.0-preview] - 2026-06-02` with public surface and PR #3 lineage. |
-| LICENSE packaging | 🟡 partial | Kept MIT expression and packed the root `LICENSE` into the `.nupkg`. |
-| .csproj packaging metadata | 🟡 partial | Set `Authors`, `PackageProjectUrl`, `RepositoryUrl`, requested tags, and packed README/LICENSE. |
-| Sample app / quickstart | 🟡 partial | Kept the consumer path as README quickstart rather than adding a sample project. |
-
-What changed in target repo `tamirdresher/squad`: docs/metadata-only commit `6f8994e5740a5b5149836efc2cb8d01e29b5bf58` on `feature/squad-agents-ai`.
-
-Pack verification observations: `dotnet build` and `dotnet pack` succeeded; `Squad.Agents.AI.0.1.0-preview.nupkg` contained `README.md`, `LICENSE`, and `lib/net10.0/Squad.Agents.AI.xml`; nuspec metadata showed `authors=Tamir Dresher`, tags `squad agents ai copilot maf multi-agent`, and `<readme>README.md</readme>`, so NuGet README rendering is wired correctly.
-
-Push/check observations: local `origin` points at upstream `bradygaster/squad`, so PR #3 push used the `fork` remote for `tamirdresher/squad`; initial push required switching GitHub auth to `tamirdresher`, then auth was restored. The 60s PR check watch ended with no failures; three checks were green and `Squad CI/test` was still pending.
-
-### PR #3 Round 2 — Keyed DI, BYOK, routing gate, security hardening (2026-06-03)
-
-**Commit:** `4ac667cd` on `feature/squad-agents-ai` (pushed to `tamirdresher/squad`)
-
-**Changes implemented:**
-- **ConfigureCopilotClient** (`Action<CopilotClientOptions>`) delegate on `SquadAgentOptions` — BYOK extension point (Picard C2 scope-expanded to v0.1)
-- **Routing gate** (Picard C1): snapshot/restore `Cwd`/`CliPath`/`CliArgs` after delegate runs; LogWarning on changes (SC-3)
-- **Keyed DI**: 4 `AddKeyedSquadAgent` overloads using .NET 8+ `ServiceDescriptor` with `serviceKey`; shared `RegisterOptionsInfrastructure` helper
-- **Environment credential leak fix** (SC-1/SC-2): `[JsonIgnore]` on `Environment`, `GitHubTokenProvider`, `ConfigureCopilotClient`; `ToString()` redacts token-pattern keys
-- **Extensibility seam comment** (Picard C3) in `SquadAgent.CreateCopilotClient`
-- **21 new tests** (43 total): 9 security redaction (SC-7/SC-8), 5 keyed DI, 7 BYOK/routing gate
-- **README**: streaming, keyed DI, BYOK, security sections; updated options table
-
-**Auth gate compliance:** Picard C1-C4 ✅, Worf SC-1 through SC-8 ✅. SC-9 (CopilotClientOptions.ToString) deferred — SDK type; not controllable from Squad wrapper.
-
-**Verification:** `dotnet build` 0 warnings 0 errors; `dotnet test` 43 passed 0 failed. PR body updated with Round 2 section.
-
----
-**Last Updated:** 2026-06-03  
-**Archive:** `.squad/agents/data/history-archive.md` (detailed research notes)
-
-
+`squad upgrade --self --insider --state-backend two-layer` prints contradictory ⚠️/✅ (exit 0), does NOT update config/hooks/branch/MCP. Upgrade strictly worse than fresh init. MCP bridge broken (npm 0.9.4 lacks state-mcp cmd). Full bug analysis + fix strategy in `history-archive.md`.
 ## Learnings — 2026-06-02 Upgrade-Path Two-Layer Baseline (insider.3)
 
 **Test repo:** https://github.com/tamirdresher_microsoft/twolayer-upgrade-test-20260602T1308 (private)

@@ -422,3 +422,43 @@ Captured timestamp: 2026-06-02 (session continues from routing-tests onboarding)
 ### Deliverable
 - Proposal written to `.squad/decisions/inbox/data-squad-agents-ai-auth-and-extensibility-proposal.md` with sections A-H.
 - Awaiting Picard (architecture) and Worf (security) review before any code changes.
+
+---
+
+## ARCHIVED 2026-06-03 by Scribe — Squad.Agents.AI Auth Expansion Proposal
+
+11-auth-mode inventory (5 pass-through, 2 awkward, 4 blocked) from Copilot SDK auth surface. Gap analysis: 4 modes supported, 5 blocked (BYOK + UseLoggedInUser). 3 extension-point candidates evaluated; Candidate 1 (configure delegate `Action<CopilotClientOptions>`) recommended. 8 invariants (F1–F8) for routing protection; convention-only enforcement. Migration risk: LOW (additive changes to unpublished v0.1-preview). Implemented in PR #3 R2 (`4ac667cd`).
+
+## ARCHIVED 2026-06-03 by Scribe — Upgrade-Path Two-Layer Baseline (insider.3)
+
+**Test repo:** https://github.com/tamirdresher_microsoft/twolayer-upgrade-test-20260602T1308 (private)
+**Driver:** `copilot --yolo --autopilot --agent squad`
+
+### What squad upgrade --self --insider --state-backend two-layer does on insider.3
+- Attempts npm install -g @bradygaster/squad-cli@insider (often EPERMs on Windows — binary in use)
+- Prints CONTRADICTORY: ⚠️ Upgrade failed THEN ✅ Upgraded. Exit code 0 regardless.
+- Does NOT write stateBackend to .squad/config.json (silently ignored — Seven's #1185 confirmed at upgrade level)
+- Does NOT create squad-state orphan branch
+- Does NOT install ANY hooks (not even sync hooks that fresh-init on two-layer installs)
+- Does NOT migrate .squad/decisions.md, agent histories, casting/routing/team state
+- Does NOT modify .copilot/mcp-config.json
+
+### What upgrade SHOULD do on backend-change flag
+1. Update config.json (merge — guard against Bug E duplicate keys)
+2. Run new backend's initializer (orphan branch, sync hooks, pre/post-commit hooks, MCP registration)
+3. Migrate pre-existing state from old layer to new layer
+4. Fail loudly on any step failure
+
+### Fresh-init vs upgrade delta (both on insider.3 targeting two-layer)
+- Fresh init: config ✅, orphan branch ✅, 4 sync hooks ✅, pre/post-commit ❌, MCP bridge broken ❌
+- Upgrade: config ❌, NO branch ❌, ZERO hooks ❌, MCP bridge broken ❌, pre-existing state STRANDED ❌
+- Upgrade strictly WORSE than fresh init.
+
+### MCP bridge root cause (fixed in combined-fix PR #1200)
+npm view @bradygaster/squad-cli dist-tags → latest=0.9.4 / insider=0.9.6-insider.3. Template wrote unpinned npx -y @bradygaster/squad-cli state-mcp → resolved to 0.9.4 → 0.9.4 has no state-mcp command. Config-level bug; fix: embed running CLI version into launch args at init (SDK) and upgrade (CLI + retrofit via runEnsureChecks).
+
+### Driver flag note
+--autopilot is a real Copilot CLI flag (copilot --help); auto-continues up to 5 messages by default (--max-autopilot-continues 5). Combined with --yolo produced no hangs and no sk_user blocks. Use both per Tamir's directive.
+
+### EVIDENCE-FIRST rule
+Without post-upgrade observability capture (config.json diff, hook listing, branch listing), "✅ Upgraded" stdout would have been the only signal — and it was wrong. Full picture only emerged after running capture script. Bake into every upgrade test.

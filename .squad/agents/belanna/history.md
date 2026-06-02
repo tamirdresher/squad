@@ -42,6 +42,15 @@ PR #3 baseline: targets `net10.0`, Version `0.1.0-preview`, MIT license. Key pin
 
 Data is implementing auth-mode expansion (Decision cleared). Implementation will modify `SquadAgentOptions`. B'Elanna's .NET CI gate on PR #3 will gate compatibility.
 
+### PR #3 R2b — Sample app for v0.1 features (2026-06-02)
+
+- **Commit:** `b55d6221` on `feature/squad-agents-ai`
+- Created `samples/squad-agents-ai-sample/` — first .NET sample in repo.
+- Four flows: (1) basic `AddSquadAgent`/`RunAsync`, (2) keyed `AddKeyedSquadAgent` × 2, (3) `ConfigureCopilotClient` BYOK delegate, (4) `RunStreamingAsync` token-by-token.
+- Key API discovery: `CopilotClientOptions.Environment` is `IReadOnlyDictionary<string, string>` — must assign a new instance, cannot use indexer setter.
+- CI updated: `squad-agents-ai-ci.yml` now triggers on `samples/squad-agents-ai-sample/**`; restore+build steps added; no run step (live CLI required).
+- All four source files (`SquadServiceCollectionExtensions`, `SquadAgentOptions`, `SquadAgent`, README) were used as ground truth for API shapes.
+
 ---
-**Last Updated:** 2026-06-02T10:50:37Z  
+**Last Updated:** 2026-06-02T12:00:00Z  
 **Archive:** `.squad/agents/belanna/history-archive.md` (comprehensive baseline)
