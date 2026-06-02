@@ -127,3 +127,66 @@ px -y @bradygaster/squad-cli state-mcp → resolved to 0.9.4 → 0.9.4 has no st
 - C7 Worf security review of advisory lock - DEFERRED
 
 ---
+
+## 2026-06-02 — Tarball smoke 1/2: travel-assistant (Node project) patterns
+
+**Outcome**: 5 ✅ / 1 ⚠️ / 1 ❌ / 1 BLOCKED — bundle measurably improves baseline but does NOT install as-shipped, and MCP-BRIDGE still broken on repos with pre-existing `.copilot/mcp-config.json`.
+
+**Bug verdicts (vs insider.3 baseline)**:
+- ✅ WI-1 hooks (all 6 installed on init AND on upgrade)
+- ✅ UPGRADE-FLAG-IGNORED (`--state-backend two-layer` honored, config written)
+- ✅ UPGRADE-NO-MIGRATION (10 files migrated to orphan; runtime Lisa read pre-upgrade decisions verbatim)
+- ✅ UPGRADE-EPERM-FALSE-SUCCESS (`--self` exits 1 with `❌ Self-upgrade failed` — no more contradictory ✅)
+- ✅ A/F-MIGRATION not manifested in this run
+- ⚠️ INSIDER3-INIT-LEAK (lift commit migrated 10 files but new dirs `Rai/`, `memory/`, `rai/` still leaked)
+- ❌ MCP-BRIDGE-BROKEN (root cause persists: `ensureSquadStateMcpPinned` only PINS existing entries, does NOT INSERT)
+- 🚫 SDK init-time pinning fix NOT exercised (tarball declared `@bradygaster/squad-sdk@>=0.9.6-preview` which is unpublished → ETARGET; workaround via npm `overrides` forces SDK to insider.3 → SDK code path bypassed)
+
+**Canonical 5-session test sequence (reusable for future tarball validations)**:
+1. fresh-init: `squad init --state-backend two-layer` → capture config.json, hooks, branches, porcelain, mcp-config, orphan tree
+2. session 1 ("build me a team from <fictional universe> for a TypeScript <domain> app") → Init Mode cast
+3. session 2 ("Lead, draft a quick architecture proposal for <feature>") → Scribe write path 1
+4. session 3 ("Tester, list edge cases for <feature>") → Scribe write path 2
+5. pre-upgrade: separate duplicate, `squad init` (worktree default), 2 sessions accumulating state
+6. `squad upgrade --self --insider --state-backend two-layer` → capture EPERM behavior
+7. `squad upgrade --state-backend two-layer` (no `--self`) → capture migration + hook install
+8. 2 post-upgrade sessions; first asks "summarize what we decided so far" → tests UPGRADE-NO-MIGRATION via runtime read
+
+**Critical patterns**:
+
+- **Tarball install workaround**: declares `@bradygaster/squad-sdk@>=0.9.6-preview`; per npm semver pre-release ordering `insider` < `preview`, so range excludes all published SDK builds → ETARGET. Sidecar `package.json` with `"overrides": { "@bradygaster/squad-sdk": "0.9.6-insider.3" }` then `npm install <tgz>` succeeds. Caveat: SDK-side fixes are NOT exercised.
+
+- **`squad upgrade --self` and `--state-backend` coupling**: when `--self` aborts (EPERM on Windows always — current shell holds binary lock), the state-backend migration NEVER runs because `--self` aborts the whole command. Always test the two paths separately: `--self --insider` alone, then `--state-backend two-layer` alone.
+
+- **Orphan branch path layout**: orphan tree is rooted WITHOUT the `.squad/` prefix. `git show squad-state:.squad/decisions.md` FAILS; `git show squad-state:decisions.md` SUCCEEDS. Same for `agents/<name>/history.md`. Validation scripts that include the `.squad/` prefix give false negatives.
+
+- **Copilot autopilot commits node_modules**: `--yolo --autopilot` may `git add -A` and capture `.squad-tarball-wrap/node_modules/` containing the 140MB `copilot.exe` binary. Push hits GitHub 100MB hard limit. Defenses: (1) add `.squad-tarball-wrap/` + `node_modules/` to `.gitignore` immediately after install, (2) reset+squash to clean commit before pushing.
+
+- **gh auth mid-session swap**: `copilot` sessions sometimes flip the active gh user. Always `gh auth switch --user tamirdresher_microsoft` after every copilot invocation before any git remote operation; otherwise `git push`/`git ls-remote` fail with `Repository not found`.
+
+- **WI-1 hook bypass evidence**: Scribe committed `.squad/agents/*/history.md` + `.squad/decisions.md` directly (commits f6ca53d, 314b649) despite the pre-commit hook targeting those paths. Either `SQUAD_SYNC_ACTIVE=1` bypass used or hook silent no-op on Windows sh. Worth a Worf/Data-7 follow-up — current hook contract may not match runtime behavior.
+
+- **ensureSquadStateMcpPinned does NOT INSERT**: only pins versions on EXISTING `squad_state` entries. On repos with pre-existing `.copilot/mcp-config.json` lacking squad_state (common for repos that used Copilot for non-Squad purposes first), MCP-BRIDGE-BROKEN persists across init AND upgrade. Iteration-3 fix needed: helper should add the entry if backend requires it.
+
+- **Orphan branch never pushed to remote** in any of 5 sessions across both duplicates. Post-commit hook calls `squad sync --quiet` but no push evidence in `git log origin/squad-state`. Possibly silent failure or no-op; worth verifying what `squad sync` actually does in this bundle.
+
+**Artifacts**:
+- fresh-path duplicate: https://github.com/tamirdresher_microsoft/travel-assistant-tarball-test-20260602T1610
+- upgrade-path duplicate: https://github.com/tamirdresher_microsoft/travel-assistant-upgrade-test-20260602T1610
+- stable copy of final report: `.squad/files/validation/TARBALL-SMOKE-travel-assistant.md`
+- decision drop: `.squad/decisions/inbox/data-tarball-smoke-travel-assistant.md`
+
+---
+
+## 2026-06-02T15:35:00+03:00 — Tarball smoke 2/2: multiplayer-sudoku (non-Node project) patterns
+
+**Mission outcome:** 6 fixes confirmed, 2 new/incomplete-fix gaps surfaced.
+
+### Patterns specific to non-Node-project tarball validation
+- **Global `npm install -g <tgz>` cannot work** when the tarball's peerDependency (`@bradygaster/squad-sdk@>=0.9.6-preview`) isn't published. Workaround: `npm pack` the SDK from the source workspace and install both tarballs together: `npm install -g <sdk.tgz> <cli.tgz>`. If even that fails on EPERM (concurrent agent contention), use a local prefix: `npm install --prefix C:\path\.npm-prefix <sdk.tgz> <cli.tgz>` and prepend `<prefix>\node_modules\.bin` to `PATH`.
+- **The MCP pin (`npx -y @bradygaster/squad-cli@<version>`) requires the version to exist on the npm registry** — local cache doesn't help because `npx` does a registry resolve first. So MCP-BRIDGE smoke-testing requires either publishing the preview/insider tag OR rewriting the pin to use a file path/local install. Document as a publishing prerequisite.
+- **The post-commit hook calls `squad sync --quiet`** which is not a registered command in this bundle. The hook's `|| true` swallows the silent failure. This means installed hooks ≠ working sync. Always run `squad sync` manually after init to verify, and run a `main` commit + check `git log squad-state` to confirm propagation works end-to-end.
+- **`ensureSquadStateMcpPinned` no-ops when the `squad_state` entry is absent.** For repos that have an existing `.copilot/mcp-config.json` (e.g. with only `EXAMPLE-github`), neither `squad init` nor `squad upgrade` adds the entry. Result: agents on those repos cannot reach the bridge regardless of backend. Recommend the fix should be: if backend requires the bridge, ADD the entry; otherwise pin.
+- **`squad init` skips existing files** including `.copilot/mcp-config.json`, `team.md`, `casting/`, `routing.md`. This is correct for static files but means partial-init repos won't benefit from any new init-time wiring without `--force` or a separate ensure step. The lift fix (`liftInitMutableStateOntoOrphan`) DOES retroactively work even when init is mostly a no-op — it operates on whatever mutable state exists.
+- **EPERM on `npm install -g` under concurrent agent runs is now exit-1 with no contradictory `✅ Upgraded`** — confirmed under real contention with travel-assistant peer. The fix is verified in the wild, not just in unit tests.
+- **Source repo with pre-existing `squad-state` orphan branch:** when you push a fresh clone+init to a new duplicate, the remote already has the orphan (because the source had it). Local lift then re-creates it; you need `git push origin squad-state --force` to align. Document this in validation runbooks.
