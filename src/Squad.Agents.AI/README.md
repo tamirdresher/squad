@@ -182,6 +182,79 @@ Parsed URI query keys: `teamRoot`, `cliPath`, `cwd`, `cliArgs` (semicolon-separa
 - `.nuspec` metadata with authors, tags, repository, and readme pointer
 - `LICENSE` copied from the repository root
 
+## Sample
+
+A runnable console application is included at
+`src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/`. It demonstrates the four
+core integration patterns in one place: basic DI, keyed DI with multiple agents,
+the `ConfigureCopilotClient` BYOK delegate, and streaming via `RunStreamingAsync`.
+
+### Prerequisites
+
+| Prerequisite | Notes |
+|---|---|
+| [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | `dotnet --version` should print `10.x.x` |
+| GitHub Copilot CLI on `PATH` | Install from [github.com/github/copilot-cli](https://github.com/github/copilot-cli); verify with `copilot --version` |
+| Squad CLI installed | Follow the install guide in the [Squad repository README](https://github.com/tamirdresher/squad#readme) |
+| Initialized Squad team root | Run `squad init` in a directory; this becomes your team root |
+| GitHub Copilot authentication | Run `gh auth login` or `copilot auth login` once before running the sample |
+
+Set the team root path before running:
+
+```bash
+# Linux / macOS
+export SQUAD_TEAM_ROOT=/path/to/your/team-root
+
+# Windows PowerShell
+$env:SQUAD_TEAM_ROOT = "C:\path\to\your\team-root"
+```
+
+### Run
+
+Run all four flows in sequence:
+
+```bash
+dotnet run --project src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/
+```
+
+Run a single flow (1–4):
+
+```bash
+dotnet run --project src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/ -- --flow=1
+dotnet run --project src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/ -- --flow=2
+dotnet run --project src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/ -- --flow=3
+dotnet run --project src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/ -- --flow=4
+```
+
+### Flow walkthrough
+
+**Flow 1 — Basic DI registration** — `AddSquadAgent` registers `SquadAgent` and the
+base `AIAgent` interface. Resolves the agent from DI, creates a session, calls
+`RunAsync`, and prints `AgentResponse.Text`.
+
+**Flow 2 — Keyed DI (multiple agents)** — `AddKeyedSquadAgent` registers two agents
+under keys `"alpha"` and `"beta"`. Resolution uses
+`GetRequiredKeyedService<SquadAgent>("alpha")`.
+
+**Flow 3 — BYOK / `ConfigureCopilotClient` delegate** — the delegate receives
+`CopilotClientOptions` after Squad has applied its defaults. Inject a custom token
+or environment variable. The routing gate prevents accidental redirection of
+`Cwd`, `CliPath`, or `CliArgs` — configure those on `SquadAgentOptions` directly.
+
+**Flow 4 — Streaming** — `RunStreamingAsync` returns
+`IAsyncEnumerable<AgentResponseUpdate>`. Each `update.Text` fragment is written to
+`Console.Write` without a newline for live token-by-token output.
+
+### Troubleshooting
+
+| Error | Cause | Fix |
+|---|---|---|
+| `GitHub Copilot CLI was not found on PATH` | `copilot` binary is missing or not on `PATH` | Install from [github.com/github/copilot-cli](https://github.com/github/copilot-cli); verify with `copilot --version` |
+| `Authentication failed` / `401` | Copilot CLI is not signed in | Run `gh auth login` or `copilot auth login` |
+| `SquadFolderPath does not exist` | `SQUAD_TEAM_ROOT` points to a non-existent path | Set `SQUAD_TEAM_ROOT` to an initialized Squad team directory |
+| `The system cannot find the file specified` (Win32Exception) | Copilot CLI not found | Same as first row above |
+| Build error: `Package Squad.Agents.AI not found` | Sample uses a project reference; ensure you run from the repo root | Run `dotnet build` from the repository root or pass `--project src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/` |
+
 ## See also
 
 - Root repo: <https://github.com/bradygaster/squad>

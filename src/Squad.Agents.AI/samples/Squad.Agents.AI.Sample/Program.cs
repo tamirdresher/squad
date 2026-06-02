@@ -7,8 +7,8 @@
 //    Flow 3 — BYOK / ConfigureCopilotClient delegate
 //    Flow 4 — Streaming via RunStreamingAsync
 //
-//  Run: dotnet run --project samples/squad-agents-ai-sample/
-//  Run one flow: dotnet run --project samples/squad-agents-ai-sample/ -- --flow=1
+//  Run: dotnet run --project src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/
+//  Run one flow: dotnet run --project src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/ -- --flow=1
 // ============================================================
 
 using Microsoft.Agents.AI;
