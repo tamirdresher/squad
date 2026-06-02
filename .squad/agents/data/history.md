@@ -1,7 +1,17 @@
 # Data Agent Learning Log — Recent Sessions
 
-**Last Summarized:** 2026-06-02T08:29:11Z  
+**Last Summarized:** 2026-06-02T08:46:00Z  
 **Archive Reference:** See history-archive.md for prior learning sessions and research context.
+
+## 2026-06-02T08:46:00Z — Scribe Archival Session
+
+**Summary (18KB → Archive):**
+Data owns Squad framework expertise. Key learnings:
+- **P0 permission bug:** `'approved'` → `'approve-once'` fix cherry-picked to PR #1192 with regression test (commit e1faf5d9); all CI green; PR #1193 closed
+- **State-backend triage:** Parallel community signal confirmed P0 blocker; 5 dominant problem themes mapped across GitHub issues (#1190, #1185, #1163, etc.)
+- **Memory governance work:** Expanded-memory A/B harness validated; substitute evidence at ceiling per Worf gate; multi-repo real CLI E2E deferred (Copilot CLI limitation: no per-repo session store partitioning)
+- **Gotcha documented:** vitest in junction-linked worktrees resolves SDK dist stale (fails local, passes CI fresh)
+- **Skill created:** `extract-test-from-competing-pr` (PR deduplication pattern)
 
 ## Recent Sessions (Last 30 days)
 - Wrote readiness/blocker note to `.squad/decisions/inbox/data-real-repo-validation-readiness.md`; Worf must reopen Tier 2 real-repo substitute validation before execution.

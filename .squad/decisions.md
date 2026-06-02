@@ -1,6 +1,6 @@
 # Squad Decisions
 
-**Last Updated:** 2026-06-02T08:29:11.224Z
+**Last Updated:** 2026-06-02T08:45:58Z
 
 ## Active Decisions
 
@@ -1067,3 +1067,851 @@ Executed final validation sweep and approved branch for upstream merge.
 
 ---
 
+
+
+---
+
+# B'Elanna — Bug C & Bug F Gap Fix Outcome
+
+**Date:** 2026-06-02T09:10:57Z  
+**Author:** B'Elanna (Durable Systems Engineer)  
+**Branch:** `squad/state-backend-upgrade-fixes` (appended to PR #1200)  
+**Commits:** `dc2b3f50` (Bug C), `fc406355` (Bug F)
+
+---
+
+## Summary
+
+PR #1200 ("harden state backend upgrade path") left two concrete gaps. This work filled both gaps by appending commits to the same branch to keep the review coherent.
+
+---
+
+## Bug C — `console.warn()` fires on every `normalizeBackendType()` call (P1)
+
+**Root cause:** No one-shot guard in `normalizeBackendType()`. Every call to `resolveStateBackend()` with a legacy `'git-notes'` config emitted a deprecation warning, spamming logs in any process that repeatedly resolves the backend (e.g., the scheduler loop, agent startup).
+
+**Fix:**
+- Added `let _warnedGitNotesMigration = false;` at module scope in `state-backend.ts`.
+- Wrapped `console.warn()` in `if (!_warnedGitNotesMigration) { _warnedGitNotesMigration = true; ... }`.
+- Exported `_resetGitNotesMigrationWarnForTesting()` for test isolation (avoids `vi.resetModules()` complexity).
+- Improved warning message: names the orphan branch being created, gives explicit `stateBackend` config key, adds docs link placeholder.
+
+**Test added:** `'git-notes deprecation warning fires exactly once per process across repeated calls (Bug C)'` — calls `resolveStateBackend` 3× with `'git-notes'`, asserts `console.warn` spy called exactly once.
+
+---
+
+## Bug F — `toRelative()` silently returns absolute paths for out-of-squad files (P3)
+
+**Root cause:** The fallback branch in `toRelative()` was `return filePath.replace(/\\/g, '/')`, which silently returned absolute paths like `C:\Users\...` as git-notes keys when a file outside `squadDir` was passed. This would corrupt the notes namespace with no diagnostic.
+
+**Fix:**
+- Changed fallback: if `!path.isAbsolute(filePath)` → normalise separators and return (relative paths are fine).
+- If `path.isAbsolute(filePath)` (i.e., absolute and not under `squadDir`): throw `new Error('[squad] toRelative: path is outside squadDir — cannot compute a relative key. filePath: ... squadDir: ...')`.
+- This is an intentional breaking change for callers passing out-of-squad absolute paths (previously silent corruption → now explicit failure with actionable message).
+
+**Tests added:**
+1. `'toRelative handles Windows-style mixed drive-letter casing (Bug F)'` — cross-platform: relative path with backslashes normalises to forward slashes.
+2. `'toRelative throws for absolute paths outside squadDir (Bug F)'` — platform-branching: POSIX uses `/tmp/outside-squad.md`; Windows uses `Z:\outside\file.md`.
+
+---
+
+## Decisions Needed
+
+None — both fixes are P1/P3 correctness repairs with no architectural choices outstanding. The intentional breaking change in `toRelative()` (absolute outside-squadDir → throw) is safe because no legitimate caller should be passing out-of-squad absolute paths; the old silent-corruption behaviour was a bug, not a contract.
+
+**Recommend:** Merge PR #1200 after standard review. No additional approvals required from B'Elanna's perspective.
+
+
+---
+
+# Decision: P0 Permissions fix landed — PR #1192 merged, PR #1193 closed
+
+**Date:** 2026-06-03  
+**Author:** Data  
+**Status:** Resolved
+
+---
+
+## What happened
+
+PR #1193 (`copilot/bug-squad-cli-permission-issues`) was opened by Copilot alongside PR #1192
+(`squad/1191-fix-cli-permission-contract`). Both addressed the same bug: the Squad CLI was sending
+`kind: "approved"` to the Copilot CLI permission handler, but v1.0.54+ requires `kind: "approve-once"`.
+
+PR #1192 contained the correct one-line fixes in both locations:
+- `packages/squad-cli/src/cli/shell/index.ts:90` — permission handler return value
+- `packages/squad-sdk/src/adapter/client.ts:508` — error message guidance string
+
+PR #1193 additionally included:
+- A **breaking type rewrite** of `SquadPermissionRequestResult` from `interface` to a `type` union
+- A regression test in `test/adapter-client.test.ts`
+
+## Decision
+
+Cherry-pick the regression test from #1193 onto #1192. Do NOT pull in the type rewrite.
+
+**Rationale:** The type rewrite changes the exported API surface and would require a major version bump
+or at minimum a dedicated review. The fix itself is complete without it. The test is self-contained and
+adds coverage for both the error-message contract and the handler return value.
+
+## Outcome
+
+- Test manually ported to `test/adapter-client.test.ts` (commit `e1faf5d9`)
+- All 5 CI checks passed on PR #1192
+- PR #1193 closed with explanation comment
+- Skill `extract-test-from-competing-pr` written for future reference
+
+## Gotcha: worktree + node_modules junction
+
+When running vitest locally in the git worktree, the node_modules junction points to the main repo's
+node_modules. The `@bradygaster/squad-sdk` symlink inside that node_modules resolves to the *main*
+repo's `packages/squad-sdk`, whose dist was built from a branch without the `approve-once` fix.
+Result: the regression test fails locally but passes in CI (which runs `npm ci + npm run build` fresh).
+
+This is expected behavior. Do not "fix" the test to match the stale dist.
+
+
+---
+
+# Decision: Squad-Squad Adopts Squad.Agents.AI NuGet Work from tamresearch1
+
+**By:** Picard (Lead/Product Architect, squad-squad)  
+**Date:** 2026-06-02  
+**Status:** PROPOSED  
+**Related:** tamresearch1/.squad/decisions.md Decisions 437–448; tamresearch1/.squad/agents/picard/history.md (2026-05-31); PR #3 in tamirdresher/squad
+
+---
+
+## Decision
+
+**Squad-Squad formally adopts the Squad.Agents.AI NuGet work from tamresearch1.** 
+
+- **Authoritative source:** PR #3 in tamirdresher/squad (commits c97fee6b, 257fc684); all green, ready for merge & v0.1 release.
+- **Inherited policy:** Decisions 437–448 from tamresearch1 become squad-squad canonical. Future SquadAgent changes flow through squad-squad decisions, not tamresearch1.
+- **Ownership transfer:** tamresearch1 completes Squad.Agents.AI work at v0.1; squad-squad assumes v0.2+ roadmap and feature requests.
+- **Repo home:** tamirdresher/squad remains production NuGet source (pending Tamir confirmation on long-term home).
+
+---
+
+## Rationale
+
+### Strategic Arc (Decisions 437–448)
+
+**Decisions 437–440** planned SquadAgent as a MAF (Microsoft.Agents.Framework) first-party contribution. The strategy assumed MAF would accept a Squad-authored async boundary wrapper and dual-stack it with existing agent infrastructure.
+
+**Decision 441** (SDK Probe Findings) invalidated that assumption. Three ground-truth facts from dotnet-inspect probe of live MAF NuGet:
+- F1: `GitHubCopilotAgent` is sealed—cannot inherit, only wrap.
+- F2: MAF's `instructions:` parameter already exists for boundary injection—custom session logic redundant.
+- F3: All operational parameters are already in `CopilotClientOptions`—no vapor properties.
+
+**Implication:** SquadAgent value collapses to DI helpers, telemetry, and trace logging. MAF contribution no longer justified; cost exceeded value.
+
+**Decision 443 (THE PIVOT)** — Tamir directive (2026-05-28): Abandon MAF wedge and EMU backstop. **Ship as community NuGet from Squad's own repo (tamirdresher/squad).** This decision represents a paradigm shift:
+
+- **Before:** Contribute upstream first, dual-stack later.
+- **After:** Own the integration layer, release on Squad's schedule, no upstream approval cycles.
+
+**Benefits realized:** Autonomy on release cadence, unblocked iteration on DI patterns, Aspire telemetry integration, no coupling to MAF's governance.
+
+**Decision 447 (Q-Lock)** — Tamir (2026-05-28): Froze design with explicit parameters:
+- Q2: Package name = `Squad.Agents.AI` (mirrors `Microsoft.Agents.AI.*` pattern).
+- Q5: `name` in `.AsAIAgent()` is metadata only; routing via `CopilotClientOptions.CliPath/CliArgs`.
+- Q6: TFM = `net10.0` only (adoption bar above MAF's `net8;net9;net10` floor).
+- Q7: DI defaults (mutable options, scoped, TraceEvents=false).
+
+**Decision 448 (Aspire SquadResource)** — Picard customer-value analysis: Recommend **Option C (Hybrid)** — metadata-only default (108 LOC + 4 commands), `.WithSquadCli()` opt-in stub for v1.1+. Balances simplicity (zero-config) + power-user scenarios (process spawning).
+
+---
+
+## Current State (v0.1 Ready)
+
+**PR #3 Status:** All green. Delivery complete:
+- Fluent `.AsAIAgent()` API wrapping MAF's `GitHubCopilotAgent`.
+- Instruction injection via MAF's native `instructions:` parameter.
+- DI helpers for agent registration (mutable options, scoped lifetime).
+- Trace logging for operational visibility.
+- Aspire SquadResource metadata baseline (Decision 448 Option C foundation).
+
+**Known good:** Commits c97fee6b, 257fc684. Link: https://github.com/tamirdresher/squad/pull/3.
+
+**Not yet:** Keyed DI finalization (validation pending). AOT/Trimming readiness (likely required). Aspire telemetry full path (v1.1+ candidate).
+
+---
+
+## Adoption Plan
+
+### Phase 1: Merge & Release (Immediate)
+1. **Merge PR #3** to tamirdresher/squad main.
+2. **Tag v0.1**, publish to NuGet.org.
+3. **Release notes** cite Decision 443 (pivot rationale), Decision 447 (design freeze), Decision 448 (Aspire strategy).
+4. **Notify consumers** (Tamir provides list; see Open Question 3).
+
+### Phase 2: Transfer Ownership to squad-squad (v0.1 Post-Release)
+1. **File squad-squad decision** recording adoption of tamresearch1 Decisions 437–448 as inherited policy.
+2. **Update issue/PR templates** in squad-squad to route SquadAgent feedback here (not tamresearch1).
+3. **Establish roadmap** for v0.2 (see Phase 3).
+
+### Phase 3: v0.2 Roadmap (Candidate Post-v0.1)
+1. **Keyed DI audit:** Finalize Decision 447 Q7 implementation; validation.
+2. **AOT/Trimming readiness:** Required for .NET 10 adoption bar (Tamir directive in Q6).
+3. **Aspire telemetry (conditional):** If committing to Decision 448 Option C full path, plan `.WithSquadCli()` + telemetry for v1.1 (v0.2 foundation only).
+4. **User feedback loop:** Integrate UX panel insights (README comprehensibility, junior dev + Sara personas per PR #3 context).
+
+---
+
+## Risk Mitigation
+
+- **Repo ambiguity:** Decision 443 said "Squad main repo" but remained ambiguous until Decision 447 Q2. **Mitigated:** tamirdresher/squad is now authoritative; Tamir confirms long-term home (see Open Question 1).
+- **Consumer notification gap:** Existing users unaware of ownership transfer. **Mitigated:** Release notes + Tamir provides consumer list (Open Question 3).
+- **v0.2 scope creep:** Outstanding items (Keyed DI, AOT, Aspire telemetry) could block v0.2. **Mitigated:** Phase 3 roadmap prioritizes; Tamir gates Aspire telemetry commitment.
+
+---
+
+## Open Questions for Tamir
+
+1. **Repo home (long-term):** Is tamirdresher/squad the intended production home, or re-home to squad-squad after v0.1 stabilization?
+2. **Aspire commitment:** Decision 448 recommends Option C. Should v0.2 commit to full Aspire telemetry integration, or defer to v1.0+?
+3. **Known consumers:** Existing SquadAgent v0.1 users/teams that should be notified of ownership transition?
+
+---
+
+## Decision Artifacts
+
+- **Strategic lineage:** Stored in squad-squad/.squad/agents/picard/history.md, Section "Squad.Agents.AI NuGet Onboarding (2026-06-02)".
+- **Inherited policy:** tamresearch1/.squad/decisions.md Decisions 437, 438, 439, 440, 441, 443, 447, 448 (cited as-is).
+- **Counterpart learnings:** tamresearch1/.squad/agents/picard/history.md (2026-05-31).
+
+---
+
+**Recommended next step:** Tamir approves and provides answers to three open questions; squad-squad proceeds with Phase 1 merge + release.
+
+
+---
+
+# State-Backend Remaining Work: Decomposition & Scope Call
+
+**Author:** Picard (Lead / Product Architect)  
+**Date:** 2026-06-02T11:29:11.224+03:00  
+**Context:** Post Data+Seven triage (2026-05-31). PR #1200 (`squad/state-backend-upgrade-fixes`) is the P0 fix consolidating Bugs A–F. This document decomposes the items that PR #1200 does NOT fully address and scopes them for the next wave.
+
+---
+
+## Phase 1 — What PR #1200 Already Covers
+
+PR #1200 ("harden state backend upgrade path") — +469/−1529 lines, 26 files, CI green, all test suites passing (89/89 state, 29/29 doctor, 194/194 template-sync). Worf gate approved.
+
+| Item | PR #1200 Coverage | Verdict |
+|------|-------------------|---------|
+| Bug A — `approve-once` permission contract (#1191) | `approveAllPermissions` returns `{ kind: 'approve-once' }`; type union updated | ✅ Fully fixed |
+| Bug B — Hard throw in `resolveStateBackend()` on explicit backend failure (#1185, #1190) | Always warns + falls back to `local`; removes fatal throw path | ✅ Fully fixed |
+| Bug C — Silent `git-notes` → `two-layer` migration (#1163) | `console.warn()` emitted on normalize; users directed to update `config.json` | ✅ Fully fixed |
+| Bug D — Coordinator template documents stale backend names | Template wording updated to `"local"` default; both `.github/agents/` and `.squad-templates/` copies synced | ✅ Fully fixed |
+| Bug E / #1194 — Externalized state path resolution broken in runtime commands | `effectiveSquadDir()` + `resolveStateDir()` helpers added; `loop`, `watch`, `plugin`, `doctor`, `shell` updated | ✅ Fully fixed |
+| Bug F — `toRelative()` Windows drive-letter case mismatch | `path.resolve()` + case-insensitive prefix check on `win32` | ✅ Fully fixed |
+| #1190 Finding 1 — ESM patch misses repo-local `node_modules` | `join(process.cwd(), 'node_modules')` added to `SEARCH_ROOTS` in `patch-esm-imports.mjs` | ✅ Fully fixed |
+| #1190 Finding 2 — `squad doctor` does not flag missing two-layer hooks | Doctor checks added; tests in `doctor.test.ts` (29/29) | 🟡 Partially fixed — detection added; upgrade hook **installation** not yet wired (see below) |
+| #1190 Finding 3 — `teamRoot` written as absolute path; `config.json` duplicate key | Not mentioned in PR body or changeset | ❌ Not touched |
+| #1185 Finding 1 — Templates dumped at `.squad/` root | Not mentioned | ❌ Not touched |
+| #1185 Finding 2 — Rai not installed during upgrade | Not mentioned | ❌ Not touched |
+| #1185 Finding 3 — `--state-backend` flag ignored; `orphan→two-layer` migration throws | Not mentioned | ❌ Not touched |
+| #1163 Finding 1 — `TEAM_ROOT` dual contradictory definition | Backend name wording fixed but structural TEAM_ROOT inconsistency untouched | ❌ Not touched |
+| #1163 Finding 2 — `teamRoot` path semantics over-restrictive (rejects relative paths) | Not touched | ❌ Not touched |
+| #1163 Finding 3 — `Worktree Awareness` step 0 lookup order undefined | Not touched | ❌ Not touched |
+| Bug G / #864 — Backend hardening (retry, circuit-breaker) | Not in scope | ❌ Not touched |
+| #1003 Phase 2-3 — Wire state backends into init/history/decisions/skills | Not in scope | ❌ Not touched |
+
+**Summary:** PR #1200 is a high-quality, comprehensive P0 covering every regression bug (A–F) plus the ESM path and externalized-state gaps. What it deliberately leaves out is the **upgrade pipeline execution path** (hook installation, backend migration, teamRoot portability, template dedup, Rai auto-install), the **coordinator prompt structural inconsistency** (#1163 Findings 1–3), and the **major feature work** (#1003 Phase 2-3).
+
+---
+
+## Phase 2 — Remaining Items After PR #1200
+
+### Items Not Fixed
+
+| # | Source | Description |
+|---|--------|-------------|
+| R1 | #1190 F2 + #1185 F3 | `squad upgrade --state-backend <value>` silently ignored; `orphan→two-layer` migration throws; `pre-commit`/`post-commit` hooks never installed even when backend configured |
+| R2 | #1190 F3 | `teamRoot` written as absolute path; `config.json` duplicate `stateBackend` key written by upgrade (append instead of merge) |
+| R3 | #1185 F1 | Template files dumped at `.squad/` root during upgrade (dedup guard missing) |
+| R4 | #1185 F2 | Rai not auto-installed/repaired during upgrade; `.gitattributes` merge driver absent; `team.md`/`routing.md` rows missing |
+| R5 | #1163 F1 | `TEAM_ROOT` defined as `<repo>/.squad/` in State & Team Root Resolution but as `<repo>/` in Worktree Awareness → false Init Mode in worktrees without committed `.squad/` |
+| R6 | #1163 F2 | `teamRoot` path semantics reject valid relative paths; wording non-canonical about whether path targets repo root or `.squad/` directly |
+| R7 | #1163 F3 | `Worktree Awareness` step 0 attempts to read `config.json` before `git rev-parse` has run (step 1) — undefined resolution order from subdirectory |
+| R8 | Bug G / #864 | Retry logic, circuit-breaker, startup verification for `OrphanBranchBackend` / `GitNotesBackend` |
+| R9 | #1003 Phase 2 | Migrate `squad init`, agent history reads/writes, decisions inbox (Scribe) to use `SquadStateContext` instead of `FSStorageProvider` directly |
+| R10 | #1003 Phase 3 | Migrate skills/casting; caching layer for git-notes; concurrency (optimistic retry/locking) |
+
+---
+
+## Phase 3 — Sequenced Work Item Plan
+
+> Items are grouped by coupling. A single branch handles tightly-coupled items to keep PRs coherent; independent items stay separate.
+
+| ID | Bug/Issue | Owner (suggested) | Branch suggestion | Complexity | Depends on | Rationale |
+|----|-----------|-------------------|-------------------|------------|------------|-----------|
+| WI-1 | R1 — `squad upgrade` state-backend migration + hook install | Geordi | `fix/upgrade-state-backend-migration` | M | PR #1200 merged | Root cause of silent state loss (BLOCKER-1). Doctor detection is live after #1200; now need the fix. Isolated to upgrade.ts + MigrationRegistry. No other active work touches it. |
+| WI-2 | R2 — `teamRoot` portable default + config merge semantics | Geordi | `fix/upgrade-config-portability` | S | PR #1200 merged | Can land independently of WI-1 but shares the upgrade path; consider bundling with WI-1 in same PR if diff stays small. Affects `squad init` and `squad upgrade`. |
+| WI-3 | R3 — Template dedup guard in upgrade copy | Geordi | `fix/upgrade-template-dedup` | S | PR #1200 merged | Isolated to upgrade copy logic. One guard + one doctor assertion. Can land in same PR as WI-2 or separately. |
+| WI-4 | R4 — Rai auto-install/repair in upgrade | Geordi | `fix/upgrade-rai-builtin` | S | PR #1200 merged | Idempotent built-in roster install is self-contained. Geordi owns tooling; Data to consult on roster semantics if needed. |
+| WI-5 | R5+R6+R7 — #1163: TEAM_ROOT unification + path semantics + step ordering | Picard (design) → Data (implementation) | `fix/coordinator-team-root-unify` | S | PR #1200 merged (Bug D already clears the template sync concern) | Prompt-only change. Prefer the `TEAM_ROOT = repo root + STATE_ROOT = .squad/` split (Finding 1 preferred fix, per ralarcon's own analysis). ralarcon offered a PR — accept it or use as basis. Worf classified this CRITICAL (false Init Mode). |
+| WI-6 | R8 — Bug G / #864 backend hardening | Data | `feat/state-backend-hardening` | L | WI-1 merged | Not a regression. No user is currently losing data because of missing retry logic. Gate: WI-1 through WI-5 stable first. |
+| WI-7 | R9 — #1003 Phase 2: init/history/decisions migration | Data + B'Elanna | separate epic branch | XL | WI-1, WI-6 | Major feature migration. Requires stable backend + hardening before operating at this scope. Separate planning session needed. |
+| WI-8 | R10 — #1003 Phase 3: skills/casting/caching/concurrency | Data | separate epic branch | XL | WI-7 | Only after Phase 2 is proven stable. |
+
+**Bundling recommendation:** WI-1 + WI-2 + WI-3 can land as one PR (`fix/upgrade-hardening` or similar) since they all live in `upgrade.ts` and `squad doctor`. WI-4 is a second small PR. WI-5 is a third, prompt-only PR. This gives reviewers three focused PRs rather than one megapatch.
+
+---
+
+## Phase 4 — Scope Call
+
+| ID | Item | Scope Call | Owner | Reason |
+|----|------|-----------|-------|--------|
+| WI-1 | `squad upgrade` backend migration + hook install | **DO NOW** | Geordi | Silent data loss. Worf BLOCKER-1. Small surface area (upgrade.ts + MigrationRegistry). |
+| WI-2 | `teamRoot` portable + config merge | **DO NOW** | Geordi | One-function change in init/upgrade. Breaks portability for every new clone. |
+| WI-3 | Template dedup guard | **DO NOW** | Geordi | Single guard + doctor assertion. Trivial to land with WI-2. |
+| WI-4 | Rai auto-install in upgrade | **DO NOW** | Geordi | S complexity. Rai was a promised built-in; upgrade regression is user-visible. |
+| WI-5 | #1163 TEAM_ROOT unification (prompt patch) | **DO NOW** | Picard (design) → Data (impl) | Prompt-only, no runtime change. False Init Mode is a correctness bug; ralarcon PR already volunteered. Picard issues design direction this session, Data authors the patch. |
+| WI-6 | Bug G / #864 backend hardening | **DEFER** | Data | Reliability enhancement, not regression. Safe to defer until upgrade path is stable. |
+| WI-7 | #1003 Phase 2 — init/history/decisions | **DEFER** | Data + B'Elanna | Major feature. Foundation must be solid first. Separate planning session. |
+| WI-8 | #1003 Phase 3 — skills/casting/caching | **DEFER** | Data | Depends on Phase 2 being stable. Not in this push. |
+
+---
+
+## Phase 5 — Critical-Path Opinion
+
+**The ONE next thing after the P0 lands: WI-1 — Fix `squad upgrade --state-backend` to actually complete state backend migration.**
+
+Here is why this is the priority above all else:
+
+PR #1200 repairs everything that was *observable* — users will see doctor pass, the template will show correct backend names, Windows paths will stop corrupting. But BLOCKER-1 remains: any user who has `stateBackend=two-layer` in their config and ran `squad upgrade` has a **dormant state branch** that has never received a write. Every commit since that upgrade silently discarded squad state. The user has no signal. `squad doctor` (after #1200) will now *detect* the missing hooks — which means the first thing users will see after upgrading is a doctor failure with no automated fix path.
+
+WI-1 closes that loop: it wires the migration so that `squad upgrade --state-backend two-layer` (or detecting the configured backend on upgrade) installs the required hooks. This is an isolated, medium-complexity change in upgrade.ts. It does not touch the state SDK, the coordinator prompt, or any shared runtime code. Geordi can ship it independently without coordinating with Data or B'Elanna. And it unblocks the user trust story: "upgrade → doctor passes → state writes actually happen."
+
+Everything else (teamRoot portability, Rai, template noise, #1163 prompt patch) is real work, but none of them are silently destroying state. Do WI-1 next, bundle WI-2/3/4 close behind, then WI-5. Defer #1003 until this cluster is closed.
+
+---
+
+## Appendix: Issue Closure Recommendations
+
+| Issue | Can Close After | Notes |
+|-------|----------------|-------|
+| #1191 (Bug A) | PR #1200 merged | Fully addressed |
+| #1192 / Bug B | PR #1200 merged | Fully addressed |
+| Bug C (silent migration) | PR #1200 merged | Fully addressed |
+| Bug D (stale template) | PR #1200 merged | Fully addressed |
+| #1194 / Bug E | PR #1200 merged | Fully addressed |
+| Bug F (Windows path) | PR #1200 merged | Fully addressed |
+| #1190 (partial) | WI-1 + WI-2 + WI-3 merged | ESM + doctor already done by #1200; close after WI-1-3 |
+| #1185 | WI-1 + WI-4 merged | --state-backend + Rai; template dedup via WI-3 |
+| #1163 | WI-5 merged | Three findings all addressed in one prompt patch |
+| #1003 | WI-7+8 (DEFERRED) | Not in this push; keep open |
+
+
+---
+
+# Fresh Community Signal Update: 2026-05-31 → 2026-06-02
+
+**Report Generated:** 2026-06-02T11:29:11.224+03:00  
+**Period Covered:** 2026-05-31 baseline → 2026-06-02  
+**Baseline Report:** Seven's 2026-05-31 state-backend issue & PR triage synthesis
+
+---
+
+## Executive Summary
+
+**No new community blockers.** All tracked issues remain in previous state. PR #1192 received actionable reviewer feedback from @jonlester on 2026-06-01. PR #1200 remains on track (last updated 2026-05-31). No new issues or PRs filed in the state-backend / upgrade / permission space since 2026-05-31.
+
+**Release Signal:** v0.9.6-insider.3 tag exists (creation date indicates post-2026-05-31 release activity).
+
+---
+
+## Phase 1: Tracked Issue & PR Diff
+
+### Issues Status
+
+| Issue | State | Last Update | Changes | Notes |
+|-------|-------|------------|---------|-------|
+| #1191 | OPEN | 2026-05-29 21:05 | None | Opened by @jonlester; no new comments |
+| #1190 | OPEN | 2026-05-29 12:20 | None | Opened by @tamirdresher; no new comments |
+| #1185 | OPEN | 2026-05-28 09:52 | None | Opened by @ischrei; no new comments |
+| #1163 | OPEN | 2026-05-25 17:56 | None | Opened by @ralarcon; no new comments |
+| #1003 | CLOSED | 2026-05-05 03:52 | ✅ Confirmed closed | Prior closure; unchanged |
+| #1157 | CLOSED | 2026-05-25 16:03 | ✅ Confirmed closed | Prior closure; unchanged |
+| #1098 | MERGED | 2026-05-07 18:55 | ✅ Confirmed merged | Prior merge; unchanged |
+
+**Finding:** All open issues remain dormant (no new comments). Closed/merged items verified in expected state.
+
+### PRs Status
+
+| PR | State | Last Update | Changes | Notes |
+|----|-------|------------|---------|-------|
+| #1192 | OPEN | 2026-06-01 16:25 | ✅ New comment | @jonlester feedback on 2026-06-01 16:25 (see Phase 3) |
+| #1193 | OPEN | 2026-05-29 21:17 | None | Copilot SWE agent-created; no reviews/comments |
+| #1200 | OPEN | 2026-05-31 22:26 | None | Last update before cutoff; no new changes since |
+| #1158 | MERGED | 2026-05-25 16:03 | ✅ Confirmed merged | Prior merge; unchanged |
+
+**Finding:** #1192 received new feedback. #1200 stable. #1193 still awaiting engagement.
+
+---
+
+## Phase 2: New Issues & PRs Filed Since 2026-05-31
+
+### New Issues
+**Search Query:** `created:>=2026-05-31 state-backend OR upgrade OR permission OR teamRoot OR worktree`  
+**Result:** `[]` (empty)
+
+**No new issues filed** in state-backend, upgrade, permission, or worktree domains since 2026-05-31.
+
+### New PRs
+**Search Query:** `created:>=2026-05-31 state OR permission OR upgrade`  
+**Result:** 1 PR returned
+
+- **PR #1200** (Tamir Dresher, created 2026-05-31 21:26)
+  - Title: `fix: harden state backend upgrade path`
+  - State: OPEN
+  - (This is a tracked PR, already analyzed above; no new out-of-scope PRs found.)
+
+**No new PRs filed outside the tracked list** in the upgrade/state/permission space since 2026-05-31.
+
+---
+
+## Phase 3: Reviewer Signals on In-Flight PRs
+
+### PR #1192 — Permission Approval Fix
+
+**Last Activity:** 2026-06-01 16:25 (New comment from @jonlester)
+
+**Reviewer Feedback Summary:**
+
+Jon Lester (community contributor) offered 2 actionable suggestions:
+
+1. **Re-export `approveAll` handler:** Recommends re-exporting from `copilot-sdk` so Squad SDK consumers (incl. squad-cli) can use it instead of hardcoding, reducing duplication and maintenance burden.
+
+2. **Version-pinned initialization validation:** Suggests checking `client.getStatus().protocolVersion` on session start. If value > 3 (current version), log a warning to console. This makes future protocol mismatches less brittle.
+
+**Assessment:**  
+- Both suggestions are low-priority enhancements, not blockers.
+- Copilot's review (2026-05-29) was "COMMENTED" (no approval); Jon's comment clarifies follow-up refinements.
+- **Recommendation for implementation:** Consider these quality-of-life improvements; not required for merge.
+
+### PR #1200 — Hardened State-Backend Upgrade Path
+
+**Last Activity:** 2026-05-31 21:32 (Copilot's comprehensive review)
+
+**Reviewer Feedback Summary:**
+
+Copilot review was "COMMENTED" (not approved), covering 25/26 files, focusing on:
+- Backend fallback & path normalization
+- Permission result typing updates
+- Externalized state directory resolution
+- Doctor checks & diagnostic wording
+
+**Assessment:**
+- No blockers flagged; review is substantive documentation of changes, not objections.
+- PR still awaits explicit approval or maintainer review.
+- **Recommendation for implementation:** Ready for maintainer sign-off; Copilot's feedback is informational, not requiring code changes.
+
+---
+
+## Phase 4: Discussions & Release Metadata
+
+### Discussions
+**Status:** No discussions updated since 2026-05-31 cutoff.
+
+### Release Tags
+Recent v0.9.x tags (most recent first):
+- `v0.9.6-insider.3` ← Post-2026-05-31 (aligned with insider testing push)
+- `v0.9.4`
+- `v0.9.1`
+- `v0.9.0`
+
+**Finding:** insider.3 release tag suggests continued release pipeline activity; no release notes/discussion blocker identified.
+
+---
+
+## Phase 5: Synthesis & Blockers/Helpers
+
+### 🟢 Green Signals (Help the fix-all push)
+
+1. **PR #1158 already merged** (2026-05-25) — State tool routing now in place; upgrade foundation solid.
+2. **PR #1200 in-flight with full Copilot review** — Comprehensive coverage of externalized state & backend hardening; no technical blockers identified.
+3. **Jon Lester's feedback on #1192 is constructive, not blocking** — Suggests quality improvements (re-export, version check) but doesn't require changes for merge.
+4. **No new conflicting issues or PRs** — Community silence on this domain since 2026-05-31; suggests stability or lack of new regression reports.
+
+### 🔴 Red Signals (Blockers)
+
+**None identified.**
+
+- No new issues that override the fix-all scope.
+- No new PRs that conflict with current work.
+- PR #1200 awaits maintainer sign-off, but review is clear; no code objections.
+
+### 🟡 Yellow Signals (Watch)
+
+1. **PR #1192 has accumulated feedback but not yet merged** — Jon's suggestions about re-export & version-pinning are design-scoped; implementers (B'Elanna/Data) may choose to fold these in or defer to follow-up PR.
+2. **PR #1193 remains untouched since 2026-05-29** — Copilot SWE agent-created; unclear ownership or intent. May be auto-generated or pending manual follow-up.
+
+---
+
+## Conclusions for Fix-All Coordination
+
+| Item | Status | Action |
+|------|--------|--------|
+| **Tracked Issues (open)** | Dormant | Continue addressing in fix-all scope; no new blockers. |
+| **PR #1192** | Awaiting QoL feedback decision | Mergeable as-is; Jon's suggestions are enhancements (re-export, version check). |
+| **PR #1200** | In-flight, well-reviewed | Ready for maintainer sign-off; comprehensive review complete. |
+| **PR #1158** | ✅ Merged | Foundation laid; build on this. |
+| **Community feedback** | Silent | No new regression reports since 2026-05-31. |
+
+**Recommendation:**  
+Proceed with fix-all push. No community-driven blockers. Both #1192 and #1200 are merge-ready; Jon's feedback on #1192 is guidance for future refinement, not a merge gate.
+
+---
+
+## Citation & Metadata
+
+- **Data Sources:** `gh issue/pr view` JSON, `gh issue/pr list` search, git tags, GitHub Discussions API
+- **Team Members Mentioned:** @jonlester (feedback), @bradygaster (author #1192), @tamirdresher (author #1200)
+- **Related Prior Work:** Seven's 2026-05-31 state-backend triage synthesis
+
+
+---
+
+# PR #3 SquadAgent NuGet Provenance
+
+**By:** Seven (Research & Integration Engineer)  
+**Date:** 2026-06-02T11:54:00.159+03:00  
+**Status:** Proposed provenance record
+
+## What
+
+PR #3 in `tamirdresher/squad` is the authoritative live branch for the community NuGet packaging work currently named `Squad.Agents.AI`. The PR branch is `feature/squad-agents-ai`; the package project is `src/Squad.Agents.AI/Squad.Agents.AI.csproj`; tests are under `test/Squad.Agents.AI.Tests/`.
+
+The Star Trek-squad provenance is split:
+
+1. **Data** owns the Track A design authority: `tamresearch1` Decision 444 is explicitly `Data — SquadAgent NuGet Contents & Implementation Design`, grounded in Decisions 441 and 443.
+2. **Coordinator/Scribe** recorded the final Q1-Q7 lock in Decision 447, including `Squad.Agents.AI`, `net10.0`, and routing via `CopilotClientOptions` rather than `AsAIAgent(name:)`.
+3. **Picard** contributed the adjacent Track B Aspire recommendation, not the NuGet implementation path.
+4. **Seven** contributed prior-work archaeology for the adjacent Aspire track; no evidence that Seven authored the NuGet code.
+5. **Worf** appears as the security hardening owner for the `GitHubTokenProvider` / token-redaction follow-up in the PR comments, not the initial package creation.
+6. The actual Git commits in PR #3 were authored by `Reno (Copilot) <reno@clawpilotsquad.dev>`, so implementation authorship should not be attributed solely to a Star Trek member unless future logs show Reno was acting as Data's implementation worker.
+
+## Evidence
+
+- PR: https://github.com/tamirdresher/squad/pull/3
+- PR branch commits: `8f2679db`, `f5b6c5f0`, `d6e59b33`, `2c357c05`, `db7940a7` on `fork/feature/squad-agents-ai`, all authored by Reno.
+- `C:\Users\tamirdresher\source\repos\squad\src\Squad.Agents.AI\Squad.Agents.AI.csproj` on `fork/feature/squad-agents-ai`: `IsPackable=true`, `PackageId=Squad.Agents.AI`, `TargetFramework=net10.0`.
+- `C:\Users\tamirdresher\source\repos\squad-squad\.squad\orchestration-log\2026-05-14T103419-scribe-merge.md`: Data completed the earlier Agent Framework PoC continuation in `squad-agent-framework-demo`.
+- `C:\Users\tamirdresher\source\repos\squad-squad\.squad\decisions-archive.md`: Agent Framework demo decisions are by Data.
+- `C:\Users\tamirdresher\tamresearch1` commit `4b608357f8a285ce0ac06170a1b57586c2a05172`: Scribe merged Decisions 441-448; Decision 444 is Data's NuGet design; Decision 447 locks Q1-Q7.
+- `C:\Users\tamirdresher\tamresearch1` commit `a85c88269f76f6cd3f58af5be7b2b757eb8ad9aa`: Ralph staged MAF contribution drafts and sample scaffold before the v4 pivot.
+
+## Why
+
+Future work on `Squad.Agents.AI` should start from PR #3 for code, from Data's Decision 444 plus Decision 447 for design intent, and from Worf's PR comment for token-handling constraints. This prevents over-attributing the implementation to the Star Trek team while preserving the accurate Star Trek decision chain that led to the PR.
+
+
+---
+
+# Squad.Agents.AI — Security Posture Inherited (2026-06-02)
+
+**By:** Worf (Security & Reliability)  
+**Date:** 2026-06-02  
+**Status:** ACTIVE — inherited from sister squad; ongoing review obligations defined  
+**Related:** [Sister squad Decision 439](https://github.com/tamirdresher/tamresearch1/wiki/decisions#decision-439-worf--issue-3437-re-inventory--remediation-plan), PR #3 (tamirdresher/squad), [Public Export Checklist Skill](#section-e-ongoing-review-obligations)
+
+---
+
+## TL;DR
+
+Squad.Agents.AI inherits a **CLEAN security baseline** from the sister squad's Decision 439 re-inventory. All six original B1–B6 blockers from Issue #3437 are **CLEARED** in the actual demo repo (`squad-agent-framework-demo@main`). Four new export-hygiene watch items (NEW-1…NEW-4) emerged; none are security blockers for M2 sample-wedge path, but all are flagged on the pre-PR and ongoing review checklist. **PR #3 audit verdict: PASS** with documentation flags on token handling, TLS behavior, and README link audit.
+
+---
+
+## Section A: B1–B6 Blocker Status & Regression Triggers
+
+### Original Blockers (Decision 439, sister squad)
+
+The original six blockers (`obj/`, `bin/`, personal paths, path-leaking screenshots, corporate-email screenshot) were documented against `aspire-squad-resource`, a **different upstream repo** than the MAF-target repo (`squad-agent-framework-demo`).
+
+**Current Status: CLEARED in squad-agent-framework-demo@main**
+
+| Blocker | Control | Current State | Regression Trigger | Severity if Regressed |
+|---------|---------|---------------|--------------------|----------------------|
+| **B1** (`obj/` in tracked tree) | .gitignore: `obj/` | Excluded, not tracked | Commit `obj/**/*.cs` or build artifacts | 🟠 HIGH (not credentials) |
+| **B2** (`bin/` in tracked tree) | .gitignore: `bin/` | Excluded, not tracked | Commit `bin/**` or release binaries | 🟠 HIGH (not credentials) |
+| **B3** (personal paths in code) | Code inspection, grep `C:\Users\`, `/home/`, `~`, email | Verified absent; examples use `{path}` placeholders | Hardcode `C:\Users\tamirdresher` or `/home/user` in docs/samples | 🔴 CRITICAL (personal data) |
+| **B4–B5** (path-leaking screenshots) | Asset inventory, exclude `.png`, `.jpg` | Verified: no screenshot artifacts in repo | Commit Codespace terminal screenshot with file tree visible | 🟡 MEDIUM (context-dependent; author may be visible) |
+| **B6** (corporate-email screenshot in docs) | Asset inventory, grep for `@microsoft.com`, `@example.com` | Verified absent | Commit Azure Portal / Teams screenshot with email visible | 🔴 CRITICAL (corporate identity policy) |
+
+### Remediation Checklist (Prevent Regression)
+
+Before any public-export validation (pre-PR, pre-package-publish):
+
+- [ ] **Gitignore validation**: Confirm `bin/`, `obj/`, `artifacts/` present in `.gitignore`
+- [ ] **Code grep**: Run `grep -r "C:\\Users\\|/home/|~|@microsoft\.com|@example\.com" --include="*.cs" --include="*.md" src/ docs/ samples/` → zero true positives (labels/documentation are allowed; hardcoded paths are not)
+- [ ] **Asset inventory**: `find . -name "*.png" -o -name "*.jpg" -o -name "*.jpeg" | wc -l` → confirm zero or only intentional branding/diagram assets
+- [ ] **README link audit**: Scan README for personal blog, internal URLs, dev-mode toggles (see Section B, NEW-1…NEW-4)
+
+---
+
+## Section B: NEW-1…NEW-4 Watch List
+
+### NEW-1: Personal Blog Link in README (🟡 MEDIUM, First-Party Context)
+
+**Location:** README.md, References section  
+**Current:** Link to `tamirdresher.com` blog (Tamir's personal blog)  
+**Status:** FLAGGED (first-party author attribution; medium-severity because Squad is Tamir's owned project)  
+**Decision:** Acceptable for M2 sample-wedge context (Tamir's open-source project). Remove or clarify as "Author's Blog" before M4 package graduation if Tamir transitions project to corporate sponsorship.  
+**Verification:** Public-export-checklist SKILL should scan README for personal domains; allowlist `tamirdresher.com` for this project only.
+
+**Watch trigger:** If Squad is adopted by Microsoft official channels or transferred to corporate org, escalate to Tamir for branding/attribution review.
+
+---
+
+### NEW-2: Squad Branding Gate (🟠 HIGH, Contribution Contribution Gate — DEFERRED)
+
+**Status:** Deferred to Tamir A/B decision (sister squad Decision 437, footnote).  
+**Context:** Squad branding lock is a deliberate risk acceptance in MAF wedge strategy (higher rejection odds for community branding on first-party sample). Not a security issue; listed for tracking.
+
+**Action:** Not blocking M2 sample wedge. Revisit if MAF team questions branding strategy.
+
+---
+
+### NEW-3: NODE_TLS_REJECT_UNAUTHORIZED Dev Toggle (🟡 MEDIUM, Conditional Dev-Only)
+
+**Location:** Code or documentation referencing TLS cert rejection behavior  
+**Current state:** PR #3 does NOT contain hardcoded `NODE_TLS_REJECT_UNAUTHORIZED=0` in source code  
+**Status:** CLEAR  
+**Watch trigger:** If squad-cli codebase ever uses TLS environment toggles, verify they are:  
+- ✅ Guarded by `if (IsDevelopment())` checks (not present in production)  
+- ✅ Documented with warnings in code comments  
+- ✅ NOT enabled by default in .squad/config.json or shipped samples
+
+---
+
+### NEW-4: Vestigial Directory Housekeeping (🟢 LOW, Maintenance)
+
+**Status:** LOW priority. Clean up before M4 package graduation.  
+**Action:** None required for M2; flagged for pre-release hygiene audit.
+
+---
+
+## Section C: NuGet Audit Suppressions (Third-Party Transitives)
+
+Inherited from sister squad Decision 602. Five `NuGetAuditSuppress` entries have been added to remediate vulnerable transitive dependencies (MongoDB driver, PowerShell SDK, KurrentDB.Client) introduced by legitimate upstream packages.
+
+| Advisory ID | Affected Package | Root Cause | Expiry Trigger |
+|------------|-----------------|-----------|----------------|
+| GHSA-6c8g-7p36-r338 | SharpCompress (MongoDB transitive) | MongoDB.Driver pre-pinning | Upgrade MongoDB.Driver to version w/ fixed SharpCompress |
+| GHSA-pggp-6c3x-2xmx | Snappier (MongoDB transitive) | MongoDB.Driver pre-pinning | Upgrade MongoDB.Driver |
+| GHSA-37gx-xxp4-5rgx | System.Security.Cryptography.Xml (PowerShell SDK transitive) | PowerShell SDK v1.x transitive | Upgrade PowerShell SDK to v2+ (if available) |
+| GHSA-w3x6-4m5h-cxqf | System.Security.Cryptography.Xml (PowerShell SDK transitive) | PowerShell SDK v1.x transitive | Upgrade PowerShell SDK to v2+ (if available) |
+| GHSA-g94r-2vxg-569j | OpenTelemetry.Api 1.12.0 (KurrentDB.Client transitive) | KurrentDB.Client pinned to v1.x | Upgrade KurrentDB.Client or upstream to fixed version |
+
+### Suppression Review Cadence
+
+- **Quarterly:** Check for upstream package updates that resolve transitives (no need to keep suppressions if transitive is patched)
+- **On Major Dependency Upgrade:** Re-audit suppressions after bumping MongoDB.Driver, PowerShell SDK, KurrentDB.Client
+- **Before M4 Package Graduation:** Confirm all suppressions are still necessary; remove any that have been fixed upstream
+
+### Core Package CVE Status
+
+**OpenTelemetry.Api 1.12.0:** The core CVE (GHSA-g94r-2vxg-569j) is **fixed in 1.15.3+**. Current pinning (baseline 1.15.1 + selective 1.15.2+ for instrumentation packages) does not reintroduce the core CVE. ✅ Safe to suppress.
+
+---
+
+## Section D: PR #3 Security Audit (PASS Verdict)
+
+### Scope
+
+PR #3 (tamirdresher/squad) includes:
+- `.gitignore` updates (bin/, obj/, artifacts/)
+- `pr-body.md` (design references, test instructions)
+- `README.md` (comprehensive Squad.Agents.AI documentation)
+
+### Audit Findings
+
+#### A. Credentials & Secrets
+
+**Status:** ✅ PASS  
+**Evidence:**
+- No hardcoded GitHub tokens, API keys, or credentials in diff
+- `GitHubToken` property documented as "For development only" with production guidance (use `GitHubTokenProvider` callback instead)
+- Environment variable references (`GH_TOKEN`, `GITHUB_TOKEN`) are properly documented as external configuration
+- No `.env.local` or `.secrets.*` files committed
+
+**Guidance in README:**
+```csharp
+opts.GitHubToken = Environment.GetEnvironmentVariable("GH_TOKEN");
+// For production, use GitHubTokenProvider instead:
+// Keeps tokens out of DI snapshots; recommended for production
+```
+
+✅ Correct pattern established.
+
+---
+
+#### B. Personal Data
+
+**Status:** ✅ PASS (with flags on repo owner context)  
+**Evidence:**
+- No personal email addresses (e.g., `tamir@...`, `someone@example.com`) in diff
+- No personal phone numbers, SSNs, or identifiers
+- GitHub repo ID uses `tamirdresher_microsoft/squad` (expected for Tamir's project)
+- Personal blog link in README references section flagged as NEW-1 (acceptable for first-party project)
+
+**Action:** No blocking issues. Confirm README link policy before M4 corporate adoption.
+
+---
+
+#### C. Environment & Dev Toggles
+
+**Status:** ✅ PASS  
+**Evidence:**
+- No `NODE_TLS_REJECT_UNAUTHORIZED=0` or equivalent TLS cert rejection toggles in PR #3
+- `TraceEvents` logging properly documented: "If enabled in non-Development environments, warnings are logged" (security-positive)
+- All dev-mode guidance is conditional or explicitly flagged
+
+✅ Security-positive posture.
+
+---
+
+#### D. Path Leakage
+
+**Status:** ✅ PASS  
+**Evidence:**
+- Example paths use placeholders: `@"C:\path\to\your\team-root"` (not hardcoded user paths)
+- Documentation paths are generic: `/squad/`, `~/. squad/` (not personal home directories)
+- No Codespace terminal screenshots or asset files with exposed file trees
+
+✅ No personal path leakage.
+
+---
+
+#### E. Links & References
+
+**Status:** ✅ PASS (with NEW-1 flag for ongoing review)  
+**Evidence:**
+- All GitHub links point to public repos: `github.com/bradygaster/squad`, `github.com/github/copilot-cli`, `github.com/microsoft/agents`
+- Documentation links point to official Microsoft docs: `learn.microsoft.com/en-us/dotnet/aspire/...`
+- One personal blog link (Tamir's blog) flagged as NEW-1; acceptable for first-party project
+
+✅ No internal/sensitive URLs leaked.
+
+---
+
+### Audit Verdict: **PASS**
+
+**Clearance:** PR #3 is **security-clean** for merge and M2 sample-wedge submission.
+
+**Conditions:**
+- ✅ GitHubToken guidance is correct; no regression on production token handling
+- ✅ TraceEvents logging is secure; warnings emitted in non-Development environments
+- ✅ .gitignore updates prevent B1/B2 regression
+- ✅ README link NEW-1 flagged for ongoing review but acceptable for first-party context
+
+**Documentation Requirements (Pre-Merge):**
+- [ ] Confirm README SecurityNotes section covers `GitHubToken` and `GitHubTokenProvider` patterns (already present in PR #3 ✅)
+- [ ] Verify `CliPath` security notes are present (already present in PR #3 ✅)
+- [ ] Ensure TraceEvents warning guidance is preserved (already present ✅)
+
+---
+
+## Section E: Ongoing Review Obligations & Public-Export Checklist
+
+### Pre-PR Verification Workflow (Before Submission to MAF)
+
+**Run Before Each PR:** (recommended as GitHub Actions CI check or manual pre-submit gate)
+
+1. **B1/B2 Gitignore Validation**
+   ```powershell
+   # Confirm bin/, obj/, artifacts/ are in .gitignore
+   git check-ignore -v bin/ obj/ artifacts/
+   # Should return:
+   # .gitignore:1:bin/
+   # .gitignore:2:obj/
+   # .gitignore:3:artifacts/
+   ```
+
+2. **Code Grep for Personal Data**
+   ```powershell
+   # Search for personal paths, emails, credentials
+   $grepPatterns = @(
+     'C:\\Users\\',
+     '/home/',
+     '@microsoft\.com',
+     '@example\.com',
+     'ghp_',
+     'github_pat_'
+   )
+   foreach ($pattern in $grepPatterns) {
+     Write-Host "Checking for: $pattern"
+     git grep -i "$pattern" -- '*.cs' '*.md' '*.csproj'
+   }
+   ```
+
+3. **Asset Inventory**
+   ```powershell
+   # Verify no screenshot artifacts
+   git ls-files --others --exclude-standard | Where-Object { $_ -match '\.(png|jpg|jpeg|gif)$' }
+   # Should be empty or only intentional branding assets
+   ```
+
+4. **README Link Audit**
+   ```powershell
+   # Extract all URLs from README
+   $readmePath = "README.md"
+   Select-String -Path $readmePath -Pattern '(https?://[^\s\)]+)' -AllMatches | ForEach-Object { $_.Matches.Value }
+   # Manual review: confirm no personal paths, internal URLs, hardcoded tokens in URLs
+   ```
+
+5. **NuGet Audit Suppressions**
+   ```powershell
+   # List current suppressions; verify all are still necessary
+   Select-String -Path "*.csproj" -Pattern "NuGetAuditSuppress" -AllMatches
+   # Compare to upstream CVE advisories; remove if fixed upstream
+   ```
+
+### Quarterly Review Cycle
+
+- **First review:** After M2 sample-wedge acceptance signal
+- **Subsequent:** Every quarter or before major dependency upgrades
+- **Trigger:** Any change to `.gitignore`, `README.md`, `*.csproj` (NuGet references)
+
+**Checklist Items:**
+- [ ] B1/B2 regression check (gitignore)
+- [ ] Personal data grep scan
+- [ ] Asset inventory audit
+- [ ] README link audit (especially NEW-1 personal blog context)
+- [ ] NuGet audit suppression expiry review (see Section C)
+- [ ] TraceEvents / TLS toggle verification (NEW-3)
+
+### Public-Export-Checklist SKILL
+
+The sister squad has established a **Public-Export-Checklist SKILL** (`.squad/skills/public-export-checklist/SKILL.md`) to automate these checks. This squad should:
+
+1. **Validate the SKILL in practice** (low confidence initially; bump after first successful public export)
+2. **Adopt the SKILL as a re-usable artifact** if it generalizes well across repos
+3. **Integrate into CI/CD** as a pre-merge check for any repo marked `[public-export]` or `[community-nuke]`
+
+### Who Should Know
+
+- **Tamir:** Project owner; responsible for README link policy decisions (NEW-1 context) and branding gate (NEW-2)
+- **Security Team:** Quarterly audit suppression review; flagging any new CVEs in transitive dependencies
+- **PR Reviewers:** Must confirm pre-PR checklist passed before approval
+- **CI/CD Ops:** Integrate public-export-checklist SKILL into GitHub Actions workflows
+
+---
+
+## Transitions & Path Forward
+
+- **M2 Sample Wedge (In Progress):** PR #3 audit PASS; proceed to MAF submission with public-export checklist confirmed
+- **M3 Multi-CLI Evidence:** Widen sample or add integration; re-run public-export checklist before merge
+- **M4 Package Graduation:** Full security baseline re-audit before corporate sponsorship or transfer to microsoft/ org
+
+---
+
+**Approved by:** Worf (Security & Reliability)  
+**Date:** 2026-06-02  
+**Next Review:** 2026-09-02 (Q3 quarterly check)

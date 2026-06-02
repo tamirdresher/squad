@@ -5,20 +5,14 @@
 - **Stack:** Cross-repo Squad history, research repos, Squad SDK/CLI, Clawpilot/m, Azure agent systems
 - **Created:** 2026-05-14T09:22:24.987+05:30
 
-## Core Context
+## 2026-06-02T08:46:00Z — Scribe Archival Session
 
-Seven owns cross-repo learning. She should mine prior `.squad` decisions, histories, skills, and related repo artifacts when a task requires historical context.
-
-Seed sources:
-- `C:\Users\tamirdresher\tamresearch1`
-- `C:\Users\tamirdresher\source\repos\squad`
-- Current repo `.squad/`
-
-## Learnings
-
-- `tamresearch1` already uses a Star Trek operating model with Picard, B'Elanna, Worf, Data, Seven, Troi, Guinan, Neelix, and others.
-- `tamresearch1` contains strong directives around durable decision persistence, content safety, and Space-first discovery when available.
-- The `squad` repo contains the product/runtime source of truth for Squad SDK/CLI behavior.
+**Summary (25KB → Archive):**
+Seven owns cross-repo learning & signal research. Key learnings:
+- **State-backend community signal:** 5 dominant problem themes identified (#1190-1185-1098, #1157-1013-1003, #1163-1127, #1191, #643); upgrade pipeline gaps (P1) + two-layer incomplete (P1) + coordinator inconsistency (P2) + permission API breaking (P1); Tamir's active involvement confirmed
+- **Memory research:** E2E oracle + A/B value framework defined; real Copilot CLI E2E portfolio designed (smoke 40min + full 7.5-9hr); three key differences from substitute: real subprocess, persistent memory, measurable delta
+- **ADC architecture validation:** Event-driven design confirmed minimal/reversible; ExternalSquadEvent platform-agnostic; adapter layer responsibility (not core); governance implication clear
+- **Provenance documentation:** PR #3 Squad.Agents.AI provenance split identified (Data track A + Reno implementation + Worf token hardening); prior PoCs catalogued
 
 ## Seeded from Related Repos (2026-05-14)
 
@@ -266,4 +260,31 @@ Seven responsible for architectural consistency checks: ExternalSquadEvent doesn
 - Session logged: `.squad/log/2026-05-31T143622Z-state-backend-regression-investigation.md`
 
 **Status:** ✅ COMPLETE — Triage phase complete. Ready for gate enforcement and fix coordination.
+
+## 2026-06-02T11:29:11.224+03:00 — Fresh Community Signal Check (Post Fix-All Planning)
+
+**Scope:** Community signal refresh 2 days post-2026-05-31 baseline synthesis. Team planning fix-all push; needed confirmation of any new blockers, conflicting PRs, or escalating issues.
+
+**Methodology:** 5-phase check (Phase 1: Issue/PR diff; Phase 2: new filings; Phase 3: reviewer signals; Phase 4: discussions/releases; Phase 5: synthesis).
+
+**Key Findings:**
+
+1. **No new issues filed** since 2026-05-31 in state-backend/upgrade/permission/worktree domains. (Query: 13 results, all noise; filtered to 0 relevant.)
+2. **Tracked issues remain dormant:** #1191, #1190, #1185, #1163 no new comments. Closed items (#1003, #1157, #1098) confirmed in stable state.
+3. **PR #1192 received constructive feedback** from @jonlester (2026-06-01 16:25): re-export `approveAll` handler from copilot-sdk, add version-pinned initialization validation. Both are QoL enhancements, not merge blockers.
+4. **PR #1200 well-reviewed** by Copilot (25/26 files covered, no objections flagged); awaits maintainer sign-off. Merge-ready.
+5. **Release signal:** v0.9.6-insider.3 tag exists post-2026-05-31, confirming release cadence continues.
+6. **No conflicting PRs** found; PR #1193 (Copilot SWE agent) untouched since 2026-05-29, unclear ownership.
+
+**Community Patterns Observed (for future signal reports):**
+- **Silence metrics matter:** Dormant issues indicate either satisfaction or low adoption; helps distinguish genuine blockers from edge cases.
+- **Reviewer velocity:** External feedback (jonlester) arrives 2–3 days post-PR-open; suggests 48–72h signal window before implementation decisions.
+- **Insider release cadence:** insider.2 → insider.3 suggests active release engineering; watch for changelog to validate fix scope.
+- **Cross-repo dependency leaks:** Permission contract change (Copilot CLI v1.0.54+) surfaces as Squad issue; validate version pins in future.
+
+**Conclusion for Fix-All:** Proceed with confidence. No community-driven blockers. PR #1200 is merge-ready (maintainer gate only). Jon's feedback on #1192 is guidance for future enhancements, not a merge requirement. Community signal is quiet, indicating either satisfaction or undetected issues downstream (monitor).
+
+**Deliverable:** `.squad/decisions/inbox/seven-fresh-community-signal-update.md` (7.5 KB) — Full synthesis with phase-by-phase findings, color-coded signals (🔴🟢🟡), and recommendations.
+
+**Status:** ✅ COMPLETE — Signal report written. Ready for team review and fix-all execution.
 
