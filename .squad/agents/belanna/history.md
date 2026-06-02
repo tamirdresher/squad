@@ -71,6 +71,13 @@ Captured at 2026-06-02T12:04:38.931+03:00 from `C:\Users\tamirdresher\tamresearc
 - Publish should be stateful and auditable: create the `.nupkg` once, retain it as a workflow artifact or GitHub Release asset, push that exact file, then verify the registry contains the intended version.
 - For multi-registry publishing, treat each registry as an independent idempotent state transition: pending → pushed → verified, with retry safe per target and no implicit side effects across targets.
 
+### Squad.Agents.AI — .NET CI gate added (2026-06-02)
+
+- Added `.github/workflows/squad-agents-ai-ci.yml` to PR #3 via commit `12d803bf` on `feature/squad-agents-ai`.
+- The workflow restores, builds, tests, packs, and uploads TestResults/nupkg artifacts on ubuntu-latest and windows-latest with .NET `10.0.x` and `NuGetAudit=true` restore posture.
+- Local sanity validation used SDK `10.0.204`: YAML parsed with `ConvertFrom-Yaml`, `dotnet restore src/Squad.Agents.AI/Squad.Agents.AI.csproj` passed, and `dotnet build src/Squad.Agents.AI/Squad.Agents.AI.csproj -c Release` passed with the inherited 9 XML-doc warnings.
+- Quirks: the target worktree had unrelated concurrent changes, so the commit was made in a clean sibling worktree; Git credentials initially selected the wrong GitHub account until `gh auth setup-git` restored the push identity; `gh pr checks` hit GraphQL rate limiting, but the unauthenticated Actions REST check showed `Squad.Agents.AI CI` in progress for `12d803bf`.
+
 ## 2026-05-17T09:05:10.003+05:30 — ADC Squad Runner Demo Reliability Invariants Finalized
 
 **Eight Invariants Documented and Approved:**

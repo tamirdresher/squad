@@ -2022,3 +2022,78 @@ The sister squad has established a **Public-Export-Checklist SKILL** (`.squad/sk
 **Approved by:** Worf (Security & Reliability)  
 **Date:** 2026-06-02  
 **Next Review:** 2026-09-02 (Q3 quarterly check)
+
+---
+
+## 2026-06-02 — Squad.Agents.AI Gap Closure + Boundary Directives
+
+### (a) Directive — clawpilotsquad Scope Boundary
+
+### 2026-06-02T13:09:53+03:00: User directive — Squad ownership boundaries
+
+**By:** Tamir Dresher (via Copilot)
+
+**What:** Reno is from the **clawpilotsquad** team (repo: https://github.com/tamirdresher_microsoft/clawpilotsquad/) and owns the **clawpilot / repo m** work — NOT the Squad.Agents.AI MAF NuGet work. Reno appearing on PR #3 commits is either accidental, a cross-squad loan that was never documented, or a git-identity overlap. Going forward: clawpilotsquad owns clawpilot/repo m; tamresearch1 + squad-squad own SquadAgent / Squad.Agents.AI. Cross-squad work must be explicitly sanctioned and logged.
+
+**Why:** User request — clarifies squad ownership boundaries so future work isn't misattributed across teams.
+
+### (b) Directive — Copilot CLI Invocation Pattern
+
+### 2026-06-02T13:08:11.343+03:00: User directive — copilot CLI invocation pattern
+
+**By:** Tamir Dresher (via Copilot)
+
+**What:** When invoking `copilot` CLI from any agent for unattended/scripted test runs, ALWAYS use this canonical form:
+
+```
+copilot --yolo --autopilot --agent squad -p "<prompt>"
+```
+
+- `--yolo` — auto-approve tool permission prompts
+- `--autopilot` — required for unattended Init Mode flows; allows the coordinator to proceed through `ask_user` confirmations without human input
+- `--agent squad` — load the squad coordinator
+- `-p "<prompt>"` — provide the initial prompt non-interactively
+
+Omitting `--autopilot` causes copilot to hang on the first `ask_user` (e.g., Init Mode Phase 1 team confirmation), producing apparent multi-hour stalls and useless test artifacts.
+
+**Why:** User request — captured for team memory. Affects any agent driving copilot as a test subject (two-layer validation, upgrade-validation, 6-repo validation, future scripted scenarios).
+
+
+### (c) B'Elanna — .NET CI gate added (commit 12d803bf)
+
+# Squad.Agents.AI .NET CI gate added
+
+Date: 2026-06-02
+Owner: B'Elanna
+PR: tamirdresher/squad#3
+Commit: 12d803bf
+Workflow: `.github/workflows/squad-agents-ai-ci.yml`
+
+Decision: the PR #3 build-verification gap is closed by adding a dedicated .NET CI gate for `Squad.Agents.AI`.
+
+Outcome:
+- Pull requests touching `src/Squad.Agents.AI/**`, `test/Squad.Agents.AI.Tests/**`, the workflow, or root `Directory.*`/SDK config now run .NET restore/build/test/pack.
+- The workflow matrix covers `ubuntu-latest` and `windows-latest`, uses .NET `10.0.x`, uploads TestResults and nupkg artifacts, and keeps `contents: read` permissions.
+- Local sanity validation passed before push: YAML parsed, package restore passed, and Release build passed with the inherited XML-doc warnings.
+- Post-push check lookup: `gh pr checks --watch` hit GraphQL rate limiting, but the Actions REST API showed `Squad.Agents.AI CI` registered and in progress for commit `12d803bf`.
+
+
+### (d) Data — Routing integration tests added (commit 3f5e61d6)
+
+# Squad.Agents.AI routing tests added (2026-06-02)
+
+## Decision
+
+Routing integration tests have been added to PR #3 (`tamirdresher/squad`, branch `feature/squad-agents-ai`) to close Data's v0.1 verification gap: the API surface now has tests proving its routing contract is wired at the `AIAgent`/Copilot boundary.
+
+## Evidence
+
+- Commit: `3f5e61d6d15e5c603f76d3a6f34acb7f97ca025e`.
+- Test file: `test/Squad.Agents.AI.Tests/SquadAgentRoutingTests.cs`.
+- New tests: 5.
+- Local validation: filtered `SquadAgentRoutingTests` passed 5/5; full `Squad.Agents.AI.Tests` suite passed 19/19.
+
+## Notes
+
+The tests intentionally do not spawn the Copilot CLI. They construct `SquadAgent` through DI with fake CLI settings and verify persona metadata, boundary instructions, working-directory isolation via `CopilotClientOptions.Cwd`, and Decision 447 routing through `CopilotClientOptions` rather than `AsAIAgent(name:)`.
+

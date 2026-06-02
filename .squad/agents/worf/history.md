@@ -651,3 +651,12 @@ This session synthesized five coordinated reports into a single onboarding decis
 
 
 **Who should know:** Tamir (project owner, NEW-1/NEW-2 context), Security Team (quarterly audit suppression review), PR Reviewers (pre-PR checklist confirmation), CI/CD Ops (public-export-checklist SKILL integration).
+
+## 2026-06-02 — New Commits Require Pre-Merge Re-Audit
+
+Two new commits added to PR #3 (feature/squad-agents-ai in tamirdrescher/squad):
+- 12d803bf: CI workflow added (B'Elanna)
+- 3f5e61d6: Routing tests added (Data)
+
+Recommend pre-merge security & reliability audit at next opportunity.
+

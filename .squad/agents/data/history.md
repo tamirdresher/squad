@@ -350,3 +350,10 @@ Data is the explicit Squad framework expert for this team. Data should learn fro
 - Pushed to `squad/1191-fix-cli-permission-contract`; all 5 CI checks green.
 - Closed PR #1193 with comment pointing to #1192.
 - Created skill `extract-test-from-competing-pr` and decision note `data-p0-fix-merged.md`.
+
+### Squad.Agents.AI — Routing tests added (2026-06-02)
+
+- Test file: `test/Squad.Agents.AI.Tests/SquadAgentRoutingTests.cs`.
+- New tests: 5 routing-boundary tests; local suite moved from 14/14 to 19/19 passing.
+- Commit: `3f5e61d6d15e5c603f76d3a6f34acb7f97ca025e` on `tamirdresher/squad` PR #3 branch `feature/squad-agents-ai`.
+- Surprises: `SquadAgent` exposes routing only through SDK object state, so the tests validate the DI-created wrapper by reflecting the inner `CopilotClientOptions` and `SessionConfig`; `AgentName` is metadata on the inner agent while operational routing remains `CliPath`/`CliArgs`/`Cwd`/`Environment`, matching Decision 447.
