@@ -472,8 +472,17 @@ export class StateBackendStorageAdapter implements StorageProvider {
     if (fileCmp === squadCmp) {
       return '.';
     }
-    // Already relative or outside squadDir — normalise separators only
-    return filePath.replace(/\\/g, '/');
+    // If the path is already relative (no drive letter or leading sep), normalise and return.
+    if (!path.isAbsolute(filePath)) {
+      return filePath.replace(/\\/g, '/');
+    }
+    // Absolute path that doesn't live under squadDir — this would produce a
+    // corrupt git-notes key (absolute path leaking into the ref namespace).
+    throw new Error(
+      `[squad] toRelative: path is outside squadDir and cannot be used as a state key.\n` +
+      `  path:     ${resolvedFile}\n` +
+      `  squadDir: ${resolvedSquad}`
+    );
   }
 }
 

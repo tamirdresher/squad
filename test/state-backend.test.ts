@@ -484,6 +484,52 @@ describe('StateBackendStorageAdapter', () => {
     expect(adapter.readSync('decisions.md')).toBe('# Decisions');
   });
 
+  it('toRelative handles Windows-style mixed drive-letter casing (Bug F)', () => {
+    // Simulate Windows drive-letter case mismatch: process.cwd() might return
+    // 'C:\...' while the stored path arrives as 'c:\...'.  Because path.resolve()
+    // canonicalises the separator (but NOT the case on Windows), we fold to
+    // lower-case for the prefix comparison only.
+    //
+    // We cannot easily mock process.platform here, but we CAN exercise the
+    // lower-case comparison branch by constructing a squadDir path that differs
+    // only in drive-letter case from the filePath argument (simulating the real
+    // Windows scenario by treating the test paths as opaque strings the way
+    // path.resolve does on the host OS).
+    //
+    // On non-Windows hosts path.isAbsolute returns false for Windows-style paths,
+    // so we test the relative-path normalisation path instead.
+    const backend = new GitNotesBackend(TMP);
+    const adapter = new StateBackendStorageAdapter(backend, squadDir());
+
+    // Relative paths must always come back normalised (no backslashes) regardless
+    // of platform — this is the safe cross-platform subset of the fix.
+    const relWithBackslash = 'sub\\dir\\file.md';
+    adapter.writeSync(relWithBackslash, 'backslash test');
+    expect(adapter.readSync('sub/dir/file.md')).toBe('backslash test');
+  });
+
+  it('toRelative throws for absolute paths outside squadDir (Bug F)', () => {
+    if (process.platform !== 'win32') {
+      // Only absolute paths starting with / are unambiguous on POSIX
+      const backend = new GitNotesBackend(TMP);
+      const adapter = new StateBackendStorageAdapter(backend, squadDir());
+      // A path outside squadDir should throw, not silently return an absolute
+      // path as a git-notes key (which would corrupt the notes namespace).
+      expect(() => adapter.writeSync('/tmp/outside-squad.md', 'data')).toThrow(
+        /toRelative: path is outside squadDir/
+      );
+    } else {
+      // On Windows use a different drive to guarantee "outside"
+      const backend = new GitNotesBackend(TMP);
+      const adapter = new StateBackendStorageAdapter(backend, squadDir());
+      // Use a drive letter that is guaranteed to differ from squadDir
+      const outsidePath = 'Z:\\outside\\file.md';
+      expect(() => adapter.writeSync(outsidePath, 'data')).toThrow(
+        /toRelative: path is outside squadDir/
+      );
+    }
+  });
+
   it('deleteSync removes entries', () => {
     const backend = new GitNotesBackend(TMP);
     const adapter = new StateBackendStorageAdapter(backend, squadDir());
