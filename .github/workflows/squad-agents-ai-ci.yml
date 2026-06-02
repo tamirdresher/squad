@@ -5,6 +5,7 @@ on:
     paths:
       - 'src/Squad.Agents.AI/**'
       - 'test/Squad.Agents.AI.Tests/**'
+      - 'samples/squad-agents-ai-sample/**'
       - '.github/workflows/squad-agents-ai-ci.yml'
       - 'Directory.*.props'
       - 'Directory.*.json'
@@ -15,6 +16,7 @@ on:
     paths:
       - 'src/Squad.Agents.AI/**'
       - 'test/Squad.Agents.AI.Tests/**'
+      - 'samples/squad-agents-ai-sample/**'
       - '.github/workflows/squad-agents-ai-ci.yml'
       - 'Directory.*.props'
       - 'Directory.*.json'
@@ -55,11 +57,17 @@ jobs:
       - name: Restore tests
         run: dotnet restore test/Squad.Agents.AI.Tests/Squad.Agents.AI.Tests.csproj -p:NuGetAudit=true
 
+      - name: Restore sample
+        run: dotnet restore samples/squad-agents-ai-sample/Squad.Agents.AI.Sample.csproj -p:NuGetAudit=true
+
       - name: Build package
         run: dotnet build src/Squad.Agents.AI/Squad.Agents.AI.csproj --no-restore -c Release
 
       - name: Build tests
         run: dotnet build test/Squad.Agents.AI.Tests/Squad.Agents.AI.Tests.csproj --no-restore -c Release
+
+      - name: Build sample
+        run: dotnet build samples/squad-agents-ai-sample/Squad.Agents.AI.Sample.csproj --no-restore -c Release
 
       - name: Test
         run: dotnet test test/Squad.Agents.AI.Tests/Squad.Agents.AI.Tests.csproj --no-build -c Release --logger trx --results-directory TestResults
