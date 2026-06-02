@@ -82,3 +82,19 @@ Confirmed pr-body.md removal from feature/squad-agents-ai (cleanup complete). Tr
 
 **Parallel activity:** Data-6 cleanup validated. PR #3 remains upstream-ready with no stale artifacts.
 
+
+---
+
+### Alias Experiment — 2026-06-02T19:39:52Z (data-16)
+
+Manually patched squad_state MCP entry on 	amir-squad-hq-tarball-test-20260602T183202 to test Data-15 Option A empirically. **Result overturns Data-15's framing.**
+
+- Bare alias squad state-mcp → tools still unavailable, orphan 2→2.
+- Debug-log inspection (Copilot CLI 1.0.58) → only user-level `~/.copilot/mcp-config.json` is loaded; project-level `.copilot/mcp-config.json` is silently skipped. `squad_state`, `bitwarden-shadow`, `EXAMPLE-trello` all dropped.
+- Passing project config via `--additional-mcp-config "<json>"` → 7 tools register, `squad_decide` works, orphan grew 2→10 commits in a single session.
+
+**iter-4 pivot:** Data-15 Option A is necessary-but-not-sufficient. Fix path = A1 (squad wraps copilot invocations with `--additional-mcp-config`) + Data-15 Option A on launch-spec content. Parallel: A4 upstream CLI issue about project-config auto-load.
+
+Side findings: `squad ensure` does not exist as a command (revert had to be manual); StateBackendStorageAdapter writes keys as absolute paths rooted at canonical TEAM_ROOT (non-portable but functional).
+
+Full verdict: `.squad/files/validation/ALIAS-EXPERIMENT-VERDICT.md`. Decision drop: `.squad/decisions/inbox/data-alias-experiment-verdict.md`.
