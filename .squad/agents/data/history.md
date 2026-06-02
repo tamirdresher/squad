@@ -349,3 +349,24 @@ Auth restored to `tamirdresher_microsoft` at end.
 - Decision drop: .squad/decisions/inbox/data-tarball-full-holocaust-research-wasserman.md
 
 **Auth**: ended on 	amirdresher_microsoft active.
+
+## 2026-06-02T17:30:00+03:00 — Tarball validation 5/6: squad-ai-vulns
+
+Combined-fix twin tarballs ( + "radygaster-squad-{sdk,cli}-combined-fixes.tgz" +  @ 0.9.6-preview.5) validated against EMU repo squad-ai-vulns.
+
+**Build-time verdict: GO.** All Iter-3 gap closures confirmed end-to-end on this Windows + EMU + dirty-mcp-config env. Phase 2 fresh-init two-layer produced full scaffold (config, 6 hooks, orphan branch with lifted mutable state, pinned MCP entry preserving pre-existing EXAMPLE-github + microsoft-docs servers). Phase 3 upgrade ran in a single command, exit 0, NO contradictory warn/ok output, migrated 9 mutable-state files into orphan, installed all hooks, updated config and pin — strictly equivalent to fresh-init + migrate (massive regression closure vs insider.3 baseline where upgrade did nothing).
+
+**Runtime symptom: residual.** Across 5 themed copilot sessions, 0 squad_state_* MCP tool calls observed. Orphan branch grew 0 commits across both dups during agent activity. Sessions either silently bypassed (Phase 2 sessions 1/2 wrote directly to main worktree, 1 new commit) or politely refused (Phase 3 continuity sessions explicitly printed "squad_state_* runtime bridge is not available in this environment"). This is a transport/launch-layer issue separate from the static-config fix in GAP-2 — recommend follow-up issue scoped to copilot-client launching  + "
+px -y @bradygaster/squad-cli@<v> state-mcp" + .
+
+**New env-bug surfaced (out of scope):** source repo squad-ai-vulns has colon-in-filename history under .squad/log and .squad/decisions/resolved which fails NTFS clone without core.protectNTFS=false. Recommend upstream rename pass.
+
+**Install:** global npm raced with parallel slots → local-prefix fallback at C:\Users\tamirdresher\squad-validation\.npm-prefix-aivulns succeeded (227 packages, 32s).
+
+**Test artifacts (retained, NOT deleted):**
+- Fresh-path duplicate: tamirdresher_microsoft/squad-ai-vulns-tarball-test-20260602T183157
+- Upgrade-path duplicate: tamirdresher_microsoft/squad-ai-vulns-upgrade-test-20260602T183157
+- Report: validation/FRESH-PATH-TARBALL-VALIDATION-squad-ai-vulns.md in fresh-path dup, mirrored to .squad/files/validation/TARBALL-FULL-squad-ai-vulns.md
+- Decision drop: .squad/decisions/inbox/data-tarball-full-squad-ai-vulns.md
+
+**Auth**: ended on tamirdresher_microsoft active.
