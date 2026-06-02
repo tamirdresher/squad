@@ -716,18 +716,28 @@ export function ensureSquadStateMcpPinned(dest: string, cliVersion: string): boo
   }
   if (!parsed || typeof parsed !== 'object') return false;
 
-  const config = parsed as { mcpServers?: Record<string, { command?: string; args?: string[] }> };
-  const server = config.mcpServers?.squad_state;
-  if (!server || !Array.isArray(server.args)) return false;
+  const config = parsed as {
+    mcpServers?: Record<string, { command?: string; args?: string[]; env?: Record<string, string> }>;
+  };
+  if (!config.mcpServers || typeof config.mcpServers !== 'object') {
+    config.mcpServers = {};
+  }
+  const server = config.mcpServers.squad_state;
 
   const pinnedSpec = `@bradygaster/squad-cli@${cliVersion}`;
   const desiredArgs = ['-y', pinnedSpec, 'state-mcp'];
-  const argsMatch = server.args.length === desiredArgs.length
-    && server.args.every((arg, i) => arg === desiredArgs[i]);
-  if (argsMatch && server.command === 'npx') return false;
 
-  server.command = 'npx';
-  server.args = desiredArgs;
+  // INSERT or UPDATE: if entry missing/unpinned/wrong-pinned, write the expected.
+  if (server && Array.isArray(server.args)) {
+    const argsMatch = server.args.length === desiredArgs.length
+      && server.args.every((arg, i) => arg === desiredArgs[i]);
+    if (argsMatch && server.command === 'npx') return false;
+  }
+
+  config.mcpServers.squad_state = {
+    command: 'npx',
+    args: desiredArgs,
+  };
   storage.writeSync(mcpConfigPath, JSON.stringify(config, null, 2) + '\n');
   return true;
 }

@@ -170,6 +170,9 @@ async function main(): Promise<void> {
     console.log(`                    --state-backend <type> (migrate to orphan|two-layer)`);
     console.log(`  ${BOLD}migrate${RESET}    Convert between markdown and SDK-First squad formats`);
     console.log(`             Flags: --to sdk|markdown, --from ai-team, --dry-run`);
+    console.log(`  ${BOLD}sync${RESET}       Sync squad-state branch(es) with remote (push/pull/both)`);
+    console.log(`             Flags: --push, --pull, --remote <name>, --quiet`);
+    console.log(`             No-op for local/worktree backends. Invoked by git hooks.`);
     console.log(`  ${BOLD}status${RESET}     Show which squad is active and why`);
     console.log(`  ${BOLD}roles${RESET}      List built-in Squad roles`);
     console.log(`             Usage: roles [--category <name>] [--search <query>]`);
@@ -440,6 +443,26 @@ async function main(): Promise<void> {
     }
     const { runStateMcp } = await import('./cli/commands/state-mcp.js');
     await runStateMcp(getSquadStartDir());
+    return;
+  }
+
+  if (cmd === 'sync') {
+    const { runSync } = await import('./cli/commands/sync.js');
+    const quiet = args.includes('--quiet');
+    const remoteIdx = args.indexOf('--remote');
+    const remote = (remoteIdx !== -1 && args[remoteIdx + 1]) ? args[remoteIdx + 1] : undefined;
+    let direction: 'push' | 'pull' | 'both' = 'both';
+    if (args.includes('--push') && !args.includes('--pull')) direction = 'push';
+    else if (args.includes('--pull') && !args.includes('--push')) direction = 'pull';
+    try {
+      await runSync({ direction, remote, cwd: getSquadStartDir(), quiet });
+    } catch (err: unknown) {
+      if (!quiet) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error(`squad sync failed: ${msg}`);
+      }
+      process.exit(1);
+    }
     return;
   }
 

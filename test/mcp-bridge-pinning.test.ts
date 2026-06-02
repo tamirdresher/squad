@@ -120,10 +120,25 @@ describe('MCP-BRIDGE-BROKEN — squad_state launch spec pinning', () => {
     expect(changed).toBe(false);
   });
 
-  it('does nothing when squad_state server is absent (user removed it)', () => {
-    writeMcpConfig(dest, { mcpServers: { 'EXAMPLE-github': { command: 'npx', args: ['-y', 'x'] } } });
+  it('inserts squad_state entry when missing (e.g. pre-existing mcp-config from another tool)', () => {
+    const cfgPath = writeMcpConfig(dest, { mcpServers: { 'EXAMPLE-github': { command: 'npx', args: ['-y', 'x'] } } });
     const changed = ensureSquadStateMcpPinned(dest, '0.9.6-preview.1');
-    expect(changed).toBe(false);
+    expect(changed).toBe(true);
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+    expect(cfg.mcpServers.squad_state).toEqual({
+      command: 'npx',
+      args: ['-y', '@bradygaster/squad-cli@0.9.6-preview.1', 'state-mcp'],
+    });
+    // Other servers preserved
+    expect(cfg.mcpServers['EXAMPLE-github']).toEqual({ command: 'npx', args: ['-y', 'x'] });
+  });
+
+  it('inserts squad_state into a config with no mcpServers key at all', () => {
+    const cfgPath = writeMcpConfig(dest, {});
+    const changed = ensureSquadStateMcpPinned(dest, '0.9.6-preview.1');
+    expect(changed).toBe(true);
+    const cfg = JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+    expect(cfg.mcpServers.squad_state.args[1]).toBe('@bradygaster/squad-cli@0.9.6-preview.1');
   });
 
   it('does nothing when version is unknown (0.0.0)', () => {
