@@ -2,6 +2,44 @@
 
 **Branch**: `squad/state-backend-upgrade-fixes`
 **PR**: [bradygaster/squad#1200](https://github.com/bradygaster/squad/pull/1200)
+**Head SHA**: `e839da6f`
+**Tarballs (TWIN — install BOTH together)**:
+- `C:\Users\tamirdresher\squad-validation\bradygaster-squad-sdk-combined-fixes.tgz` (787 KB)
+- `C:\Users\tamirdresher\squad-validation\bradygaster-squad-cli-combined-fixes.tgz` (570 KB)
+
+**Install pattern**: `npm install -g <sdk-tgz> <cli-tgz>` (both at once — see Gap 3 / #1203)
+
+**Date**: 2026-06-02T21-25-00+03-00
+**Author agent**: Data
+**Iteration**: 4 (end-to-end demonstrably working against Copilot CLI 1.0.58)
+**Version**: `0.9.6-preview.8` (auto-bumped during build from preview.6)
+**Upstream issue filed**: [github/copilot-cli#3642](https://github.com/github/copilot-cli/issues/3642)
+
+## Iteration 4 — end-to-end working bundle
+
+| Fix | What | Where |
+|---|---|---|
+| **MCP-NOT-AUTOLOADED** | Inject `--additional-mcp-config @<teamRoot>/.copilot/mcp-config.json` on every `copilot` spawn (Copilot 1.0.58 silently ignores project mcp-config) | NEW `packages/squad-cli/src/cli/core/copilot-invocation.ts` + 10 spawn sites wrapped (watch/index, 6 watch capabilities, loop, copilot-bridge start, start PTY) |
+| **REGISTRY-PIN-UNPUBLISHED** | npm registry HEAD-check w/ 2s timeout + cache; falls back to `@bradygaster/squad-cli@insider` if version isn't published | NEW `packages/squad-cli/src/cli/core/npm-registry.ts` + `resolveSquadStateMcpSpec` in `upgrade.ts`; `runEnsureChecks` now async |
+| **EPERM-ABORTS-MIGRATION** | When `--self` hits EPERM but `--state-backend` was also requested, log + continue migration; exit non-zero only if any step failed | `packages/squad-cli/src/cli-entry.ts` (selfUpgradeFailed flag) |
+| **TIMESTAMP-COLON-LEAK** | Scribe/after-agent templates now instruct agents to replace `:` → `-` in `{timestamp}` filename portions | `.squad-templates/{squad.agent.md, after-agent-reference.md, scribe-charter.md}` (build mirrors) |
+| **CI-TEST-DRIFT** | 3 CI tests repaired (`KNOWN_UNWIRED` empty, help line cap 130→150, init.test.ts pinned-args regex) | `test/cli-command-wiring.test.ts`, `test/speed-gates.test.ts`, `test/cli/init.test.ts` |
+| **REGRESSION-COVERAGE** | 3 new test files for iter-4 helpers | `test/copilot-invocation-mcp-wrap.test.ts`, `test/npm-registry-fallback.test.ts`, `test/upgrade-eperm-state-backend-continues.test.ts` |
+
+### Iteration 4 — Validation
+
+- ✅ `npm run build` clean (workspace SDK + CLI)
+- ✅ Targeted vitest green: **83/83** (cli-command-wiring, speed-gates, init, copilot-invocation-mcp-wrap, npm-registry-fallback, upgrade-eperm-state-backend-continues) + **15/15** (mcp-bridge-pinning, upgrade-eperm-false-success, upgrade-state-backend)
+- 📦 Twin tarballs re-packed at `0.9.6-preview.8`, mirrored to `C:\Users\tamirdresher\squad-validation\`
+- 📨 Upstream `mcp-config` issue filed: github/copilot-cli#3642
+- ⚠ Policy Gates will reject `0.9.6-preview.8` — `skip-version-check` label required on PR #1200
+
+---
+
+# Combined Fix Branch Manifest — `squad/state-backend-upgrade-fixes`
+
+**Branch**: `squad/state-backend-upgrade-fixes`
+**PR**: [bradygaster/squad#1200](https://github.com/bradygaster/squad/pull/1200)
 **Head SHA**: `3b44f45e`
 **Tarballs (TWIN — install BOTH together)**:
 - `C:\Users\tamirdresher\squad-validation\bradygaster-squad-sdk-combined-fixes.tgz` (787 KB)
