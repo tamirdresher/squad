@@ -1,26 +1,27 @@
 namespace Squad.Agents.AI;
 
 /// <summary>
-/// Static factory that parses connection strings emitted by CommunityToolkit.Aspire.Hosting.Squad.
+/// Parses Squad connection strings into <see cref="SquadAgentOptions"/> instances.
 /// </summary>
 public static class SquadConnectionFactory
 {
     /// <summary>
-    /// Parses a Squad connection string into SquadAgentOptions.
-    ///
-    /// Supported formats (Hybrid wire — Q1 lock):
-    ///
-    ///   1) PATH form (default — emitted when SquadFolderPath only):
-    ///        "C:\path\to\team-root"
-    ///        "/Users/me/team-root"
-    ///      Maps directly to SquadFolderPath. Cwd defaults to same.
-    ///
-    ///   2) URI form (escape hatch — when extra knobs needed):
-    ///        "squad://localhost?teamRoot=...&amp;cliPath=...&amp;protocol=maf-1.0"
-    ///      Reserved for future AFCP (Agent-to-Agent Framework
-    ///      Communication Protocol) support where host:port matters. For now
-    ///      we only parse query params; host is ignored.
+    /// Parses a Squad connection string into agent options.
     /// </summary>
+    /// <param name="connectionString">PATH form or `squad://` URI form connection string.</param>
+    /// <returns>Options populated from the supplied connection string.</returns>
+    /// <exception cref="ArgumentException">Thrown when <paramref name="connectionString"/> is null, empty, or whitespace.</exception>
+    /// <remarks>
+    /// PATH form maps the entire value to <see cref="SquadAgentOptions.SquadFolderPath"/> and <see cref="SquadAgentOptions.Cwd"/>.
+    /// URI form parses `teamRoot`, `cliPath`, `cwd`, `cliArgs`, and `env` query values; the URI host is reserved.
+    /// </remarks>
+    /// <example>
+    /// <code>
+    /// var options = SquadConnectionFactory.FromConnectionString(@"C:\repo");
+    /// var advanced = SquadConnectionFactory.FromConnectionString(
+    ///     "squad://localhost?teamRoot=C%3A%5Crepo&amp;cliArgs=--yolo");
+    /// </code>
+    /// </example>
     public static SquadAgentOptions FromConnectionString(string connectionString)
     {
         if (string.IsNullOrWhiteSpace(connectionString))
@@ -38,13 +39,13 @@ public static class SquadConnectionFactory
 
             if (query.TryGetValue("teamRoot", out var teamRoot))
                 options.SquadFolderPath = teamRoot;
-            
+
             if (query.TryGetValue("cliPath", out var cliPath))
                 options.CliPath = cliPath;
-            
+
             if (query.TryGetValue("cwd", out var cwd))
                 options.Cwd = cwd;
-            
+
             if (query.TryGetValue("cliArgs", out var cliArgsString))
             {
                 foreach (var arg in cliArgsString.Split(';', StringSplitOptions.RemoveEmptyEntries))
@@ -79,7 +80,7 @@ public static class SquadConnectionFactory
     private static Dictionary<string, string> ParseQueryString(string query)
     {
         var result = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        
+
         if (string.IsNullOrEmpty(query))
             return result;
 
