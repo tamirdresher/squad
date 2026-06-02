@@ -26,12 +26,19 @@ interface McpServerSpec {
   env?: Record<string, string>;
 }
 
-function buildMcpServerSpecs(isGitHub: boolean): McpServerSpec[] {
+function buildMcpServerSpecs(isGitHub: boolean, cliVersion?: string): McpServerSpec[] {
+  // Pin the squad-cli package to the currently-installed CLI version so that
+  // `npx -y @bradygaster/squad-cli state-mcp` does NOT silently resolve to the
+  // npm `latest` dist-tag (which may predate the `state-mcp` command and thus
+  // expose zero tools to Copilot — see MCP-BRIDGE-BROKEN root cause).
+  const pkgSpec = cliVersion && cliVersion !== '0.0.0'
+    ? `@bradygaster/squad-cli@${cliVersion}`
+    : '@bradygaster/squad-cli';
   const servers: McpServerSpec[] = [
     {
       name: 'squad_state',
       command: 'npx',
-      args: ['-y', '@bradygaster/squad-cli', 'state-mcp'],
+      args: ['-y', pkgSpec, 'state-mcp'],
     },
   ];
 
@@ -66,9 +73,9 @@ function yamlEnvValue(value: string): string {
   return `"${value.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`;
 }
 
-function buildMcpFrontmatterBlock(isGitHub: boolean): string {
+function buildMcpFrontmatterBlock(isGitHub: boolean, cliVersion?: string): string {
   const lines = ['mcp-servers:'];
-  for (const server of buildMcpServerSpecs(isGitHub)) {
+  for (const server of buildMcpServerSpecs(isGitHub, cliVersion)) {
     lines.push(`  ${server.name}:`);
     lines.push('    type: local');
     lines.push(`    command: ${server.command}`);
@@ -86,7 +93,7 @@ function buildMcpFrontmatterBlock(isGitHub: boolean): string {
   return lines.join('\n');
 }
 
-function injectMcpFrontmatter(content: string, isGitHub: boolean): string {
+function injectMcpFrontmatter(content: string, isGitHub: boolean, cliVersion?: string): string {
   const closingStart = content.indexOf('\n---', 4);
   if (!content.startsWith('---') || closingStart === -1) {
     return content;
@@ -94,7 +101,7 @@ function injectMcpFrontmatter(content: string, isGitHub: boolean): string {
 
   return content.slice(0, closingStart)
     + '\n'
-    + buildMcpFrontmatterBlock(isGitHub)
+    + buildMcpFrontmatterBlock(isGitHub, cliVersion)
     + content.slice(closingStart);
 }
 
@@ -205,7 +212,7 @@ function detectIsGitHubForMcp(dest: string, config: Record<string, unknown>): bo
 function writeAgentTemplate(agentSrc: string, agentDest: string, cliVersion: string, mcpConfigMode: McpConfigMode, isGitHub: boolean): void {
   let agentContent = storage.readSync(agentSrc) ?? '';
   if (mcpConfigMode === 'agent-frontmatter') {
-    agentContent = injectMcpFrontmatter(agentContent, isGitHub);
+    agentContent = injectMcpFrontmatter(agentContent, isGitHub, cliVersion);
   }
   storage.writeSync(agentDest, agentContent);
   stampVersion(agentDest, cliVersion);
@@ -678,6 +685,51 @@ function runEnsureChecks(dest: string, templatesDir: string, filesUpdated: strin
   refreshSquadTemplatesDir(dest, templatesDir);
   success('refreshed .squad/templates/');
   filesUpdated.push('.squad/templates/');
+
+  // MCP-BRIDGE-BROKEN fix: ensure squad_state launch spec pins the current CLI
+  // version so `npx -y @bradygaster/squad-cli` doesn't resolve to the stale
+  // `latest` dist-tag (which may not contain the `state-mcp` command).
+  if (ensureSquadStateMcpPinned(dest, getPackageVersion())) {
+    success('ensured .copilot/mcp-config.json squad_state pinned to current CLI version');
+    filesUpdated.push('.copilot/mcp-config.json');
+  }
+}
+
+/**
+ * Rewrite `.copilot/mcp-config.json` so the `squad_state` server pins
+ * `@bradygaster/squad-cli@<cliVersion>` instead of falling back to the npm
+ * `latest` dist-tag. Returns true if the file was updated.
+ *
+ * Preserves any other configured MCP servers untouched. Idempotent.
+ */
+export function ensureSquadStateMcpPinned(dest: string, cliVersion: string): boolean {
+  const mcpConfigPath = path.join(dest, '.copilot', 'mcp-config.json');
+  if (!storage.existsSync(mcpConfigPath)) return false;
+  if (!cliVersion || cliVersion === '0.0.0') return false;
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(storage.readSync(mcpConfigPath) ?? '{}');
+  } catch {
+    // Don't clobber a manually edited / malformed mcp-config.
+    return false;
+  }
+  if (!parsed || typeof parsed !== 'object') return false;
+
+  const config = parsed as { mcpServers?: Record<string, { command?: string; args?: string[] }> };
+  const server = config.mcpServers?.squad_state;
+  if (!server || !Array.isArray(server.args)) return false;
+
+  const pinnedSpec = `@bradygaster/squad-cli@${cliVersion}`;
+  const desiredArgs = ['-y', pinnedSpec, 'state-mcp'];
+  const argsMatch = server.args.length === desiredArgs.length
+    && server.args.every((arg, i) => arg === desiredArgs[i]);
+  if (argsMatch && server.command === 'npx') return false;
+
+  server.command = 'npx';
+  server.args = desiredArgs;
+  storage.writeSync(mcpConfigPath, JSON.stringify(config, null, 2) + '\n');
+  return true;
 }
 
 export function ensureMemoryGovernanceUpgradeDefaults(dest: string): string[] {

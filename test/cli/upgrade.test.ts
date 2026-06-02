@@ -156,7 +156,10 @@ describe('CLI: upgrade command', () => {
     const upgraded = await readFile(agentPath, 'utf-8');
     expect(upgraded).toContain('mcp-servers:');
     expect(upgraded).toContain('  squad_state:');
-    expect(upgraded).toContain("    args: ['-y', '@bradygaster/squad-cli', 'state-mcp']");
+    // After MCP-BRIDGE-BROKEN fix the args MUST pin the CLI version so npx
+    // does not silently resolve to the npm `latest` dist-tag (which lacks the
+    // state-mcp command). Match a regex rather than literal version.
+    expect(upgraded).toMatch(/args: \['-y', '@bradygaster\/squad-cli@[^']+', 'state-mcp'\]/);
     expect(upgraded).toContain('  EXAMPLE-github:');
     expect(upgraded).toContain("    args: ['-y', '@anthropic/github-mcp-server']");
     expect(upgraded).toContain('      GITHUB_TOKEN: ${GITHUB_TOKEN}');
