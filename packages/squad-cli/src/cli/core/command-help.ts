@@ -384,12 +384,48 @@ function printRcHelp(name: 'rc' | 'remote-control', version: string): void {
 }
 
 /**
+ * Map of command aliases to their canonical name in the help registry.
+ *
+ * The CLI router in `cli-entry.ts` accepts several aliases for the same
+ * command (e.g. `streams` / `workstreams` both route to `subsquads`). The
+ * help registry is keyed by the canonical name only, so alias lookups must
+ * be normalized before the registry lookup — otherwise `squad streams --help`
+ * falls through to the generic fallback instead of showing the dedicated
+ * subsquads help block.
+ *
+ * Keep this in sync with the alias `||` chains in `cli-entry.ts` (search
+ * for `cmd === '<alias>'`). Canonical commands that already have a
+ * dedicated entry in `COMMAND_HELP` (e.g. `rc` and `remote-control` both
+ * have explicit help blocks) do NOT need an entry here.
+ */
+const COMMAND_ALIASES: Readonly<Record<string, string>> = {
+  streams: 'subsquads',
+  workstreams: 'subsquads',
+};
+
+/**
+ * Normalize a CLI command alias to its canonical name for help-registry
+ * lookup. Returns the input unchanged when no alias mapping applies.
+ *
+ * Exported for testing. The runtime caller (`printCommandHelp`) applies
+ * this automatically.
+ */
+export function normalizeCommandAlias(cmd: string): string {
+  return COMMAND_ALIASES[cmd] ?? cmd;
+}
+
+/**
  * Print help for `cmd` if a dedicated help block exists.
  * Returns `true` when help was printed, `false` otherwise so the caller can
  * fall back to a generic "see `squad help`" message.
+ *
+ * Aliases (see `COMMAND_ALIASES`) are normalized to their canonical command
+ * before the registry lookup, so `printCommandHelp('streams', v)` prints
+ * the `subsquads` help block.
  */
 export function printCommandHelp(cmd: string, version: string): boolean {
-  const printer = COMMAND_HELP[cmd];
+  const canonical = normalizeCommandAlias(cmd);
+  const printer = COMMAND_HELP[canonical];
   if (!printer) {
     return false;
   }

@@ -26,6 +26,7 @@ import {
   printCommandHelp,
   printGenericCommandHelp,
   commandsWithHelp,
+  normalizeCommandAlias,
 } from '../../packages/squad-cli/src/cli/core/command-help.js';
 
 const execFileAsync = promisify(execFile);
@@ -63,6 +64,30 @@ describe('printCommandHelp', () => {
     const result = printCommandHelp('definitely-not-a-real-command', '0.0.0');
     expect(result).toBe(false);
     expect(logs).toEqual([]);
+  });
+
+  it('normalizes subsquads aliases ("streams", "workstreams") to the canonical help block', () => {
+    // Regression guard for PR #1202 review nit: cli-entry.ts routes
+    // `squad streams` and `squad workstreams` to the subsquads command,
+    // but the help registry is keyed by canonical name only. Without
+    // alias normalization both `--help` invocations would fall through
+    // to the generic fallback.
+    for (const alias of ['streams', 'workstreams']) {
+      logs.length = 0;
+      const result = printCommandHelp(alias, '9.9.9-test');
+      expect(result, `printCommandHelp('${alias}') should resolve via alias`).toBe(true);
+      const blob = logs.join('\n');
+      expect(blob, `'${alias}' --help should print subsquads block`).toContain('squad subsquads');
+      expect(blob).toContain('9.9.9-test');
+    }
+  });
+
+  it('normalizeCommandAlias maps known aliases and leaves others untouched', () => {
+    expect(normalizeCommandAlias('streams')).toBe('subsquads');
+    expect(normalizeCommandAlias('workstreams')).toBe('subsquads');
+    expect(normalizeCommandAlias('subsquads')).toBe('subsquads');
+    expect(normalizeCommandAlias('init')).toBe('init');
+    expect(normalizeCommandAlias('made-up')).toBe('made-up');
   });
 
   it('covers every documented subcommand with a dedicated help block', () => {
