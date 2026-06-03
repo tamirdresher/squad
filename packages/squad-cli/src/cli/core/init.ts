@@ -16,6 +16,7 @@ import { installGitHooks } from '../commands/install-hooks.js';
 import { liftInitMutableStateOntoOrphan } from '../commands/migrate-backend.js';
 import { ensureSquadStateMcpPinned } from './upgrade.js';
 import { resolveSquadStateMcpSpec } from './mcp-spec.js';
+import { describeMcpSpec } from './upgrade.js';
 
 const storage = new FSStorageProvider();
 
@@ -355,9 +356,9 @@ export async function runInit(dest: string, options: RunInitOptions = {}): Promi
         // leaving the bridge unwired. Force-insert/pin the squad_state entry so
         // the MCP server is reachable regardless of pre-existing config.
         try {
-          const argSpec = await resolveSquadStateMcpSpec(getPackageVersion());
-          if (ensureSquadStateMcpPinned(dest, getPackageVersion(), { argSpec })) {
-            success(`pinned .copilot/mcp-config.json squad_state to ${argSpec}`);
+          const mcpSpec = await resolveSquadStateMcpSpec(getPackageVersion());
+          if (ensureSquadStateMcpPinned(dest, getPackageVersion(), { mcpSpec })) {
+            success(`pinned .copilot/mcp-config.json squad_state to ${describeMcpSpec(mcpSpec)}`);
           }
         } catch (err) {
           console.warn(`${YELLOW}⚠ Could not pin squad_state in mcp-config.json: ${err instanceof Error ? err.message : err}${RESET}`);
@@ -368,19 +369,19 @@ export async function runInit(dest: string, options: RunInitOptions = {}): Promi
     }
   }
 
-  // INIT-vs-UPGRADE asymmetry fix (iter-5): SDK init writes
+  // INIT-vs-UPGRADE asymmetry fix (iter-5 + iter-6): SDK init writes
   // .copilot/mcp-config.json with a hard pin to the running CLI version
   // (`@bradygaster/squad-cli@<currentVersion>`). For unpublished preview
   // builds this E404s under `npx -y`, leaving the runtime bridge unwired
-  // even after a successful init. Mirror upgrade.ts's HEAD-check fallback
+  // even after a successful init. Mirror upgrade.ts's resolver
   // unconditionally here so vanilla `squad init` (no --state-backend flag)
-  // also benefits.
+  // also benefits — and so the iter-6 local-install fallback kicks in
+  // when the preview tarball is unpublished.
   try {
-    const argSpec = await resolveSquadStateMcpSpec(version);
-    const pinnedVersionSpec = `@bradygaster/squad-cli@${version}`;
-    if (argSpec !== pinnedVersionSpec) {
-      if (ensureSquadStateMcpPinned(dest, version, { argSpec })) {
-        success(`fell back .copilot/mcp-config.json squad_state to ${argSpec} (pinned version unpublished)`);
+    const mcpSpec = await resolveSquadStateMcpSpec(version);
+    if (mcpSpec.source !== 'pinned') {
+      if (ensureSquadStateMcpPinned(dest, version, { mcpSpec })) {
+        success(`fell back .copilot/mcp-config.json squad_state to ${describeMcpSpec(mcpSpec)} (pinned version unpublished)`);
       }
     }
   } catch {

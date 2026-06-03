@@ -14,7 +14,7 @@ import { TEMPLATE_MANIFEST, getTemplatesDir } from './templates.js';
 import { runMigrations } from './migrations.js';
 import { scrubEmails } from './email-scrub.js';
 import { getPackageVersion, stampVersion, readInstalledVersion } from './version.js';
-import { resolveSquadStateMcpSpec } from './mcp-spec.js';
+import { resolveSquadStateMcpSpec, type SquadStateMcpSpec } from './mcp-spec.js';
 export { resolveSquadStateMcpSpec } from './mcp-spec.js';
 
 const storage = new FSStorageProvider();
@@ -697,10 +697,20 @@ async function runEnsureChecks(dest: string, templatesDir: string, filesUpdated:
   // preview builds being validated locally before publish), fall back to the
   // `@insider` dist-tag so `npx` can still resolve a working binary.
   const pinnedSpec = await resolveSquadStateMcpSpec(getPackageVersion());
-  if (ensureSquadStateMcpPinned(dest, getPackageVersion(), { argSpec: pinnedSpec })) {
-    success(`ensured .copilot/mcp-config.json squad_state pinned to ${pinnedSpec}`);
+  if (ensureSquadStateMcpPinned(dest, getPackageVersion(), { mcpSpec: pinnedSpec })) {
+    success(`ensured .copilot/mcp-config.json squad_state pinned to ${describeMcpSpec(pinnedSpec)}`);
     filesUpdated.push('.copilot/mcp-config.json');
   }
+}
+
+/** Human-readable single-line description of an McpSpec for success() messages. */
+export function describeMcpSpec(spec: SquadStateMcpSpec): string {
+  if (spec.source === 'local') {
+    return `local install (${spec.args[0] ?? '<unknown>'})`;
+  }
+  // npx specs: `-y <pkg@version-or-tag> state-mcp` → describe by the pkg spec.
+  const pkg = spec.args[1] ?? '<unknown>';
+  return spec.source === 'insider' ? `${pkg} (@insider fallback)` : pkg;
 }
 
 /**
@@ -710,13 +720,18 @@ async function runEnsureChecks(dest: string, templatesDir: string, filesUpdated:
  *
  * Preserves any other configured MCP servers untouched. Idempotent.
  *
- * @param options.argSpec  Override the npm spec written into args (e.g. to
- *   substitute `@insider` when the pinned version isn't published yet).
+ * @param options.mcpSpec  Full SquadStateMcpSpec to write — preferred. When
+ *   supplied, takes precedence over `argSpec`. Iter-6: enables the local-install
+ *   fallback path which uses `node <pkgRoot>/dist/cli-entry.js state-mcp`
+ *   (a non-`npx` command shape).
+ * @param options.argSpec  Legacy override — npm package spec written into the
+ *   `-y <spec> state-mcp` argv. Retained for backward compat with code that
+ *   pre-dates the iter-6 SquadStateMcpSpec shape.
  */
 export function ensureSquadStateMcpPinned(
   dest: string,
   cliVersion: string,
-  options: { argSpec?: string } = {},
+  options: { mcpSpec?: SquadStateMcpSpec; argSpec?: string } = {},
 ): boolean {
   const mcpConfigPath = path.join(dest, '.copilot', 'mcp-config.json');
   if (!storage.existsSync(mcpConfigPath)) return false;
@@ -739,18 +754,28 @@ export function ensureSquadStateMcpPinned(
   }
   const server = config.mcpServers.squad_state;
 
-  const pinnedSpec = options.argSpec ?? `@bradygaster/squad-cli@${cliVersion}`;
-  const desiredArgs = ['-y', pinnedSpec, 'state-mcp'];
+  // Resolve desired (command, args) from the supplied options, with
+  // back-compat for the iter-4 `argSpec: string` shape.
+  let desiredCommand: string;
+  let desiredArgs: string[];
+  if (options.mcpSpec) {
+    desiredCommand = options.mcpSpec.command;
+    desiredArgs = options.mcpSpec.args;
+  } else {
+    const pinnedSpec = options.argSpec ?? `@bradygaster/squad-cli@${cliVersion}`;
+    desiredCommand = 'npx';
+    desiredArgs = ['-y', pinnedSpec, 'state-mcp'];
+  }
 
   // INSERT or UPDATE: if entry missing/unpinned/wrong-pinned, write the expected.
-  if (server && Array.isArray(server.args)) {
+  if (server && Array.isArray(server.args) && server.command === desiredCommand) {
     const argsMatch = server.args.length === desiredArgs.length
       && server.args.every((arg, i) => arg === desiredArgs[i]);
-    if (argsMatch && server.command === 'npx') return false;
+    if (argsMatch) return false;
   }
 
   config.mcpServers.squad_state = {
-    command: 'npx',
+    command: desiredCommand,
     args: desiredArgs,
   };
   storage.writeSync(mcpConfigPath, JSON.stringify(config, null, 2) + '\n');
