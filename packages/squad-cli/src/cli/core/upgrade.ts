@@ -16,7 +16,7 @@ import { scrubEmails } from './email-scrub.js';
 import { getPackageVersion, stampVersion, readInstalledVersion } from './version.js';
 import { resolveSquadStateMcpSpec, type SquadStateMcpSpec } from './mcp-spec.js';
 export { resolveSquadStateMcpSpec } from './mcp-spec.js';
-import { ensureSquadStateMcpInHome, tombstoneProjectSquadStateMcp } from './mcp-home.js';
+import { ensureSquadStateMcpInRoot, tombstoneStaleSquadStateInProjectMcp } from './mcp-root.js';
 
 const storage = new FSStorageProvider();
 
@@ -689,22 +689,23 @@ async function runEnsureChecks(dest: string, templatesDir: string, filesUpdated:
   success('refreshed .squad/templates/');
   filesUpdated.push('.squad/templates/');
 
-  // iter-7: write squad_state MCP entry to `~/.copilot/mcp-config.json`
-  // (auto-loaded by copilot) under a per-project-namespaced key, and
-  // tombstone the stale project-level entry left by older Squad versions.
+  // iter-8: write squad_state MCP entry to repo-root `.mcp.json`
+  // (auto-loaded by Copilot CLI 5.3+ walking up from cwd to git root)
+  // and tombstone any stale project-level entry left by older Squad
+  // versions in `.copilot/mcp-config.json`. No HOME modifications.
   const pinnedSpec = await resolveSquadStateMcpSpec(getPackageVersion());
   try {
-    const homeResult = ensureSquadStateMcpInHome(dest, getPackageVersion(), pinnedSpec);
-    if (homeResult.written) {
-      success(`installed ${homeResult.key} -> ${homeResult.path} (${describeMcpSpec(pinnedSpec)})`);
-      filesUpdated.push('~/.copilot/mcp-config.json');
+    const rootResult = ensureSquadStateMcpInRoot(dest, getPackageVersion(), pinnedSpec);
+    if (rootResult.written) {
+      success(`installed squad_state MCP server to .mcp.json (${describeMcpSpec(pinnedSpec)}) — Copilot CLI will auto-load on next invocation`);
+      filesUpdated.push('.mcp.json');
     }
   } catch (err) {
-    warn(`Could not write ~/.copilot/mcp-config.json: ${err instanceof Error ? err.message : err}`);
+    warn(`Could not write .mcp.json: ${err instanceof Error ? err.message : err}`);
   }
-  const tomb = tombstoneProjectSquadStateMcp(dest);
+  const tomb = tombstoneStaleSquadStateInProjectMcp(dest);
   if (tomb.removed) {
-    success(`removed stale project squad_state from ${tomb.path} (now lives in HOME)`);
+    success(`removed stale squad_state from ${tomb.path} (now lives in .mcp.json)`);
     filesUpdated.push('.copilot/mcp-config.json (tombstoned)');
   }
 }

@@ -16,7 +16,7 @@ import { installGitHooks } from '../commands/install-hooks.js';
 import { liftInitMutableStateOntoOrphan } from '../commands/migrate-backend.js';
 import { resolveSquadStateMcpSpec } from './mcp-spec.js';
 import { describeMcpSpec } from './upgrade.js';
-import { ensureSquadStateMcpInHome, tombstoneProjectSquadStateMcp } from './mcp-home.js';
+import { ensureSquadStateMcpInRoot, tombstoneStaleSquadStateInProjectMcp } from './mcp-root.js';
 
 const storage = new FSStorageProvider();
 
@@ -355,23 +355,23 @@ export async function runInit(dest: string, options: RunInitOptions = {}): Promi
         // exists (e.g. partially-squadified repo or pre-existing Copilot setup),
         // leaving the bridge unwired. Force-insert/pin the squad_state entry so
         // the MCP server is reachable regardless of pre-existing config.
-        // iter-7: write squad_state to HOME `~/.copilot/mcp-config.json`
-        // (auto-loaded by copilot) and tombstone the stale project-level
-        // entry left by the SDK init writer. Per-project namespacing via
-        // `squad_state_<hash>` prevents collisions across Squad projects.
+        // iter-8: write squad_state to repo-root `.mcp.json` (auto-loaded by
+        // Copilot CLI 5.3+ walking up from cwd to git root) and tombstone any
+        // stale project-level entry left by the SDK init writer in
+        // `.copilot/mcp-config.json`. No HOME modifications.
         try {
           const mcpSpec = await resolveSquadStateMcpSpec(getPackageVersion());
-          const homeResult = ensureSquadStateMcpInHome(dest, getPackageVersion(), mcpSpec);
-          if (homeResult.written) {
-            success(`installed ${homeResult.key} -> ${homeResult.path} (${describeMcpSpec(mcpSpec)})`);
-            console.log(`${DIM}  to remove later: edit ${homeResult.path} and delete ${homeResult.key}${RESET}`);
+          const rootResult = ensureSquadStateMcpInRoot(dest, getPackageVersion(), mcpSpec);
+          if (rootResult.written) {
+            success(`installed squad_state MCP server to .mcp.json (${describeMcpSpec(mcpSpec)}) — Copilot CLI will auto-load on next invocation`);
+            console.log(`${DIM}  to remove later: edit ${rootResult.path} and delete squad_state${RESET}`);
           }
-          const tomb = tombstoneProjectSquadStateMcp(dest);
+          const tomb = tombstoneStaleSquadStateInProjectMcp(dest);
           if (tomb.removed) {
-            success(`removed stale project squad_state from ${tomb.path} (now lives in HOME)`);
+            success(`removed stale squad_state from ${tomb.path} (now lives in .mcp.json)`);
           }
         } catch (err) {
-          console.warn(`${YELLOW}⚠ Could not install squad_state MCP entry in ~/.copilot/mcp-config.json: ${err instanceof Error ? err.message : err}${RESET}`);
+          console.warn(`${YELLOW}⚠ Could not install squad_state MCP entry in .mcp.json: ${err instanceof Error ? err.message : err}${RESET}`);
         }
       }
     } else {
@@ -379,21 +379,21 @@ export async function runInit(dest: string, options: RunInitOptions = {}): Promi
     }
   }
 
-  // iter-7: unconditionally mirror HOME-write + tombstone for vanilla
-  // `squad init` (no --state-backend flag) so the squad_state MCP entry
-  // lives in `~/.copilot/mcp-config.json` regardless of init path.
+  // iter-8: unconditionally mirror repo-root `.mcp.json` write + tombstone
+  // for vanilla `squad init` (no --state-backend flag) so the squad_state
+  // MCP entry is reachable regardless of init path. No HOME modifications.
   try {
     const mcpSpec = await resolveSquadStateMcpSpec(version);
-    const homeResult = ensureSquadStateMcpInHome(dest, version, mcpSpec);
-    if (homeResult.written) {
-      success(`installed ${homeResult.key} -> ${homeResult.path} (${describeMcpSpec(mcpSpec)})`);
+    const rootResult = ensureSquadStateMcpInRoot(dest, version, mcpSpec);
+    if (rootResult.written) {
+      success(`installed squad_state MCP server to .mcp.json (${describeMcpSpec(mcpSpec)}) — Copilot CLI will auto-load on next invocation`);
     }
-    const tomb = tombstoneProjectSquadStateMcp(dest);
+    const tomb = tombstoneStaleSquadStateInProjectMcp(dest);
     if (tomb.removed) {
-      success(`removed stale project squad_state from ${tomb.path}`);
+      success(`removed stale squad_state from ${tomb.path} (now lives in .mcp.json)`);
     }
   } catch {
-    // best-effort: HOME write failure does not block init
+    // best-effort: .mcp.json write failure does not block init
   }
 
   // Report .init-prompt storage
