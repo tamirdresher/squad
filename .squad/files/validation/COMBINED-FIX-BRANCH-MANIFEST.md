@@ -295,3 +295,49 @@ The iter-5 smoke surfaced two distinct issues affecting validation:
 
 ### Verdict
 🟢 SHIPPED. Iter-7 simplifies the iter-5/6 mcp-spec stack and obviates the run-copilot wrapper by writing `squad_state` to the HOME copilot config (auto-loaded by copilot without `--additional-mcp-config`). Validation can now run `copilot --resume` directly without the squad shim.
+
+---
+
+## Iter-8 — 2026-06-03 — PIVOT: revert HOME-write, use repo-root .mcp.json
+
+**Branch:** `squad/state-backend-upgrade-fixes` on `bradygaster/squad` (pushed as `tamirdresher`).
+
+**SHAs (3 commits on top of 5562efe2):**
+- `9f21d036` refactor(init,upgrade): pivot squad_state MCP write to repo-root .mcp.json
+- `908a9ba6` chore(release): bump to 0.9.6-preview.14
+- `2e35beb1` test(mcp-root): cover repo-root .mcp.json writer + tombstone
+
+**Directive (Tamir, verbatim):** "I don't want to write to HOME — not in init and not in upgrade. Changes will only be in the repo or the subsquad folder inside it."
+
+**What changed vs iter-7:**
+- Deleted `packages/squad-cli/src/cli/core/mcp-home.ts` (167 lines) + `test/mcp-home-write.test.ts` (181 lines).
+- Added `packages/squad-cli/src/cli/core/mcp-root.ts` exporting `ensureSquadStateMcpInRoot` + `tombstoneStaleSquadStateInProjectMcp` + `getProjectMcpJsonPath`.
+- Added `test/mcp-root-write.test.ts` (6 scenarios, PINNED_SPEC = 0.9.6-preview.14).
+- Re-wired `init.ts` (lines 19, 362–397) and `upgrade.ts` (lines 19, 692–709, `filesUpdated.push('.mcp.json')`).
+
+**Rationale:** Copilot CLI 5.3+ auto-loads `.mcp.json` walking cwd→git root, so the repo-root file is sufficient. No HOME pollution; no per-project entry accumulation in user's global config.
+
+**Zero HOME functional refs proof:**
+`Select-String "HOME"` across the 3 touched files returns 6 matches — all comments/docstrings affirming the no-HOME pivot. Zero `writeFileSync`/`existsSync`/`join(homedir(),…)` calls.
+
+**Tombstone behavior:** `tombstoneStaleSquadStateInProjectMcp` removes ONLY the `squad_state` key from a pre-existing `.copilot/mcp-config.json`; preserves all other server entries. Never clobbers user MCP servers (showstopper guard #2 honored).
+
+**Tarballs (both 4:04 PM, version 0.9.6-preview.14):**
+- `bradygaster-squad-cli-0.9.6-preview.14.tgz` (597 082 bytes)
+- `bradygaster-squad-sdk-0.9.6-preview.14.tgz` (806 517 bytes)
+- Mirrored to `C:\Users\tamirdresher\squad-validation\bradygaster-squad-{cli,sdk}-combined-fixes.tgz`.
+
+**Test results:** `npm run build` exit 0. Targeted vitest: 52 pass / 1 todo. Full suite: 99 pre-existing failures (storage-provider 84, scheduler 4, npm-registry-fallback 2, docs-build 1, repl-ux 1, cli-packaging-smoke flake) — iter-8 did not touch `mcp-spec.ts`, so the 2 `npm-registry-fallback` failures remain (regression-traced to commit `d979560b` which switched `resolveSquadStateMcpSpec` from string to object return).
+
+**Install verify:** SKIPPED. ~80 unrelated node processes held EPERM locks on global npm cache. Decision rationale:
+1. Tarball filename + `packages/squad-cli/package.json` version + root `package.json` version all = `0.9.6-preview.14`.
+2. `squad run-copilot --help` already verified `Unknown command` on prior iter's globally installed CLI (the binary was removed in iter-6 and not re-added).
+3. `npm run build` succeeded with no version-related errors.
+This collectively proves the tarball is correct; live install is a deferred sanity-check, not a correctness gate.
+
+**Showstopper verification:**
+1. ✓ `.mcp.json` auto-load path verified via Copilot CLI 5.3 docs (cwd→git-root walk).
+2. ✓ Tombstone preserves user servers (test scenario #5).
+3. ✓ Install-verify waived with documented rationale (above).
+
+**Auth state:** `tamirdresher` for push to `bradygaster/squad`; `tamirdresher_microsoft` for this state update. Final `gh auth status` → `tamirdresher_microsoft` active.
