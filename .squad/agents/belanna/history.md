@@ -156,3 +156,79 @@ Data is implementing auth-mode expansion (Decision cleared). Implementation will
 3. Auth remains on tamirdresher (personal) per instructions; do NOT switch back to EMU
 
 **Last Updated:** 2026-06-02T21:05:00+03:00
+
+---
+
+## 2026-06-03T07:55:04+03:00 — Drafted Teams DMs to MAF team in Tamir's voice
+
+**Deliverable:** Two length variants (short ~65w, medium ~130w) ready to paste into Teams DM.
+
+- **Variant A:** Quick ping — "hey [name], built X, would value your eyes, here's the link, is it useful?"
+- **Variant B:** Bit more context — Names the thing, says what it does, asks 3 specific questions (API shape / blockers / scenarios), signs off naturally
+- **Artifacts:** `.squad/workstreams/active/squad-agents-ai/decisions/inbox/belanna-maf-teams-dm-drafts.md`
+
+**Key voice choices applied:**
+- Lowercase "i" in both (`i built`, `i'd`) — natural typing, not faked
+- Casual punctuation — fragments with dashes, no formal closers
+- Direct asks — no hedging language ("I'd love if you could maybe..."), just straight Tamir ("curious if", "really love your take on")
+- Zero AI-isms — avoided "excited to share", "Looking forward to", "Hope all is well", "Just wanted to reach out"
+- Peer-to-peer — assumes audience knows MAF, AIAgent, DI registration terminology; no over-explanation
+- One PR reference per draft — not peppered through
+- Left rough on purpose — maintains his rhythm without forced typos
+
+**Tamir ready to use:** Copy one variant, replace `[colleague name]`, paste into Teams. Choice between A (for close colleagues he pings often) or B (for people he respects but doesn't message daily).
+
+## Learnings
+
+- Drafted Teams DM to MAF team in Tamir's voice — captured key voice patterns: lowercase i, casual punctuation, no AI-isms, peer-to-peer tone.
+
+### Drafted Teams group chat ask to Shawn/Glenn for MAF review (2026-06-03)
+
+- **Artifact:** `.squad/workstreams/active/squad-agents-ai/decisions/inbox/belanna-shawn-glenn-maf-review-ask.md`
+- **Chat:** "Brady, Glenn, and Shawn" — chatId `19:d00f3ddc39ac4e9c95e3b49e83c5b11d@thread.v2`
+- **Anchor message:** Shawn Henry, 2026-05-31 08:47 (re: reviewing commandline.ms docs and API shape)
+- **Draft length:** ~60 words, opens with `hey Shawn, Glenn —` to bridge existing thread momentum
+- **Concrete ask:** MAF-expert eye on PR #1207, confirm API shape + no workflow breakage
+- **Status:** DRAFT ONLY — no Teams message posted, file saved for Tamir approval before send
+
+---
+
+## 2025-07-09 — iter-9 Dogfood Smoke Test: v0.9.6-preview.15 (PR #1200)
+
+**Status:** ✅ COMPLETE — APPROVE recommended
+
+**Test:** 6-repo dogfood validation of `@bradygaster/squad-cli@0.9.6-preview.15` + `@bradygaster/squad-sdk@0.9.6-preview.15`. Local test clones only (`C:\Users\tamirdresher\squad-validation\iter9-dogfood\`), originals untouched.
+
+### Results Matrix
+
+| Repo | Command | From | Exit | .mcp.json | Tombstone | Runtime | Score |
+|------|---------|------|------|-----------|-----------|---------|-------|
+| travel-assistant | upgrade | 0.9.4-insider.1 | 0 | ✅ | ✅ | ✅ | ✅ |
+| holocaust-research-wasserman | upgrade | 0.8.25 | 0 | ✅ | ✅ | ✅ | ✅ |
+| gh-ai-adoption2026 | upgrade | 0.9.4-insider.1 | 0 | ✅ | ✅ | ✅ | ✅ |
+| squad-ai-vulns | init* | N/A | 0 | ✅ | ✅ | ✅ | ⚠️ |
+| multiplayer-sudoku | upgrade | 0.9.4-insider.1 | 0 | ✅ | ✅ | ✅ | ✅ |
+| tamir-squad-hq | upgrade | 0.9.6-preview.11 | 0 | ✅ | ✅ | ✅ | ✅ |
+
+*Repo 4 ran `init` — NTFS colon-in-filename blocked checkout of `.squad/decisions/resolved/2026-05-16T00:50Z-upstream-blockers.md`
+
+### Runtime Verification (repo 1, v0.9.6-preview.15)
+
+- MCP server starts and responds ✅
+- 7 tools exposed: `squad_decide`, `squad_state_read/write/append/delete/list/health` ✅
+- `squad_state_health` → `FSStorageProvider` ✅
+- `squad_state_read config.json` → `{"version":1}` ✅
+- HOME mcp-config.json SHA256 unchanged (byte-identical) ✅
+
+### Key Findings
+
+1. **`@insider` dist-tag fallback** — Tarball installs write `@bradygaster/squad-cli@insider` to `.mcp.json`. `@insider` currently resolves to `0.9.6-insider.3`. Registry users not affected. Follow-up polish item, non-blocking.
+2. **NTFS colon-in-filename** — Pre-existing issue in `squad-ai-vulns` repo: ISO 8601 timestamps with `:` in decision filenames are illegal on Windows. Not a CLI regression. Recommend hyphen-based timestamp convention for decision files.
+3. **`stateBackend: "two-layer"` not written** — Config stays `{"version":1}`. Current impl uses `FSStorageProvider`. Two-layer was older spec expectation, superseded.
+
+### Artifacts
+
+- Full report: `.squad/files/validation/SMOKE-ITER9-6REPO-DOGFOOD.md`
+- Decision drop: `.squad/workstreams/active/squad-agents-ai/decisions/inbox/belanna-iter9-dogfood-results.md`
+
+**Last Updated:** 2025-07-09
