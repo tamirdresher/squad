@@ -208,6 +208,9 @@ async function main(): Promise<void> {
     console.log(`             Usage: hire [--name <name>] [--role <role>]`);
     console.log(`  ${BOLD}copilot${RESET}    Add/remove the Copilot coding agent (@copilot)`);
     console.log(`             Usage: copilot [--off] [--auto-assign]`);
+    console.log(`  ${BOLD}run-copilot${RESET} Launch \`copilot\` with this project's MCP config injected`);
+    console.log(`             Usage: run-copilot [copilot args...]`);
+    console.log(`             Example: squad run-copilot --yolo -p "..."`);
     console.log(`  ${BOLD}plugin${RESET}     Manage plugin marketplaces`);
     console.log(`             Usage: plugin marketplace add|remove|list|browse`);
     console.log(`  ${BOLD}export${RESET}     Export squad to a portable JSON snapshot`);
@@ -847,6 +850,12 @@ async function main(): Promise<void> {
     const autoAssign = args.includes('--auto-assign');
     await runCopilot(getSquadStartDir(), { off: isOff, autoAssign });
     return;
+  }
+
+  if (cmd === 'run-copilot') {
+    const { runRunCopilot } = await import('./cli/commands/run-copilot.js');
+    const code = await runRunCopilot(getSquadStartDir(), args.slice(1));
+    process.exit(code);
   }
 
   if (cmd === 'scrub-emails') {

@@ -14,6 +14,8 @@ import { TEMPLATE_MANIFEST, getTemplatesDir } from './templates.js';
 import { runMigrations } from './migrations.js';
 import { scrubEmails } from './email-scrub.js';
 import { getPackageVersion, stampVersion, readInstalledVersion } from './version.js';
+import { resolveSquadStateMcpSpec } from './mcp-spec.js';
+export { resolveSquadStateMcpSpec } from './mcp-spec.js';
 
 const storage = new FSStorageProvider();
 
@@ -699,20 +701,6 @@ async function runEnsureChecks(dest: string, templatesDir: string, filesUpdated:
     success(`ensured .copilot/mcp-config.json squad_state pinned to ${pinnedSpec}`);
     filesUpdated.push('.copilot/mcp-config.json');
   }
-}
-
-/**
- * Resolve the launch spec to write for the `squad_state` MCP entry. Returns
- * the version-pinned spec when that version IS published on npm; falls back
- * to `@bradygaster/squad-cli@insider` when it isn't (so npx can still find a
- * working binary while a fresh preview build is being validated locally).
- */
-export async function resolveSquadStateMcpSpec(cliVersion: string): Promise<string> {
-  const pinned = `@bradygaster/squad-cli@${cliVersion}`;
-  if (!cliVersion || cliVersion === '0.0.0') return '@bradygaster/squad-cli@insider';
-  const { isSquadCliVersionPublished } = await import('./npm-registry.js');
-  const published = await isSquadCliVersionPublished(cliVersion);
-  return published ? pinned : '@bradygaster/squad-cli@insider';
 }
 
 /**

@@ -15,6 +15,7 @@ import { initSquad as sdkInitSquad, cleanupOrphanInitPrompt, ensurePersonalSquad
 import { installGitHooks } from '../commands/install-hooks.js';
 import { liftInitMutableStateOntoOrphan } from '../commands/migrate-backend.js';
 import { ensureSquadStateMcpPinned } from './upgrade.js';
+import { resolveSquadStateMcpSpec } from './mcp-spec.js';
 
 const storage = new FSStorageProvider();
 
@@ -354,8 +355,9 @@ export async function runInit(dest: string, options: RunInitOptions = {}): Promi
         // leaving the bridge unwired. Force-insert/pin the squad_state entry so
         // the MCP server is reachable regardless of pre-existing config.
         try {
-          if (ensureSquadStateMcpPinned(dest, getPackageVersion())) {
-            success('pinned .copilot/mcp-config.json squad_state to current CLI version');
+          const argSpec = await resolveSquadStateMcpSpec(getPackageVersion());
+          if (ensureSquadStateMcpPinned(dest, getPackageVersion(), { argSpec })) {
+            success(`pinned .copilot/mcp-config.json squad_state to ${argSpec}`);
           }
         } catch (err) {
           console.warn(`${YELLOW}⚠ Could not pin squad_state in mcp-config.json: ${err instanceof Error ? err.message : err}${RESET}`);
@@ -364,6 +366,25 @@ export async function runInit(dest: string, options: RunInitOptions = {}): Promi
     } else {
       console.warn(`${YELLOW}⚠ Unknown state backend "${options.stateBackend}". Using default (local).${RESET}`);
     }
+  }
+
+  // INIT-vs-UPGRADE asymmetry fix (iter-5): SDK init writes
+  // .copilot/mcp-config.json with a hard pin to the running CLI version
+  // (`@bradygaster/squad-cli@<currentVersion>`). For unpublished preview
+  // builds this E404s under `npx -y`, leaving the runtime bridge unwired
+  // even after a successful init. Mirror upgrade.ts's HEAD-check fallback
+  // unconditionally here so vanilla `squad init` (no --state-backend flag)
+  // also benefits.
+  try {
+    const argSpec = await resolveSquadStateMcpSpec(version);
+    const pinnedVersionSpec = `@bradygaster/squad-cli@${version}`;
+    if (argSpec !== pinnedVersionSpec) {
+      if (ensureSquadStateMcpPinned(dest, version, { argSpec })) {
+        success(`fell back .copilot/mcp-config.json squad_state to ${argSpec} (pinned version unpublished)`);
+      }
+    }
+  } catch {
+    // best-effort: bridge will remain pinned to the literal version
   }
 
   // Report .init-prompt storage
