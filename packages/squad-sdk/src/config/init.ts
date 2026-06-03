@@ -1349,7 +1349,7 @@ ${projectDescription ? `- **Description:** ${projectDescription}\n` : ''}- **Cre
         legacyMcpPath,
         'squad_state',
         squadStateEntry,
-        { createIfMissing: false },
+        { createIfMissing: false, overwriteOnConflict: true },
       );
       if (pinResult.status === 'updated' || pinResult.status === 'added') {
         warnings.push(
