@@ -146,7 +146,7 @@ git diff <pre-upgrade-commit> -- .squad/config.json
 Get-ChildItem .git/hooks | Where-Object Name -notlike '*.sample' | Select-Object Name
 Test-Path .git/hooks/pre-commit; Test-Path .git/hooks/post-commit
 # 3. MCP registration
-Select-String -Path .copilot/mcp-config.json -Pattern 'squad_state'
+Select-String -Path .mcp.json -Pattern 'squad_state'
 # 4. orphan branch
 git branch -a | Select-String 'squad-state'
 git show squad-state:.squad/decisions.md 2>&1   # did pre-upgrade decisions migrate?

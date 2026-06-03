@@ -73,3 +73,25 @@ Data authored 11-auth-mode inventory for Squad.Agents.AI expansion (Decision cle
 **Implication for squad-cli:** Current workaround --additional-mcp-config @./.copilot/mcp-config.json targets a non-standard path. Migration = move file to `./.mcp.json` and drop the flag. Decision written to `.squad/decisions/inbox/seven-mcp-config-paths-verified.md`.
 
 **Caveats:** Verified on 1.0.58 / Windows. Precedence among User/Workspace/Plugin not stated in help; re-verify after CLI upgrades.
+
+## 2026-06-02T22:22:40+03:00 — MCP Config Precedence / Merge / Failure (RESOLVED)
+
+### Learnings (empirical, Copilot CLI 1.0.58 / Windows)
+
+**Question (a) — Precedence:** Workspace `.mcp.json` **wins** over user `~/.copilot/mcp-config.json` for same-named servers. Proven via `copilot mcp list --json` from a temp workspace dir: the resolved entry's `source` field reads `"workspace"` and `sourcePath` points at the temp `.mcp.json`; all of `command`, `args`, and `env` come from the workspace file, with the user definition completely invisible.
+
+**Question (b) — Merge vs shadow:** **Full shadow at the field level, name-level union at the outer dict.** Test: workspace `probe_merge` defined `command`+`args` but NO `env`; user `probe_merge` had `env: { USER_ONLY_ENV: "user_value" }`. Resolved record had NO `env` key at all — the user's `env` did not leak in. → Higher-precedence source wholly replaces the lower one; the CLI does not deep-merge fields. Disjoint names (`probe_user_only`, `probe_workspace_only`) coexist with their respective `source` tags, confirming the union is purely at the server-name level.
+
+**Question (c) — Malformed `.mcp.json`:** **Silent fallback to user file. Zero diagnostic.** Wrote literal `{` to `.mcp.json`; `copilot mcp list` exited `0`, printed only the three user servers, no warning on stdout or stderr. Identical behavior for empty file and for non-JSON garbage. `copilot mcp get probe_workspace_only` returns "Server not found" with the workspace-only name absent from "Available servers". **Debuggability hazard:** a typo in `.mcp.json` makes `squad_state` "disappear" with no clue why.
+
+**Useful CLI artifact discovered:** `copilot mcp list --json` emits a `source` field (`"user"` | `"workspace"` | presumably `"plugin"`/`"builtin"`) and, for workspace entries, a `sourcePath`. This is the authoritative provenance probe for future precedence work — re-verify it survives future CLI bumps.
+
+### Recommendation handed to Data
+1. Same-name conflict → warn + prefer existing (do NOT silently overwrite a non-equivalent `squad_state` entry).
+2. Pre-write JSON validation is mandatory — CLI swallows parse errors, so the helper must surface them itself.
+3. Atomic temp-file rename so a crash mid-write never produces malformed JSON (which the CLI would then silently ignore, vanishing `squad_state`).
+4. Plugin vs Workspace precedence NOT tested (out of scope); flag for follow-up if `squad-cli` ever ships as a plugin.
+
+### Artifacts
+- Decision: `.squad/decisions/inbox/seven-mcp-config-precedence.md` (full reproducer + exact CLI output).
+- Production user config (`~/.copilot/mcp-config.json`) backed up before test, restored after, verified byte-equal; test temp dir removed.

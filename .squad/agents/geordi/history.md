@@ -29,3 +29,9 @@ Geordi owns Azure platform and operational concerns for Squad and AI-agent runti
 ---
 **Last Updated:** 2026-06-02T11:23:51Z  
 **Archive:** `.squad/agents/geordi/history-archive.md`
+
+## Learnings (2025 — Worf Conditions A/B, commit 77186501)
+
+- **EACCES/EISDIR failure mode on dual-write mirrors**: filesystem-mirror writes (legacy dual-write to a non-canonical path like `.copilot/mcp-config.json`) must NEVER crash the primary operation. The canonical write is the source of truth; the mirror is by definition non-critical. Always wrap in try/catch and downgrade thrown errors to warnings. See `packages/squad-sdk/src/config/init.ts:1346-1382`.
+- **JSON round-trip as defense-in-depth**: even when `JSON.stringify` is theoretically sound for plain objects, a `JSON.parse(serialized)` call before write costs <1ms and immunizes against future refactors that introduce custom `toJSON` methods or non-stringify-safe values. Critical when the downstream consumer (Copilot CLI 1.0.58) silently drops malformed JSON with no warning -- per Seven's precedence research. See `packages/squad-sdk/src/upgrade/migrate-mcp-config.ts:355-364`.
+- **vitest pattern for cross-platform fs-permission tests**: use `it.skipIf(process.platform === 'win32')` when the failure mode requires POSIX `chmod`-based read-only directory simulation. NTFS ACLs don't honor `chmod` bits the same way. Acceptable to leave Windows uncovered when the underlying bug is platform-agnostic and POSIX coverage proves the fix.
