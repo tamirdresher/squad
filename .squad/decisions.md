@@ -1,8 +1,30 @@
 # Squad Decisions
 
-**Last Updated:** 2026-06-03T22:15:00Z
+**Last Updated:** 2026-06-03T21:05:00Z
 
 ## Active Decisions
+
+---
+
+### 2026-06-03T20:25:00Z: iter-9 Test Drift Fix — PR #1200 [ws:squad-agents-ai]
+
+**By:** Picard (Lead)
+
+**What:** 4 stale test expectations updated to match iter-9 production reality. No production code changed.
+
+**Ruling:** Test drift only — production code is correct. Per Tamir's directive: `copilot-invocation.ts` and `mcp-spec.ts` are correct. Tests updated to match iter-9 implementation changes.
+
+**Changes Made:**
+- `test/copilot-invocation-mcp-wrap.test.ts`: Path drift (`.copilot/mcp-config.json` → repo-root `.mcp.json`) and `--yolo` flag addition (first element in args array).
+- `test/npm-registry-fallback.test.ts`: Return shape drift (`resolveSquadStateMcpSpec()` now returns `SquadStateMcpSpec` object instead of string).
+
+**Verification:** All 4 target tests PASS; no regression in `test/upgrade-state-backend.test.ts` (5 tests) or other test suites (6 tests in copilot-invocation, 4 tests in npm-registry-fallback).
+
+**Architectural Note:** The `--yolo` + `--additional-mcp-config @.mcp.json` pattern is the ONLY way to load workspace MCP tools in non-interactive mode (empirically proven, Copilot CLI 1.0.59 test matrix). Future tests of `buildAdditionalMcpConfigArgs` or `withAdditionalMcpConfig` MUST account for `--yolo` as first element when `.mcp.json` exists.
+
+**PR:** bradygaster/squad #1200 (`squad/state-backend-upgrade-fixes`)  
+**Commit:** `3f0a16d6`  
+**Status:** ALL CI GREEN — PR mergeable
 
 ---
 
