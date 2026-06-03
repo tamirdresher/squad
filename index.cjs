@@ -1768,34 +1768,10 @@ Reusable patterns and heuristics learned through work. NOT transcripts — each 
   console.log(`${DIM}identity/wisdom.md already exists — skipping${RESET}`);
 }
 
-// Create sample MCP config (skip if .copilot/mcp-config.json already exists)
-if (!isUpgrade) {
-  const mcpDir = path.join(dest, '.copilot');
-  const mcpConfigPath = path.join(mcpDir, 'mcp-config.json');
-  if (!fs.existsSync(mcpConfigPath)) {
-    try {
-      fs.mkdirSync(mcpDir, { recursive: true });
-      const mcpSample = {
-        mcpServers: {
-          "EXAMPLE-trello": {
-            command: "npx",
-            args: ["-y", "@trello/mcp-server"],
-            env: {
-              TRELLO_API_KEY: "${TRELLO_API_KEY}",
-              TRELLO_TOKEN: "${TRELLO_TOKEN}"
-            }
-          }
-        }
-      };
-      fs.writeFileSync(mcpConfigPath, JSON.stringify(mcpSample, null, 2) + '\n');
-      console.log(`${GREEN}✓${RESET} .copilot/mcp-config.json (MCP sample — rename EXAMPLE-trello to enable)`);
-    } catch (err) {
-      // Non-fatal — MCP config is optional
-    }
-  } else {
-    console.log(`${DIM}mcp-config.json already exists — skipping${RESET}`);
-  }
-}
+// MCP sample config is now written by the squad-sdk init flow (packages/squad-sdk/src/config/init.ts)
+// to `.mcp.json` at the repo root — the workspace path that Copilot CLI auto-loads
+// (see `copilot mcp --help`). Legacy `.copilot/mcp-config.json` is no longer written
+// here. See github/copilot-cli#3642 and the `mcp-json-migration` changeset.
 
 // Copy default ceremonies config
 const ceremoniesDest = path.join(squadInfo.path, 'ceremonies.md');

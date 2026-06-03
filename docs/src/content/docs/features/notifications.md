@@ -375,7 +375,7 @@ For advanced use cases, you can also:
 
 ## Sample MCP Configs
 
-Below are complete, copy-pasteable `.copilot/mcp-config.json` examples for each notification platform. Pick the one that matches your setup and copy the entire `mcpServers` block into your config file.
+Below are complete, copy-pasteable `.mcp.json` (project, at repo root) examples for each notification platform. Pick the one that matches your setup and copy the entire `mcpServers` block into your config file (use `~/.copilot/mcp-config.json` instead if you want it user-level rather than committed to the repo).
 
 ### Teams Webhook (Simplest)
 

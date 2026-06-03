@@ -5,10 +5,12 @@ MCP (Model Context Protocol) servers extend Squad with tools for external servic
 ## Config File Locations
 
 Users configure MCP servers at these locations (checked in priority order):
-1. **Repository-level:** `.copilot/mcp-config.json` (team-shared, committed to repo)
-2. **Workspace-level:** `.vscode/mcp.json` (VS Code workspaces)
-3. **User-level:** `~/.copilot/mcp-config.json` (personal)
-4. **CLI override:** `--additional-mcp-config` flag (session-specific)
+1. **Repository-level (auto-loaded):** `.mcp.json` at the repo root — team-shared, committed; this is the workspace path Copilot CLI auto-loads (see `copilot mcp --help`).
+2. **Workspace-level:** `.vscode/mcp.json` (VS Code workspaces).
+3. **User-level:** `~/.copilot/mcp-config.json` (personal, user-wide).
+4. **CLI override:** `--additional-mcp-config <path>` (session-specific).
+
+> **Migration note:** Older Squad versions wrote the per-repo config to `.copilot/mcp-config.json`. That path was not auto-loaded by Copilot CLI and required `--additional-mcp-config`. New `squad init` writes `.mcp.json` instead. If your repo still has a `.copilot/mcp-config.json`, it is preserved as-is — see `docs/features/mcp.md` for a manual merge recipe until `squad upgrade` ships a guided merge.
 
 ## Sample Config — Trello
 

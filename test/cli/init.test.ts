@@ -84,12 +84,12 @@ describe('CLI: init command', () => {
     expect(wisdomContent).toContain('Team Wisdom');
   });
 
-  it('should create .copilot/mcp-config.json', async () => {
+  it('should create .mcp.json at repo root (Copilot CLI auto-loaded workspace path)', async () => {
     await runInit(TEST_ROOT);
-    
-    const mcpPath = join(TEST_ROOT, '.copilot', 'mcp-config.json');
+
+    const mcpPath = join(TEST_ROOT, '.mcp.json');
     expect(existsSync(mcpPath)).toBe(true);
-    
+
     const content = await readFile(mcpPath, 'utf-8');
     const config = JSON.parse(content);
     expect(config).toHaveProperty('mcpServers');
@@ -97,12 +97,17 @@ describe('CLI: init command', () => {
     expect(config.mcpServers.squad_state).not.toHaveProperty('env');
     expect(content).not.toContain('SQUAD_TEAM_ROOT');
     expect(content).not.toContain(TEST_ROOT);
+
+    // Legacy .copilot/mcp-config.json should NOT be created by new init
+    // (preservation of existing legacy file is handled in test/mcp-config.test.cjs)
+    const legacyPath = join(TEST_ROOT, '.copilot', 'mcp-config.json');
+    expect(existsSync(legacyPath)).toBe(false);
   });
 
   it('should write MCP config into agent frontmatter when requested', async () => {
     await runInit(TEST_ROOT, { mcpFrontmatter: true });
 
-    const mcpPath = join(TEST_ROOT, '.copilot', 'mcp-config.json');
+    const mcpPath = join(TEST_ROOT, '.mcp.json');
     expect(existsSync(mcpPath)).toBe(false);
 
     const agentPath = join(TEST_ROOT, '.github', 'agents', 'squad.agent.md');

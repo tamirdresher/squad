@@ -25,14 +25,17 @@ MCP bridges Squad agents and external services. Agents use MCP tools to send not
 
 ## MCP Configuration Files
 
-There are two places to configure MCP, depending on your platform:
+There are two scopes to configure MCP, depending on whether the servers are shared with your team or personal to you:
 
-| Platform | Config File | How to Edit | Startup |
-|----------|------------|-----------|---------|
-| **Copilot CLI** | `.copilot/mcp-config.json` | Text editor | Add to shell initialization (`~/.bashrc`, `~/.zshrc`, etc.) |
-| **VS Code** | `.vscode/settings.json` | VS Code Settings GUI or JSON editor | Built-in; restarts Copilot extension |
+| Scope | Config File | How to Edit | Loaded By |
+|-------|-------------|-------------|-----------|
+| **Project (team-shared)** | `.mcp.json` (at repo root) | Text editor; commit to the repo | Auto-loaded by Copilot CLI (`copilot mcp --help`); also discovered by VS Code workspaces. **This is what `squad init` writes.** |
+| **User (personal)** | `~/.copilot/mcp-config.json` | Text editor | Loaded by Copilot CLI globally for your account |
+| **VS Code workspace** | `.vscode/mcp.json` or `.vscode/settings.json` | VS Code Settings GUI or JSON editor | Built-in; restarts Copilot extension |
 
-This guide covers both. Pick the one that matches your workflow.
+This guide covers all three. Pick the one that matches your workflow.
+
+> **Migration note:** Squad ≤ 0.9.x wrote the per-repo config to `.copilot/mcp-config.json`. That path is **not** auto-loaded by Copilot CLI (it required the `--additional-mcp-config` flag). Newer `squad init` writes `.mcp.json` instead. If your repo already has both files, see the "Migrating from `.copilot/mcp-config.json`" section below.
 
 ---
 
@@ -169,7 +172,7 @@ Press `Cmd+Shift+P` (macOS) or `Ctrl+Shift+P` (Windows) and select **"Copilot: R
 
 Most Squad installs come with GitHub MCP pre-configured. Here's what it looks like:
 
-### CLI: `.copilot/mcp-config.json`
+### CLI: `.mcp.json` (project) or `~/.copilot/mcp-config.json` (user)
 
 ```json
 {
@@ -349,6 +352,21 @@ Agents don't need special setup to discover tools. Here's the flow:
    copilot
    ```
 
+### Migrating from `.copilot/mcp-config.json`
+
+Squad ≤ 0.9.x wrote the per-repo MCP config to `.copilot/mcp-config.json`. That path was **not** auto-loaded by Copilot CLI — users had to pass `--additional-mcp-config .copilot/mcp-config.json` on every invocation, and a lot of teams never noticed their MCP servers weren't actually loading. See [github/copilot-cli#3642](https://github.com/github/copilot-cli/issues/3642).
+
+Newer `squad init` writes `.mcp.json` at the repo root — the path Copilot CLI auto-loads per `copilot mcp --help`.
+
+**If your repo already has `.copilot/mcp-config.json`:**
+
+1. Open both files (the old `.copilot/mcp-config.json` and the new `.mcp.json` that `squad init` wrote).
+2. Copy any custom `mcpServers.*` entries from `.copilot/mcp-config.json` into `.mcp.json` — merge them under the existing `mcpServers` key.
+3. Delete `.copilot/mcp-config.json` once you've verified the merged `.mcp.json` works (`copilot mcp` should list the merged servers).
+4. Commit `.mcp.json`. You can stop passing `--additional-mcp-config`.
+
+A `squad upgrade` guided merge will ship in a follow-up release; until then, the migration is manual.
+
 ### Tools Not Appearing in Agent Responses
 
 **Symptom:** Agent says "I don't have access to GitHub tools" even though you configured MCP.
@@ -357,7 +375,9 @@ Agents don't need special setup to discover tools. Here's the flow:
 
 1. **Verify config syntax:**
    ```bash
-   # CLI
+   # Project (auto-loaded by Copilot CLI)
+   cat ./.mcp.json | jq .
+   # User-level (also valid)
    cat ~/.copilot/mcp-config.json | jq .
    # Should be valid JSON; if not, `jq` will error
    ```

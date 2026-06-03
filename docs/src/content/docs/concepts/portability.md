@@ -226,7 +226,7 @@ MCP (Model Context Protocol) servers extend Squad with external services. Agents
 
 | Platform | Config File |
 |----------|------------|
-| **Copilot CLI** | `.copilot/mcp-config.json` |
+| **Copilot CLI** | `.mcp.json` (project, repo root) |
 | **VS Code** | `.vscode/settings.json` (under `copilot.mcp.servers`) |
 
 ### Example: GitHub MCP

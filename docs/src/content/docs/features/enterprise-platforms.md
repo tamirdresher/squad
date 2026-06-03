@@ -104,7 +104,7 @@ Squad uses the Azure CLI for ADO authentication — **no Personal Access Tokens 
 
 For GitHub repositories, Squad uses the `gh` CLI for authentication. When working across multiple GitHub accounts (e.g., personal GitHub and Enterprise Managed Users), use `gh auth switch` to toggle between accounts. See [Cross-organization authentication](../scenarios/cross-org-auth) for detailed multi-account setup.
 
-Alternatively, if the Azure DevOps MCP server is configured in your environment, Squad will use it automatically for richer API access. Add it to `.copilot/mcp-config.json`:
+Alternatively, if the Azure DevOps MCP server is configured in your environment, Squad will use it automatically for richer API access. Add it to `.mcp.json` at the repo root (the path Copilot CLI auto-loads):
 
 ```json
 {

@@ -112,7 +112,7 @@ These are created only when you opt in during init.
 
 - **`.squad/templates/`** — SDK templates, overwritten on upgrade
 - **`.github/workflows/*.yml`** — CI/CD workflows (opt-in: `--include-workflows`)
-- **`.copilot/mcp-config.json`** — MCP server config (opt-in: `--include-mcp-config`)
+- **`.mcp.json`** — MCP server config at repo root (opt-in: `--include-mcp-config`); auto-loaded by Copilot CLI
 
 > ⚠️ **Hard rule:** Squad NEVER writes temp files, logs, or memory to your repo root. All team state lives in `.squad/` only. Your project tree stays clean.
 

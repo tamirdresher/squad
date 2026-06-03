@@ -715,7 +715,7 @@ function injectMcpFrontmatter(content: string, servers: McpServerSpec[]): string
  * - .github/agents/squad.agent.md
  * - .github/workflows/ (optional)
  * - .squad/templates/ (optional)
- * - .copilot/mcp-config.json (optional)
+ * - .mcp.json (optional; Copilot CLI auto-loaded workspace path)
  * - Identity files (now.md, wisdom.md)
  * - ceremonies.md
  *
@@ -1323,7 +1323,11 @@ ${projectDescription ? `- **Description:** ${projectDescription}\n` : ''}- **Cre
   // -------------------------------------------------------------------------
 
   if (mcpConfigMode === 'copilot-file') {
-    const mcpConfigPath = join(teamRoot, '.copilot', 'mcp-config.json');
+    // Write to .mcp.json at the repo root — this is the workspace path that
+    // GitHub Copilot CLI auto-loads (per `copilot mcp --help`, verified on
+    // CLI 1.0.58+). The legacy `.copilot/mcp-config.json` is not auto-loaded
+    // and required the `--additional-mcp-config` flag. See github/copilot-cli#3642.
+    const mcpConfigPath = join(teamRoot, '.mcp.json');
     if (!storage.existsSync(mcpConfigPath)) {
       const mcpSample = buildMcpConfigJson(mcpServers);
       await storage.write(mcpConfigPath, JSON.stringify(mcpSample, null, 2) + '\n');

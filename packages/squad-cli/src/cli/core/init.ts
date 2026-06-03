@@ -111,7 +111,7 @@ export interface RunInitOptions {
   isGlobal?: boolean;
   /** State backend to configure at init time (local, orphan, two-layer) */
   stateBackend?: string;
-  /** If true, write MCP server config into squad.agent.md frontmatter instead of .copilot/mcp-config.json */
+  /** If true, write MCP server config into squad.agent.md frontmatter instead of .mcp.json (repo root) */
   mcpFrontmatter?: boolean;
 }
 

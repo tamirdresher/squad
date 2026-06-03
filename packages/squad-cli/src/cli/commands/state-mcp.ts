@@ -201,8 +201,9 @@ export function printStateMcpHelp(): void {
     'Usage: squad state-mcp',
     '',
     'This command is intended to be launched by GitHub Copilot CLI through',
-    '.copilot/mcp-config.json. It exposes squad_decide and state.* tools',
-    'backed by the configured Squad state backend.',
+    '.mcp.json (repo root) — the workspace MCP config path that the CLI',
+    'auto-loads. It exposes squad_decide and state.* tools backed by the',
+    'configured Squad state backend.',
     '',
   ].join('\n'));
 }
