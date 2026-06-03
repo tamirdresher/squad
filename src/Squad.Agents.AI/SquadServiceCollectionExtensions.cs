@@ -40,7 +40,10 @@ public static class SquadServiceCollectionExtensions
         this IServiceCollection services,
         string name,
         Action<SquadAgentOptions>? configure = null)
-        => AddSquadAgentCore(services, name, ServiceLifetime.Scoped, configure);
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return AddSquadAgentCore(services, name, ServiceLifetime.Scoped, configure);
+    }
 
     /// <summary>
     /// Registers <see cref="SquadAgent"/> and base <see cref="AIAgent"/> with the specified lifetime.
@@ -68,7 +71,10 @@ public static class SquadServiceCollectionExtensions
         string name,
         ServiceLifetime lifetime,
         Action<SquadAgentOptions>? configure = null)
-        => AddSquadAgentCore(services, name, lifetime, configure);
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return AddSquadAgentCore(services, name, lifetime, configure);
+    }
 
     // ── Keyed DI overloads ───────────────────────────────────────────────────
 
@@ -109,7 +115,10 @@ public static class SquadServiceCollectionExtensions
         string serviceKey,
         string name,
         Action<SquadAgentOptions>? configure = null)
-        => AddKeyedSquadAgentCore(services, serviceKey, name, ServiceLifetime.Scoped, configure);
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return AddKeyedSquadAgentCore(services, serviceKey, name, ServiceLifetime.Scoped, configure);
+    }
 
     /// <summary>
     /// Registers <see cref="SquadAgent"/> as a keyed service with the specified lifetime.
@@ -141,7 +150,10 @@ public static class SquadServiceCollectionExtensions
         string name,
         ServiceLifetime lifetime,
         Action<SquadAgentOptions>? configure = null)
-        => AddKeyedSquadAgentCore(services, serviceKey, name, lifetime, configure);
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(name);
+        return AddKeyedSquadAgentCore(services, serviceKey, name, lifetime, configure);
+    }
 
     // ── Core implementation (non-keyed) ──────────────────────────────────────
 

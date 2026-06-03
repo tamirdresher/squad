@@ -146,7 +146,7 @@ if (RunFlow(3))
 
     // Simulate a token from a credential store (never hardcode real tokens).
     // In production replace this with Key Vault, managed identity, etc.
-    const string simulatedToken = "ghp_EXAMPLE_REPLACE_WITH_REAL_TOKEN";
+    const string simulatedToken = "YOUR_GITHUB_PAT_HERE";
 
     var host3 = Host.CreateApplicationBuilder(args);
     host3.Logging.SetMinimumLevel(LogLevel.Warning);

@@ -195,7 +195,7 @@ the `ConfigureCopilotClient` BYOK delegate, and streaming via `RunStreamingAsync
 |---|---|
 | [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | `dotnet --version` should print `10.x.x` |
 | GitHub Copilot CLI on `PATH` | Install from [github.com/github/copilot-cli](https://github.com/github/copilot-cli); verify with `copilot --version` |
-| Squad CLI installed | Follow the install guide in the [Squad repository README](https://github.com/tamirdresher/squad#readme) |
+| Squad CLI installed | Follow the install guide in the [Squad repository README](https://github.com/bradygaster/squad#readme) |
 | Initialized Squad team root | Run `squad init` in a directory; this becomes your team root |
 | GitHub Copilot authentication | Run `gh auth login` or `copilot auth login` once before running the sample |
 

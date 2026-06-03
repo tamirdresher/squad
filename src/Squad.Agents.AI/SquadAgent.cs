@@ -134,7 +134,8 @@ public sealed class SquadAgent : AIAgent, IAsyncDisposable
             // Snapshot routing properties before the delegate runs
             var snapshotCwd = clientOptions.Cwd;
             var snapshotCliPath = clientOptions.CliPath;
-            var snapshotCliArgs = clientOptions.CliArgs;
+            // snapshot is a clone — in-place CliArgs mutation by SDK consumers is also caught
+            var cliArgsSnapshot = clientOptions.CliArgs?.ToArray();
 
             options.ConfigureCopilotClient(clientOptions);
 
@@ -160,12 +161,12 @@ public sealed class SquadAgent : AIAgent, IAsyncDisposable
                 restored = true;
             }
 
-            if (!ReferenceEquals(clientOptions.CliArgs, snapshotCliArgs))
+            if (!(clientOptions.CliArgs ?? Array.Empty<string>()).SequenceEqual(cliArgsSnapshot ?? Array.Empty<string>()))
             {
                 logger?.LogWarning(
-                    "ConfigureCopilotClient delegate replaced CliArgs; " +
+                    "ConfigureCopilotClient delegate changed CliArgs; " +
                     "restoring original value to preserve Squad routing.");
-                clientOptions.CliArgs = snapshotCliArgs;
+                clientOptions.CliArgs = cliArgsSnapshot;
                 restored = true;
             }
 

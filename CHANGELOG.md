@@ -114,7 +114,7 @@ First stable release since v0.9.4 (April 25). Consumes 97 changesets (sdk: 50, c
 - Added `Squad.Agents.AI`, a `net10.0` Microsoft Agent Framework package that exposes a Squad team as an `AIAgent`.
 - Public surface: `SquadAgent`, `SquadAgentOptions`, `SquadConnectionFactory`, and `SquadServiceCollectionExtensions`.
 - Added DI registration, PATH/URI connection-string parsing, GitHub token/provider options, and XML documentation for the public preview surface.
-- Documented PR #3 lineage for the v0.1-preview package in `src/Squad.Agents.AI/README.md`.
+- Added README documentation for the `Squad.Agents.AI` package in `src/Squad.Agents.AI/README.md`.
 
 ## [0.9.0] - 2026-03-23
 
