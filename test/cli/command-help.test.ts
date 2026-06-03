@@ -250,10 +250,24 @@ describe.skipIf(!cliBuilt)('squad <cmd> --help end-to-end', () => {
     expect(out).not.toMatch(/Active squad:/);
   });
 
-  it('falls back to a generic help message for unknown commands', async () => {
+  it('discover --help prints discover-specific help (not the generic fallback)', async () => {
     const { stdout, stderr } = await runSquad(['discover', '--help'], tempDir);
     const out = stdout + stderr;
     // discover IS registered, so verify it prints command-specific help.
     expect(out).toContain('squad discover');
+  });
+
+  it('falls back to a generic help message for unknown commands', async () => {
+    // Use a name guaranteed not to be in COMMAND_HELP nor routed by
+    // cli-entry.ts. The early --help intercept (cli-entry.ts ~L290) must
+    // still kick in and dispatch to printGenericCommandHelp, which
+    // mentions the cmd verbatim and points users at `squad help`.
+    const bogus = 'this-command-does-not-exist-xyz';
+    const { stdout, stderr } = await runSquad([bogus, '--help'], tempDir);
+    const out = stdout + stderr;
+    expect(out).toContain(bogus);
+    expect(out).toContain('squad help');
+    // Ensure no scaffolding / side effects from an unknown command.
+    expect(existsSync(join(tempDir, '.squad'))).toBe(false);
   });
 });
