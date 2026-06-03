@@ -127,3 +127,37 @@ Picard's upstream tracking issue draft posted as bradygaster/squad#1205 (type:fe
 **Picard sequencing lesson:** MCP migration scope decision (Picard-4) executed perfectly — additive migration path selected, all handoff gates locked in and traversed, no silent file deletion, historical decisions preserved. Upstream PR open with full audit trail in `.squad/decisions.md`.
 
 **Awaiting:** Upstream maintainer merge on bradygaster/squad (PR #1208)
+
+## Learnings
+
+### 2026-06-03 — Design-to-shipped-prompt gap (Decision 3 omitted by implementer)
+
+**Workstream:** skill-discovery-paths
+**Trigger:** Worf rejected Gate 2 (symlink-skip rationale) on Data's commit `fe1e7e8c`. Decision 3 (one-level / skip symlinks / no per-session cache) was clearly stated in workstream `decisions.md:236-250` but **zero lines** made it into the shipped prompt at `.squad-templates/squad.agent.md`. Five mirrors synced — and all five had the same missing content.
+
+**Root cause hypothesis:** Decision 3 in my design doc was structured as three labeled rules ("Recursive: ONE level only", "Symlinks: SKIP", "Caching: NO explicit cache") with rationale bullets, but it was NOT presented as a drop-in replacement paragraph for the prompt. The other decisions (precedence list, personal-paths exclusion, dedup rule) had near-verbatim prompt-shaped text. An implementer skimming for "what literally goes in the file" would see prompt-ready text for 4 of 5 decisions and design-doc-shaped text for Decision 3 — and then ship only what was prompt-ready.
+
+**Lesson for future hand-offs:**
+1. When my design includes content that MUST land in a shipped artifact (prompt, doc, code), present that content **in its final shipped form** in the design doc — not as design-doc bullets that need translation.
+2. Add an explicit "**Shipped text (drop in verbatim):**" subsection per decision when the decision has prompt language.
+3. Reviewers should grep the shipped artifact against each decision's key terms ("symlink", "one-level", "cache") as a preflight check — Worf did this and caught it cleanly. Bake this into the reviewer's standard preflight.
+
+**Validation:** I authored the revision (Data locked out per Reviewer Rejection Lockout). The shipped paragraph is now self-contained and reviewer-greppable. Worf re-review pending.
+
+**Tag:** [ws:skill-discovery-paths]
+
+---
+
+### 2026-06-03T03:55:03Z — Skill-Discovery-Paths: Remediation Complete + PR #1209 Opened [ws:skill-discovery-paths]
+
+**Status:** ✅ PR #1209 OPEN on bradygaster/squad:dev — awaiting upstream review
+
+**Remediation executed:** All 5 conditions applied in single commit pair per anti-hang rule.
+- Upstream `8a62093a`: Traversal rule + Windows reparse-point callout + "Legitimate monorepo" clause. Also: Unicode NFC + denylist, Windows reserved names, dedup logic + tests, personal-path exclusion.
+- Squad-squad `d852083f`: Lockstep `.github/agents/squad.agent.md` update. SHA-256 mirror invariant verified across all 5 upstream mirrors.
+
+**Worf verdict:** ✅ APPROVED — C-0..C-4 all verified satisfied. No new conditions. Tests 261/261 pass.
+
+**Coordinator actions:** Push squad-squad master to EMU (commit d852083f), auth-switch to personal fork, push upstream feat/skill-discovery-paths to tamirdresher/squad, open cross-fork PR #1209 on bradygaster/squad with full context body.
+
+**Governance complete:** All `.squad/` state committed. Workstream transitioned to "PR open — awaiting upstream review."

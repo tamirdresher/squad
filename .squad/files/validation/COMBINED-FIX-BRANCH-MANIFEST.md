@@ -2,18 +2,44 @@
 
 **Branch**: `squad/state-backend-upgrade-fixes`
 **PR**: [bradygaster/squad#1200](https://github.com/bradygaster/squad/pull/1200)
-**Head SHA**: `e839da6f`
+**Head SHA**: `3c019242` (iter-5)
 **Tarballs (TWIN — install BOTH together)**:
-- `C:\Users\tamirdresher\squad-validation\bradygaster-squad-sdk-combined-fixes.tgz` (787 KB)
-- `C:\Users\tamirdresher\squad-validation\bradygaster-squad-cli-combined-fixes.tgz` (570 KB)
+- `C:\Users\tamirdresher\squad-validation\bradygaster-squad-sdk-combined-fixes.tgz` (788 KB)
+- `C:\Users\tamirdresher\squad-validation\bradygaster-squad-cli-combined-fixes.tgz` (574 KB)
 
 **Install pattern**: `npm install -g <sdk-tgz> <cli-tgz>` (both at once — see Gap 3 / #1203)
 
-**Date**: 2026-06-02T21-25-00+03-00
+**Date**: 2026-06-03T07-25-00+03-00
 **Author agent**: Data
-**Iteration**: 4 (end-to-end demonstrably working against Copilot CLI 1.0.58)
-**Version**: `0.9.6-preview.8` (auto-bumped during build from preview.6)
+**Iteration**: 5 (closes the three follow-up gaps surfaced by REVAL-ITER4-multiplayer-sudoku.md)
+**Version**: `0.9.6-preview.11` (auto-bumped from preview.10)
 **Upstream issue filed**: [github/copilot-cli#3642](https://github.com/github/copilot-cli/issues/3642)
+
+## Iteration 5 — follow-up fixes for revalidation gaps
+
+| Fix | What | Where |
+|---|---|---|
+| **USER-FACING-WRAPPER** | NEW `squad run-copilot` subcommand that injects `--additional-mcp-config @<path>` into the canonical user-launched `copilot` invocation (iter-4 only wrapped 10 squad-internal spawn sites). Naming: `squad copilot` is taken by team-roster mgmt | NEW `packages/squad-cli/src/cli/commands/run-copilot.ts` + cli-entry.ts wiring + help text |
+| **INIT-vs-UPGRADE-ASYMMETRY** | Extracted `resolveSquadStateMcpSpec` to shared `mcp-spec.ts` and called it unconditionally from `init.ts` post-`sdkInitSquad`, so vanilla `squad init` gets the same `@insider` fallback as upgrade when the version is unpublished | NEW `packages/squad-cli/src/cli/core/mcp-spec.ts`, modified `init.ts` + `upgrade.ts` (re-export for compat) |
+| **TEMPLATE-DOC-FLATTEN** | ~17 generic `*.md` template entries had flat destinations (e.g. `'charter.md'`), dumping reference docs into `.squad/` root on every upgrade. Routed all to `templates/<name>`. Casting JSONs deliberately kept flat (runtime contract) | `packages/squad-cli/src/cli/core/templates.ts` |
+| **REGRESSION-COVERAGE** | 3 new test files for the iter-5 surfaces | `test/run-copilot-wrapper.test.ts`, `test/mcp-spec-init.test.ts`, `test/template-routing.test.ts` |
+
+### Iteration 5 — Validation
+
+- ✅ `npm run build` clean (workspace SDK + CLI, preview.11)
+- ✅ All 10 targeted test files green: cli-command-wiring, copilot-invocation-mcp-wrap, npm-registry-fallback, mcp-bridge-pinning, ux-gates, cli/upgrade (35 tests), init-scaffolding + the 3 new files (14 new assertions)
+- 📦 Twin tarballs re-packed at `0.9.6-preview.11`, mirrored to `C:\Users\tamirdresher\squad-validation\bradygaster-squad-{sdk,cli}-combined-fixes.tgz`
+- ⚠ Policy Gates will continue to reject preview builds — `skip-version-check` label required on PR #1200
+
+### Iteration 5 — Naming carve-out
+
+`squad copilot` was already taken by the team-roster management command (`packages/squad-cli/src/cli/commands/copilot.ts`). The new wrapper is therefore registered as `squad run-copilot`. Canonical end-user invocation becomes:
+
+```
+squad run-copilot --yolo --agent squad -p "…"
+```
+
+---
 
 ## Iteration 4 — end-to-end working bundle
 

@@ -9,105 +9,11 @@
 
 Worf (Security & Reliability Reviewer) owns security audits, threat modeling, credential handling verification, pre-existing vulnerability discovery, and implementation security gates. Security reviewer for Squad.Agents.AI auth expansion.
 
-## 2026-06-02 — Squad.Agents.AI Auth Expansion Security Review (PASS_WITH_CONDITIONS)
-
-**Review Verdict:** PASS_WITH_CONDITIONS (9 mandatory security conditions SC-1..SC-9)
-
-**Key Findings:**
-- **UseLoggedInUser:** ALLOWED with consent documentation (F-DOC-4 required).
-- **Configure-Delegate Threat Model:** MEDIUM-HIGH risk (delegates receive fully-resolved tokens, can observe/exfiltrate). Mitigated by post-delegate validation + documentation.
-- **Critical Conditions:** SC-1 (ToString() redaction for Provider + Environment tokens), SC-2 (JSON serialization safety), SC-3 (post-delegate logging for routing invariant changes), SC-4..SC-9 (docs + tests).
-
-**🚨 PRE-EXISTING BUG (P0):** `SquadAgentOptions.Environment` NOT redacted by `ToString()` and lacks `[JsonIgnore]`. Any HMAC key or API token placed in Environment leaks via logging. **Must fix in same implementation pass (SC-1).**
-
-**Lockout Status:** NOT locked out. PASS_WITH_CONDITIONS. Data may implement.
-
-**Documentation Required:** 6 security docs (F-DOC-1..F-DOC-6) covering token handling, delegate security, BYOK keys, UseLoggedInUser consent, Environment dict warning, token precedence.
-
 ---
 
-## 2026-06-02 — SC-1..SC-9 Conditions Pending Implementation
-
-**Status:** Flagged for next round
-
-The 9 mandatory security conditions (SC-1..SC-9) from the 2026-06-02 auth-extensibility security review remain pending implementation. Next round: when Data picks up auth expansion work (post-v0.1 release), SC-1..SC-9 must be implemented in the same pass. P0 pre-existing bug (`SquadAgentOptions.Environment` not redacted by `ToString()`) must be fixed alongside SC-1.
+**[Historical entries 2026-06-02 (Auth Review, PR #3 audit, Workstreams review, MCP migration review) archived to .squad/agents/worf/history-archive.md on 2026-06-03T03:55:03Z]**
 
 ---
-
-## Learnings
-
-### PR #3 — Public-leak audit (2026-06-02)
-
-**Finding Counts:**
-- 🔴 SHIPPED IN .NUPKG: 0 (draft stage; no .csproj files in current PR)
-- 🟠 PUBLIC ON GITHUB: 9 findings (4 in PR body, 5 in commits)
-- 🟡 INSIDE PR BUT NOT PACKAGED: 0
-
-**Most Critical Leaks (by file:line):**
-1. **PR #3 body** — "Decisions 441, 443, 444, 447 — full Q1–Q7 design lock" (Design refs section)
-2. **commit 8f2679db** — "Closes Track A of the Q1-Q7 design lock (see tamresearch1 .squad/decisions.md Decisions 441, 443, 444, 447)."
-3. **PR #3 body** — "tamirdresher_microsoft/tamresearch1" (internal repo reference)
-
-**Leaked Metadata:**
-- Internal Decision numbers (441, 443, 444, 447, 452a, 602)
-- Internal terminology ("Q1-Q7 design lock", "Track A", "Q-lock")
-- Internal repo reference ("tamresearch1")
-- `.squad/` path references in commit messages
-
-**Remediation (Priority Order):**
-1. **IMMEDIATE:** Edit PR #3 body via `gh pr edit` to replace Decision references and "Q1-Q7 design lock" with neutral language ("design review identified X and Y constraints").
-2. **RECOMMENDED:** Consider interactive rebase + force-push to scrub commit messages (5 commits) before merge, if acceptable to Tamir.
-3. **BACKLOG:** Add GitHub Actions pre-commit hook to block future PRs with regex matching `.squad|Decision \d+|Q\d-Q\d|Track [AB]|design lock|tamresearch`.
-
-**Visibility:** Every public viewer of PR #3 and the branch history sees these leaks. Not yet shipped in any NuGet (draft stage).
-
-**Full Report:** `.squad/decisions/inbox/worf-pr3-public-leak-audit.md`  
-**Package Verdict:** `.squad/decisions/inbox/worf-pr3-URGENT-nupkg-leak.md` (GREEN — no shipped artifacts)
-
-### Workstreams security review — multi-session credential surface (2026-06-02)
-
-**Verdict:** PASS_WITH_CONDITIONS (9 binding conditions SC-Wn.1..SC-Wn.12, 5 advisory recommendations)  
-**Workstream:** workstreams-design (cross-cutting)
-
-**Top 2 conditions:**
-1. **SC-Wn.9 (HIGH):** Scribe MUST validate inbox file `workstream:` frontmatter matches `SESSION_WORKSTREAM` and MUST construct inbox paths from `WORKSTREAM_PATH` — never glob across workstreams. Without this, a Scribe glob bug silently consumes another workstream's inbox and misattributes decisions.
-2. **SC-Wn.5 (MEDIUM):** Scribe MUST validate staged files before commit — warn and unstage files outside the active workstream subtree. A manual `git add` by the developer can silently cross-contaminate a scoped commit.
-
-**Worst threat caught:** SC-Wn.9 — Scribe cross-workstream inbox mis-routing. If Scribe globs `active/*/decisions/inbox/*.md` instead of using the explicit `WORKSTREAM_PATH`, it silently consumes ALL workstreams' inboxes, deletes the source files, and misattributes every decision to the wrong workstream. This is a silent data-integrity corruption with no recovery path short of git history forensics.
-
-**Full Report:** `.squad/decisions/inbox/worf-workstreams-security-review.md`
-
----
-
-## 2026-06-02T21:10:16.324+03:00 — Skill Discovery Design Review (APPROVED WITH RECOMMENDATIONS)
-
-**Workstream:** [ws:skill-discovery-paths]  
-**Reviewed:** Picard's skill-discovery precedence design (Decisions 1–5)
-
-**Verdict:** APPROVED WITH RECOMMENDATIONS (3 non-blocking recommendations)
-
-**Security Review Findings:**
-- **Symlink-skip rationale:** Sound. Windows compatibility + traversal prevention justified. Hardlink alternative suitable for monorepo scenarios.
-- **Path traversal safety:** Safe by design (readdir on fixed paths). Gap: no Unicode normalization rule specified. **R-1 (MEDIUM):** Implement NFC normalization + whitespace trim + explicit denylist of control/separator chars.
-- **Personal-skill exclusion:** Correct. Prevents duplication with CLI ambient loading; respects team-visible boundary; ensures cross-machine reproducibility.
-- **Dedup correctness:** Well-specified. All edge cases (3+ paths, race conditions, case mismatches) correctly handled.
-- **Implementation surface:** 4 files / 6 edit sites identified correctly. Gap: no test/CI gate for 5-path precedence. **R-3 (MEDIUM):** Add test verifying precedence order, dedup, symlink handling.
-
-**Recommendations (3 total):**
-1. **R-1 (MEDIUM):** Unicode normalization (NFC) + whitespace trim + control-char denylist in directory-name handling.
-2. **R-2 (LOW):** Document hardlinks as monorepo alternative in code comments.
-3. **R-3 (MEDIUM):** Add test/CI gate for 5-path precedence + dedup correctness.
-
-**Design Framing:** Picard applied defense-in-depth (fixed paths, no symlinks, explicit precedence, no cache), avoiding trap of premature optimization. Personal-skill exclusion correctly scopes to team reproducibility boundary.
-
-**Implementation:** Design is ready for Data. Recommendations are not blockers; Data should incorporate R-1 + R-3 in same pass, R-2 as concurrent doc update.
-
-**Full Report:** `.squad/workstreams/active/skill-discovery-paths/decisions/inbox/worf-skill-discovery-review.md`
-
----
-**Last Updated:** 2026-06-02T21:10:16.324+03:00  
-**Archive:** `.squad/agents/worf/history-archive.md` (detailed security review)
-
 ## Learnings — MCP merge helper review (2026-06-02T23:18:09+03:00)
 
 **Subject:** `feat/mcp-json-migration` branch, Phase 2 (`migrate-mcp-config.ts` + dual-write in `init.ts`).
@@ -152,3 +58,59 @@ The 9 mandatory security conditions (SC-1..SC-9) from the 2026-06-02 auth-extens
 **Worf Sequencing Lesson:** Merge helper review executed correctly — all Picard gates (atomicity / conflict resolution / crash recovery) verified with cited evidence. Two conditions handed to Geordi (platform/systems) per reviewer/author separation. Conditions applied without modification to core helper logic. Phase 1 (commit 892b2da2) and Phase 2 (4 commits) shipped clean.
 
 **Awaiting:** Upstream maintainer merge on bradygaster/squad (PR #1208)
+
+## Learnings — 2026-06-03 [ws:skill-discovery-paths]
+
+**Reviewing governance-only (prompt-based) safety rules vs runtime-enforced rules:**
+- When a "rule" lives only in an LLM prompt and has no runtime gate, treat the prompt as a *specification for a future enforcer*, not as enforcement itself. Reject if the spec is too vague for a careful implementer to ship a correct gate from it.
+- Always grep the SHIPPED artifact, not the design doc, for the safety rule. Designs frequently contain rationale that never makes it into the deployed prompt — and the gap is invisible without a literal grep. In this review, Picard's Decision 3 (symlinks/one-level/no-cache) was in `decisions.md` but ZERO lines of it survived into `squad.agent.md`. The byte-identical mirror SHA-256 check tells you mirrors are in sync; it does NOT tell you the right content is in them.
+- The mirror-invariant test (SHA-256 across `.squad-templates/` + 4 mirrors) is a strong reliability control — recommend it as a pattern for any repo with intentional content duplication.
+
+**Reusable security checklist for skill-directory scanners (governance OR runtime):**
+1. Path-component denylist: NUL bytes, C0 controls (`\x00-\x1F`), DEL (`\x7F`), POSIX `/`, Windows `\`, parent-dir `..`.
+2. Homoglyph hardening: also reject fullwidth solidus `U+FF0F`, fraction slash `U+2044`, and other Unicode characters that NFC will NOT collapse to ASCII separators. NFKC would catch them but causes false-positive dedups — prefer explicit denylist over normalization-form swap.
+3. Reparse-point handling: "no symlinks" is insufficient on Windows. Must also reject NTFS junctions (`mklink /J`) and other reparse points. Use `FILE_ATTRIBUTE_REPARSE_POINT` check, not just `IsSymbolicLink`.
+4. Traversal depth: explicitly state max depth (one level for skill dirs). LLMs without an explicit depth limit may go arbitrarily deep.
+5. Whitespace trim: leading AND trailing, plus zero-width chars (ZWSP `U+200B`, ZWNJ `U+200C`, ZWJ `U+200D`, BOM `U+FEFF`).
+6. Case normalization: pick consistent cross-platform behavior; document it; warn on case-mismatch dedup so the user can observe it.
+7. Windows reserved names: `CON`, `PRN`, `AUX`, `NUL`, `COM1-9`, `LPT1-9` — reject for cross-platform portability even on Linux.
+8. Personal-vs-project scope: if claiming "X already injects personal context for free," scope the claim to the specific runtime surface (CLI vs IDE plugin vs web).
+
+**Reviewer Rejection Lockout discipline:** When the original implementer (Data) shipped per Picard's design but the design itself had a documented-but-unshipped rule, the right remediation owner is the *design author* (Picard), not the implementer. Don't punish the implementer for faithfully porting an incomplete spec.
+
+
+## Learnings — 2026-06-03 re-review of skill-discovery-paths (C-0..C-4)
+
+**Round-trip:** 1 reject → 1 fix-bundle → 1 approve. Clean. Picard bundled all 5 conditions in a single commit pair per anti-hang rule, which is the pattern future reviewers should expect (and reject if violated — incremental drip-fixes burn re-review budget).
+
+**Did Picard's fix close the C-0 gap cleanly?** Yes — and slightly better than asked. The original BLOCKING gap was that Decision 3 from decisions.md:236-250 was missing from the shipped prompt. Picard ported it verbatim AND added two unrequested-but-welcome reinforcements: (1) explicit `FILE_ATTRIBUTE_REPARSE_POINT` callout in the rationale (I asked for "reparse points" — Picard named the Win32 attribute), (2) "Legitimate monorepo case" clause documenting the silent-skip failure mode with the hardlink workaround. Lesson: when the original designer owns the remediation (vs. a different agent), the prompt language tends to be tighter because they already internalized the constraint set during design.
+
+**Lessons for future C-0 fixes:**
+
+1. **Always require lockstep across BOTH source-of-truth AND governance mirror in a single response.** Picard did both (8a62093a upstream + d852083f squad-squad). If only one repo gets the fix, the next sync ceremony will silently revert it. Make this explicit in the original condition wording — I did, and Picard executed correctly.
+2. **SHA-256 preflight is non-negotiable.** I verified all 5 upstream mirrors hash identically (C5C8E633…) before declaring approve. Without this, a partial sync could leave one template stale and the failure would only surface when a downstream consumer regenerates from the wrong source.
+3. **squad-squad governance hash WILL differ from upstream** (different surrounding content) — verify the *block content* matches verbatim instead of the full-file hash. Grep for a distinctive phrase ("Traversal rule:") in the lockstep commit diff. I did this and it landed correctly.
+4. **Strict-superset acceptance is fine.** Picard delivered stronger language than C-1 (added Windows reserved names enumeration) and C-3 (explicit FS enumeration). Don't down-grade an approve just because the fix exceeds the contract — only reject when the fix is *weaker* or *narrower* than asked.
+5. **Tests as a sanity check, not a security check.** 261/261 passed — but tests cover sync invariants and structural correctness, not prompt semantics. The real verification is reading the prompt text and confirming each required element (a/b/c/d for C-0) is literally present. Don't let a green test suite substitute for prose review.
+6. **Time-box held:** review completed well under the 20-min budget. The fix was clean enough that 80% of the time was spent verifying mirror invariants and tests, 20% reading the new prose. When fixes are sloppy, ratio flips — and that itself is a signal worth surfacing in the verdict.
+
+**One thing I'd do differently:** my original C-0 wording said "skip symlinks and other reparse points". Picard interpreted this correctly, but a less careful author might have shipped just "skip symlinks" (POSIX-only) and missed the NTFS junction case. Next time, name the Win32 attribute (`FILE_ATTRIBUTE_REPARSE_POINT`) directly in the condition itself rather than only in the rationale. Reduces interpretation surface.
+
+---
+
+### 2026-06-03T03:55:03Z — Skill-Discovery-Paths: Gate 2 RE-REVIEW — APPROVED (C-0..C-4 VERIFIED) [ws:skill-discovery-paths]
+
+**Status:** ✅ READY-FOR-MERGE — No new conditions. PR push authorized.
+
+**Task:** Re-review Picard's remediation for C-0 BLOCKING + C-1..C-4 conditions (symlink-skip + Decision 3 traversal rule + Unicode hardening + dedup + tests).
+
+**Executed:** Commit `8a62093a` (upstream) + `d852083f` (squad-squad lockstep). All 261 tests pass. SHA-256 mirror invariant verified across all 5 upstream mirrors.
+
+**Verdict:** ✅ **APPROVED — NO NEW CONDITIONS.** All 5 conditions verified satisfied:
+- **C-0 BLOCKING:** Traversal rule paragraph present, all 4 elements shipped (one-level depth, skip symlinks + reparse points, no cache, rationale with legitimate-monorepo clause). Bonus: FILE_ATTRIBUTE_REPARSE_POINT named explicitly.
+- **C-1..C-4:** Recommended conditions adopted verbatim or strict supersets. Unicode normalization, dedup, Windows reserved names, personal-path exclusion all present.
+
+**Round-trip pattern:** 1 reject → 1 bundled fix (all 5 conditions in one commit pair per anti-hang rule) → 1 approve. Clean handoff from Data → Picard → Worf re-review. Picard's execution was precise; language is tighter when design author owns remediation.
+
+**Lesson:** Mirror SHA-256 invariant verification is non-negotiable before declare-approve. Block content must match verbatim across lockstep repos (grep for distinctive phrase). Tests = sanity check, not security check — always prose-review the actual shipped prompt text to confirm each required element is literally present.
+
