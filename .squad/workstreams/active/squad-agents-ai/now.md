@@ -1,36 +1,50 @@
 ---
-updated_at: 2026-06-02T20:58:00+03:00
-focus: "Tracking issue #1205 posted on bradygaster/squad; PR #3 paused"
-blocked_on: "Brady's signal on squad-agents-ai placement (go:yes, go:no, or needs-research)"
-next_action: "Monitor bradygaster/squad#1205 for Brady's triage decision; open cross-fork PR if go:yes"
+updated_at: 2026-06-02T22:42:00Z
+focus: "PR #1207 rebased + 12-comment reviewer sweep completed; MERGEABLE/CLEAN awaiting brady review"
+blocked_on: "Brady's final review on PR #1207 (bradygaster/squad)"
+next_action: "Monitor bradygaster/squad#1207 for Brady's merge decision; post-merge: publish prerelease NuGet to dev, prep v0.2 scope"
 active_agents: []
 ---
 
 ## Current State
 
-Tracking issue #1205 is **LIVE** on bradygaster/squad. PR #3 is **PAUSED** pending Brady's signal.
+PR #1207 is **LIVE** on bradygaster/squad and fully addressed. All technical + review feedback resolved. Status: **MERGEABLE/CLEAN**, awaiting Brady's final review.
 
-**R2c Milestones (2026-06-02):**
-- **Data (data-5):** Sample co-location restructured from `samples/squad-agents-ai-sample/` to `src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/`. README consolidated; sample contains stub pointer to main docs at `src/Squad.Agents.AI/README.md`. All CI green (Squad.Agents.AI CI ubuntu+windows, Squad CI). Tests: 43/43 pass. Commit: `e214c4fb`.
-- **B'Elanna (belanna-4 + belanna-5):** Researched bradygaster/squad PR conventions + external contributor patterns (paulyuk PR #1181, weinong PR #1166). Drafted upstream-voice body per Brady's template (What/Why/How/Quick Check/Readiness Checklist). Finalized PR body (4089 bytes) + title (removed [DRAFT] prefix). Title: `feat: Squad.Agents.AI - Microsoft Agent Framework adapter for the Squad CLI`. Leak check: PASS (zero internal references). PR ready for upstream review.
+**Rebase + Reviewer Sweep (Data-7 + Data-8, 2026-06-02T22:25-22:30Z):**
 
-**PR #3 State:**
+**Rebase (Data-7, 2026-06-02T22:25Z):**
 - Branch: `feature/squad-agents-ai`
-- Base: `dev` (tamirdresher/squad fork)
-- Commits: Anchor `e214c4fb` (data-5); R2c body/title finalized via `gh pr edit`
-- CI: All green across .NET 8+9 / ubuntu+windows
-- Status: **Upstream-ready** — pending Tamir's decision on next step (review push to bradygaster/squad or local iteration)
+- Rebased onto `upstream/dev` to clear merge-conflict state on PR #1207
+- Conflicts resolved: 2 files (`.gitignore` — kept both upstream `.squad/.scratch/` + our .NET output block; `CHANGELOG.md` — kept both `[Unreleased]` + our `[0.1.0-preview]` in correct order)
+- Build verification: ✅ dotnet restore, build, test 43/43 passing
+- New HEAD: `87645bfd`
+- Push method: `git push --force-with-lease`
 
-## Next Steps (Awaiting Tamir)
+**Reviewer Sweep (Data-8, 2026-06-02T22:30Z):**
+- Applied all 12 Copilot review comments in single forward commit: `de057079`
+- Fixes: A) CliArgs reference → value clone via `?.ToArray()` + `SequenceEqual` guard; B) 4x `ArgumentException.ThrowIfNullOrWhiteSpace(name)` validation; C) placeholder `ghp_` → `YOUR_GITHUB_PAT_HERE`; D/E) hardcoded PR #3 refs removed from README/CHANGELOG; F) fork URLs tamirdresher → bradygaster/squad; G) NuGet metadata updated; H) multi-target net8.0;net9.0;net10.0
+- Build verification: ✅ dotnet restore, build (all 3 TFMs), test (129 total: 43×3)
+- Final HEAD: `de057079`
 
-- **Review decision:** bradygaster/squad upstream push, or continue locally?
-- **If upstream push:** merge to dev, tag v0.1, publish NuGet.org
-- **If local iteration:** v0.2 scope (BYOK at SessionConfig seam, expanded Aspire telemetry, etc.)
+**PR #1207 Final State:**
+- Branch: `feature/squad-agents-ai`
+- Base: `bradygaster/squad:dev`
+- Status: **MERGEABLE/CLEAN**
+- Commits in sequence: rebase (87645bfd) → reviewer sweep (de057079)
+- Tests: 129/129 passing (net8.0, net9.0, net10.0)
+- CI: All green across both phases
 
-## Recently Completed (R2c, 2026-06-02)
+## Next Steps (Awaiting Brady)
 
-- Sample co-location restructured (`data-5`, commit `e214c4fb`)
-- README consolidated; sample sanity-check passed
-- PR body drafted + finalized per Brady's upstream conventions (`belanna-4`)
-- PR title + body pushed via `gh pr edit`; [DRAFT] removed (`belanna-5`)
-- All CI green; PR **upstream-ready**; awaiting Tamir's next-step decision
+- **Brady's review:** Expecting final review on PR #1207 (bradygaster/squad)
+- **Post-merge plan:** Publish prerelease NuGet to NuGet.org via branch-driven CI (dev → prerelease per release strategy)
+- **Pending decision:** `<Authors>Tamir Dresher</Authors>` in `Squad.Agents.AI.csproj` — leave as-is or update to canonical repo owner? (policy decision, not blocker)
+- **v0.2 scope:** BYOK at SessionConfig seam, expanded Aspire telemetry, multi-agent orchestration patterns
+
+## Recently Completed (R2d, 2026-06-02T22:25-22:42Z)
+
+- PR #1207 rebased onto upstream/dev; 2 conflicts resolved (Data-7)
+- All 12 Copilot review comments addressed in forward commit (Data-8)
+- Multi-target test suite expanded to net8.0/net9.0/net10.0 (129/129 passing)
+- PR #1207 transitioned to MERGEABLE/CLEAN status
+- Decision inbox files merged; orchestration/session logs written; history summarized

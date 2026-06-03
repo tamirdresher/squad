@@ -1,548 +1,415 @@
-# Data Agent Learning Log — Recent Sessions
+# Project Context
 
-**Last Summarized:** 2026-06-02T08:46:00Z  
-**Archive Reference:** See history-archive.md for prior learning sessions and research context.
+- **Owner:** Tamir Dresher
+- **Project:** squad-squad
+- **Stack:** Squad.Agents.AI research & architecture, SDK auth modes, extension-point design, MAF samples
+- **Created:** 2026-06-02T09:00:00Z
 
-## 2026-06-02T08:46:00Z — Scribe Archival Session
+## Data — Core Mission
 
-**Summary (18KB → Archive):**
-Data owns Squad framework expertise. Key learnings:
-- **P0 permission bug:** `'approved'` → `'approve-once'` fix cherry-picked to PR #1192 with regression test (commit e1faf5d9); all CI green; PR #1193 closed
-- **State-backend triage:** Parallel community signal confirmed P0 blocker; 5 dominant problem themes mapped across GitHub issues (#1190, #1185, #1163, etc.)
-- **Memory governance work:** Expanded-memory A/B harness validated; substitute evidence at ceiling per Worf gate; multi-repo real CLI E2E deferred (Copilot CLI limitation: no per-repo session store partitioning)
-- **Gotcha documented:** vitest in junction-linked worktrees resolves SDK dist stale (fails local, passes CI fresh)
-- **Skill created:** `extract-test-from-competing-pr` (PR deduplication pattern)
+Data owns Squad Framework expertise, SDK/CLI research, auth-mode inventory, extension-point design evaluation, and proposal-first research workflow. Lead researcher for Squad.Agents.AI auth expansion.
 
-### [2026-06-02 Session] Cross-Reference: Squad.Agents.AI Onboarding Fan-Out
-
-**Session Log:** `.squad/log/2026-06-02T09-04-38Z-squad-agents-ai-onboarding.md`  
-**Decision Entry:** `.squad/decisions.md` section "2026-06-02 — Squad.Agents.AI NuGet Onboarding: 5-Agent Fan-Out"  
-**Coordinating Agents:** Data (this agent, technical baseline), Worf (security), Picard (strategy), Seven (provenance), B'Elanna (build/CI).
-
-This session synthesized five coordinated reports into a single onboarding decision batch. Data's technical baseline (4 public types, SDK pins, package identity) paired with B'Elanna's build/CI findings and Worf's security gate clearance. Key open: confirm Squad routing functionally without explicit agent config; decide GitHub.Copilot.SDK direct-pin strategy.
-
-## Recent Sessions (Last 30 days)
-- Wrote readiness/blocker note to `.squad/decisions/inbox/data-real-repo-validation-readiness.md`; Worf must reopen Tier 2 real-repo substitute validation before execution.
-- Prepared scope uses isolated copies of `squad-memory-governance` first and optionally `squad`, removes `.github\workflows`, keeps A/B prompts identical, retains all guards, and marks `realCopilotCliE2E: false`.
-- Prepared Worf-gated runnable artifacts under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\real-repo-validation-20260519T115829\`.
-- Did not run a real-repo substitute batch because Worf's current final decision says substitute evidence ceiling was reached and further substitute expansion is not approved.
-- Read the new user directive, Picard confidence framework, Worf's final multi-repo gate, and prior expanded-memory artifacts.
-
-## 2026-05-19T11:58:29.988+03:00 — Real-repo substitute validation readiness
-
-- Wrote Worf next-gate input to `.squad/decisions/inbox/data-multirepo-scaleout-results.md`.
-- Guards retained: redaction=True, forbidden rejection=True, workflow disabled/removed=True, timeouts=0, silence hangs=0, hang escalations=0, token proxy total=106665.
-- Results: pass=True; A recall=0, B recall=27; task success A=150/150, B=150/150; forbidden rejection turns=6; supersession turns=6; forward-link recall=3; failures=0.
-- Scope/constraints passed: 3 isolated fixtures/repos, 2 variants each, exactly 150 paired turns / 300 rows, byte-identical prompts within pair, `realCopilotCliE2E: false`, no statistical/production/ship/release claims.
-- Ran Worf-conditionally-approved multi-repo substitute direct-layer A/B scale-out under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\multirepo-scaleout-20260519T101227\`.
-
-## 2026-05-19T10:12:27.018+03:00 — Multi-repo substitute-harness scale-out
-
-- Wrote Worf next-gate input to `.squad/decisions/inbox/data-50turn-scaleout-results.md`.
-- Guards retained: redaction=True, forbidden rejection=True, workflow disabled=True, timeouts=0, silence hangs=0, hang escalations=0, token proxy total=26419.
-- Results: pass=True; A recall=0, B recall=9; task success A=50/50, B=50/50; forbidden rejection turns=2; supersession turns=2; failures=0.
-- Scope/constraints passed: 1 fixture repo, 2 variants, exactly 50 paired turns / 100 rows, byte-identical prompts, `realCopilotCliE2E: false`, no statistical/production/ship/release claims.
-- Ran Worf-approved single-repo substitute direct-layer A/B scale-out under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\scaleout-50turn-20260519T101227\`.
-
-## 2026-05-19T10:12:27.018+03:00 — 50-turn substitute-harness scale-out
-
-- Boundary preserved: substitute memory-layer evidence only; no Copilot CLI E2E claim; 50-turn scale-out still requires Worf re-gate.
-- Results: 20 rows / 10 paired turns, byte-identical prompts, overall pass true, A recall 0, B recall 3, forbidden/transient rejection passed, no timeout, no silence hang, no escalation, token proxy total 4605.
-- Added harness support for R-1 silence detector, R-2 three-hang escalation, and R-3 per-turn token/cost proxy accounting; R-4 load-guidance tags and R-5 superseded forward-link behavior were exercised in the prompts/results.
-- Implemented and ran the permitted autonomous 10-turn substitute direct-layer A/B pilot under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\pilot-10turn-20260519T101227\`.
-
-## 2026-05-19T10:12:27.018+03:00 — 10-turn substitute-harness pilot
-
-- Ran substitute direct-layer simulation only (not Copilot CLI E2E) under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\autonomous-sim-20260519T090004\`; Worf must re-gate before 10-turn pilot or 50-turn scale-out.
-- Validated with `npm run lint`, targeted Vitest memory/tool tests (59/59), SDK build, CLI build.
-- Added CLI `--load-guidance`, docs, tests, and updated expanded-memory A/B scaffold seed/prompts to carry load-guidance tags.
-- Fixed promotion supersession metadata so the archived prior entry links forward with `supersededBy` and the active successor records `supersedes`; tombstones preserve previous status and forward-link metadata.
-- Implemented load-guidance semantics in `squad-memory-governance`: `[ALWAYS]` for policy/decision, `[ON-DEMAND]` for retrievable local/semantic entries, `[ARCHIVE]` for superseded/deleted/tombstoned entries, and `[NEVER]` for forbidden/transient rejected memory.
-## 2026-05-19T09:00:04.581+03:00 — Memory load guidance tags and supersession simulation
-
-- Worf gate readout: HB-1, HB-2, HB-3, HB-4, HB-5, and HB-7 look evidenced for dry-run review; HB-6 and HB-8 need cost accounting and explicit silence telemetry before any 10-turn pilot.
-- Substitute A/B result: A returned `NOT_IN_CONTEXT` for seeded recall, B recalled the prior n=20 honesty boundary plus the blog two-layer concept, and forbidden/transient memory was rejected without repeating the synthetic secret.
-- Real Copilot CLI smoke passed for the no-memory orientation turn, but the full paired 3-turn conclusion uses the clearly labeled substitute direct-layer harness; do not treat this as full Copilot UI proof.
-- Included blog-post memory concepts in the prompts and B seed: Tamir's two-layer architecture, with git notes for commit-scoped why and an orphan branch for permanent decisions/history.
-- Used a tiny fixture copied under the session artifact folder; fixture commit `8961ee9d45a3bbf2929808889e46057283936dcc`, tree `fa25d87e390e3ea48712f6a086ca2ac58f6cc051`; removed `.github/workflows` from both variants.
-- Ran only the permitted 3-turn dry-run stage under `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\dry-run-3turn-20260519T075511\`; did not run the 10-turn pilot or 50-turn scale-out.
-
-## 2026-05-19T07:55:11.928+03:00 — Expanded memory A/B 3-turn dry run
-
-- Feasibility verdict: 50-turn paired sessions are plausible but not yet proven reliable; require 3-turn dry run and 10-turn pilot before scaling. If reliability fails, use the direct Squad CLI/SDK replay path and label it memory-layer evidence only, not Copilot UI proof.
-- Important client-compatibility boundary: PowerShell wrapper rejected `-C` and `--name`; harness must set cwd externally and resume by parsed session id. Share files are per-turn, not full resumed transcripts.
-- Copilot CLI smoke evidence improved from prior inconclusive sentinel: from cwd, `copilot --agent squad -p ... --share ...` returned the exact sentinel, and `--resume=<session-id>` worked for turn 2.
-- Designed a gated larger A/B harness in session artifacts only: `C:\Users\tamirdresher\.copilot\session-state\e9c1993c-7118-476c-acb1-9616a7fecbe1\files\expanded-memory-ab\`.
-
-## 2026-05-19T07:11:25.375+03:00 — Expanded Copilot+Squad memory A/B harness design
-
-- Raw artifacts: `C:\Users\tamirdresher\.copilot\session-state\memory-ab-20260519T063342\`.
-- Controlled results: slim-context recall had no lift because decisions were in prompt; large-context/compacted recall improved from 0.000 to 1.000 with 120 distractors, and governed policy rejected forbidden/transient writes with audit evidence.
-- Full Copilot CLI + `--agent squad` was smoke-tested non-interactively but returned only `● S`, so the measurable study is a clearly marked direct-layer substitute, not full UI E2E proof.
-- Built and ran a 20-pair A/B harness against `C:\Users\tamirdresher\source\repos\squad-memory-governance` using real `squad init` plus the actual `LocalMemoryStore`; full repo `npm test` was intentionally avoided.
-
-## 2026-05-19T06:33:42.877+03:00 — Local governed memory value A/B experiment
+## Current Status (2026-06-02T19:39:52Z)
 
 
-**Local Memory E2E Validation (18-May):** Real local-memory A/B against squad-memory-governance fixtures; 20-pair controlled study; slim-context no lift (decisions in prompt), large-context recall 0.000→1.000 (120 distractors); governed policy rejects forbidden writes with audit evidence. Full Copilot CLI + --agent squad smoke-tested non-interactively (inconclusive sentinel). Artifacts: `C:\Users\tamirdresher\.copilot\session-state\memory-ab-20260519T063342\`.
+## Archived Sessions (pre-2026-06-02T22:51Z)
 
-**Governed Memory Boundary (18-May):** Copilot Memory API undocumented; provider=copilot fails closed until real contract exists; hostInjectedCopilotAdapter opt-in only; unsafe content/queries classified BEFORE external calls; audit/telemetry redacted; all eight Worf gates satisfied; tests pass.
+### 6-Repo Tarball Validation Batch — COMPLETE
 
-**ADC Integration:** ADC event bus (Redis streams) is production-ready; Squad needs fireEventTrigger() SDK + CLI command; separate platform-specific adapter layer; periodic ephemeral sandbox approved as MVP over webhook/long-lived models; Worf guardrails G1–G5 required.
+**Result:** 🟢 GO on build-time fixes. Iteration 4 pending decision.
 
-**Brady Squad Framework:** TypeScript ESM monorepo with SDK/CLI; Node >=22.5.0; agent spawning loads charters via FSStorageProvider; coordinator is dispatcher, not doer; `.squad/decisions/inbox/` governance; append-only merge rules; resolution worktree-aware + legacy-aware.
+**Agents completed:**
+- data-15: MCP loader RCA (Theory 2 confirmed—unpublished version)
+- data-14: tamir-squad-hq (8✅/1❌)
+- data-12: gh-ai-adoption2026 (8✅/2❌)
+- data-11: holocaust-research-wasserman (8✅/4❌, first Gap-1 end-to-end proof)
+- data-13: squad-ai-vulns (8✅/1❌)
 
-## Prior Work Summary (2026-05-14–2026-05-18)
+**Build-time verdicts:** 8 fixes confirmed (GAP-1, GAP-2, WI-1, UPGRADE-FLAG-IGNORED, UPGRADE-NO-MIGRATION, UPGRADE-EPERM-FALSE-SUCCESS, INSIDER3-INIT-LEAK, MCP-config retrofit).
 
-6. **Draft status + UNSTABLE is a double disqualifier.** A draft PR signals the author knows it is not ready. UNSTABLE merge state reinforces it. Both flags together mean "do not merge without human escalation."
-5. **Cherry-pick the valuable piece from the loser.** When the losing PR has one genuinely good contribution (e.g., a regression test), extract and land it rather than losing it entirely.
-4. **Backward compat trumps correctness theater.** Adding `'approve-once'` alongside `'approved'` is correct for a P0 fix. Removing `'approved'` and the `denied-*` kinds is a separate semver-major concern that needs its own review cycle.
-3. **CI green is a hard gate.** A PR with zero CI runs (regardless of how correct the code looks) cannot be trusted for P0 merge. Always check `mergeStateStatus` and `statusCheckRollup` before recommending.
-2. **Core-maintainer authorship matters.** A PR from a repo owner carries implicit merge authority and reviewability; an autonomous bot draft does not.
-1. **Minimal wins over comprehensive at P0.** When a bug is blocking a release, the smallest correct fix that passes CI beats a larger "while we're here" refactor. Scope creep risks introducing new breakage on the critical path.
-**General patterns for resolving duplicate fix PRs:**
+**Iteration 4 queued:**
+- Option A: MCP pin validation + fallback to @insider tag (~40 LOC)
+- Decouple EPERM from --state-backend migration
 
-**Winner:** PR #1192. The only gap was the absence of a regression test; #1193 did write a useful one that can be cherry-picked.
+**Artifacts:** 5 TARBALL-FULL-*.md in .squad/files/validation/, orchestration logs, session log, RCA report at MCP-LOADER-ROOT-CAUSE.md, 8 test repos retained.
 
-**What was found:** Two competing PRs existed for the same one-line P0 fix (`'approved'` → `'approve-once'`). PR #1192 (bradygaster, core maintainer) was minimal (+9/−2), backward-compatible, CI-green, in CLEAN mergeable state, and had active reviewer engagement. PR #1193 (autonomous Copilot bot) was a draft, had zero CI runs (UNSTABLE), and expanded scope to a full type-system rewrite — replacing the `SquadPermissionRequestResult` interface with a discriminated union while dropping three `denied-*` kind values and the `rules?` property, which constitutes a breaking API change beyond P0 scope.
+### Next Steps
 
-### 2026-06-02T11:29:11.224+03:00 — Duplicate-PR triage: permission contract P0 (#1192 vs #1193)
+1. Review iteration-4 decision on Option A implementation
+2. If approved: re-smoke after MCP pin fix, re-test all 6 repos
+3. Promote tarball bundle to production (build-time gates all passed)
+4. File separate issue for runtime MCP bridge reachability (copilot-client layer)
 
-- Squad framework work should preserve strict routing discipline: the coordinator routes; specialists build and review.
-- The `squad` repo's team uses Mission Control roles such as Flight, CAPCOM, CONTROL, FIDO, and others. This project uses Star Trek names, but Data owns equivalent Squad SDK/CLI expertise here.
+## Session Archives
+
+**Completed sessions moved to:** .squad/agents/data/history-archive.md
+- Auth Expansion Proposal
+- Upgrade-Path Baseline Analysis
+- Combined Fix Bundles (Iter 1–3)
+- Tarball Smoke Tests (travel-assistant, multiplayer-sudoku)
+- PR #3 R2c completion
+- Workstreams Bootstrap
+
+## 2026-06-02T19:39:52+03:00 — Synthesis pattern: 6-repo final validation report
+
+Synthesized 6 per-repo tarball reports + MCP RCA + iter-3 manifest + insider.3 baseline into a single evidence-driven GO/NO-GO document.
+
+Pattern learned for future multi-repo bundle validations:
+1. **Bug-by-bug cross-repo matrix** with one row per bug, one column per test repo. Forces ✅/❌/⚠️/n.a. discipline and makes "how universal is this fix" visible at a glance. Skip percentages — exact symbols only.
+2. **Story-of-the-residual-bug** section before the bug list. Names the RCA author, names the independent corroborators (Data-15 RCA, Data-12 + Data-11 repros), and states the end-user impact in one bolded sentence so the reader doesn't have to infer severity from the matrix.
+3. **Iteration N+1 list with concrete LOC + file path + test plan** for each remaining item. ~40 LOC at upgrade.ts:705 + ~20 LOC at cli-entry.ts + ~10 LOC filename sanitizer. Makes follow-up scope auditable.
+4. **Three-track GO/NO-GO** (MERGE-NOW / MERGE-AFTER-ITER-N / HOLD) with the exact conditions for each, then pick one explicitly. Don't hedge.
+5. **Coverage matrix with browsable URLs as a single row per repo** — owner class + pre-squadified state + fresh/upgrade verdict + dup URLs. Tamir clicks once to reproduce anything.
+
+Final report: .squad/files/validation/6REPO-TARBALL-VALIDATION-FINAL.md (~16 KB). Recommendation: 🟡 MERGE-AFTER-ITER-4.
 
 ## Learnings
 
-2026-06-02: Use `copilot --yolo --autopilot --agent squad -p '<prompt>'` for unattended copilot CLI invocations (per user directive).
+### Cleanup: removed pr-body.md (2026-06-02)
 
-### Squad.Agents.AI NuGet — Technical Onboarding (2026-06-02)
-
-Captured timestamp: 2026-06-02T12:04:38.931+03:00.
-
-#### Source base read
-
-- Authoritative PR: `tamirdresher/squad#3`, title `[DRAFT - needs local test] feat: Squad.Agents.AI community NuGet`, state `OPEN`, draft `true`, head branch `feature/squad-agents-ai`, base `main`.
-- PR #3 commits inspected: `8f2679db87c451b0774752e71d2bcc6eee14993a` (initial package), `ad05d3d4342a57b5ae708db38cc2272d33d9c4bd` (PR body), `f5b6c5f0a3dbd1f5e9d7e098360b9f57e5d8ced7` (inherit `AIAgent`, remove `IChatClient` force-cast), `257fc684c96844d55fe786bc1ec01384d0519462` (README rewrite), `d6e59b3392790c548df21429273a4d31c1b0cf6e` (`GitHubTokenProvider` + redacted `ToString()`), `c97fee6bafbb827716a273cf99419f1f541d8487` (README token-provider docs), `2c357c057cae8e66db29640992940e86aa76d1b5` (`ConnectionStrings__squad`/`IConfigureOptions` binding), `db7940a78ee34766794c6cf9fd27cd4d08be73e4` (README removes deleted `WithTeamRoot`).
-- PR #3 file paths: `.gitignore`; `pr-body.md`; `src/Squad.Agents.AI/README.md`; `src/Squad.Agents.AI/Squad.Agents.AI.csproj`; `src/Squad.Agents.AI/SquadAgent.cs`; `src/Squad.Agents.AI/SquadAgentOptions.cs`; `src/Squad.Agents.AI/SquadAgentOptionsConfigurator.cs`; `src/Squad.Agents.AI/SquadConnectionFactory.cs`; `src/Squad.Agents.AI/SquadServiceCollectionExtensions.cs`; `test/Squad.Agents.AI.Tests/Squad.Agents.AI.Tests.csproj`; `test/Squad.Agents.AI.Tests/SquadConnectionFactoryTests.cs`; `test/Squad.Agents.AI.Tests/SquadServiceCollectionExtensionsTests.cs`.
-- PR #3 diff size: 12 files changed, 1025 insertions. `.gitignore` adds root `bin/`, `obj/`, and `artifacts/` ignores. All `src/Squad.Agents.AI/` and `test/Squad.Agents.AI.Tests/` files are new.
-- Local Squad repo: `C:\Users\tamirdresher\source\repos\squad` is currently checked out on `squad/781-watch-verbose-reliability`, not PR #3. The PR branch exists locally as `remotes/fork/feature/squad-agents-ai`; the current worktree does not contain `Squad.Agents.AI` at repo root. Inspect PR files via the remote branch instead of checking out because the local repo has unrelated modified/untracked files.
-- Sample scaffold source: `C:\Users\tamirdresher\tamresearch1\.squad\research\maf-contribution-drafts\03-sample-pr-scaffold\dotnet\samples\02-agents\SquadAgent\` (`SquadAgent.cs`, `SquadAgentOptions.cs`, `Program.cs`, `README.md`, `SquadAgent.csproj`).
-- Working demo comparison: `C:\Users\tamirdresher\source\repos\squad-agent-framework-demo\Squad.AgentFramework.Demo.csproj` and `C:\Users\tamirdresher\source\repos\squad-agent-framework-demo\SquadAgent.cs`.
-- Tamresearch1 source decisions/history read: `C:\Users\tamirdresher\tamresearch1\.squad\decisions.md`, `C:\Users\tamirdresher\tamresearch1\.squad\agents\data\history.md`, and `history-archive.md`.
-
-#### A. Public API surface
-
-| Public type | PR #3 path | Purpose | Key members | Mutability / contract note |
-|---|---|---|---|---|
-| `Squad.Agents.AI.SquadAgent` | `src/Squad.Agents.AI/SquadAgent.cs` | Squad-flavored `Microsoft.Agents.AI.AIAgent` wrapper over a GitHub Copilot `CopilotClient`/inner `AIAgent`. It centralizes Squad-ish options, DI construction, logging, and disposal. | Constructors: `SquadAgent(SquadAgentOptions options, ILoggerFactory? loggerFactory = null)`, `SquadAgent(IOptions<SquadAgentOptions> options, ILoggerFactory? loggerFactory = null)`. Public overrides: `Name`, `Description`. Inherited public agent entry points come from `AIAgent`; protected core overrides delegate to `_inner`: `CreateSessionCoreAsync`, `RunCoreAsync`, `RunCoreStreamingAsync`, `SerializeSessionCoreAsync`, `DeserializeSessionCoreAsync`. Public lifecycle: `ValueTask DisposeAsync()`. | No public settable properties on the agent. Sealed class. Owns a `CopilotClient` when constructed from options. Delegates session and run behavior to `_inner = _copilotClient.AsAIAgent(instructions: options.Instructions, name: options.AgentName ?? "Squad")`. |
-| `Squad.Agents.AI.SquadAgentOptions` | `src/Squad.Agents.AI/SquadAgentOptions.cs` | Options bag for `SquadAgent`, bindable from DI/app configuration and Aspire connection strings. | `SquadFolderPath`, `CliPath`, `CliArgs`, `Cwd`, `Environment`, `GitHubToken`, `GitHubTokenProvider`, `TraceEvents`, `AgentName`, `Instructions`, and redacting `ToString()`. | PR #3 uses mutable options, not init-only: string/bool/function properties are `get; set;`; `CliArgs` is get-only but the `IList<string>` instance is mutable; `Environment` is get-only but the `IDictionary<string,string?>` instance is mutable. `GitHubToken` is `[JsonIgnore]`; `ToString()` prints `GitHubToken = [REDACTED]`. This differs from the sample scaffold, whose `SquadAgentOptions` used init-only properties (`CliPath`, `WorkingDirectory`, `AgentName`, `BoundaryInstructions`). |
-| `Squad.Agents.AI.SquadConnectionFactory` | `src/Squad.Agents.AI/SquadConnectionFactory.cs` | Static parser for connection strings emitted by the Aspire Squad resource or supplied manually. | `public static SquadAgentOptions FromConnectionString(string connectionString)`. Supports literal PATH form and `squad://localhost?...` URI form. URI query parameters parsed today: `teamRoot`, `cliPath`, `cwd`, `cliArgs` (semicolon-separated), `env` (`key=value;key2=value2`). | Static type; no instance state. Throws `ArgumentException` on null/empty/whitespace. Host and `protocol` are ignored/reserved. PATH form sets both `SquadFolderPath` and `Cwd` to the full string. |
-| `Squad.Agents.AI.SquadServiceCollectionExtensions` | `src/Squad.Agents.AI/SquadServiceCollectionExtensions.cs` | DI registration surface for consumers. | `AddSquadAgent(this IServiceCollection services, Action<SquadAgentOptions>? configure = null)` and `AddSquadAgent(this IServiceCollection services, ServiceLifetime lifetime, Action<SquadAgentOptions>? configure = null)`. Registers `SquadAgent` and `AIAgent` with the selected lifetime; default lifetime is scoped. Registers `SquadAgentOptionsConfigurator` as `IConfigureOptions<SquadAgentOptions>` via `TryAddEnumerable`; applies user callback via `services.Configure(configure)`. Adds `PostConfigure<ILoggerFactory>` warning when `TraceEvents` is true. | Static extension type; no instance state. No keyed DI overloads in v0.1. Warning text says production caution, but code currently warns whenever `TraceEvents` is true; it does not inspect `IHostEnvironment`. |
-
-Not public but important: `Squad.Agents.AI.SquadAgentOptionsConfigurator` in `src/Squad.Agents.AI/SquadAgentOptionsConfigurator.cs` is `internal sealed`. It reads `IConfiguration.GetConnectionString("squad")`, parses it with `SquadConnectionFactory`, fills only unset scalar options, appends missing CLI args, and fills only missing environment keys. This is the `ConnectionStrings__squad`/Aspire binding bridge.
-
-Public types that existed in earlier designs but are **not** present in PR #3: `SquadTelemetry`, `SquadDefaults`, `WithTeamRoot`, `AddSquadAgentFromConnectionString`, keyed DI registration types, an `ExtensionSlug` property, and any public session type.
-
-#### B. SDK contract
-
-- Direct package references in `src/Squad.Agents.AI/Squad.Agents.AI.csproj`:
-  - `Microsoft.Agents.AI.GitHub.Copilot` = `1.7.0-preview.260526.1`.
-  - `Microsoft.Extensions.AI` = `10.6.0`.
-  - `Microsoft.Extensions.Options` = `10.0.8`.
-  - `Microsoft.Extensions.DependencyInjection.Abstractions` = `10.0.8`.
-  - `Microsoft.Extensions.Hosting.Abstractions` = `10.0.8`.
-  - `Microsoft.Extensions.Logging.Abstractions` = `10.0.8`.
-- `GitHub.Copilot.SDK` is used by source (`using GitHub.Copilot.SDK;`, `CopilotClient`, `CopilotClientOptions`) but is **not** a direct PR #3 package reference. It is expected transitively through `Microsoft.Agents.AI.GitHub.Copilot`. This is a version-control risk: the package does not directly pin the SDK whose public types it imports.
-- `Microsoft.Agents.AI` core is also used by source (`AIAgent`, `AgentSession`, `AgentRunOptions`, `AgentResponse`, `AgentResponseUpdate`) and likely arrives transitively via the GitHub Copilot MAF package; there is no direct `Microsoft.Agents.AI` package reference in PR #3.
-- `AIAgent` base class contract used by `SquadAgent`: PR #3 subclasses `AIAgent` directly, overrides `Name` and `Description`, and implements the protected core methods by forwarding to `_inner`. It does not force-cast to `IChatClient`; PR body text about `(IChatClient)(object)agent` is stale after commit `f5b6c5f0a3dbd1f5e9d7e098360b9f57e5d8ced7`.
-- `CopilotClientOptions` usage in PR #3: `CliPath = options.CliPath`; `Cwd = options.Cwd ?? options.SquadFolderPath`; `GitHubToken = resolvedToken`; `CliArgs = options.CliArgs.ToArray()` when non-empty; `Environment = Dictionary<string,string>` copied from non-null option values; `Logger = loggerFactory.CreateLogger<CopilotClient>()` when `TraceEvents` is true.
-- Token resolution order: `GitHubTokenProvider(CancellationToken.None).GetAwaiter().GetResult()` wins over `GitHubToken`. That means token retrieval is synchronous during construction and does not receive the per-run cancellation token.
-- `SessionConfig` usage: PR #3 does not construct `SessionConfig` directly. Boundary/system text is passed as `instructions: options.Instructions` to `AsAIAgent`; per tamresearch1 Decision 441 this maps to the underlying `GitHubCopilotAgent` system message/session config. The original sample scaffold did use `SessionConfig.WorkingDirectory`, manual `SquadAgentSession.IsFirstTurn`, and `FormatUserMessage`; Decision 441 said that first-turn preamble should be deleted in favor of `instructions:`.
-- Assumptions and flagged contracts:
-  - The sample scaffold's `SessionConfig.WorkingDirectory` and `CopilotClientOptions.CliPath` assumptions were explicitly flagged for verification by the requested 1054 item. Decision 441 later verified `CopilotClientOptions` operational properties (`CliPath`, `CliArgs`, `Cwd`, `Environment`, `GitHubToken`, etc.). PR #3 avoids direct `SessionConfig.WorkingDirectory` by setting `CopilotClientOptions.Cwd`.
-  - `AsAIAgent(name: ...)` is identity metadata, not routing. Decision 447/Q5 resolved that routing happens through `CopilotClientOptions.CliPath`/`CliArgs`/`Cwd`/`Environment`, not through `name`. PR #3 sets name to `Squad`, but that alone does not route to a Squad Copilot extension.
-  - If invoking the actual Squad extension requires `SessionConfig.Agent = "Squad"` or a specific CLI arg, PR #3 currently does not do that explicitly. `SquadFolderPath` only defaults `Cwd`; it is not included in system instructions and is not validated for `.squad/` existence.
-  - `TraceEvents` does not wire `OnEvent`, `Streaming`, or `IncludeSubAgentStreamingEvents` like the working demo; it only assigns `CopilotClientOptions.Logger`. This is narrower than the demo's trace implementation.
-
-#### C. Packaging metadata
-
-From `src/Squad.Agents.AI/Squad.Agents.AI.csproj`:
-
-| Field | PR #3 value |
-|---|---|
-| SDK | `Microsoft.NET.Sdk` |
-| `TargetFramework` | `net10.0` |
-| `Nullable` | `enable` |
-| `ImplicitUsings` | `enable` |
-| `LangVersion` | `latest` |
-| `IsPackable` | `true` |
-| `PackageId` | `Squad.Agents.AI` |
-| `Title` | `Squad Agents AI` |
-| `Description` | `Community SquadAgent for Microsoft Agent Framework. Exposes the Squad multi-agent CLI as an AIAgent that can be composed into any MAF app or workflow.` |
-| `Authors` | `Squad contributors` |
-| `PackageTags` | `squad;agent-framework;maf;copilot;ai-agent` |
-| `RepositoryUrl` | `https://github.com/bradygaster/squad` |
-| `RepositoryType` | `git` |
-| `PackageLicenseExpression` | `MIT` |
-| `PackageReadmeFile` | `README.md` |
-| `GenerateDocumentationFile` | `true` |
-| `Version` | `0.1.0-preview` |
-| README packing | `<None Include="README.md" Pack="true" PackagePath="\" />` |
-
-Packaging notes/blockers:
-
-- There is no `Directory.Build.props` in the PR #3 file list or `src/Squad.Agents.AI` tree, so no shared .NET metadata/versioning is being imported for this package.
-- `GeneratePackageOnBuild` is absent, so package generation on build is not enabled by the project; the documented path is explicit `dotnet pack -c Release -o ../../artifacts`.
-- `RepositoryUrl` points to `https://github.com/bradygaster/squad`, while the PR and branch live under `tamirdresher/squad`. This is a release metadata blocker unless upstream is the intended final package source.
-- `Authors` is generic (`Squad contributors`); no `PackageProjectUrl`, source link, symbol package settings, changelog, release notes, or NuGet publish workflow are present.
-- NuGet.org flat-container lookup for `squad.agents.ai` returned 404, so the package is not published there under that ID at the time of this onboarding.
-- PR #3 is still draft/open. Root workflows in the branch are existing Squad Node/npm workflows; no workflow references `dotnet`, `nupkg`, `NuGet`, or `Squad.Agents.AI`.
-- The PR body is stale: it says unit tests are deferred, but PR #3 now adds `test/Squad.Agents.AI.Tests/` with xUnit tests.
-
-#### D. Integration patterns
-
-- Standalone DI:
-  ```csharp
-  using Microsoft.Agents.AI;
-  using Microsoft.Extensions.DependencyInjection;
-  using Squad.Agents.AI;
-
-  var services = new ServiceCollection();
-  services.AddLogging();
-  services.AddSquadAgent(options =>
-  {
-      options.SquadFolderPath = @"C:\path\to\team-root";
-      options.Cwd = @"C:\path\to\team-root";
-      options.GitHubToken = Environment.GetEnvironmentVariable("GH_TOKEN");
-      options.Instructions = "You are the repo-local Squad facade.";
-  });
-
-  var provider = services.BuildServiceProvider();
-  var squad = provider.GetRequiredService<AIAgent>();
-  var session = await squad.CreateSessionAsync();
-  var response = await squad.RunAsync("hello squad", session);
-  ```
-- Aspire/config binding:
-  - `AddSquadAgent()` with no callback reads `ConnectionStrings:squad` via `IConfiguration.GetConnectionString("squad")`; in environment-variable form this is `ConnectionStrings__squad`.
-  - PATH connection string (`C:\team-root` or `/Users/me/team-root`) maps to `SquadFolderPath` and `Cwd`.
-  - URI connection string (`squad://localhost?teamRoot=...&cliPath=...&cwd=...&cliArgs=--verbose;--trace&env=KEY=value`) maps to the corresponding options.
-  - The connection-string configurator runs before user callbacks; callbacks can override scalar values and append additional CLI args/environment values.
-- Lifetime and multiple squads:
-  - Default `AddSquadAgent()` lifetime is `Scoped`; overload accepts any `ServiceLifetime`.
-  - Registers both concrete `SquadAgent` and base `AIAgent`, so consumers can resolve either.
-  - No keyed DI exists; multiple teams in one app require manual service-registration workarounds today.
-- Working-directory isolation:
-  - `CopilotClientOptions.Cwd` defaults to `options.Cwd ?? options.SquadFolderPath`.
-  - There is no validation that the directory exists, contains `.squad/`, is a git repo, or is isolated/containerized. Consumer must pick a safe team root and process identity.
-- Session-scoped chat history:
-  - Consumers should create/pass `AgentSession` for multi-turn coherence.
-  - `SquadAgent` delegates session creation, serialization, deserialization, sync run, and streaming run to `_inner`.
-  - The original sample scaffold held a custom `SquadAgentSession` with `IsFirstTurn`; PR #3 removed that in favor of inner MAF session behavior.
-- Boundary/system instructions:
-  - Sample scaffold injected boundary instructions manually into the first user turn via `FormatUserMessage`.
-  - PR #3 passes `SquadAgentOptions.Instructions` into `AsAIAgent(instructions: ...)`, so instructions are expected to become the inner agent's system message/session config.
-  - PR #3 has no default Squad boundary text. If `Instructions` is null, no explicit Squad governance preamble is set by this wrapper.
-- Demo comparison:
-  - `squad-agent-framework-demo\Squad.AgentFramework.Demo.csproj` targets `net9.0`, references `GitHub.Copilot.SDK 1.0.0-beta.2`, `Microsoft.Agents.AI 1.5.0`, `Microsoft.Agents.AI.GitHub.Copilot 1.5.0-preview.260507.1`, and workflow packages.
-  - Demo `SquadAgent.cs` constructs `GitHubCopilotAgent` directly with `SessionConfig { Agent = "Squad", OnPermissionRequest = PermissionHandler.ApproveAll, OnEvent = ..., Streaming = ..., IncludeSubAgentStreamingEvents = ... }`, adds a hard-coded read-only boundary system message, and has richer event tracing.
-  - PR #3 packaging is narrower and cleaner for NuGet, but it drops demo-specific `SessionConfig.Agent`, `PermissionHandler.ApproveAll`, native event tracing, `Capabilities`, `IdCore`, and hard-coded boundary behavior.
-
-#### E. Known v0.1 release risks and v0.2 backlog
-
-From tamresearch1 Decision 453 / requested persona-validation entries:
-
-- Persona validation result: Noob, Senior, and Expert personas found no v0.1 blockers, but identified risks to validate/document and a v0.2 backlog.
-- v0.1 risks to document/validate:
-  - Data: cancellation propagation — prove `CancellationToken` on `RunAsync()`/streaming cancels the CLI subprocess and does not orphan it.
-  - B'Elanna: thread safety under parallel load — profile multiple concurrent `SquadAgent` calls and track process count/resource exhaustion.
-  - Data: CLI error-message clarity — break the team root/auth and verify the wrapper surfaces actionable errors rather than opaque failures.
-  - Data history also tracks AOT/Trimming readiness as a release-risk concern, while the decision table places it in the v0.2 Track A backlog.
-- v0.2 feature backlog by owner:
-  - Data / Track A: keyed DI registration for two or more `SquadAgent` instances with different team roots; session-serialization docs for `GitHubTokenProvider` closures; AOT/Trimming readiness (`DynamicallyAccessedMembers` audit/fixes); cancellation and error-message improvements.
-  - B'Elanna / Track B: parallel concurrency profile; Aspire dashboard resource updates for SquadAgent telemetry.
-  - Worf / Track C: token-provider caching semantics; token source audit trail; URI parsing security to prevent query params from becoming shell injection vectors.
-- Decision 441/447 technical risks still relevant:
-  - `GitHubCopilotAgent` is sealed; wrapper/delegation is correct.
-  - `AsAIAgent(name: ...)` does not route to Squad; routing must be operational (`CliPath`, `CliArgs`, `Cwd`, `Environment`).
-  - `net10.0` honors the locked preference but raises the adoption bar above MAF's broader target floor.
-  - Preview SDK package `Microsoft.Agents.AI.GitHub.Copilot 1.7.0-preview.260526.1` can break before stable.
-
-#### F. What is missing for this squad to continue
-
-Concrete continuation gaps:
-
-1. Publish state: `Squad.Agents.AI` is not published on NuGet.org under that ID; PR #3 remains draft/open.
-2. Release workflow: no dotnet build/test/pack/publish workflow exists in PR #3; existing workflows are Squad Node/npm workflows.
-3. Package metadata hardening: confirm final repository URL (`tamirdresher/squad` vs `bradygaster/squad`), authorship, project URL, source link, symbol package, release notes, and README package rendering.
-4. Versioning/changelog: no package-specific `CHANGELOG.md`, release notes, MinVer/Nerdbank/GitVersion strategy, or preview-to-stable policy.
-5. Dependency pins: direct `GitHub.Copilot.SDK` pin is absent despite source using its public types; confirm transitive version and lock strategy.
-6. Build/test wiring: xUnit tests exist (14 smoke tests) but need CI inclusion and a solution or explicit test command in repo docs.
-7. Behavioral validation: run local `dotnet restore`, `dotnet build -c Release`, `dotnet test`, `dotnet pack`, then a consumer smoke app with a real `.squad/` team root.
-8. Runtime contract validation: verify whether PR #3 actually invokes Squad (not just bare Copilot) without `SessionConfig.Agent = "Squad"` or an explicit CLI arg.
-9. Security validation: token-provider deadlock/blocking behavior, direct token storage, URI env/CLI arg injection, and trace logging content need Worf review.
-10. Documentation/sample apps: README has quick start and troubleshooting, but PR #3 has no dedicated sample app project; the external demo remains separate and targets older package versions.
-11. AOT/trimming/multi-target: no trimming annotations; `net10.0` only; no `net8.0`/`net9.0` compatibility plan in package metadata.
-12. Observability: demo event-tracing/Aspire dashboard behavior is not in PR #3; decide whether v0.1 intentionally excludes it or tracks it for v0.2.
-
-- `origin/squad/949-fix-externalized-state-paths` — externalized path resolution (not merged)
-- `origin/squad/864-state-backend-hardening` — retry + circuit-breaker (not merged)
-- `origin/copilot/bug-squad-cli-permission-issues` — same permission fix (different branch)
-- `origin/squad/1191-fix-cli-permission-contract` — permission contract one-liner fix
-- `origin/bradygaster/squad-p1-coordinator-bugs` — P1 coordinator + state bugs; also adds State & Team Root Resolution section to coordinator template
-**Relevant in-flight branches:**
-
-Seven independently identified the same P0 permission contract blocker via community issue research (#1191). Her findings corroborate this analysis and validate the urgency of the fix. Seven also mapped 5 dominant problem themes from GitHub issues; Data's bug taxonomy aligns with all 5 themes. Both agents recommend immediate prioritization of the one-line permission contract fix before any further insider.3 user testing.
-**Cross-Agent Note (2026-05-31T14:03:06.842+03:00):**
-
-**`StateBackendStorageAdapter.toRelative()` Windows edge case:** Strips `squadDir` prefix using `path.normalize().slice(normalizedBase.length + 1)` then converts slashes. If absolute path has a different-case drive letter or UNC form, normalization may produce a non-matching prefix and leak an absolute path into the orphan/notes backend, corrupting git notes refs.
-
-- Coordinator template still documents `"worktree"` and `"git-notes"` as valid config values (stale docs — fixed in p1 branch)
-- State backend hardening (retry + circuit-breaker): `origin/squad/864-state-backend-hardening` not merged
-- Externalized state path resolution broken: `origin/squad/949-fix-externalized-state-paths` not merged
-**P2 bugs (not yet merged at insider.3):**
-
-- Fix in `bradygaster/squad-p1-coordinator-bugs`: removes the `explicitBackend` throw logic and `requireGitRepository()` entirely
-- At insider.3, if `stateBackend` is explicitly set to `'orphan'` or `'two-layer'` in config.json AND the backend init fails (not a git repo, or `requireGitRepository` throws), the code rethrows instead of falling back to `'local'`
-**P1 bug — `resolveStateBackend` throws on explicit backend failure:**
-
-- Single-character fix: `'approved'` → `'approve-once'` in `shell/index.ts`
-- All spawned agent operations (including state writes) hang or fail on v1.0.54+
-- Copilot CLI v1.0.54+ changed the contract to require `{ kind: 'approve-once' }`
-- `approveAllPermissions` returns `{ kind: 'approved' }` at insider.3
-**P0 bug — permission contract broken (not in insider.3, fix in branch `squad/1191-fix-cli-permission-contract`):**
-
-**GitNotesBackend anchor change:** Old code wrote notes on `HEAD` (lost on branch switch). New code uses `rev-list --max-parents=0 HEAD` (root commit as stable anchor). Caveat: per-instance `cachedAnchor` — if a new instance is created mid-session after HEAD changed, it still uses the cached root commit from that instance. Nondeterministic on repos with multiple root commits (unrelated histories merge).
-
-**TwoLayerBackend architecture:** Orphan branch is the permanent read store; git notes are a best-effort commit-scoped annotation. `write/delete/append` all try orphan first (hard), then notes (swallowed catch). `read/list/exists` go to orphan only. `promote_to_permanent` concept: Ralph moves notes to orphan after PR merge.
-
-- `isValidBackendType()` accepts legacy values, so parse-time validation passes
-- Migration is transparent via `normalizeBackendType()` in `resolveStateBackend()`, but users whose config says `"git-notes"` now silently get orphan branch creation — a significant behavioral side-effect
-- `'two-layer'` added (orphan permanent + git-notes best-effort annotation layer)
-- `'git-notes'` removed as standalone type; migrated to `'two-layer'` via `normalizeBackendType()`
-- `'worktree'` → `'local'` (WorktreeBackend.name also changed)
-**StateBackendType rename (v0.9.4 → insider.3):**
-
-- Upgrade flow (reads config.json): `packages/squad-cli/src/cli/core/upgrade.ts`
-- MCP state command: `packages/squad-cli/src/cli/commands/state-mcp.ts`
-- CLI permission handler: `packages/squad-cli/src/cli/shell/index.ts` (`approveAllPermissions`)
-- State backend implementations: `packages/squad-sdk/src/state-backend.ts` (all 4 backends + adapter)
-**Key code locations (insider.3):**
-
-**Baseline clarification:** Tag `v0.9.6-insider.2` does not exist in the Squad repo. Only `v0.9.6-insider.3` is tagged (on `origin/feature/coordinator-as-agent`, commit `ce326d56`). Triage used `v0.9.4` as the prior stable baseline.
-
-## 2026-05-31T14:09:11Z — State-backend insider.2→insider.3 triage
-
-Data is the explicit Squad framework expert for this team. Data should learn from `C:\Users\tamirdresher\source\repos\squad`, including the Brady Squad repo's SDK/CLI design, governance files, prompt templates, and existing team decisions.
-
-## Core Context
-
-- **Created:** 2026-05-14T09:22:24.987+05:30
-- **Stack:** Squad CLI/SDK, GitHub Copilot agent workflows, TypeScript/Node.js, prompt/runtime templates, client compatibility, agent orchestration
-- **Project:** squad-squad
-- **Owner:** Tamir Dresher
-
-# Project Context
-
-
-
-## 2026-06-03 — P0 Permissions fix: cherry-pick regression test onto PR #1192
-- Inspected PR #1193 diff; identified regression test in `test/adapter-client.test.ts` as safe to extract (no type-rewrite dependency).
-- Manually ported test to #1192 branch (worktree `C:\Users\tamirdresher\source\repos\squad-1191`); committed as `e1faf5d9`.
-- Discovered local test failure is a worktree artifact: node_modules junction resolves `@bradygaster/squad-sdk` to the main repo's stale compiled dist; test is correct and CI passes.
-- Pushed to `squad/1191-fix-cli-permission-contract`; all 5 CI checks green.
-- Closed PR #1193 with comment pointing to #1192.
-- Created skill `extract-test-from-competing-pr` and decision note `data-p0-fix-merged.md`.
-
-### Squad.Agents.AI — Routing tests added (2026-06-02)
-
-- Test file: `test/Squad.Agents.AI.Tests/SquadAgentRoutingTests.cs`.
-- New tests: 5 routing-boundary tests; local suite moved from 14/14 to 19/19 passing.
-- Commit: `3f5e61d6d15e5c603f76d3a6f34acb7f97ca025e` on `tamirdresher/squad` PR #3 branch `feature/squad-agents-ai`.
-- Surprises: `SquadAgent` exposes routing only through SDK object state, so the tests validate the DI-created wrapper by reflecting the inner `CopilotClientOptions` and `SessionConfig`; `AgentName` is metadata on the inner agent while operational routing remains `CliPath`/`CliArgs`/`Cwd`/`Environment`, matching Decision 447.
-
-## Learnings — 2026-06-02 Fresh-Path Two-Layer Baseline (insider.3)
-
-**Test repo:** https://github.com/tamirdresher_microsoft/twolayer-fresh-test-20260602T1146 (private)
-
-### Driver invocation patterns that worked
-- `copilot --yolo --agent squad -p "<prompt>"` is the canonical non-interactive driver. `--yolo` = `--allow-all-tools --allow-all-paths --allow-all-urls`.
-- `--yolo` auto-approves PERMISSION prompts but does NOT auto-respond to `ask_user`. In this run the Squad coordinator never invoked `ask_user` during Init Mode, so no workaround was needed. If a future build adds `ask_user` to Phase 1 confirmation, the driver will hang and the `--no-ask-user` flag becomes necessary (with attendant behaviour change).
-- 5-minute timeout is plenty for most sessions; complex multi-agent sessions (3 spawns + tests) ran ~8 minutes. Size `initial_wait` accordingly.
-
-### Gotchas with the test driver
-- **`squad <subcommand> --help` EXECUTES the subcommand** instead of printing help. `squad init --help` will (re-)initialise squad in CWD. Always test new subcommand flags in a throwaway scratch dir.
-- Insider builds do not lock to a tagged version — re-install with `npm install -g @bradygaster/squad-cli@<version>` is needed to switch between insiders.
-- `squad init` on a repo where `.squad` already partially exists silently "creates" the new state files (Rai agent dir, memory tree) but skips existing ones. This can pollute a working tree if invoked accidentally.
-
-### Two-layer behaviour on insider.3
-- `--state-backend two-layer` flag IS recognised; config.json gets `"stateBackend": "two-layer"` cleanly with no duplicates.
-- `squad-state` orphan branch IS created at init, pushed to remote on first push via the pre-push hook.
-- Sync hooks installed: `pre-push`, `post-merge`, `post-rewrite`, `post-checkout`.
-- MISSING: `pre-commit` and `post-commit` hooks (matches Picard WI-1 prediction).
-- MISSING: `squad_state_*` MCP tools in `.copilot/mcp-config.json`. Coordinator agents (Scribe especially) explicitly detect this via `squad_state_health` check and refuse to hand-write mutable state — GRACEFUL failure but failure nonetheless.
-- Init Mode itself bypasses the runtime bridge and writes `.squad/` files directly to the working tree. So even with two-layer chosen, the working tree comes out dirty on the very first init. This is INSIDER3-INIT-LEAK (new P1 finding).
-- After 6 sessions of real work, the orphan `squad-state` branch still contains only `README.md` — zero state writes ever land on it. `refs/notes/squad/*` is empty too. Net effect: cross-session memory is broken.
-- Branch-switch test (Phase 5 vs Bug #643) passes the surface symptom because state lives in a dirty working tree (which carries across branches), NOT because the orphan branch holds it. `git stash` or `git clean -fdx` would erase everything.
-
-### Bug A re-examination needed
-- Copilot CLI 1.0.57 (well above the 1.0.54 trigger threshold) under `--yolo` — all agent spawns, file edits, shell commands ran cleanly across 6 sessions. Bug A's "all agent ops fail/hang" symptom did NOT manifest. Either `--yolo` bypasses the per-call permission `kind` handler, or the original repro is environment-specific. Before claiming insider.4 "fixes" Bug A, build a focused regression that reproduces the failure WITHOUT `--yolo` first.
-
-## Learnings — 2026-06-02 Auth Modes & Extensibility Deep Dive
-
-Captured timestamp: 2026-06-02 (session continues from routing-tests onboarding).
-
-### Copilot SDK auth architecture — two-level split
-- **Client-level auth** (via `CopilotClientOptions`): `GitHubToken`, `UseLoggedInUser`, HMAC env vars — determines WHO is calling. This is where Squad routing invariants live (Decision 447).
-- **Session-level auth** (via `SessionConfig.Provider`): BYOK `ProviderConfig` — determines WHICH backend to hit. Completely orthogonal to client-level auth.
-- The 6-level priority chain (`gitHubToken` → HMAC → Direct API → Env vars → Stored OAuth → GitHub CLI) all operates at client level. BYOK sidesteps the entire chain.
-
-### Squad.Agents.AI gap findings
-- `SquadAgentOptions` already covers client-level auth well (`GitHubToken`, `GitHubTokenProvider`, `Environment` dict for env-var injection).
-- BYOK is fully blocked: `SquadAgent` passes only `instructions` and `name` to `AsAIAgent()`, never a full `SessionConfig` with `Provider` field. Adding `Provider` and `Model` properties requires either constructing a `SessionConfig` in Squad or switching from `AsAIAgent(instructions:, name:)` to `AsAIAgent(sessionConfig:, ownsClient:)`.
-- `UseLoggedInUser` is blocked: no property on `SquadAgentOptions`, no pass-through to `CopilotClientOptions`.
-- HMAC and Direct API modes work via `Environment` dict but are undocumented.
-
-### MAF layer is auth-agnostic
-- `GitHubCopilotAgent` receives an already-constructed `CopilotClient`; it cannot influence client-level auth.
-- `AsAIAgent()` overloads: one takes `(SessionConfig?, ownsClient)`, other takes `(instructions?, name?, tools?)`. Neither accepts `CopilotClientOptions`.
-- `CopySessionConfig()` internal method copies all `SessionConfig` fields including `Provider`, so BYOK pass-through IS possible if Squad constructs the `SessionConfig` correctly.
-
-### Extension point design tradeoffs
-- `Action<CopilotClientOptions>` delegate is the right v0.1 escape hatch: minimal ceremony, covers 100% of SDK options.
-- `IConfigureOptions<CopilotClientOptions>` DI hook is the right v0.3+ pattern for multi-tenant/Aspire composition but requires refactoring client construction.
-- Client factory override is too dangerous — bypasses all Squad invariants.
-- Key invariant risk: configure delegate can override `Cwd`, `CliArgs`, and `CliPath` after Squad sets them. Mitigation: post-delegate warning log, not hard block.
-
-### Gotchas
-- Classic PATs (`ghp_`) are NOT supported by Copilot SDK — only `gho_`, `ghu_`, `github_pat_` tokens work.
-- BYOK `bearerToken` is static only — no auto-refresh mechanism.
-- Azure BYOK uses `type: "azure"` (not "openai"); `baseUrl` must NOT include `/openai/v1/` (SDK appends automatically).
-- No Entra ID auth for Azure AI Foundry in BYOK mode.
-
-### Deliverable
-- Proposal written to `.squad/decisions/inbox/data-squad-agents-ai-auth-and-extensibility-proposal.md` with sections A-H.
-- Awaiting Picard (architecture) and Worf (security) review before any code changes.
+**Commit SHA:** beec9cf2  
+**Action:** Deleted outdated draft PR body file from feature/squad-agents-ai.  
+**Rationale:** File was added in commit ad05d3d4 as an early draft before the live PR description finalized. PR #3 body on GitHub (edited by B'Elanna) is now the canonical source. Standalone file creates confusion during upstream review.  
+**CI behavior:** No checks ran due to path filter (file at repo root, not in src/Squad.Agents.AI/**).  
+**Returned to branch:** tamirdresher/1201-subcommand-help ✓  
 
 ---
 
-## ARCHIVED 2026-06-03 by Scribe — Squad.Agents.AI Auth Expansion Proposal
+**Last Updated:** 2026-06-02T21:32:00+03:00
 
-11-auth-mode inventory (5 pass-through, 2 awkward, 4 blocked) from Copilot SDK auth surface. Gap analysis: 4 modes supported, 5 blocked (BYOK + UseLoggedInUser). 3 extension-point candidates evaluated; Candidate 1 (configure delegate `Action<CopilotClientOptions>`) recommended. 8 invariants (F1–F8) for routing protection; convention-only enforcement. Migration risk: LOW (additive changes to unpublished v0.1-preview). Implemented in PR #3 R2 (`4ac667cd`).
+## 2026-06-02T21:32:00+03:00 — Re-Val iter-4 (1/6) travel-assistant ❌
 
-## ARCHIVED 2026-06-03 by Scribe — Upgrade-Path Two-Layer Baseline (insider.3)
+Tarball **0.9.6-preview.9** against `tamirdresher/travel-assistant`. 4 sessions across 2 dups (3 fresh-init + 1 post-upgrade continuity); **orphan grew 0 commits across all 4.** MCP runtime bridge still dead because `copilot --agent squad` invokes copilot directly, bypassing squad's process wrap. The iter-4 `copilot-invocation.ts` fix only injects `--additional-mcp-config` when squad is the spawn parent (watch/loop/bridge/PTY — 10 internal sites). Canonical user invocation never hits any of those. Same root failure as iter-3, same as Data-16 alias experiment.
 
-**Test repo:** https://github.com/tamirdresher_microsoft/twolayer-upgrade-test-20260602T1308 (private)
-**Driver:** `copilot --yolo --autopilot --agent squad`
+Sub-finding: REGISTRY-PIN fallback is asymmetric. `upgrade.ts` correctly swaps unpublished `@0.9.6-preview.9` → `@insider` dist-tag (validated on dup2). `init.ts:buildMcpServerSpecs` retains literal pin (dup1 shows `@0.9.6-preview.9`). 15 LOC mirror needed.
 
-### What squad upgrade --self --insider --state-backend two-layer does on insider.3
-- Attempts npm install -g @bradygaster/squad-cli@insider (often EPERMs on Windows — binary in use)
-- Prints CONTRADICTORY: ⚠️ Upgrade failed THEN ✅ Upgraded. Exit code 0 regardless.
-- Does NOT write stateBackend to .squad/config.json (silently ignored — Seven's #1185 confirmed at upgrade level)
-- Does NOT create squad-state orphan branch
-- Does NOT install ANY hooks (not even sync hooks that fresh-init on two-layer installs)
-- Does NOT migrate .squad/decisions.md, agent histories, casting/routing/team state
-- Does NOT modify .copilot/mcp-config.json
+Iter-5 ask: ship `squad copilot` wrapper subcommand pre-mixing `--additional-mcp-config @<teamRoot>/.copilot/mcp-config.json` + recommend it as canonical user invocation in README and squad.agent.md prompt. ~30 LOC + docs.
 
-### What upgrade SHOULD do on backend-change flag
-1. Update config.json (merge — guard against Bug E duplicate keys)
-2. Run new backend's initializer (orphan branch, sync hooks, pre/post-commit hooks, MCP registration)
-3. Migrate pre-existing state from old layer to new layer
-4. Fail loudly on any step failure
+Score: 14 ✅ / 2 ❌ / 1 ⚠ / 1 n/a. Verdict drop at `.squad/decisions/inbox/data-reval-iter4-travel-assistant.md`. Full report at `.squad/files/validation/REVAL-ITER4-travel-assistant.md`. Dups retained (private). Auth restored to tamirdresher_microsoft.
 
-### Fresh-init vs upgrade delta (both on insider.3 targeting two-layer)
-- Fresh init: config ✅, orphan branch ✅, 4 sync hooks ✅, pre/post-commit ❌, MCP bridge broken ❌
-- Upgrade: config ❌, NO branch ❌, ZERO hooks ❌, MCP bridge broken ❌, pre-existing state STRANDED ❌
-- Upgrade strictly WORSE than fresh init.
+## 2026-06-02T20:58:00+03:00 — Tracking Issue #1205 Posted & Live (Data-6 Cleanup)
 
-### MCP bridge root cause (fixed in combined-fix PR #1200)
-npm view @bradygaster/squad-cli dist-tags → latest=0.9.4 / insider=0.9.6-insider.3. Template wrote unpinned npx -y @bradygaster/squad-cli state-mcp → resolved to 0.9.4 → 0.9.4 has no state-mcp command. Config-level bug; fix: embed running CLI version into launch args at init (SDK) and upgrade (CLI + retrofit via runEnsureChecks).
+**Status:** Awaiting Brady's signal on bradygaster/squad#1205.
 
-### Driver flag note
---autopilot is a real Copilot CLI flag (copilot --help); auto-continues up to 5 messages by default (--max-autopilot-continues 5). Combined with --yolo produced no hangs and no sk_user blocks. Use both per Tamir's directive.
+Confirmed pr-body.md removal from feature/squad-agents-ai (cleanup complete). Tracking issue #1205 is now live on bradygaster/squad; awaiting Brady's `go:yes` triage decision to proceed with cross-fork PR.
 
-### EVIDENCE-FIRST rule
-Without post-upgrade observability capture (config.json diff, hook listing, branch listing), "✅ Upgraded" stdout would have been the only signal — and it was wrong. Full picture only emerged after running capture script. Bake into every upgrade test.# Data Agent History Archive
+**Parallel activity:** Data-6 cleanup validated. PR #3 remains upstream-ready with no stale artifacts.
 
-**Archived:** 2026-06-02T19:39:52Z  
-**Reason:** Main history.md exceeded 15360 byte threshold (36878 bytes). Archiving completed sections.
 
-## Completed Projects (2026-06-02)
+---
 
-### Auth Expansion Proposal (CLEARED)
-- 11-mode auth inventory; Candidate 1 configure-delegate recommended
-- Picard + Worf gated; implemented in PR #3 R2 (4ac667cd)
-- Full research notes archived here
+### Alias Experiment — 2026-06-02T19:39:52Z (data-16)
 
-### Upgrade-Path Baseline (insider.3) Analysis
-- squad upgrade --self --insider --state-backend two-layer issues documented
-- Contradictory ⚠️/✅ status, all-or-nothing failure mode identified
-- Fix strategy: 5 required upgrade actions, proper separation of concerns
+Manually patched squad_state MCP entry on 	amir-squad-hq-tarball-test-20260602T183202 to test Data-15 Option A empirically. **Result overturns Data-15's framing.**
 
-### Combined Fix Branch (Iteration 1)
-- Cherry-picked 4 PRs, fixed 3 major bugs (EPERM, WI-1, FLAG-IGNORED+MIGRATION)
-- Lint clean, build clean, 16/16 new tests pass
-- Tarball: 574 KB, pushed to fork
+- Bare alias squad state-mcp → tools still unavailable, orphan 2→2.
+- Debug-log inspection (Copilot CLI 1.0.58) → only user-level `~/.copilot/mcp-config.json` is loaded; project-level `.copilot/mcp-config.json` is silently skipped. `squad_state`, `bitwarden-shadow`, `EXAMPLE-trello` all dropped.
+- Passing project config via `--additional-mcp-config "<json>"` → 7 tools register, `squad_decide` works, orphan grew 2→10 commits in a single session.
 
-### Bundle Iteration 2 (Both Punted P0s Fixed)
-- MCP-BRIDGE-BROKEN: root cause identified (unpinned CLI → 0.9.4 → no state-mcp command)
-  Fix: embed running version in launch args at init + upgrade
-- INSIDER3-INIT-LEAK: SDK runs before CLI config written
-  Fix: post-hoc lift in CLI, reuse migrate-backend.ts plumbing
-- 10 new tests pass; both fixes cross-wired to SDK + CLI
-- Tarball refreshed (563 KB)
+**iter-4 pivot:** Data-15 Option A is necessary-but-not-sufficient. Fix path = A1 (squad wraps copilot invocations with `--additional-mcp-config`) + Data-15 Option A on launch-spec content. Parallel: A4 upstream CLI issue about project-config auto-load.
 
-### Workstreams Bootstrap
-- Created .squad/workstreams/ tree: active/squad-agents-ai, evergreen/global, _template
-- squad-agents-ai live focus + 8 seeded decisions
-- .squad/identity/now.md tombstoned
-- 7 Picard conditions: C1-C6 completed, C7 deferred
+Side findings: `squad ensure` does not exist as a command (revert had to be manual); StateBackendStorageAdapter writes keys as absolute paths rooted at canonical TEAM_ROOT (non-portable but functional).
 
-### Tarball Smoke 1/2 (travel-assistant)
-- Node project patterns: 5✅/1⚠️/1❌/1🚫
-- 6 fixes confirmed, 2 new gaps (MCP-BRIDGE SDK pin unexercised, post-commit no-op on local-only)
-- Twin tarball pattern documented, EPERM race workaround, orphan tree path correction
+Full verdict: `.squad/files/validation/ALIAS-EXPERIMENT-VERDICT.md`. Decision drop: `.squad/decisions/inbox/data-alias-experiment-verdict.md`.
 
-### Tarball Smoke 2/2 (multiplayer-sudoku)
-- Non-Node project patterns: 6 fixes confirmed, 2 incomplete fixes
-- MCP pin requires npm registry version; local tarball insufficient for 
-px resolve
-- ensureSquadStateMcpPinned no-ops on missing entry (new finding for iteration 3)
-- Pre-existing squad-state on remote requires --force push
+---
 
-### Iteration 3 Closeout
-- Registered squad sync command (3b44f45e)
-- Rewrote ensureSquadStateMcpPinned to insert entry when missing (3b44f45e + a0fa7e3e)
-- Wired retrofit into BOTH squad init AND runEnsureChecks
-- Key learning: MCP retrofit has TWO call sites, both needed
-- Twin-tarball install pattern: npm install --prefix <dir> <sdk.tgz> <cli.tgz>
+### 2026-06-02T21:10:16.324+03:00 — 5-Path Skill Discovery Policy Implemented [ws:skill-discovery-paths]
 
-### PR #3 R2c Completion
-- Sample co-location under src/Squad.Agents.AI/samples/
-- MSBuild fix: added <Compile Remove="samples/**/*.cs" /> to prevent glob collision
-- All CI workflows green (ubuntu + windows matrix)
-- Upstream-ready status achieved
+**What shipped:** Picard's skill-discovery design (5-decision policy) implemented across 4 files / 6 edit sites. Squad's coordinator now scans ALL 5 project skill paths in precedence order instead of just 2.
 
-### Tarball Validation 6/6 Outcomes
-- 5 agents (data-11 through data-15) + Scribe completed batch
-- 6 repos tested: tamir-squad-hq, gh-ai-adoption2026, holocaust-research-wasserman, squad-ai-vulns, travel-assistant smoke, multiplayer-sudoku smoke
-- Build-time: 8 fixes confirmed across all repos
-- Runtime: MCP bridge unreachable (separate iteration-4 scope)
-- Key: first proof Gap-1 hook-sync works end-to-end (data-11 orphan grew 926948e→9276687)
+**5-path scan policy — for future reference:**
+- **Scan order (high → low precedence):** `.squad/skills/` > `.copilot/skills/` > `.github/skills/` > `.claude/skills/` > `.agents/skills/`
+- **Personal paths excluded:** `~/.copilot/skills/` and `~/.agents/skills/` are NOT scanned — CLI injects them ambiently. Logging them in team-visible spawn artifacts violates the personal/team boundary.
+- **Traversal:** one level deep only (`{path}/{skill-name}/SKILL.md`). Symlinks skipped. No per-session cache.
+- **Dedup rule:** directory name is the skill identity (case-insensitive). When the same name appears in multiple paths, the highest-precedence version wins. Log a warning on case-mismatch: `⚠ Skill '{name}' found in multiple paths (case-variant); using {winner-path}.`
 
-### Key Learnings to Preserve
-1. Recurring pattern: "code exists, wiring missing" (sync command not in router)
-2. MCP-config retrofit TWO call sites (SDK init + CLI upgrade)
-3. Twin-tarball install pattern necessary until #1203 lands
-4. Auto-version bumping on every build (preview.3 → preview.4 → preview.5)
-5. Re-smoke seeded state strategy (pre-populate mcp-config without squad_state entry)
-6. squad sync does NOT lift working-tree state (only push/pull orphan refs)
-7. gh auth dance: tamirdresher for fork, tamirdresher_microsoft for squad-squad
-8. .squad/decisions/inbox gitignored, needs -f to commit
+**squad.agent.md ↔ template sync discipline learned:**
+- `.github/agents/squad.agent.md` and `.squad/templates/squad.agent.md.template` are structural twins — every content change to the coordinator prompt must be mirrored in the template.
+- The template ships via `squad upgrade`; if the two files drift, upgraded projects get inconsistent behavior.
+- Verification step: after editing, check that both files show the same `git diff --stat` line count for the changed sections. The routing section, State Protocol skills note, and spawn template skill-check all changed by identical line deltas (+14/-5) — that's the PASS signal.
+- Gotcha: when replacing a multi-line block in the template, verify the `old_str` doesn't inadvertently include neighboring `{% if %}` blocks. My first attempt accidentally swallowed the orphan-branch section; caught immediately and restored.
 
-## Current Focus (Ongoing)
+**Files changed:**
 
-**6-Repo Tarball Validation Batch (2026-06-02 active):**
-- Real-time validation of 0.9.6-preview.5 twin tarballs
-- 5 parallel agents testing diverse repos + codebases + MCP configurations
-- MCP root-cause analysis to distinguish session-reload vs version-pin theories
-- Waiting: iteration 4 decision on whether to implement MCP pin validation in #1200
+---
+
+# Archived History Entries (2026-06-02 to 2026-06-03)
+
+# Project Context
+
+- **Owner:** Tamir Dresher
+- **Project:** squad-squad
+- **Stack:** Squad.Agents.AI research & architecture, SDK auth modes, extension-point design, MAF samples
+- **Created:** 2026-06-02T09:00:00Z
+
+## Data — Core Mission
+
+Data owns Squad Framework expertise, SDK/CLI research, auth-mode inventory, extension-point design evaluation, and proposal-first research workflow. Lead researcher for Squad.Agents.AI auth expansion.
+
+## Current Status (2026-06-02T19:39:52Z)
+
+
+- `.github/agents/squad.agent.md` — 3 sites: routing section (5-path + dedup + personal exclusion + HTML sync comment), State Protocol skills note (parenthetical added), spawn template skill-check (single line naming all 5 paths)
+- `.squad/templates/squad.agent.md.template` — same 3 sites mirrored exactly
+- `.squad/templates/plugin-marketplace.md` — 1 site: added "Why `.squad/skills/`?" note after the install steps
+- `.copilot/skills/squad-conventions/SKILL.md` — 1 site: file structure section expanded from single `.squad/skills/` line to full 5-path table with personal-paths exclusion note
+
+**Sync verification:** PASS — both squad.agent.md files show identical +14/-5 delta in the routing and spawn-template sections.
+
+---
+
+### 2026-06-02T21:33:08+03:00 — RE-VAL iter-4 (3/6): tamirdresher/holocaust-research-wasserman
+
+**Verdict:** 🟢 GO on the two bugs this repo originally surfaced; ⚠️ HOLD on declaring MCP-RUNTIME fully fixed.
+
+**EPERM-NO-SHORTCIRCUIT — FIXED.** This is the repo that surfaced the bug in iter-3. Re-tested in the same failure environment: `squad upgrade --self --state-backend two-layer` now completes state migration (10 files → squad-state branch, backend flipped, 6 hooks installed) BEFORE surfacing the self-upgrade failure as a deferred non-zero-exit warning. Most important single signal in this re-val.
+
+**REGISTRY-PIN-UNPUBLISHED — FIXED.** Upgrade log shows `ensured squad_state pinned to @bradygaster/squad-cli@insider` — HEAD-check detected `0.9.6-preview.9` is not on the registry and fell back to `@insider` dist-tag spec as designed.
+
+**MCP-NOT-AUTOLOADED — PARTIAL.** Orphan SHA timeline across FRESH-init 3 sessions: `2dd3d02 → 2dd3d02 → 2dd3d02 → 2dd3d02` (Δ0 commits). Direct MCP probe: agent reports `"no tools prefixed with squad_state_*"`. The iter-4 wrapper only injects `--additional-mcp-config` on copilot spawns from inside squad-cli; the canonical user invocation `copilot --yolo --autopilot --agent squad -p "..."` bypasses the wrapper, so Copilot CLI 1.0.58 still silently skips `.copilot/mcp-config.json`. Per Data-16 alias experiment — bug not closed for canonical UX.
+
+**MCP-RUNTIME / mcp-config form:** npx-pinned form, not non-npx. `@bradygaster/squad-cli@0.9.6-preview.9` on init, `@bradygaster/squad-cli@insider` after upgrade (fallback engaged).
+
+**Bug counts:** 8 ✅ / 1 ⚠️ / 1 ➖ (TIMESTAMP-COLON-LEAK not triggered).
+
+**Iter-5 recommendation:** ship `squad copilot ...` shim subcommand (~15 LOC) that pre-injects `--additional-mcp-config` so canonical user invocations get the bridge.
+
+**Artifacts:**
+- Primary dup: https://github.com/tamirdresher_microsoft/holocaust-research-wasserman-tarball-test-iter4-20260602T213308
+- Upgrade dup: https://github.com/tamirdresher_microsoft/holocaust-research-wasserman-upgrade-test-iter4-20260602T213308
+- Per-repo report: `<primary-dup>/validation/RE-VAL-iter4-holocaust-research-wasserman.md`
+- Mirror: `.squad/files/validation/REVAL-ITER4-holocaust-research-wasserman.md`
+- Decision drop: `.squad/decisions/inbox/data-reval-iter4-holocaust-research-wasserman.md`
+- Scratch: `C:\Users\tamirdresher\squad-validation\wasserman-iter4-20260602T213308\`
+
+**Auth restored:** `tamirdresher_microsoft` (verified on exit).
+
+---
+
+### 2026-06-02T21:10:16.324+03:00 — Worf R-1/R-2 landed [ws:skill-discovery-paths]
+
+**R-1 — NFC Normalization + Control-Char Denylist:**
+- Dedup rule now mandates NFC Unicode normalization and trailing-whitespace trim before comparison. Prevents Unicode-confusable attack (NFC vs NFD variants of the same name bypassing dedup).
+- Explicit denylist: skip any skill directory whose name contains null bytes, control characters (`\x00`–`\x1F`, `\x7F`), or path separators (`..`, `/`, `\`). Log: `⚠ Skill name '{name}' in {path} skipped (contains invalid characters).`
+- Edit sites: Dedup rule paragraph in `.github/agents/squad.agent.md` and `.squad/templates/squad.agent.md.template` (both mirrored per twin-file invariant).
+
+**R-2 — Hardlinks over Symlinks (monorepo UX):**
+- Symlinks are NOT followed during discovery (Windows compat + security). For monorepo users who need a skill to appear in multiple logical locations: use a hardlink (`ln {source} {destination}`, not `ln -s`). Hardlinks are regular files from the filesystem's perspective and are discovered normally.
+- Edit site: `.copilot/skills/squad-conventions/SKILL.md` only (user-facing skill-author guidance; does NOT belong in squad.agent.md).
+
+**R-3 — Out of Scope:**
+- Squad's skill discovery is LLM-prompt-driven, not runtime code. No `.squad/test/` exists. No test scaffolding created. Revisit if a CLI scanner is ever introduced.
+
+---
+
+### 2026-06-02T21:33:10+03:00 — Re-Val Iter-4 / 2-of-6 — multiplayer-sudoku [data-reval-iter4-multiplayer-sudoku]
+
+**Tarballs on disk:** `0.9.6-preview.9` (manifest claimed preview.8 — auto-bump on pack). Dup names: `multiplayer-sudoku-tarball-test-iter4-20260602T213310` (fresh-init), `multiplayer-sudoku-upgrade-test-iter4-20260602T213310` (upgrade).
+
+**Headline:** Iter-4 fixes are **asymmetric across init vs upgrade paths**. Upgrade ✅; init ❌.
+
+- **Init (fresh `--state-backend two-layer`):** orphan SHA was `e5725a96` after init and STILL `e5725a96` after S1, S2, S3. Zero MCP tool calls in any session log. Root cause: `buildMcpServerSpecs` in `squad-sdk/init.ts` hard-pins `npx -y @bradygaster/squad-cli@<currentVersion>`; for the local-tarball build `0.9.6-preview.9` this E404s on the npm registry, Copilot CLI silently drops the failed server, the agents work entirely in WT.
+- **Upgrade (`local → two-layer`):** 8 state files migrated to orphan, mcp-config.json pinned to `@bradygaster/squad-cli@insider` (fallback fired correctly via `resolveSquadStateMcpSpec` in `upgrade.ts`), one follow-up session pushed `+1` commit (`0de57272` → `0f62575f`) to `origin/squad-state`.
+
+**Why the asymmetry:** the new `resolveSquadStateMcpSpec` helper with `npm-registry.ts` HEAD-check + `@insider` fallback was wired only into `upgrade.ts`. The init path calls the older synchronous `buildMcpServerSpecs` that doesn't do the HEAD-check. Mirroring the helper (or factoring one shared lib) is a ~15-LOC iter-5 spin + 2 tests.
+
+**New bug surfaced:** **UPGRADE-TEMPLATE-DOC-FLATTEN.** `squad upgrade --state-backend two-layer` dumped ~20 template docs and per-agent charter scaffolds (`charter.md`, `casting-history.json`, `casting-policy.json`, `casting-registry.json`, `Rai-charter.md`, `scribe-charter.md`, `fact-checker-charter.md`, `mcp-config.md`, `multi-agent-format.md`, `plugin-marketplace.md`, `orchestration-log.md`, `roster.md`, etc.) directly into `.squad/` root. They should live under `.squad/templates/` and `.squad/agents/<name>/`. Cosmetic-but-shadowing bug; iter-5 candidate (~20 LOC).
+
+**Bug matrix counts:** 8 ✅ · 3 ⚠ · 2 ❌ · 9 n/a (14 prior + 1 iter4-new = 15 tracked).
+
+**MCP-NOT-AUTOLOADED status note:** the canonical command in the prompt is plain `copilot --yolo --autopilot --agent squad -p "…"`, which bypasses every `--additional-mcp-config` wrap site iter-4 added to squad's spawn code. On this repo, project `.copilot/mcp-config.json` DID load under Copilot CLI 1.0.58 (refuting one Data-16 finding for this cwd + this version), which makes the wrapper concern less urgent than thought — what matters is whether the pinned package resolves. Still worth a `squad copilot` wrapper subcommand so canonical usage actually runs through squad.
+
+**Verdict:** 🟡 HOLD merge. Land iter-5 with: (1) helper-mirror into init, (2) UPGRADE-TEMPLATE-DOC-FLATTEN fix. Then re-validate. Decision drop: `.squad/decisions/inbox/data-reval-iter4-multiplayer-sudoku.md`. Per-repo report: `multiplayer-sudoku-tarball-test-iter4-20260602T213310/validation/RE-VAL-iter4-multiplayer-sudoku.md`. Squad mirror: `.squad/files/validation/REVAL-ITER4-multiplayer-sudoku.md`. Auth: `gh auth switch --user tamirdresher_microsoft` confirmed (active id 188938611).
+
+
+---
+
+### 2026-06-02T21:50:00+03:00 — Re-validation iter-4 on tamir-squad-hq (WORST-CASE, data-reval-iter4-tamir-squad-hq)
+
+**Dup:** https://github.com/tamirdresher_microsoft/tamir-squad-hq-tarball-test-iter4-20260602T213310
+**Tarballs:**  .9.6-preview.9 (rebuilt since manifest's preview.8)
+**Verdict:** Build-time fixes 🟢 GREEN end-to-end on the worst-case repo. Runtime bridge ❌ STILL FAILS for direct copilot --agent squad -p "..." invocations.
+
+**Build-time wins (all 5 user MCP servers preserved verbatim):**
+- Pre: 5 servers (azure-devops, bitwarden, bitwarden-shadow, EXAMPLE-trello, chrome-devtools). Post: same 5 byte-identical + new squad_state block.
+- squad_state entry uses **iter-4 form**: 
+px -y @bradygaster/squad-cli@insider state-mcp (dist-tag fallback per REGISTRY-PIN-UNPUBLISHED) — *not* an unresolvable @0.9.6-preview.9 pin.
+- 18 state files migrated (1MB decisions.md + 17 agent histories) onto orphan squad-state cleanly; static files preserved on disk.
+- 6 hooks installed; stateBackend: two-layer; pre-existing 	eamRoot/peers/devbox config preserved.
+- Self-upgrade EPERM did NOT abort migration (UPGRADE-EPERM-FALSE-SUCCESS confirmed on the worst-case repo).
+
+**Runtime failure (END-USER PROOF):**
+- 4 continuity sessions, identical canonical invocation copilot --yolo --autopilot --agent squad -p "...".
+- Orphan SHA frozen at deb2d49b across ALL 4 sessions (pre == post each time, zero growth).
+- 3 of 4 sessions explicitly logged tools unavailable: "Scribe found the runtime state tools unavailable", "squad_state_* runtime tools aren't bound in this environment", "no squad_state_* runtime bridge is available".
+
+**Root cause (confirmed again after alias experiment):** Copilot CLI 1.0.58 silently ignores project-level .copilot/mcp-config.json. The iter-4 MCP-NOT-AUTOLOADED wrapper (copilot-invocation.ts + 10 spawn sites) intercepts squad-spawned copilot processes but NOT the user's direct invocation. Retrofitted config is correct as an artefact, unreachable at runtime via the canonical entry point.
+
+**Iter-5 recommendation:** ship squad copilot <args...> wrapper that pre-mixes --additional-mcp-config @<teamRoot>/.copilot/mcp-config.json, and make it the documented canonical end-user entry point.
+
+**Report:** `.squad/files/validation/REVAL-ITER4-tamir-squad-hq.md` (mirror at `<dup>/validation/RE-VAL-iter4-tamir-squad-hq.md`). Decision drop: `.squad/decisions/inbox/data-reval-iter4-tamir-squad-hq.md`.
+
+---
+
+### 2026-06-02T213308+03:00 — Re-validation iter-4 / gh-ai-adoption2026 (data-reval-iter4)
+
+**Bundle:** preview.8 manifest / preview.9 tarballs (re-pack). Twin SDK+CLI installed under `.npm-prefix-ghai-iter4`.
+**Dups:**
+- Fresh: tamirdresher_microsoft/gh-ai-adoption2026-tarball-test-iter4-20260602T213308
+- Upgrade: tamirdresher_microsoft/gh-ai-adoption2026-tarball-upgrade-iter4-20260602T213308
+
+**Build-time:** 🟢 GO. Fresh init two-layer clean; upgrade migrates 8 mutable files onto orphan, hooks install all 6, REGISTRY-PIN-UNPUBLISHED fallback verified (mcp-config rewritten to `@bradygaster/squad-cli@insider` because preview.9 unpublished).
+
+**Runtime MCP:** 🔴 unresolved for direct-copilot pattern. Orphan SHA timeline `f5f7a48f → f5f7a48f → f5f7a48f → f5f7a48f` (0 commits across 3 sessions: Simpsons team build / Lisa schema / Frink KPI). Scribe + Coordinator self-reported "state bridge missing" verbatim. Iter-4 wrap fix scope = squad-spawned copilot (watch/loop/triage), NOT user-spawned `copilot --agent squad -p "..."`.
+
+**Bug matrix:** ✅ 7 · 🔴 1 · n.a. 3.
+
+**Iter-5 ask:** add `squad copilot <args>` subcommand to pre-mix `--additional-mcp-config` for the user-direct invocation path. Track github/copilot-cli#3642 for the upstream auto-load fix.
+
+**Reports:** `.squad/files/validation/REVAL-ITER4-gh-ai-adoption2026.md` (mirror) · per-repo `validation/RE-VAL-iter4-gh-ai-adoption2026.md` on Dup A.
+
+
+
+Full archive: .squad/agents/data/history-archive.md
+
+---
+
+## Learnings
+
+### Port-from-local-to-upstream skill-discovery (2025-11-22)
+
+**Commit SHA:** `fe1e7e8c` on branch `feat/skill-discovery-paths` (upstream `bradygaster/squad`, branched from `upstream/dev`, NOT pushed).
+
+**Pattern: governance-doc-first → upstream port.** squad-squad's `.github/agents/squad.agent.md` is the authoritative skill-routing source; upstream templates lag. Workflow: read TEAM ROOT governance lines (266-278 + 933) → edit upstream `.squad-templates/` ONLY → run `node scripts/sync-templates.mjs --sync` → verify byte-identical via SHA-256. Source-of-truth is `.squad-templates/` (not `templates/`); script propagates to 3 mirror dirs + `.github/agents/`.
+
+**Surprise: adjacent ref in spawn-reference.md.** Task brief implied 5 files (squad.agent.md mirrors only), but the spawn-template "Check project skill directories" line lives in `spawn-reference.md` (4 mirrors). Final edit count: 9 template files + 1 changeset = 10. Always grep upstream for the OLD 2-path text across all template `.md` files, not just `squad.agent.md`.
+
+**Mirror invariant enforcement:** `test/template-sync.test.ts` re-runs sync in `beforeAll` then byte-compares all mirrors (194 tests, 2.3s on Windows). It's the single test that catches "edited mirror but forgot to update `.squad-templates/`" — make it the first targeted test after any template edit.
+
+**sync-templates.mjs invocation:** Requires `--sync` flag OR `SQUAD_SYNC_TEMPLATES=1`. Exits 0 silently when nothing changes; prints copied-file list when work was done. Safe to re-run.
+
+---
+
+
+
+**Commit SHA:** `de057079`
+
+**Files modified (8):**
+- `src/Squad.Agents.AI/SquadAgent.cs`
+- `src/Squad.Agents.AI/SquadServiceCollectionExtensions.cs`
+- `src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/Program.cs`
+- `README.md`
+- `CHANGELOG.md`
+- `src/Squad.Agents.AI/README.md`
+- `src/Squad.Agents.AI/Squad.Agents.AI.csproj`
+- `test/Squad.Agents.AI.Tests/Squad.Agents.AI.Tests.csproj`
+
+**Multi-target test result:** 43 passed / 0 failed on each of net8.0, net9.0, net10.0 → 129 total.
+
+**PR mergeable-state after push:** `MERGEABLE` / `CLEAN` (head `de057079`).
+
+**Surprising:** The `Microsoft.Agents.AI.GitHub.Copilot` preview package (v1.7.0-preview.260526.1) supports net8.0 and net9.0 without any conditional compilation needed — multi-target restore and build succeeded cleanly on all three TFMs with zero warnings.
+
+---
+
+## 2025 — MCP Phase 1 Recovery Spawn (data-5)
+
+**Context:** Spawned to salvage Phase 1 of MCP config path migration after data-4 hung for ~7 hours without committing.
+
+**Commit:** `892b2da2` on `feat/mcp-json-migration` (local only — no push, no PR per coordinator instruction).
+
+**True scope shipped (21 files, all AUDIT-MATCH):**
+- 4 code: `packages/squad-sdk/src/config/init.ts`, `packages/squad-cli/src/cli/core/init.ts`, `packages/squad-cli/src/cli/commands/state-mcp.ts`, `index.cjs`
+- 1 test: `test/cli/init.test.ts`
+- 8 template mirrors (twin-file invariant respected across `.squad-templates/`, `packages/squad-cli/templates/`, `packages/squad-sdk/templates/`, root `templates/`, plus `.github/agents/squad.agent.md`)
+- 5 docs (`mcp.md` full rewrite + 4 cross-references)
+- 2 changesets (new `mcp-json-migration.md`, 1-line update to `mcp-frontmatter-init.md`)
+
+**Tests:** `test/cli/init.test.ts` 15/15 vitest pass; `test/mcp-config.test.cjs` 10/10 node:test pass.
+
+**Lessons learned (the actually-useful ones):**
+
+1. **Stale-stat phantom mods are a real recovery trap.** Initial `git status --porcelain` reported 3 modified `package.json` files with empty `git diff` output. Running `git update-index --refresh` immediately revealed the true state: 0 package.json mods, but 20 real modifications on other files that the index was hiding. **Rule: when diagnosing a hung-spawn recovery, `git update-index --refresh` is mandatory before trusting `git status`.** data-4 likely touched mtimes (build watch? IDE indexer?) without changing content.
+
+2. **Stash named `phase1-temp` was a red herring.** It contained `ceremonies.md` deletions and `.gitignore` tweaks — completely unrelated to MCP Phase 1. Real Phase 1 work was live in the working tree, not stashed. **Rule: never auto-`git stash pop` on recovery; inspect `git stash show -p stash@{0}` first.**
+
+3. **Coordinator's predicted collateral list was outdated.** No `.mcp.json` at root, no `test-fixtures/copilot-install-test/`, no `test-fixtures/init-test/`, no parser-contracts snapshot mod. Working tree was much cleaner than the spawn prompt predicted. **Rule: always re-verify `git status` and `Test-Path` collateral candidates fresh — don't trust a spawn-time snapshot of state.**
+
+4. **Audit table missing from `decisions.md`.** The "Data — MCP Config Migration Audit" 25-row blast-radius table referenced in the spawn prompt was NOT in `.squad/decisions.md` (4017 lines searched). Worked around by using the new changeset `.changeset/mcp-json-migration.md` as scope-of-truth proxy. All 20 modifications mapped cleanly to its declared scope. **Rule: if a referenced decision is missing, the freshest changeset is usually the next-best authority.**
+
+5. **Twin-file invariant survived.** All 4 mirrors of `mcp-config.md` and 4 mirrors of `squad.agent.md.template` had identical diffs — data-4 (or whoever did the edits before hanging) respected the invariant. The sync-templates script handles propagation but a manual review confirmed parity.
+
+6. **Time-box discipline:** completed recovery+commit in well under the 45-minute budget once stale-stat was unblocked. Spawn for batch edits across N>10 files should split into per-area spawns of ≤5 files to avoid the 7-hour hang pattern.
+
+**Deferred to Phase 2 (next spawn, with Worf review):**
+- `squad upgrade` merge helper for repos that already have `.copilot/mcp-config.json` (apply Seven's precedence research: parse-before-overwrite, warn-and-preserve on same-name conflict with different command/args, atomic temp+rename writes)
+- `ensureSquadStateMcpPinned` dual-write window (both legacy and new path during deprecation)
+- Worf review pass on the Phase 1 commit before opening PR
+
+
+## Learnings — MCP migration Phase 2 (2026-06-03)
+
+- EnsureMcpServerResult exposes .warning (string|undefined), NOT .error. MigrateMcpConfigResult exposes both .warnings (array) and .error? (only on malformed-* statuses). Don't confuse them.
+- TypeScript strict + `Record<string, T>` index access yields `T | undefined`. Guard with `if (x === undefined) continue;` before use.
+- `overwriteOnConflict` defaults to `false` on `ensureMcpServerPinned` for safety on user-owned files. The `squad_state` pin is canonical, so init.ts must pass `true`. Dual-write tests need both branches.
+- vitest cases for fs-touching helpers belong at `test/*.test.ts` (top-level), beside siblings like `storage-provider.test.ts`. The glob is `test/**/*.test.ts`.
+- Atomic-write contract: temp file lives in the SAME dir as target so rename is single-volume atomic. Always assert no .tmp leftovers in success-path tests.
+
+---
+
+## 2026-06-02 → 2026-06-03 — MCP JSON Migration Batch (Phases 1–2, Issue #3642)
+
+**Batch summary:** 5-agent spawn batch to implement MCP config migration feature and open PR #1208 on upstream (bradygaster/squad).
+
+**Agent timeline:**
+- **data-4** (2026-06-02T16:00:00Z): Phase 1 spawn — ZOMBIE (hung ~7.25h, no commits, replaced by data-5)
+- **data-5** (2026-06-03T02:00:00Z): Phase 1 recovery — ✅ COMPLETED commit 892b2da2 (21 files, zero collateral)
+- **data-6** (2026-06-03T03:33:48Z): Phase 2 implementation — ✅ COMPLETED 4 commits (3207f075, 4b635463, c264e57b, 92e3a394)
+
+**data-4 hang analysis (Scribe lockout note):**
+- Spawned with broad scope: 23+ predicted edits across templates, init, tests, docs, changesets
+- Hung without reporting progress; likely hit interaction of:
+  1. Large batch edit cross-file dependencies (template sync invariant + init updates + dual changesets)
+  2. Stale stat-info phantom modifications (git index vs worktree time-mismatch)
+  3. No intermediate checkpoints / time-box enforcement
+- **Rule applied post-hang:** Batch edits with N > 10 files must decompose into per-area spawns ≤5 files each, with explicit time-boxes
+
+**data-5 recovery (completed on-budget 45 min):**
+- Applied `git update-index --refresh` (revealed stale stat phantom; true state = 20 files, not 3)
+- Classified all 21 files: AUDIT-MATCH (zero collateral found; stash `phase1-temp` was unrelated)
+- Shipped Phase 1: init code + 8 template mirrors + 5 docs + 2 changesets
+- Tests: 15/15 (init), 10/10 (mcp-config) pass
+- Commit: 892b2da2 on feat/mcp-json-migration (upstream squad, not squad-squad)
+
+**data-6 Phase 2 (completed before Worf review):**
+- Four commits shipped:
+  1. 3207f075: Merge helper foundation (reconcile workspace + user configs)
+  2. 4b635463: Dual-write support (both `.copilot/mcp-config.json` + `.mcp.json` during migration)
+  3. c264e57b: atomicWriteJson helper (temp + rename for atomic safety)
+  4. 92e3a394: Edge case tests (13/13 pass)
+- Implementation incorporates Seven's precedence research (full shadow, no key-merge) and defensive patterns (no silent overwrites, atomic writes)
+- Tests: 13/13 pass; ready for Worf review
+
+**Worf review + Geordi conditions (batch closure):**
+- Worf approved with 2 conditions (see worf-1 orchestration-log)
+- Geordi applied both conditions (commit 77186501, tests 29/30 pass, 1 Windows-expected skip)
+- PR #1208 opened by Coordinator on bradygaster/squad (feat/mcp-json-migration → main)
+
+**Scribe decision batch:** 5 inbox files merged to decisions.md (2026-06-03T04:00Z):
+- `seven-mcp-config-precedence.md`: CLI precedence research (workspace full-shadows user, no key-merge)
+- `data-mcp-phase1-recovery.md`: Phase 1 commit + audit
+- `data-mcp-phase2-complete.md`: Phase 2 commits + tests
+- `worf-mcp-merge-helper-review.md`: Worf approval + 2 conditions
+- `geordi-mcp-worf-conditions-applied.md`: Condition application + final tests
+
+**Deferral:** None — feature complete, PR open, awaiting upstream maintainer merge on PR #1208 (bradygaster/squad)
+
+**Batch status:** ✅ CLOSED (PR #1208 opened; issue #3642 resolved in implementation)
+
+## 2026-06-03T06:56:20+03:00 — Iter-4 re-validation synthesis (5/6 cross-repo)
+Synthesized 5 per-repo iter-4 re-val reports + Data-15 RCA + Data-17 alias proof + iter-3 final into .squad/files/validation/6REPO-REVAL-ITER4-FINAL.md (~14 KB). Verdict: 8 build-time fixes confirmed across 5/5 reporting repos including worst-case (tamir-squad-hq). Runtime MCP via direct user invocation still blocked by two newly-pinpointed root causes: (1) USER-INVOCATION-BYPASSES-MCP-CONFIG — wrap fix only intercepts squad-internal copilot spawns; (2) INIT-VS-UPGRADE-ASYMMETRY — REGISTRY-PIN fallback only in upgrade.ts, not init.ts. Iter-5 in flight (peer spawn): squad copilot wrapper (~25 LOC), init.ts MCP-spec mirror (~15 LOC), UPGRADE-TEMPLATE-DOC-FLATTEN (~20 LOC). Sample completeness 5/6 — data-23 (squad-ai-vulns) hung 8h+, documented as measurement gap. Recommendation: 🟡 MERGE-AFTER-ITER-5 + 2-repo re-smoke (hq upgrade + travel fresh-init), pass = orphan SHA grows.
+
+## 2026-06-02T22:42:00Z — PR #1207 Rebase + 12-comment Reviewer Sweep (Data-7 + Data-8)
+
+PR bradygaster/squad#1207 (Squad.Agents.AI NuGet) fully addressed: (1) rebased feature/squad-agents-ai onto upstream/dev clearing 2 merge conflicts (.gitignore, CHANGELOG.md); (2) applied all 12 Copilot review comments in single forward commit (CliArgs guard, 4x name validation, placeholder fix, 3x doc refs, multi-target net8/9/10 with 129 tests passing). New HEAD de057079. Status: MERGEABLE/CLEAN, awaiting brady review.

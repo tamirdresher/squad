@@ -576,3 +576,125 @@ NO internal references, NO agent names, NO condition IDs, NO "Round 2b" language
 
 ---
 
+---
+
+### [COMPLETED] 2026-06-02 — PR #1207 Cross-Fork Opened (B'Elanna)
+
+**Agent:** B'Elanna
+**Date:** 2026-06-02
+
+**Execution Summary:**
+
+**PR Created:**
+- **Number:** 1207
+- **URL:** https://github.com/bradygaster/squad/pull/1207
+- **Head:** tamirdresher:feature/squad-agents-ai
+- **Base:** bradygaster/squad:dev
+- **Title:** feat: Squad.Agents.AI - Microsoft Agent Framework adapter for the Squad CLI
+- **Body:** 4126 bytes; prepended `Closes bradygaster/squad#1205`
+
+**Issue #1205 Trimmed:**
+- **URL:** https://github.com/bradygaster/squad/issues/1205
+- **Line Removed:** "The implementation lives in my fork: [tamirdresher/squad#3](...)."
+- **Verification:** `contains()` test returns `false` ✓
+
+**Key Verifications:**
+- ✅ Auth: tamirdresher (personal), NOT EMU
+- ✅ `dev` branch confirmed on bradygaster/squad
+- ✅ PR body backticks: 88 in prepared file; 29 lines on live PR
+- ✅ Temp files cleaned
+- ✅ No auth switch-back (per instructions)
+
+**Next:** Brady reviews; Tamir adapts as needed.
+
+---
+
+### [COMPLETED] 2026-06-02T22:25:00+03:00 — PR #1207 Rebase onto upstream/dev (Data)
+
+**Agent:** Data
+**Task:** Rebase `feature/squad-agents-ai` onto `upstream/dev` to clear merge-conflict state on PR bradygaster/squad#1207
+
+**Pre-Rebase State:**
+- Branch: `feature/squad-agents-ai`
+- Starting HEAD: `beec9cf2` (chore: remove outdated draft PR body file)
+- Commits ahead of upstream/dev: 19
+- Commits behind upstream/dev: 307
+- Working tree dirty: No (clean)
+- origin/feature sync: ✅ In sync
+
+**Conflicts Encountered: 2 files**
+
+**1. `.gitignore` — Commit 1/18**
+- Upstream added: `# Squad: ignore runtime state (logs, inbox, sessions) .squad/.scratch/`
+- Our commit added: `bin/, obj/, artifacts/` (.NET build output)
+- **Resolution:** KEEP BOTH. Retained upstream's `.squad/.scratch/` entry and our .NET build-output entries.
+
+**2. `CHANGELOG.md` — Commit 12/18**
+- Upstream had: `## [Unreleased]` section with Fixed + Added entries
+- Our commit added: `## [0.1.0-preview] - 2026-06-02` section
+- **Resolution:** KEEP BOTH. Preserved upstream's full `[Unreleased]` section unchanged. Inserted our `## [0.1.0-preview]` immediately below `[Unreleased]` (correct Keep-a-Changelog ordering).
+
+**Build Verification:**
+- `dotnet restore`: ✅ All projects up-to-date
+- `dotnet build src/Squad.Agents.AI/Squad.Agents.AI.csproj`: ✅ 0 warnings, 0 errors
+- `dotnet build .../Squad.Agents.AI.Sample.csproj`: ✅ 0 warnings, 0 errors
+- `dotnet test .../Squad.Agents.AI.Tests.csproj`: ✅ 43/43 passed
+
+**Post-Rebase Push:**
+- Command: `git push --force-with-lease origin feature/squad-agents-ai`
+- Old head: `beec9cf2`
+- **New head:** **`87645bfd`**
+- Push result: ✅ Forced update accepted
+
+**PR #1207 State After Push:**
+`
+{
+  "base": "dev",
+  "head": "87645bfd",
+  "mergeState": "CLEAN",
+  "mergeable": "MERGEABLE"
+}
+`
+
+**Status: ✅ Merge-conflict state cleared. PR is MERGEABLE / CLEAN.**
+
+**Auth note:** `gh auth` is currently active on `tamirdresher` (personal). If EMU-scoped commands are needed for other workstreams, run `gh auth switch --user tamirdresher_microsoft` manually.
+
+---
+
+### [COMPLETED] 2026-06-02T22:30:00+03:00 — PR #1207 Reviewer Feedback Sweep (Data)
+
+**Agent:** Data
+**Date:** 2026-06-02T22:30:00+03:00
+**Commit SHA:** `de057079`
+**Branch:** `feature/squad-agents-ai` → `tamirdresher/squad`
+**PR:** bradygaster/squad #1207
+
+**Per-Fix Outcomes:**
+
+| Fix | Status | Detail |
+|-----|--------|--------|
+| **A** — CliArgs snapshot (SquadAgent.cs) | ✅ DONE | Changed `var snapshotCliArgs = clientOptions.CliArgs` (reference) → `var cliArgsSnapshot = clientOptions.CliArgs?.ToArray()` (value clone). Guard now uses `SequenceEqual` instead of `ReferenceEquals`; detects array replacement, length change, and in-place element mutation. |
+| **B** — name/connectionName validation (SquadServiceCollectionExtensions.cs) | ✅ DONE | Added `ArgumentException.ThrowIfNullOrWhiteSpace(name)` to all 4 public overloads that accept a `string name` parameter. |
+| **C** — `ghp_` placeholder (Program.cs:149) | ✅ DONE | Replaced `"ghp_EXAMPLE_REPLACE_WITH_REAL_TOKEN"` with `"YOUR_GITHUB_PAT_HERE"`. |
+| **D** — brittle PR #3 ref in root README.md:81 | ✅ DONE | Removed "PR #3 adds" phrase; rephrased to "`Squad.Agents.AI` is a preview NuGet package…". |
+| **E** — brittle PR #3 ref in CHANGELOG.md:44 | ✅ DONE | Replaced "Documented PR #3 lineage…" with "Added README documentation for the `Squad.Agents.AI` package…". |
+| **F** — fork URL in src/Squad.Agents.AI/README.md:198 | ✅ DONE | Changed `https://github.com/tamirdresher/squad#readme` → `https://github.com/bradygaster/squad#readme`. |
+| **G** — NuGet metadata in Squad.Agents.AI.csproj | ✅ DONE | `<PackageProjectUrl>` and `<RepositoryUrl>` updated to `bradygaster/squad`. `<RepositoryBranch>main</RepositoryBranch>` added. `<Authors>` left untouched (authorship is separate from canonical-repo URLs). |
+| **H** — multi-target test project (Squad.Agents.AI.Tests.csproj) | ✅ DONE | Both package csproj and test csproj updated from `<TargetFramework>net10.0</TargetFramework>` to `<TargetFrameworks>net8.0;net9.0;net10.0</TargetFrameworks>`. Restore and build succeeded on all three TFMs with 0 warnings/errors. |
+
+**Build & Test Verification:**
+- `dotnet restore`: ✅ 0 errors
+- `dotnet build src/Squad.Agents.AI/Squad.Agents.AI.csproj`: ✅ 0 warnings, 0 errors (net8.0, net9.0, net10.0)
+- `dotnet test .../Squad.Agents.AI.Tests.csproj`: ✅ 43 passed net8.0, 43 passed net9.0, 43 passed net10.0 = **129 total**
+
+**PR State After Push:**
+`
+{
+  "head": "de057079",
+  "mergeable": "MERGEABLE",
+  "state": "CLEAN"
+}
+`
+
+**Note:** The `<Authors>Tamir Dresher</Authors>` tag in `Squad.Agents.AI.csproj` was deliberately left unchanged per the fix instructions ("authorship is separate from canonical-repo URLs"). Before merging to `bradygaster/squad`, Tamir should decide whether to update the `<Authors>` and `<Company>` NuGet metadata fields to reflect the canonical repo owner/team, or leave them as the original contributor attribution. This is a policy decision, not a technical one.
