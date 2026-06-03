@@ -1,6 +1,6 @@
 # Squad Decisions
 
-**Last Updated:** 2026-06-02T20:58:00Z
+**Last Updated:** 2026-06-03T22:15:00Z
 
 ## Active Decisions
 
@@ -6305,7 +6305,46 @@ test/upgrade-mcp-merge.test.ts                     | 18 +++++++++-
 
 ## References
 
-- `.squad/decisions/inbox/worf-mcp-merge-helper-review.md` — Worf's review with both conditions
-- `.squad/decisions/inbox/seven-mcp-config-precedence.md` — Seven's empirical evidence on Copilot CLI silent-drop behavior
+---
+# [ws:squad-agents-ai] 2026-06-03 — Policy Gate Insider Expansion & Docs-Match-Implementation Directive
+
+**Date:** 2026-06-03T22:15:00Z  
+**Status:** MERGED from inbox (16 files: 4 squad-level + 12 workstream-level)  
+**Sources:** Inbox consolidation; inbox files deleted after merge
+
+## Summary
+
+PR #1200 ships iteration 9 with critical fixes: Policy Gate regex expansion to accept `-preview.N` and `-insider.N` versions (commits 5bef8f28 + 4da11839), `skip-version-check` label for pre-release CI bypass, comprehensive 6-repo dogfood validation (Belanna), non-interactive MCP load fix (Data), and security review APPROVED_WITH_CONDITIONS (Worf). Docs-must-match-implementation directive (Copilot) enforces code-over-docs priority. All 14 test assertions passing. Ready for maintainer sign-off.
+
+## Key Decisions & Directives
+
+1. **Policy Gate Fix (Data):** Regex now matches `-preview.N` and `-insider.N` patterns; commits 5bef8f28 + 4da11839 landed in PR #1200. `skip-version-check` label gates pre-release CI.
+
+2. **Docs-Must-Match-Implementation (Copilot Directive, CRITICAL):** Implementation drives docs, never the reverse. Applies to PR #1200 and all future work. If code and docs differ, fix code—never revert code to match stale docs.
+
+3. **Iter-9 Dogfood APPROVED (Belanna):** 6-repo parallel dogfood passed; @insider fallback pattern validated. No regressions.
+
+4. **Non-Interactive MCP (Data):** Inject `--yolo --additional-mcp-config @.mcp.json` on watch/loop/CLI-ref invocations. Ships preview.15.
+
+5. **Iter-9 C-2/C-3 Scoped Out (Copilot Directive):** Only C-1 accepted; ship 0.9.6-preview.15 as candidate.
+
+6. **In-Repo Placement Confirmed (User Decision):** Squad.Agents.AI lives in-repo at `bradygaster/squad/src/Squad.Agents.AI/` (not companion repo).
+
+7. **Watch/Loop YOLO Defaults Directive (Copilot):** Squad must default to `--yolo --additional-mcp-config @.mcp.json` on watch/loop invocations.
+
+8. **Security Review Gates (Worf):** APPROVED_WITH_CONDITIONS; 3 blocking (C-1/C-2/C-3 threat-class), 2 recommended (C-4/C-5); 6 threats documented (T-1 through T-6).
+
+## Docs Audit & MCP Trust
+
+- MCP trust gate cross-links added to watch/loop/CLI-ref docs (commits routed).
+- Non-interactive fixes injected; preview.15 candidate ready.
+- All spawn directives routed through yolo defaults pattern.
+
+## Action Items
+
+- [ ] Merge PR #1200 (maintainer approval gate; all technical review complete)
+- [ ] Publish preview.15 release candidate
+- [ ] Update docs to match non-interactive MCP pattern (code-first priority per docs-must-match-impl directive)
+- [ ] Implement C-1 security conditions before M4 graduation
 
 ---

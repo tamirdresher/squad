@@ -413,3 +413,35 @@ Synthesized 5 per-repo iter-4 re-val reports + Data-15 RCA + Data-17 alias proof
 ## 2026-06-02T22:42:00Z — PR #1207 Rebase + 12-comment Reviewer Sweep (Data-7 + Data-8)
 
 PR bradygaster/squad#1207 (Squad.Agents.AI NuGet) fully addressed: (1) rebased feature/squad-agents-ai onto upstream/dev clearing 2 merge conflicts (.gitignore, CHANGELOG.md); (2) applied all 12 Copilot review comments in single forward commit (CliArgs guard, 4x name validation, placeholder fix, 3x doc refs, multi-target net8/9/10 with 129 tests passing). New HEAD de057079. Status: MERGEABLE/CLEAN, awaiting brady review.
+
+## 2026-06-02T to 2026-06-03T00:00:00Z — Historical Summary (Compacted on 2026-06-03)
+
+### Major Workstreams Completed
+
+**Squad.Agents.AI Research & Launch (2026-06-02 ongoing):**
+- PR #1207 opened on bradygaster/squad targeting dev branch (Closes issue #1205)
+- All 12 Copilot review comments addressed; 129/129 tests passing
+- PR #1207 status: MERGEABLE/CLEAN, awaiting brady review
+
+**MCP JSON Migration Batch (2026-06-02 to 2026-06-03):**
+- PR #1208 opened (feat/mcp-json-migration → main); status: CLOSED, awaiting upstream maintainer merge
+
+**Validation & Combined-Fixes (2026-06-03):**
+- RE-VAL iter-4 through iter-6: validation smokes across 5/6 cross-repo test suite
+- Iter-5 shipped: `squad run-copilot`, init MCP-spec parity, template-doc routing (PR #1200, preview.11)
+- Iter-6 shipped: Windows quoting fix + local-install fallback (PR #1200, preview.12)
+- Smokes revealed persistent orphan-Δ=0 due to npm public access; re-test with HOME override pending
+- Detailed archive: `.squad/agents/data/history-archive-2026-06-03.md`
+- **SMOKE iter-7 / tamir-squad-hq (2026-06-03):** 🟡 PARTIAL. iter-7 HOME-write architecture verified: `squad run-copilot` deleted (✓ Unknown command), `squad upgrade` auto-installed `squad_state_8721a7e9` to `~/.copilot/mcp-config.json` (no hand-edit), all 8 pre-existing user MCP servers preserved byte-identical (sha256), project mcp tombstone removed. **Blocked at sessions step:** repo has no `stateBackend: "two-layer"` in `.squad/config.json` and no `origin/squad-state` branch — never initialized to two-layer despite task context. Not an iter-7 regression. HOME restored sha256-identical to backup; backup deleted. Report: `.squad/files/validation/SMOKE-ITER7-tamir-squad-hq.md`.
+
+### Skill Discovery Paths (2026-06-02)
+
+- Worf R-1: NFC normalization + control-char denylist
+- Worf R-2: Hardlinks over symlinks (Windows compat)
+- Status: 🔒 LOCKED OUT (Gate 2 Security); Picard owns remediation
+
+### Current Operational Status
+
+- **Auth state:** Currently on tamirdresher_microsoft (EMU)
+- **Backlog:** Iter-7 re-smoke with tighter deterministic prompt; upstream iteration planning
+- **Blockers:** None for Squad.Agents.AI PR #1207 (upstream-ready)

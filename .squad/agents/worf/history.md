@@ -114,3 +114,42 @@ Worf (Security & Reliability Reviewer) owns security audits, threat modeling, cr
 
 **Lesson:** Mirror SHA-256 invariant verification is non-negotiable before declare-approve. Block content must match verbatim across lockstep repos (grep for distinctive phrase). Tests = sanity check, not security check — always prose-review the actual shipped prompt text to confirm each required element is literally present.
 
+---
+
+## Learnings — 2026-06-03 iter-9 `--yolo --additional-mcp-config @.mcp.json` Defaults [ws:squad-agents-ai]
+
+**Subject:** PR #1200 (bradygaster/squad, `squad/state-backend-upgrade-fixes`). Making `--yolo --additional-mcp-config @.mcp.json` the default for `squad watch` and Ralph's in-session work-check loop.
+
+**Verdict:** APPROVED_WITH_CONDITIONS (3 blocking, 2 recommended). Full report at `.squad/workstreams/active/squad-agents-ai/decisions/inbox/worf-iter9-yolo-defaults-security-review.md`.
+
+**Core finding:** `--yolo` as a Squad automation default is NOT the problem — it's been the correct established pattern since iter-1 (`copilot-yolo-driving/SKILL.md`). Without `--allow-all-tools`, non-interactive sessions block on permission prompts forever. The problem is `--additional-mcp-config @.mcp.json` passing the ENTIRE file, not just the `squad_state` entry.
+
+**Primary risk (T-1/T-2):** When users legitimately add project MCP servers to `.mcp.json` for interactive Copilot sessions (azure-devops, trello, chrome-devtools, etc.), `squad watch` silently inherits all of them under `--yolo` — full shell access with no per-tool confirmation. This is an invisible, unintended capability escalation.
+
+**Root cause of the change (verified):** Copilot CLI 1.0.59 `FH.isFolderTrusted()` gate requires interactive UI to populate `trustedFolders` — it will never fire in `-p` mode. `--additional-mcp-config` is the correct escape hatch. The iter-8 SMOKE failure proves this is a real gap, not a theoretical one.
+
+**Three blocking conditions:**
+
+- **C-1:** `.mcp.json` existence check before passing `--additional-mcp-config`. If absent → warn + fall back, do NOT crash.
+- **C-2:** Squad Watch must load ONLY the `squad_state` entry from `.mcp.json`, not the full file. Implementation: extract the entry at startup, serialize to inline JSON string, pass as `--additional-mcp-config '{...}'`. Eliminates T-1 (malicious PR adds rogue server) and T-2 (silent escalation) entirely. This is the key architectural fix.
+- **C-3:** Document `.mcp.json` as a security-sensitive file. Changes in PRs must be reviewed like build scripts. Document `--yolo` semantics in user-facing help output.
+
+**Two recommended conditions:**
+
+- **C-4:** Pin `squad_state` entry in `.mcp.json` to an exact version (not `@insider` dist-tag) when the version IS published on npm. The `@insider` floating tag is a supply chain risk — one compromised publish silently updates all users.
+- **C-5:** Verify Ralph's in-session work-check loop applies the same C-1/C-2 mitigations.
+
+**Reusable patterns extracted:**
+
+1. **"Full file vs. selective load" distinction.** When passing `--additional-mcp-config @file`, you load ALL servers in the file. If the intent is "load only server X," extract and inline. Never assume the file will stay single-entry.
+
+2. **`.mcp.json` is a security boundary.** It is stored in source control, auto-loaded by automated flows with `--yolo`, and not treated as security-sensitive by typical PR reviewers. Projects using Squad should add `.mcp.json` to their CODEOWNERS or PR review checklist.
+
+3. **`--yolo` blast radius clarification.** `--allow-all-paths` is the most dangerous component of `--yolo` — it removes the CWD sandbox and allows reads/writes anywhere on the filesystem. `--allow-all-tools` + `--allow-all-urls` are required for non-interactive automation and are the accepted tradeoff. The path component is the one that enables credential exfiltration (`~/.ssh/`, env files, etc.) if a rogue server loads.
+
+4. **Folder-trust gate bypass.** `--additional-mcp-config` is explicitly designed to bypass Copilot CLI's `FH.isFolderTrusted()` gate. This gate exists to prevent auto-loading untrusted servers in non-interactive contexts. Any use of `--additional-mcp-config` in automated flows is, by definition, a deliberate bypass of this gate — and should be scoped as narrowly as possible (extract specific entry, not whole file).
+
+5. **Floating dist-tag risk.** `@insider`, `@latest`, `@next` in `.mcp.json` or any auto-launched MCP config are supply chain soft spots. An adversary who compromises the npm account or the dist-tag pointer gets silent RCE on all users at next `squad watch` run. Prefer exact version pins for published releases; document the fallback as a last resort.
+
+**Handoff to Data:** C-1 is ~3 LOC; C-2 is ~15 LOC. Both are well-scoped. C-3 is documentation. All three can land in the same PR as the iter-9 change. No re-review by Worf required for C-4/C-5.
+
