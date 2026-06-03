@@ -2,18 +2,48 @@
 
 **Branch**: `squad/state-backend-upgrade-fixes`
 **PR**: [bradygaster/squad#1200](https://github.com/bradygaster/squad/pull/1200)
-**Head SHA**: `3c019242` (iter-5)
+**Head SHA**: `f8347d84` (iter-9)
 **Tarballs (TWIN — install BOTH together)**:
-- `C:\Users\tamirdresher\squad-validation\bradygaster-squad-sdk-combined-fixes.tgz` (788 KB)
-- `C:\Users\tamirdresher\squad-validation\bradygaster-squad-cli-combined-fixes.tgz` (574 KB)
+- `C:\Users\tamirdresher\squad-validation\bradygaster-squad-sdk-combined-fixes.tgz` (806 KB)
+- `C:\Users\tamirdresher\squad-validation\bradygaster-squad-cli-combined-fixes.tgz` (598 KB)
 
 **Install pattern**: `npm install -g <sdk-tgz> <cli-tgz>` (both at once — see Gap 3 / #1203)
 
 **Date**: 2026-06-03T07-25-00+03-00
 **Author agent**: Data
-**Iteration**: 5 (closes the three follow-up gaps surfaced by REVAL-ITER4-multiplayer-sudoku.md)
-**Version**: `0.9.6-preview.11` (auto-bumped from preview.10)
+**Iteration**: 9 (closes non-interactive MCP trust gate regression introduced in iter-7/8)
+**Version**: `0.9.6-preview.15` (bumped from preview.14)
 **Upstream issue filed**: [github/copilot-cli#3642](https://github.com/github/copilot-cli/issues/3642)
+
+## Iteration 9 — non-interactive MCP trust gate fix
+
+| Fix | What | Where |
+|---|---|---|
+| **PATH-REGRESSION** | `copilot-invocation.ts` checked for `.copilot/mcp-config.json` (iter-7 path) instead of `.mcp.json` (iter-8 canonical path) — injection helper found nothing and injected nothing | `packages/squad-cli/src/cli/core/copilot-invocation.ts` |
+| **YOLO-MISSING** | `--yolo` was never injected by the helper; without it, `copilot -p` hangs waiting for per-tool consent prompts in non-interactive mode | Same file: prepend `--yolo` before `--additional-mcp-config` |
+| **YOLO-DEDUP** | Guard against `--yolo --yolo` if caller already passes it in copilotFlags | `withAdditionalMcpConfig`: `args.filter(a => a !== '--yolo')` before prepend |
+| **MISSING-FILE-WARNING** | Silent failure when `.mcp.json` is absent → now emits `⚠  .mcp.json not found at <path>` | `buildAdditionalMcpConfigArgs` |
+| **DOCS** | New `copilot-mcp-trust.md` explaining trust gate, empirical test matrix, `--additional-mcp-config` workaround, `squad:copilot` script recommendation | `docs/src/content/docs/features/copilot-mcp-trust.md` |
+| **TEMPLATE-DOCS** | Watch Mode section in `ralph-reference.md` and MCP note in `squad.agent.md` + template twin | `packages/squad-cli/templates/ralph-reference.md`, `squad.agent.md.template`, `.github/agents/squad.agent.md` |
+| **INIT-TIP** | Post-init output prints `squad:copilot` script tip | `packages/squad-cli/src/cli/core/init.ts` |
+
+### Iteration 9 — Validation
+
+- ✅ `npm run build` clean (workspace SDK + CLI, preview.15)
+- 📦 Twin tarballs re-packed at `0.9.6-preview.15`, mirrored to `C:\Users\tamirdresher\squad-validation\bradygaster-squad-{sdk,cli}-combined-fixes.tgz`
+- ⚠ Policy Gates will continue to reject preview builds — `skip-version-check` label required on PR #1200
+
+### Iteration 9 — Trust gate empirical matrix
+
+| Invocation | workspace `.mcp.json` loaded? |
+|---|---|
+| `copilot -p "..."` | ❌ No |
+| `copilot --yolo -p "..."` | ❌ No |
+| `copilot --yolo --autopilot -p "..."` | ❌ No |
+| `copilot --additional-mcp-config @.mcp.json --yolo -p "..."` | ✅ **Yes** |
+| Interactive `copilot` → Trust? → Yes | ✅ Yes (not automatable) |
+
+---
 
 ## Iteration 5 — follow-up fixes for revalidation gaps
 
