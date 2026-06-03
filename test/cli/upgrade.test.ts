@@ -14,6 +14,7 @@ import { runUpgrade, ensureGitattributes, ensureGitignore, ensureDirectories, en
 import { getPackageVersion } from '@bradygaster/squad-cli/core/version';
 
 const TEST_ROOT = join(tmpdir(), `.test-cli-upgrade-${randomBytes(4).toString('hex')}`);
+const TEST_HOME = join(tmpdir(), `.test-cli-upgrade-home-${randomBytes(4).toString('hex')}`);
 
 describe('CLI: upgrade command', () => {
   beforeEach(async () => {
@@ -21,14 +22,25 @@ describe('CLI: upgrade command', () => {
       await rm(TEST_ROOT, { recursive: true, force: true });
     }
     await mkdir(TEST_ROOT, { recursive: true });
-    
+    if (existsSync(TEST_HOME)) {
+      await rm(TEST_HOME, { recursive: true, force: true });
+    }
+    await mkdir(TEST_HOME, { recursive: true });
+    // iter-7: redirect ~/.copilot/mcp-config.json writes to a temp dir so
+    // tests don't pollute the developer's real HOME.
+    process.env.SQUAD_HOME_DIR_OVERRIDE = TEST_HOME;
+
     // Initialize a squad
     await runInit(TEST_ROOT);
   });
 
   afterEach(async () => {
+    delete process.env.SQUAD_HOME_DIR_OVERRIDE;
     if (existsSync(TEST_ROOT)) {
       await rm(TEST_ROOT, { recursive: true, force: true });
+    }
+    if (existsSync(TEST_HOME)) {
+      await rm(TEST_HOME, { recursive: true, force: true });
     }
   });
 

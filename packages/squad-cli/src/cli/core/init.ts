@@ -14,9 +14,9 @@ import { getPackageVersion, stampVersion } from './version.js';
 import { initSquad as sdkInitSquad, cleanupOrphanInitPrompt, ensurePersonalSquadDir, resolvePersonalSquadDir, clearResolveSquadCache, type InitOptions } from '@bradygaster/squad-sdk';
 import { installGitHooks } from '../commands/install-hooks.js';
 import { liftInitMutableStateOntoOrphan } from '../commands/migrate-backend.js';
-import { ensureSquadStateMcpPinned } from './upgrade.js';
 import { resolveSquadStateMcpSpec } from './mcp-spec.js';
 import { describeMcpSpec } from './upgrade.js';
+import { ensureSquadStateMcpInHome, tombstoneProjectSquadStateMcp } from './mcp-home.js';
 
 const storage = new FSStorageProvider();
 
@@ -355,13 +355,23 @@ export async function runInit(dest: string, options: RunInitOptions = {}): Promi
         // exists (e.g. partially-squadified repo or pre-existing Copilot setup),
         // leaving the bridge unwired. Force-insert/pin the squad_state entry so
         // the MCP server is reachable regardless of pre-existing config.
+        // iter-7: write squad_state to HOME `~/.copilot/mcp-config.json`
+        // (auto-loaded by copilot) and tombstone the stale project-level
+        // entry left by the SDK init writer. Per-project namespacing via
+        // `squad_state_<hash>` prevents collisions across Squad projects.
         try {
           const mcpSpec = await resolveSquadStateMcpSpec(getPackageVersion());
-          if (ensureSquadStateMcpPinned(dest, getPackageVersion(), { mcpSpec })) {
-            success(`pinned .copilot/mcp-config.json squad_state to ${describeMcpSpec(mcpSpec)}`);
+          const homeResult = ensureSquadStateMcpInHome(dest, getPackageVersion(), mcpSpec);
+          if (homeResult.written) {
+            success(`installed ${homeResult.key} -> ${homeResult.path} (${describeMcpSpec(mcpSpec)})`);
+            console.log(`${DIM}  to remove later: edit ${homeResult.path} and delete ${homeResult.key}${RESET}`);
+          }
+          const tomb = tombstoneProjectSquadStateMcp(dest);
+          if (tomb.removed) {
+            success(`removed stale project squad_state from ${tomb.path} (now lives in HOME)`);
           }
         } catch (err) {
-          console.warn(`${YELLOW}⚠ Could not pin squad_state in mcp-config.json: ${err instanceof Error ? err.message : err}${RESET}`);
+          console.warn(`${YELLOW}⚠ Could not install squad_state MCP entry in ~/.copilot/mcp-config.json: ${err instanceof Error ? err.message : err}${RESET}`);
         }
       }
     } else {
@@ -369,23 +379,21 @@ export async function runInit(dest: string, options: RunInitOptions = {}): Promi
     }
   }
 
-  // INIT-vs-UPGRADE asymmetry fix (iter-5 + iter-6): SDK init writes
-  // .copilot/mcp-config.json with a hard pin to the running CLI version
-  // (`@bradygaster/squad-cli@<currentVersion>`). For unpublished preview
-  // builds this E404s under `npx -y`, leaving the runtime bridge unwired
-  // even after a successful init. Mirror upgrade.ts's resolver
-  // unconditionally here so vanilla `squad init` (no --state-backend flag)
-  // also benefits — and so the iter-6 local-install fallback kicks in
-  // when the preview tarball is unpublished.
+  // iter-7: unconditionally mirror HOME-write + tombstone for vanilla
+  // `squad init` (no --state-backend flag) so the squad_state MCP entry
+  // lives in `~/.copilot/mcp-config.json` regardless of init path.
   try {
     const mcpSpec = await resolveSquadStateMcpSpec(version);
-    if (mcpSpec.source !== 'pinned') {
-      if (ensureSquadStateMcpPinned(dest, version, { mcpSpec })) {
-        success(`fell back .copilot/mcp-config.json squad_state to ${describeMcpSpec(mcpSpec)} (pinned version unpublished)`);
-      }
+    const homeResult = ensureSquadStateMcpInHome(dest, version, mcpSpec);
+    if (homeResult.written) {
+      success(`installed ${homeResult.key} -> ${homeResult.path} (${describeMcpSpec(mcpSpec)})`);
+    }
+    const tomb = tombstoneProjectSquadStateMcp(dest);
+    if (tomb.removed) {
+      success(`removed stale project squad_state from ${tomb.path}`);
     }
   } catch {
-    // best-effort: bridge will remain pinned to the literal version
+    // best-effort: HOME write failure does not block init
   }
 
   // Report .init-prompt storage

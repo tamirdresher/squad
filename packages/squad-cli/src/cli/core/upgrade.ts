@@ -16,6 +16,7 @@ import { scrubEmails } from './email-scrub.js';
 import { getPackageVersion, stampVersion, readInstalledVersion } from './version.js';
 import { resolveSquadStateMcpSpec, type SquadStateMcpSpec } from './mcp-spec.js';
 export { resolveSquadStateMcpSpec } from './mcp-spec.js';
+import { ensureSquadStateMcpInHome, tombstoneProjectSquadStateMcp } from './mcp-home.js';
 
 const storage = new FSStorageProvider();
 
@@ -688,18 +689,23 @@ async function runEnsureChecks(dest: string, templatesDir: string, filesUpdated:
   success('refreshed .squad/templates/');
   filesUpdated.push('.squad/templates/');
 
-  // MCP-BRIDGE-BROKEN fix: ensure squad_state launch spec pins the current CLI
-  // version so `npx -y @bradygaster/squad-cli` doesn't resolve to the stale
-  // `latest` dist-tag (which may not contain the `state-mcp` command).
-  //
-  // Iter-4 hardening (Option A): before writing the pin, HEAD-check the npm
-  // registry. If the exact version isn't published yet (common for in-flight
-  // preview builds being validated locally before publish), fall back to the
-  // `@insider` dist-tag so `npx` can still resolve a working binary.
+  // iter-7: write squad_state MCP entry to `~/.copilot/mcp-config.json`
+  // (auto-loaded by copilot) under a per-project-namespaced key, and
+  // tombstone the stale project-level entry left by older Squad versions.
   const pinnedSpec = await resolveSquadStateMcpSpec(getPackageVersion());
-  if (ensureSquadStateMcpPinned(dest, getPackageVersion(), { mcpSpec: pinnedSpec })) {
-    success(`ensured .copilot/mcp-config.json squad_state pinned to ${describeMcpSpec(pinnedSpec)}`);
-    filesUpdated.push('.copilot/mcp-config.json');
+  try {
+    const homeResult = ensureSquadStateMcpInHome(dest, getPackageVersion(), pinnedSpec);
+    if (homeResult.written) {
+      success(`installed ${homeResult.key} -> ${homeResult.path} (${describeMcpSpec(pinnedSpec)})`);
+      filesUpdated.push('~/.copilot/mcp-config.json');
+    }
+  } catch (err) {
+    warn(`Could not write ~/.copilot/mcp-config.json: ${err instanceof Error ? err.message : err}`);
+  }
+  const tomb = tombstoneProjectSquadStateMcp(dest);
+  if (tomb.removed) {
+    success(`removed stale project squad_state from ${tomb.path} (now lives in HOME)`);
+    filesUpdated.push('.copilot/mcp-config.json (tombstoned)');
   }
 }
 
@@ -708,75 +714,6 @@ export function describeMcpSpec(spec: SquadStateMcpSpec): string {
   // After iter-7 all specs are `npx -y <pkg@version-or-tag> state-mcp`.
   const pkg = spec.args[1] ?? '<unknown>';
   return spec.source === 'insider' ? `${pkg} (@insider fallback)` : pkg;
-}
-
-/**
- * Rewrite `.copilot/mcp-config.json` so the `squad_state` server pins
- * `@bradygaster/squad-cli@<cliVersion>` instead of falling back to the npm
- * `latest` dist-tag. Returns true if the file was updated.
- *
- * Preserves any other configured MCP servers untouched. Idempotent.
- *
- * @param options.mcpSpec  Full SquadStateMcpSpec to write — preferred. When
- *   supplied, takes precedence over `argSpec`. Iter-6: enables the local-install
- *   fallback path which uses `node <pkgRoot>/dist/cli-entry.js state-mcp`
- *   (a non-`npx` command shape).
- * @param options.argSpec  Legacy override — npm package spec written into the
- *   `-y <spec> state-mcp` argv. Retained for backward compat with code that
- *   pre-dates the iter-6 SquadStateMcpSpec shape.
- */
-export function ensureSquadStateMcpPinned(
-  dest: string,
-  cliVersion: string,
-  options: { mcpSpec?: SquadStateMcpSpec; argSpec?: string } = {},
-): boolean {
-  const mcpConfigPath = path.join(dest, '.copilot', 'mcp-config.json');
-  if (!storage.existsSync(mcpConfigPath)) return false;
-  if (!cliVersion || cliVersion === '0.0.0') return false;
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(storage.readSync(mcpConfigPath) ?? '{}');
-  } catch {
-    // Don't clobber a manually edited / malformed mcp-config.
-    return false;
-  }
-  if (!parsed || typeof parsed !== 'object') return false;
-
-  const config = parsed as {
-    mcpServers?: Record<string, { command?: string; args?: string[]; env?: Record<string, string> }>;
-  };
-  if (!config.mcpServers || typeof config.mcpServers !== 'object') {
-    config.mcpServers = {};
-  }
-  const server = config.mcpServers.squad_state;
-
-  // Resolve desired (command, args) from the supplied options, with
-  // back-compat for the iter-4 `argSpec: string` shape.
-  let desiredCommand: string;
-  let desiredArgs: string[];
-  if (options.mcpSpec) {
-    desiredCommand = options.mcpSpec.command;
-    desiredArgs = options.mcpSpec.args;
-  } else {
-    const pinnedSpec = options.argSpec ?? `@bradygaster/squad-cli@${cliVersion}`;
-    desiredCommand = 'npx';
-    desiredArgs = ['-y', pinnedSpec, 'state-mcp'];
-  }
-
-  // INSERT or UPDATE: if entry missing/unpinned/wrong-pinned, write the expected.
-  if (server && Array.isArray(server.args) && server.command === desiredCommand) {
-    const argsMatch = server.args.length === desiredArgs.length
-      && server.args.every((arg, i) => arg === desiredArgs[i]);
-    if (argsMatch) return false;
-  }
-
-  config.mcpServers.squad_state = {
-    command: desiredCommand,
-    args: desiredArgs,
-  };
-  storage.writeSync(mcpConfigPath, JSON.stringify(config, null, 2) + '\n');
-  return true;
 }
 
 export function ensureMemoryGovernanceUpgradeDefaults(dest: string): string[] {
