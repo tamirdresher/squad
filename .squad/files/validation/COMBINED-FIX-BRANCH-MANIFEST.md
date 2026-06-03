@@ -216,3 +216,34 @@ After the iter-3 re-smoke surfaced that the SDK `init.ts` skips `.copilot/mcp-co
 - **Tarballs at:** `0.9.6-preview.5` (twin)
 - **Final re-smoke (travel + sudoku, fresh clones, seeded stale mcp-config):** GAP-1 ✅ closed · GAP-2 ✅ closed (insert path verified on init) · GAP-3 ➖ workaround + #1203 follow-up
 - **Verdict:** 🟢 GO for the remaining 4-repo validation. See `TARBALL-SMOKE-ITERATION-3-VERDICT.md`.
+---
+
+## Iteration 6 (2026-06-03) — Conditional local-install MCP fallback + Windows quoting fix
+
+The iter-5 smoke surfaced two distinct issues affecting validation:
+
+1. **Pinned MCP server unreachable when both `0.9.6-preview.N` and `@insider` are unpublished.** `squad upgrade`/`squad init` pinned `.copilot/mcp-config.json` to `npx -y @bradygaster/squad-cli@<version> state-mcp`, which made it impossible to smoke-test the *locally installed* tarball's state-mcp implementation — npx kept fetching the published `@insider`.
+2. **`squad run-copilot` mangled multi-word `-p "prompt"` on Windows.** Wrapper spawned with `shell:true`, hit Node DEP0190 and dropped inner quotes, so prompts were truncated to the first word.
+
+**Branch:** `squad/state-backend-upgrade-fixes` on `tamirdresher/squad` (PR #1200 to `bradygaster/squad`).
+**Tarballs:** `0.9.6-preview.12` (twin) → `C:\Users\tamirdresher\squad-validation\bradygaster-squad-{sdk,cli}-combined-fixes.tgz`.
+
+### Commits
+- `9b5f377b` — `fix(mcp-spec): fall back to local install when pinned version unpublished`. Rewrote `resolveSquadStateMcpSpec` to return `{command, args, source}` with a 4-tier resolution: pinned → `@insider` → local install (`node <pkgRoot>/dist/cli-entry.js state-mcp`) → throw. Threaded `mcpSpec` through `ensureSquadStateMcpPinned` / `init.ts` / `upgrade.ts` (back-compat `argSpec` retained). New `describeMcpSpec()` helper for user-facing messages.
+- `f25e400e` — `fix(run-copilot): use shell:false + cmd.exe shim with windowsVerbatimArguments to preserve multi-word -p prompts on Windows`. Wrapper now always spawns with `shell:false`. On Windows `.cmd`/`.bat` shims it invokes `cmd.exe /d /s /c <commandLine>` with `windowsVerbatimArguments:true` and MSVCRT-style escaping (`quoteWindowsArg`). Added `buildSpawnInvocation` pure builder + `defaultCopilotResolver` PATH walker. Eliminates DEP0190.
+
+### Files
+- `packages/squad-cli/src/cli/core/mcp-spec.ts` — full rewrite (~210 lines)
+- `packages/squad-cli/src/cli/core/upgrade.ts` — new `describeMcpSpec`, updated `ensureSquadStateMcpPinned` signature
+- `packages/squad-cli/src/cli/core/init.ts` — 2 callers updated to pass `mcpSpec`
+- `packages/squad-cli/src/cli/commands/run-copilot.ts` — full rewrite (Windows-correct spawn)
+- `test/mcp-spec-init.test.ts` — 9 tests covering all 4 resolution branches
+- `test/run-copilot-wrapper.test.ts` — +10 tests (Windows cmd.exe shim, `quoteWindowsArg`)
+
+### Tests
+- 32 targeted (`mcp-spec-init`, `run-copilot-wrapper`, `mcp-bridge-pinning`): ✅
+- 129 regression (`init`, `init-scaffolding`, `init-sdk`, `upgrade-state-backend`, `cli/init`, `cli/upgrade`, `cli/init-upgrade-parity`, `cli/state-mcp`, `copilot-invocation-mcp-wrap`, `self-upgrade`): ✅
+- Pre-existing baseline failures (`storage-provider`, `scheduler`, `team-root-resolution` — ~89 tests) verified to fail identically on iter-5 HEAD; not caused by iter-6.
+
+### Verdict
+🟡 READY FOR RE-SMOKE. The local-install fallback unblocks smoke-testing the locally-installed tarball's state-mcp (resolves the iter-5 orphan-Δ=0 root cause). Windows quoting fix removes the `cmd /c '"…"'` workaround. Re-run the 4-repo validation against `0.9.6-preview.12` tarballs.
