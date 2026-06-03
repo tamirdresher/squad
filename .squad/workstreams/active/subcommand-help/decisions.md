@@ -43,3 +43,37 @@ Full upstream suite was intentionally skipped (84 pre-existing Windows flakes pe
 
 **Not recommended.** Fix 1 is the only non-trivial logic: a 2-entry map + one-line lookup with explicit unit coverage of both aliases and the fall-through case. Code is colocated with high cohesion.
 
+---
+
+## 2026-06-03 — PR #1202 help-interception end-to-end validation + Copilot-bot review threads resolved
+
+**Author:** data + coordinator | **Status:** Merged | **Related:** bradygaster/squad#1202, [ws:subcommand-help]
+
+### Validation Summary
+
+**PR #1202 is ready for Brady's review.** End-to-end validation of `squad <cmd> --help` / `-h` across all routed subcommands: **90/90 PASS**. Zero regressions, zero fallbacks, zero side effects, zero new files in any temp cwd.
+
+- **Test coverage:** 45 command identities (incl. 2 `subsquads` aliases) × 2 flags = 90 runs
+- **Max wall-time:** 1132 ms (cold-start). Avg: 711 ms
+- **Non-PASS deviations:** Only `squad version --help` prints version (by design, not a regression)
+- **Alias parity:** `subsquads`, `streams`, `workstreams` produce byte-identical output (commit `69aeee07` confirmed)
+- **All #1201 issues verified:** 31 commands listed as broken in #1201 + 12 additional routed commands all PASS
+- **Coverage:** Full report: `.squad/workstreams/active/subcommand-help/files/help-validation-report-2026-06-03T08-44-10.md` (6150 bytes)
+
+### Recommendation
+
+**Merge PR #1202. No follow-up fix commit needed from this validation pass.**
+
+Optional defense-in-depth (do NOT block merge):
+1. Add unit-level guard in `command-help.test.ts` that asserts `commandsWithHelp()` is a superset of ROUTED_COMMANDS list.
+2. Decide whether `squad version --help` should print help (currently prints version). If yes, drop `version` from intercept allow-list in `cli-entry.ts:296`.
+
+### Coordinator Resolution
+
+Coordinator posted reply + resolved all 3 Copilot-bot review threads on PR #1202:
+- **Thread 1** (Fix 1 — alias normalization, commit `69aeee07`) — replied with design rationale
+- **Thread 2** (Fix 2 — test rename, commit `532edf03`) — replied with coverage justification
+- **Thread 3** (Fix 3 — filesystem assertion, commit `64b19531`) — replied with acceptance spec link
+
+All threads now show `resolved: true`, `lastReplyBy: tamirdresher`. GraphQL verified. Account-switch dance completed (6 API calls, no side effects).
+
