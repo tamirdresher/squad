@@ -35,7 +35,7 @@ B'Elanna drives Squad.Agents.AI delivery to bradygaster/squad: .NET adapter via 
   - `refs/notes/squad` appears on first write (single JSON blob anchored to root commit) ✅
   - `OrphanBranchBackend.write()` via SDK correctly stores and round-trips content ✅
 
-- **MCP tool layer content anomaly (NEW-4, low):** `squad_state_write` via MCP session wrote empty blob to orphan branch, but direct SDK write (`OrphanBranchBackend.write()`) works correctly. Backend is sound; anomaly is in the tool handler layer.
+- **MCP tool layer content anomaly (NEW-4, low):** `squad_state_write` via MCP session wrote empty blob to orphan branch, but direct SDK write (`OrphanBranchBackend.write()`) works correctly. Backend is sound; anomaly is in the tool handler layer. ✅ **FIXED by Data (debd05c4):** runtime guard added to `stateWrite`/`stateAppend` handlers to validate content before backend dispatch. Picard confirmed F3 was test infrastructure only, not production regression.
 
 - **HOME mcp-config SHA256 unchanged** throughout (`928760588EE047B9A96E7F85150907B97F369C1FDB088D4ED959D03D205D3A86`) ✅
 

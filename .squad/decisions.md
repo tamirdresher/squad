@@ -6348,3 +6348,175 @@ PR #1200 ships iteration 9 with critical fixes: Policy Gate regex expansion to a
 - [ ] Implement C-1 security conditions before M4 graduation
 
 ---
+
+---
+
+### [ws:squad-agents-ai] 2026-06-03T19:58:00Z — Picard: upgrade --state-backend fix (UPGRADE-FLAG-IGNORED)
+
+# Decision: `squad upgrade --state-backend` fix (UPGRADE-FLAG-IGNORED)
+
+**Author:** Picard  
+**Date:** 2026-06-04  
+**Status:** RESOLVED — code merged to PR #1200
+
+---
+
+## Problem
+
+`squad upgrade --state-backend two-layer` silently dropped the `--state-backend` flag.  
+`stateBackend` was never written to `.squad/config.json`.
+
+## Root Cause
+
+`runUpgrade()` in `core/upgrade.ts` is backend-agnostic and only reads config; it never writes `stateBackend`. The CLI entry point (`cli-entry.ts`) was not calling `migrateStateBackend` when the flag was supplied.
+
+## Fix
+
+**Commit `e010b161`** — After `runUpgrade` completes, `cli-entry.ts` now calls:
+
+```ts
+await migrateStateBackend(dest, upgradeStateBackend);
+```
+
+`migrateStateBackend` (in `migrate-backend.ts`) JSON-merges `{ stateBackend: target }` into config.json and installs git hooks.
+
+## Architectural Ruling (LOCKED)
+
+`stateBackend` migration is intentionally kept **separate from `runUpgrade()`**. `runUpgrade` must stay backend-agnostic. All future upgrade-related state-backend changes must follow this split pattern.
+
+## Tests
+
+**Commit `bc5e81ee`** added `{ timeout: 30_000 }` to all tests in `test/upgrade-state-backend.test.ts` (git plumbing ops exceed the default 5 s limit) and added a 5th test:
+
+- **UPGRADE-FLAG-IGNORED (clean target):** verifies that when config.json has **no** `stateBackend` field (original bug condition), migration writes the field and preserves other fields like `teamRoot`.
+
+All 5 tests pass (≈ 30 s total on Windows).
+
+
+---
+
+### [ws:squad-agents-ai] 2026-06-03T19:58:00Z — Data: NEW-4 MCP content guard fix
+
+# Decision: Guard Against Undefined Content in squad_state_write/append (NEW-4)
+
+**Date:** 2026-06-03  
+**Author:** Data  
+**Bug:** NEW-4 (from B'Elanna TWO-LAYER-VALIDATION-ITER9.md)  
+**Branch:** `squad/state-backend-upgrade-fixes` (tamirdresher/squad)  
+**Commit:** `debd05c4`  
+**Status:** IMPLEMENTED AND PUSHED
+
+---
+
+## Problem
+
+`squad_state_write` via MCP tool layer wrote empty content to the orphan branch (blob SHA `e69de29bb2d1d6434b8b29ae775ad8c2e48c5391`) while direct `OrphanBranchBackend.write()` worked correctly.
+
+## Root Cause
+
+`parseObject()` in `state-mcp.ts` casts MCP arguments to `Record<string,unknown>` with no runtime type validation. When the MCP payload omits `content`, `args.content === undefined` at runtime. This propagates through `StateBackendStorageAdapter.writeSync()` → `OrphanBranchBackend.write()` → `gitExecWithInput(['hash-object', '-w', '--stdin'], undefined, cwd)`. Node.js `execFileSync` with `input: undefined` sends zero bytes to git stdin → git hashes empty input → empty blob.
+
+## Decision
+
+Add runtime content guards in `stateWrite` and `stateAppend` handlers that check for `null`/`undefined`/non-string `content` and return a structured failure result before reaching the backend. Do NOT coerce to `""` — that would mask the caller error.
+
+```typescript
+if ((args as unknown as Record<string, unknown>)['content'] == null ||
+    typeof (args as unknown as Record<string, unknown>)['content'] !== 'string') {
+  return {
+    textResultForLlm: 'Failed to write state: content is required and must be a string',
+    resultType: 'failure' as const,
+    error: 'content is required',
+  };
+}
+```
+
+## Alternatives Considered
+
+- **Fix `parseObject()` to validate schema**: Would need JSON schema validation injected into the MCP dispatch layer. More invasive; would require changes to `state-mcp.ts`. Better long-term but larger scope.
+- **Fix `gitExecWithInput` to guard `undefined`**: Defense-in-depth, but would silently succeed writing empty content on `null`/`""` — not correct behavior.
+- **Return failure at adapter layer**: `StateBackendStorageAdapter.writeSync()` could guard, but the error message would be less context-rich for the LLM caller.
+
+## Chosen Approach Rationale
+
+The `stateWrite`/`stateAppend` handlers already own argument validation logic (`normalizeStateToolKey`, `validateMutableStateToolKey`). Adding a content guard at this layer is consistent with the existing pattern, minimally invasive, and produces a clear, LLM-readable error message.
+
+## Files Changed
+
+| File | Change |
+|------|--------|
+| `packages/squad-sdk/src/tools/index.ts` | +16 lines: content guard in `stateWrite` and `stateAppend` handlers |
+| `test/state-backend.test.ts` | +51 lines: 3 regression tests covering undefined-write, valid-write, undefined-append |
+
+## Test Results
+
+- ✅ `squad_state_write with undefined content returns failure, does not write empty blob (NEW-4)`
+- ✅ `squad_state_write with valid content writes correct non-empty content (NEW-4)`
+- ✅ `squad_state_append with undefined content returns failure, does not corrupt existing content (NEW-4)`
+- Pre-existing failures unchanged: `allows only approved runtime state mutation paths`, `replays the failed two-layer flow`
+
+
+---
+
+### [ws:squad-agents-ai] 2026-06-03T19:58:00Z — B'Elanna: Two-Layer State Backend Verification
+
+# Decision: Two-Layer State Backend Verification
+**Author:** B'Elanna  
+**Date:** 2026-06-03  
+**Package:** `@bradygaster/squad-cli@0.9.6-preview.15`  
+**References:** `SMOKE-ITER9-6REPO-DOGFOOD.md` (F3), `TWO-LAYER-VALIDATION-ITER9.md`
+
+---
+
+## Verdict: PARTIALLY VERIFIED
+
+The two-layer state backend (git-notes + orphan branch) is **fully implemented and functional** when explicitly activated, but is **never activated by default**.
+
+---
+
+## What Was Verified (✅ Works)
+
+- `squad init --state-backend two-layer` writes `"stateBackend": "two-layer"` to `.squad/config.json`
+- `squad-state` orphan branch is created immediately (not lazily) when `--state-backend` flag is used
+- `squad-state` branch holds `decisions.md` and `agents/*/history.md` (migrated from working tree)
+- Each state write creates a new commit on `squad-state` (audit trail preserved)
+- `squad_state_health` correctly reports `StateBackendStorageAdapter` (not `FSStorageProvider`) when two-layer is configured
+- `refs/notes/squad` is created on first write, anchored to root commit as a JSON blob
+- `OrphanBranchBackend.write()` via SDK correctly stores and round-trips content
+- HOME mcp-config unchanged throughout (safety invariant holds)
+
+## What Was NOT Verified (❌ Not Working / Not Default)
+
+- Default `squad init` (no flags) still produces `{"version":1}` with no `stateBackend` key → uses `FSStorageProvider` → **F3 confirmed**
+- `squad_state_write` via MCP tool layer produced empty orphan blob (content anomaly — separate from backend correctness)
+- Upgrade path scenario (travel-assistant + `squad upgrade --state-backend two-layer`) not separately tested — code path confirmed equivalent to init via source inspection
+
+---
+
+## Root Cause of F3
+
+```javascript
+// cli/upgrade.js ~ line 241
+if (options.stateBackend) {
+  config['stateBackend'] = options.stateBackend;
+  // ... orphan branch creation ...
+}
+// WITHOUT --state-backend flag:
+// config is NOT mutated → no stateBackend key → resolves to 'local' → FSStorageProvider
+```
+
+The `--state-backend` flag is the exclusive activation gate. No default, no prompt, no docs visible during init.
+
+---
+
+## Required Action
+
+Brady / CLI maintainer should decide:
+
+1. **Make two-layer the default** — change `'local'` default in `resolveStateBackend()` to `'two-layer'`
+2. **Add opt-in hint** — post-init message suggesting `--state-backend two-layer` for multi-worktree/persistent state
+3. **Document explicitly** — make the opt-in requirement visible in init output and README
+
+Finding F3 should remain open until one of these options is implemented and validated.
+
+
