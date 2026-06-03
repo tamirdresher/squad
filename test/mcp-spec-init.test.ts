@@ -1,19 +1,18 @@
 /**
  * Tests for the mcp-spec helper.
  *
- * Iter-5 introduced the shared `resolveSquadStateMcpSpec` so init.ts and
- * upgrade.ts agree on the runtime-MCP fallback behavior. Iter-6 extends it
- * to return a full SquadStateMcpSpec (command + args + source) and to fall
- * back to the locally-installed package when neither the pinned version nor
- * the @insider dist-tag is published — required for in-flight preview
- * validation (smoke data-27 / data-28).
+ * Iter-7 simplified the resolver to 2 tiers:
+ *   1. Pinned version published on npm  → npx -y <pkg>@<version>
+ *   2. Anything else                     → npx -y <pkg>@insider
+ *
+ * The iter-6 local-install path and the hard-error fallback were deleted;
+ * smoke data-30/data-32 confirmed `@insider` is always reachable in practice
+ * and tier-3 never fired.
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
 import { readFileSync } from 'node:fs';
 import path from 'node:path';
-import os from 'node:os';
 
 vi.mock(
   '../packages/squad-cli/src/cli/core/npm-registry.js',
@@ -30,17 +29,15 @@ import { isSquadCliVersionPublished } from '../packages/squad-cli/src/cli/core/n
 
 const mockIsPublished = vi.mocked(isSquadCliVersionPublished);
 
-describe('resolveSquadStateMcpSpec (iter-6: returns full SquadStateMcpSpec)', () => {
+describe('resolveSquadStateMcpSpec (iter-7: 2-tier resolver)', () => {
   beforeEach(() => {
     mockIsPublished.mockReset();
     _resetMcpSpecCache();
   });
 
   it('returns a pinned npx spec when the version is published on npm', async () => {
-    mockIsPublished.mockResolvedValue(true);
     const spec = await resolveSquadStateMcpSpec('0.9.6-preview.42', {
-      insiderAvailabilityProbe: async () => false,
-      localPackageResolver: () => null,
+      publishedCheck: async () => true,
     });
     expect(spec.source).toBe('pinned');
     expect(spec.command).toBe('npx');
@@ -51,74 +48,46 @@ describe('resolveSquadStateMcpSpec (iter-6: returns full SquadStateMcpSpec)', ()
     ]);
   });
 
-  it('falls back to @insider when the version is NOT published but @insider IS', async () => {
-    mockIsPublished.mockResolvedValue(false);
+  it('falls back to @insider when the version is NOT published', async () => {
     const spec = await resolveSquadStateMcpSpec('0.9.6-preview.99999', {
-      insiderAvailabilityProbe: async () => true,
-      localPackageResolver: () => null,
+      publishedCheck: async () => false,
     });
     expect(spec.source).toBe('insider');
     expect(spec.command).toBe('npx');
     expect(spec.args).toEqual(['-y', '@bradygaster/squad-cli@insider', 'state-mcp']);
   });
 
-  it('falls back to local install when neither pinned version nor @insider is published', async () => {
-    mockIsPublished.mockResolvedValue(false);
-    // Create a fake on-disk cli-entry so existsSync passes.
-    const tmp = mkdtempSync(path.join(os.tmpdir(), 'squad-mcp-local-'));
-    try {
-      const fakeEntry = path.join(tmp, 'dist', 'cli-entry.js');
-      mkdirSync(path.dirname(fakeEntry), { recursive: true });
-      writeFileSync(fakeEntry, '// stub');
-
-      const spec = await resolveSquadStateMcpSpec('0.9.6-preview.99999', {
-        insiderAvailabilityProbe: async () => false,
-        localPackageResolver: () => fakeEntry,
-      });
-      expect(spec.source).toBe('local');
-      // command must be an absolute node path so MCP loader can exec directly.
-      expect(spec.command).toBe(process.execPath);
-      expect(spec.args).toEqual([fakeEntry, 'state-mcp']);
-    } finally {
-      rmSync(tmp, { recursive: true, force: true });
-    }
-  });
-
-  it('throws a clear error when all three branches fail', async () => {
-    mockIsPublished.mockResolvedValue(false);
-    await expect(
-      resolveSquadStateMcpSpec('0.9.6-preview.99999', {
-        insiderAvailabilityProbe: async () => false,
-        localPackageResolver: () => null,
-      }),
-    ).rejects.toThrow(/Unable to resolve squad_state MCP launch spec/);
-  });
-
-  it('does not return a local spec when the resolver returns a path that does not exist', async () => {
-    mockIsPublished.mockResolvedValue(false);
-    await expect(
-      resolveSquadStateMcpSpec('0.9.6-preview.99999', {
-        insiderAvailabilityProbe: async () => false,
-        localPackageResolver: () => path.join(os.tmpdir(), 'definitely-does-not-exist-12345', 'cli-entry.js'),
-      }),
-    ).rejects.toThrow(/Unable to resolve/);
-  });
-
-  it('short-circuits the registry HEAD check for the placeholder 0.0.0 version (still falls back)', async () => {
+  it('short-circuits the registry check for the placeholder 0.0.0 version (returns @insider)', async () => {
     const spec = await resolveSquadStateMcpSpec('0.0.0', {
-      insiderAvailabilityProbe: async () => true,
-      localPackageResolver: () => null,
+      publishedCheck: async () => {
+        throw new Error('publishedCheck should not be called for 0.0.0');
+      },
     });
-    expect(mockIsPublished).not.toHaveBeenCalled();
+    expect(spec.source).toBe('insider');
+    expect(spec.args[1]).toBe('@bradygaster/squad-cli@insider');
+  });
+
+  it('short-circuits the registry check for empty version (returns @insider)', async () => {
+    const spec = await resolveSquadStateMcpSpec('', {
+      publishedCheck: async () => {
+        throw new Error('publishedCheck should not be called for empty version');
+      },
+    });
     expect(spec.source).toBe('insider');
   });
 
-  it('short-circuits the registry HEAD check for empty version (still falls back)', async () => {
-    const spec = await resolveSquadStateMcpSpec('', {
-      insiderAvailabilityProbe: async () => true,
-      localPackageResolver: () => null,
+  it('never throws — always returns a usable spec (no hard-error tier in iter-7)', async () => {
+    const spec = await resolveSquadStateMcpSpec('0.9.6-preview.99999', {
+      publishedCheck: async () => false,
     });
-    expect(mockIsPublished).not.toHaveBeenCalled();
+    expect(spec).toBeDefined();
+    expect(spec.command).toBe('npx');
+  });
+
+  it('uses the real npm-registry probe by default when publishedCheck is not injected', async () => {
+    mockIsPublished.mockResolvedValue(false);
+    const spec = await resolveSquadStateMcpSpec('0.9.6-preview.99999');
+    expect(mockIsPublished).toHaveBeenCalledWith('0.9.6-preview.99999');
     expect(spec.source).toBe('insider');
   });
 });

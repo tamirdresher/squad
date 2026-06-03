@@ -705,10 +705,7 @@ async function runEnsureChecks(dest: string, templatesDir: string, filesUpdated:
 
 /** Human-readable single-line description of an McpSpec for success() messages. */
 export function describeMcpSpec(spec: SquadStateMcpSpec): string {
-  if (spec.source === 'local') {
-    return `local install (${spec.args[0] ?? '<unknown>'})`;
-  }
-  // npx specs: `-y <pkg@version-or-tag> state-mcp` → describe by the pkg spec.
+  // After iter-7 all specs are `npx -y <pkg@version-or-tag> state-mcp`.
   const pkg = spec.args[1] ?? '<unknown>';
   return spec.source === 'insider' ? `${pkg} (@insider fallback)` : pkg;
 }
