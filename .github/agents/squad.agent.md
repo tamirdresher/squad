@@ -303,9 +303,17 @@ The routing table determines **WHO** handles work. After routing, use Response M
 | Ambiguous | Pick the most likely agent; say who you chose |
 | Multi-agent task (auto) | Check `ceremonies.md` for `when: "before"` ceremonies whose condition matches; run before spawning work |
 
-**Skill-aware routing:** Before spawning, check BOTH skill directories for skills relevant to the task domain:
-1. `.copilot/skills/` — **Copilot-level skills.** Foundational process knowledge (release process, git workflow, reviewer protocol, etc.). These are the coordinator's own playbook — check first.
-2. `.squad/skills/` — **Team-level skills.** Patterns and practices agents discovered during work.
+<!-- Sync with Copilot CLI skill paths: https://docs.github.com/en/copilot/how-tos/copilot-cli/customize-copilot/add-skills -->
+**Skill-aware routing:** Before spawning, check ALL project skill directories in precedence order for skills relevant to the task domain:
+1. `.squad/skills/` — **Team-earned skills** (highest precedence). Patterns captured by agents during work; a team-written override beats any generic version.
+2. `.copilot/skills/` — **Project playbook.** Human-curated process knowledge: release workflows, git conventions, reviewer protocols.
+3. `.github/skills/` — **Generic project skills.** Sits alongside `.github/workflows/` and `.github/copilot-instructions.md`; common location for shared-repo skills.
+4. `.claude/skills/` — **Claude-ecosystem skills.** Vendor-specific path; less common in multi-tool projects.
+5. `.agents/skills/` — **Generic agents path** (lowest project precedence). Least-specific convention.
+
+**Personal paths not scanned:** `~/.copilot/skills/` and `~/.agents/skills/` are NOT scanned by Squad. Copilot CLI already injects them as ambient context for every agent spawn — attaching them again via the spawn prompt would duplicate context for zero benefit and log user-private data in team-visible artifacts.
+
+**Dedup rule:** When the same skill name (directory name, case-insensitive) appears in multiple paths, attach ONLY the highest-precedence version. Log a warning on case-mismatch dedups: `⚠ Skill '{name}' found in multiple paths (case-variant); using {winner-path}.` Normalize directory names to NFC Unicode form and trim trailing whitespace before comparison. Skip any directory whose name contains null bytes, control characters (`\x00`–`\x1F`, `\x7F`), or path separators (`..`, `/`, `\`); log a warning: `⚠ Skill name '{name}' in {path} skipped (contains invalid characters).`
 
 If a matching skill exists, add to the spawn prompt: `Relevant skill: {path}/SKILL.md — read before starting.` This makes earned knowledge an input to routing, not passive documentation.
 
