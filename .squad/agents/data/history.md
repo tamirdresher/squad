@@ -134,3 +134,99 @@ px -y @bradygaster/squad-cli@insider state-mcp (dist-tag fallback per REGISTRY-P
 
 
 Full archive: .squad/agents/data/history-archive.md
+
+---
+
+## 2025 — MCP Phase 1 Recovery Spawn (data-5)
+
+**Context:** Spawned to salvage Phase 1 of MCP config path migration after data-4 hung for ~7 hours without committing.
+
+**Commit:** `892b2da2` on `feat/mcp-json-migration` (local only — no push, no PR per coordinator instruction).
+
+**True scope shipped (21 files, all AUDIT-MATCH):**
+- 4 code: `packages/squad-sdk/src/config/init.ts`, `packages/squad-cli/src/cli/core/init.ts`, `packages/squad-cli/src/cli/commands/state-mcp.ts`, `index.cjs`
+- 1 test: `test/cli/init.test.ts`
+- 8 template mirrors (twin-file invariant respected across `.squad-templates/`, `packages/squad-cli/templates/`, `packages/squad-sdk/templates/`, root `templates/`, plus `.github/agents/squad.agent.md`)
+- 5 docs (`mcp.md` full rewrite + 4 cross-references)
+- 2 changesets (new `mcp-json-migration.md`, 1-line update to `mcp-frontmatter-init.md`)
+
+**Tests:** `test/cli/init.test.ts` 15/15 vitest pass; `test/mcp-config.test.cjs` 10/10 node:test pass.
+
+**Lessons learned (the actually-useful ones):**
+
+1. **Stale-stat phantom mods are a real recovery trap.** Initial `git status --porcelain` reported 3 modified `package.json` files with empty `git diff` output. Running `git update-index --refresh` immediately revealed the true state: 0 package.json mods, but 20 real modifications on other files that the index was hiding. **Rule: when diagnosing a hung-spawn recovery, `git update-index --refresh` is mandatory before trusting `git status`.** data-4 likely touched mtimes (build watch? IDE indexer?) without changing content.
+
+2. **Stash named `phase1-temp` was a red herring.** It contained `ceremonies.md` deletions and `.gitignore` tweaks — completely unrelated to MCP Phase 1. Real Phase 1 work was live in the working tree, not stashed. **Rule: never auto-`git stash pop` on recovery; inspect `git stash show -p stash@{0}` first.**
+
+3. **Coordinator's predicted collateral list was outdated.** No `.mcp.json` at root, no `test-fixtures/copilot-install-test/`, no `test-fixtures/init-test/`, no parser-contracts snapshot mod. Working tree was much cleaner than the spawn prompt predicted. **Rule: always re-verify `git status` and `Test-Path` collateral candidates fresh — don't trust a spawn-time snapshot of state.**
+
+4. **Audit table missing from `decisions.md`.** The "Data — MCP Config Migration Audit" 25-row blast-radius table referenced in the spawn prompt was NOT in `.squad/decisions.md` (4017 lines searched). Worked around by using the new changeset `.changeset/mcp-json-migration.md` as scope-of-truth proxy. All 20 modifications mapped cleanly to its declared scope. **Rule: if a referenced decision is missing, the freshest changeset is usually the next-best authority.**
+
+5. **Twin-file invariant survived.** All 4 mirrors of `mcp-config.md` and 4 mirrors of `squad.agent.md.template` had identical diffs — data-4 (or whoever did the edits before hanging) respected the invariant. The sync-templates script handles propagation but a manual review confirmed parity.
+
+6. **Time-box discipline:** completed recovery+commit in well under the 45-minute budget once stale-stat was unblocked. Spawn for batch edits across N>10 files should split into per-area spawns of ≤5 files to avoid the 7-hour hang pattern.
+
+**Deferred to Phase 2 (next spawn, with Worf review):**
+- `squad upgrade` merge helper for repos that already have `.copilot/mcp-config.json` (apply Seven's precedence research: parse-before-overwrite, warn-and-preserve on same-name conflict with different command/args, atomic temp+rename writes)
+- `ensureSquadStateMcpPinned` dual-write window (both legacy and new path during deprecation)
+- Worf review pass on the Phase 1 commit before opening PR
+
+
+## Learnings — MCP migration Phase 2 (2026-06-03)
+
+- EnsureMcpServerResult exposes .warning (string|undefined), NOT .error. MigrateMcpConfigResult exposes both .warnings (array) and .error? (only on malformed-* statuses). Don't confuse them.
+- TypeScript strict + `Record<string, T>` index access yields `T | undefined`. Guard with `if (x === undefined) continue;` before use.
+- `overwriteOnConflict` defaults to `false` on `ensureMcpServerPinned` for safety on user-owned files. The `squad_state` pin is canonical, so init.ts must pass `true`. Dual-write tests need both branches.
+- vitest cases for fs-touching helpers belong at `test/*.test.ts` (top-level), beside siblings like `storage-provider.test.ts`. The glob is `test/**/*.test.ts`.
+- Atomic-write contract: temp file lives in the SAME dir as target so rename is single-volume atomic. Always assert no .tmp leftovers in success-path tests.
+
+---
+
+## 2026-06-02 → 2026-06-03 — MCP JSON Migration Batch (Phases 1–2, Issue #3642)
+
+**Batch summary:** 5-agent spawn batch to implement MCP config migration feature and open PR #1208 on upstream (bradygaster/squad).
+
+**Agent timeline:**
+- **data-4** (2026-06-02T16:00:00Z): Phase 1 spawn — ZOMBIE (hung ~7.25h, no commits, replaced by data-5)
+- **data-5** (2026-06-03T02:00:00Z): Phase 1 recovery — ✅ COMPLETED commit 892b2da2 (21 files, zero collateral)
+- **data-6** (2026-06-03T03:33:48Z): Phase 2 implementation — ✅ COMPLETED 4 commits (3207f075, 4b635463, c264e57b, 92e3a394)
+
+**data-4 hang analysis (Scribe lockout note):**
+- Spawned with broad scope: 23+ predicted edits across templates, init, tests, docs, changesets
+- Hung without reporting progress; likely hit interaction of:
+  1. Large batch edit cross-file dependencies (template sync invariant + init updates + dual changesets)
+  2. Stale stat-info phantom modifications (git index vs worktree time-mismatch)
+  3. No intermediate checkpoints / time-box enforcement
+- **Rule applied post-hang:** Batch edits with N > 10 files must decompose into per-area spawns ≤5 files each, with explicit time-boxes
+
+**data-5 recovery (completed on-budget 45 min):**
+- Applied `git update-index --refresh` (revealed stale stat phantom; true state = 20 files, not 3)
+- Classified all 21 files: AUDIT-MATCH (zero collateral found; stash `phase1-temp` was unrelated)
+- Shipped Phase 1: init code + 8 template mirrors + 5 docs + 2 changesets
+- Tests: 15/15 (init), 10/10 (mcp-config) pass
+- Commit: 892b2da2 on feat/mcp-json-migration (upstream squad, not squad-squad)
+
+**data-6 Phase 2 (completed before Worf review):**
+- Four commits shipped:
+  1. 3207f075: Merge helper foundation (reconcile workspace + user configs)
+  2. 4b635463: Dual-write support (both `.copilot/mcp-config.json` + `.mcp.json` during migration)
+  3. c264e57b: atomicWriteJson helper (temp + rename for atomic safety)
+  4. 92e3a394: Edge case tests (13/13 pass)
+- Implementation incorporates Seven's precedence research (full shadow, no key-merge) and defensive patterns (no silent overwrites, atomic writes)
+- Tests: 13/13 pass; ready for Worf review
+
+**Worf review + Geordi conditions (batch closure):**
+- Worf approved with 2 conditions (see worf-1 orchestration-log)
+- Geordi applied both conditions (commit 77186501, tests 29/30 pass, 1 Windows-expected skip)
+- PR #1208 opened by Coordinator on bradygaster/squad (feat/mcp-json-migration → main)
+
+**Scribe decision batch:** 5 inbox files merged to decisions.md (2026-06-03T04:00Z):
+- `seven-mcp-config-precedence.md`: CLI precedence research (workspace full-shadows user, no key-merge)
+- `data-mcp-phase1-recovery.md`: Phase 1 commit + audit
+- `data-mcp-phase2-complete.md`: Phase 2 commits + tests
+- `worf-mcp-merge-helper-review.md`: Worf approval + 2 conditions
+- `geordi-mcp-worf-conditions-applied.md`: Condition application + final tests
+
+**Deferral:** None — feature complete, PR open, awaiting upstream maintainer merge on PR #1208 (bradygaster/squad)
+
+**Batch status:** ✅ CLOSED (PR #1208 opened; issue #3642 resolved in implementation)

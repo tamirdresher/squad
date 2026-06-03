@@ -83,3 +83,47 @@ Release pipeline now implemented as branch-driven (dev→prerelease, main→stab
 Picard's upstream tracking issue draft posted as bradygaster/squad#1205 (type:feature). Issue includes pre-post analysis on Brady's repo posture, existing related issue #1144 (social proof for MAF/Squad integration), and explicit recommendation on in-repo vs. companion-repo placement.
 
 **Next:** Monitor #1205 for Brady's triage decision. If greenlit, Tamir opens cross-fork PR to tamirdresher/squad targeting bradygaster/squad:dev.
+
+## 2026-06-02T22:22:40+03:00 — MCP config migration scope (Picard-4)
+
+**Decision:** GO additive .copilot/mcp-config.json -> .mcp.json in next minor of squad-cli + squad-sdk.
+
+**Key trade-offs weighed:**
+- Additive vs rip-and-replace: chose additive because we do NOT pin user's Copilot CLI version, so a hard cutover would break users mid-upgrade. +0.5 day cost is worth zero-regression guarantee.
+- Additive vs deprecate-and-warn: warning is noisy for the majority of users who never edit MCP config; merge helper is mechanical, so just do the merge silently and preserve the legacy file.
+- One minor release window is our default cadence; merge helper persists forever for users who skip versions.
+
+**Handoff gates locked in:**
+1. Seven re-spawn (30 min) for precedence/merge/failure semantics — informs Data's conflict-resolution logic, not blocking on code start.
+2. Worf BLOCKING review of merge helper for `squad_state` atomicity + conflict policy + crash recovery, before upstream PR goes ready-for-review.
+3. Coordinator enforces: no silent legacy-file deletion, historical decisions log not rewritten, ADC sandbox files untouched.
+
+**Sequencing:** open bradygaster/squad tracking issue NOW (same playbook as #1205), close github/copilot-cli#3642 immediately with thank-you + cross-link, ship upstream PR after.
+
+**Reusable lesson:** when a third-party tool's supported config path differs from ours, the answer is almost always **additive + merge-helper**, never rip-and-replace, because we do not control the user's tool version. Pattern applies to any future Copilot CLI / VS Code / Cursor path divergence.
+
+**No B'Elanna engagement** — merge helper is filesystem-only, no durable-state invariant impact.
+
+**Decision file:** `.squad/decisions/inbox/picard-mcp-json-migration-scope.md`
+
+---
+
+## 2026-06-03T03:50:00Z — PR #1208 Opened on bradygaster/squad (MCP JSON Migration)
+
+**Coordinator action:** PR #1208 on bradygaster/squad (feat/mcp-json-migration → main) opened after Geordi confirmed conditions applied + tests passing (29/30).
+
+**Batch status:** ✅ Feature implementation complete:
+- Seven: Precedence research (3 experiments on CLI 1.0.58)
+- Data-5: Phase 1 shipped (commit 892b2da2; 21 files, zero collateral)
+- Data-6: Phase 2 shipped (4 commits; merge helper, dual-write, tests 13/13)
+- Worf: Safety reviewed, approved with 2 conditions
+- Geordi: Conditions applied (commit 77186501; tests 29/30, 1 Windows skip)
+
+**PR summary:** Closes issue #3642 (MCP config migration from `.copilot/mcp-config.json` → workspace `.mcp.json`). Includes:
+- Phase 1: Init code + template mirrors + docs + changesets
+- Phase 2: Merge helper (reconcile workspace + user configs) + dual-write support + atomic writes + edge-case tests
+- Conditions: EACCES handling (try/catch) + round-trip parse validation before rename
+
+**Picard sequencing lesson:** MCP migration scope decision (Picard-4) executed perfectly — additive migration path selected, all handoff gates locked in and traversed, no silent file deletion, historical decisions preserved. Upstream PR open with full audit trail in `.squad/decisions.md`.
+
+**Awaiting:** Upstream maintainer merge on bradygaster/squad (PR #1208)

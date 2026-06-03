@@ -107,3 +107,48 @@ The 9 mandatory security conditions (SC-1..SC-9) from the 2026-06-02 auth-extens
 ---
 **Last Updated:** 2026-06-02T21:10:16.324+03:00  
 **Archive:** `.squad/agents/worf/history-archive.md` (detailed security review)
+
+## Learnings — MCP merge helper review (2026-06-02T23:18:09+03:00)
+
+**Subject:** `feat/mcp-json-migration` branch, Phase 2 (`migrate-mcp-config.ts` + dual-write in `init.ts`).
+
+**Verdict:** APPROVE WITH CONDITIONS. All three Picard gates (atomicity / conflict resolution / failure mode) pass on cited evidence. Two conditions handed to Geordi:
+- A (required): wrap `ensureMcpServerPinned` call in `init.ts:1340–1361` in try/catch so EACCES/EROFS on legacy file doesn't crash `squad init`.
+- B (recommended): add `JSON.parse(serialized)` belt-and-braces in `atomicWriteJson` per Seven §"Recommendation 2".
+
+**Certified:**
+- Temp-then-rename pattern in `atomicWriteJson` (same-dir → same-volume → atomic on POSIX + Windows MoveFileEx).
+- Helper never writes the legacy file → Picard constraint 3 satisfied by construction, not just by convention.
+- `parseJsonFile` round-trip + non-object guard at line 324–335 closes Seven §(c) silent-fallback hazard at the input boundary.
+- Conflict policy (warn + keep target) covered by tests at `test/upgrade-mcp-merge.test.ts:96–125` for both equivalent and non-equivalent branches.
+
+**Flagged (non-blocking):**
+- No `fsync` before rename. Accepted (standard CLI tradeoff: npm, yarn, pnpm do the same). Document and move on.
+- Conflict path returns `status: 'no-op'` + warn rather than non-zero exit (Seven asked for non-zero). Picard's gate didn't require it; accepted with note that wrapped/non-interactive callers might miss the warning.
+- `force: true` codepath silently drops malformed workspace state — unreachable from current `runUpgrade` (no `--force` plumbed). Out of scope, but flagged if `--force` is ever added.
+
+**Reusable pattern extracted:** "Atomic JSON Write Checklist" → `.squad/skills/atomic-json-write-checklist/SKILL.md`. This pattern recurs across init/upgrade/state-machinery — codify once.
+
+**Rejection-lockout reassignment:** Data wrote the helper and the integration site; both conditions touch `init.ts`. Handed to Geordi (platform/systems) to keep reviewer/author separation clean even though no part of Data's helper was itself rejected.
+
+**Full Report:** `.squad/decisions/inbox/worf-mcp-merge-helper-review.md`
+
+---
+
+## 2026-06-03T03:50:00Z — PR #1208 Opened on bradygaster/squad (MCP Migration Conditions Applied)
+
+**Coordinator action:** PR #1208 on bradygaster/squad (feat/mcp-json-migration → main) opened after Geordi verified both Worf conditions applied + all tests pass (29/30, 1 Windows-expected skip).
+
+**Conditions Applied:**
+- **Condition A (required):** EACCES/EROFS handling wrapped in try/catch at init.ts:1340–1361 (legacy `.copilot/mcp-config.json` permissions edge-case on Windows)
+- **Condition B (recommended):** Round-trip `JSON.parse(serialized)` validation added to `atomicWriteJson` before final rename (defense-in-depth per Seven's recommendation)
+
+**Verification by Geordi:**
+- All 29 core tests pass (1 Windows-specific POSIX file permission test skipped as expected)
+- Edge-case tests for equivalent/non-equivalent merge paths pass
+- Atomic write pattern confirmed correct (temp-then-rename on same-dir/same-volume)
+- No silent config drops (parseJsonFile round-trip + non-object guard closed silent-fallback hazard)
+
+**Worf Sequencing Lesson:** Merge helper review executed correctly — all Picard gates (atomicity / conflict resolution / crash recovery) verified with cited evidence. Two conditions handed to Geordi (platform/systems) per reviewer/author separation. Conditions applied without modification to core helper logic. Phase 1 (commit 892b2da2) and Phase 2 (4 commits) shipped clean.
+
+**Awaiting:** Upstream maintainer merge on bradygaster/squad (PR #1208)

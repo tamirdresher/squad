@@ -5811,3 +5811,501 @@ ready-for-review.
 
 
 
+
+---
+# Seven — MCP Config Precedence / Merge / Failure Semantics (Copilot CLI 1.0.58)
+
+**By:** Seven (Research & Integration Engineer)
+**Date:** 2026-06-02T22:22:40+03:00
+**Requested by:** Picard (per `decisions.md` § "Further research asks (Seven re-spawn)")
+**Consumer:** Data — merge-helper conflict-resolution policy
+**Env:** Copilot CLI 1.0.58, Windows, `~/.copilot/mcp-config.json` and workspace `.mcp.json`.
+
+---
+
+## TL;DR
+
+| # | Question                                                                 | Empirical answer                                                                                                                              |
+|---|--------------------------------------------------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------|
+| a | Same server name in both files — which wins?                             | **Workspace (`.mcp.json`) wins.** The user entry is completely hidden; `source` field on the served entry reads `"workspace"`.                |
+| b | Merged (union of keys) or shadow?                                        | **Full shadow.** When the workspace entry exists, no field from the user entry leaks in — including `env`, even when the workspace has none. |
+| c | Malformed `.mcp.json` (e.g. content = `{`) — fallback, hard-fail, log?   | **Silent fallback to user file.** Exit code `0`, no stderr/stdout warning. Workspace servers are simply absent from `copilot mcp list`.       |
+
+**One-line recommendation for Data's merge helper:** because workspace fully shadows user with no key-level merging and no warning on parse failure, the helper MUST (1) refuse to silently overwrite an existing `squad_state` workspace entry whose `command`/`args` differ from the canonical pin, and (2) round-trip parse `.mcp.json` itself with a clear error before writing — Copilot CLI will not tell the user the file is broken.
+
+---
+
+## Test setup (throwaway temp dir, no production state mutated)
+
+```powershell
+$ts      = "20260602-230917"
+$testDir = "$env:TEMP\seven-mcp-precedence-test-$ts"
+$userCfg = "$env:USERPROFILE\.copilot\mcp-config.json"
+
+New-Item -ItemType Directory -Path $testDir | Out-Null
+Copy-Item $userCfg "$testDir\mcp-config.json.bak"   # backup
+```
+
+### User config (`~/.copilot/mcp-config.json`)
+```json
+{
+  "mcpServers": {
+    "probe_precedence":     { "type": "local", "command": "node", "args": ["-e", "console.error('USER MCP')"],       "env": { "PROBE_SOURCE": "user" } },
+    "probe_merge":          { "type": "local", "command": "node", "args": ["-e", "console.error('USER MCP merge')"], "env": { "USER_ONLY_ENV": "user_value" } },
+    "probe_user_only":      { "type": "local", "command": "node", "args": ["-e", "console.error('USER ONLY')"] }
+  }
+}
+```
+
+### Workspace config (`$testDir\.mcp.json`)
+```json
+{
+  "mcpServers": {
+    "probe_precedence":     { "type": "local", "command": "node", "args": ["-e", "console.error('WORKSPACE MCP')"],       "env": { "PROBE_SOURCE": "workspace" } },
+    "probe_merge":          { "type": "local", "command": "node", "args": ["-e", "console.error('WORKSPACE MCP merge')"] },
+    "probe_workspace_only": { "type": "local", "command": "node", "args": ["-e", "console.error('WORKSPACE ONLY')"] }
+  }
+}
+```
+
+Key design points:
+- `probe_precedence` is defined in both with **distinguishable `args` and `env`** → answers (a).
+- `probe_merge` is defined in both, but the **workspace entry omits `env`** while the user entry has one → answers (b) (does the user's `env` survive into the merged record?).
+- `probe_user_only` and `probe_workspace_only` are disjoint controls.
+
+---
+
+## (a) Precedence — Workspace wins
+
+**Command:**
+```powershell
+cd $testDir
+copilot mcp list --json
+```
+
+**Exact output (excerpt for `probe_precedence`):**
+```json
+"probe_precedence": {
+  "tools": ["*"],
+  "type": "local",
+  "command": "node",
+  "args": ["-e", "console.error('WORKSPACE MCP')"],
+  "env": { "PROBE_SOURCE": "workspace" },
+  "source": "workspace",
+  "sourcePath": "C:\\Users\\tamirdresher\\AppData\\Local\\Temp\\seven-mcp-precedence-test-20260602-230917\\.mcp.json"
+}
+```
+
+**Interpretation:** Every field — `command`, `args`, `env.PROBE_SOURCE`, and the diagnostic `source`/`sourcePath` — comes from the workspace file. The user-file definition of `probe_precedence` is invisible. **Workspace > User** at config-resolution time.
+
+---
+
+## (b) Merge vs shadow — Full shadow (no key-level merging)
+
+**Same command as (a). Exact output (excerpt for `probe_merge`):**
+```json
+"probe_merge": {
+  "tools": ["*"],
+  "type": "local",
+  "command": "node",
+  "args": ["-e", "console.error('WORKSPACE MCP merge')"],
+  "source": "workspace",
+  "sourcePath": "C:\\Users\\tamirdresher\\AppData\\Local\\Temp\\seven-mcp-precedence-test-20260602-230917\\.mcp.json"
+}
+```
+
+**Interpretation:** The workspace entry has no `env`. The user entry has `env: { USER_ONLY_ENV: "user_value" }`. The resolved record has **no `env` at all**. If precedence were a key-level merge, the user's `env` would survive into the workspace-shadowed entry. It does not. → **Shadow, not merge. At the server-name level the union is taken (disjoint names from each source coexist); at the field level the higher-precedence source wholly replaces the lower one.**
+
+This is also confirmed by `probe_user_only` (source: `user`) and `probe_workspace_only` (source: `workspace`) appearing side-by-side — proving the *outer* dict is a name-level union.
+
+---
+
+## (c) Malformed `.mcp.json` — Silent fallback to user file
+
+**Setup + command:**
+```powershell
+Set-Content -Path "$testDir\.mcp.json" -Value "{" -Encoding UTF8   # invalid JSON
+cd $testDir
+copilot mcp list
+echo "exit=$LASTEXITCODE"
+```
+
+**Exact output:**
+```
+User servers:
+  probe_precedence (local)
+  probe_merge (local)
+  probe_user_only (local)
+
+
+exit=0
+```
+
+`copilot mcp list --json` from the same broken-workspace dir is equally clean — only the three user entries, no `probe_workspace_only`, no warning, exit `0`.
+
+**Confirmation via `mcp get`:**
+```
+> copilot mcp get probe_workspace_only
+Error: Server "probe_workspace_only" not found.
+
+Available servers:
+  probe_precedence
+  probe_merge
+  probe_user_only
+exit=1
+```
+
+Equivalent runs with `.mcp.json` = empty string and with `.mcp.json` = `"this is not json at all {{ ]]"` produced **identical silent-fallback behavior** (exit 0, no diagnostic, workspace servers absent).
+
+**Interpretation:** Copilot CLI does NOT hard-fail on a malformed workspace `.mcp.json`. It does NOT log a parse error to stdout or stderr. It silently drops the entire workspace source and continues with user + plugin + builtin only. **This is a debuggability hazard** — a typo in `.mcp.json` will make `squad_state` "disappear" with no clue why.
+
+---
+
+## Recommendation for Data's merge-helper conflict policy
+
+1. **Same-name conflict → warn + prefer existing.** Because workspace fully shadows user at the field level, blindly writing a `squad_state` entry into `.mcp.json` when one already exists with a different `command` or `args` will silently dispatch the legacy entry on every CLI invocation. Helper MUST:
+   - Parse the existing `.mcp.json` first.
+   - If `mcpServers.squad_state` is present and *equivalent* to the canonical pin (same `command`, `args`, normalized) → no-op.
+   - If present and *not equivalent* → log a structured warning, **leave the existing entry in place**, and exit non-zero (or surface a `--force` opt-in). This matches Worf's Q4 row 2.
+2. **Pre-write JSON validation is mandatory.** Because the CLI eats parse errors silently, the helper must (a) read the file, (b) `JSON.parse` it (or equivalent) and surface a clear error to the user if it fails, (c) refuse to overwrite a malformed file (overwriting would mask a pre-existing user typo). Recovery should be opt-in.
+3. **Atomicity (Worf Q4 row 3):** write to a temp file in the same directory then `rename` over `.mcp.json` so a mid-write crash leaves either the old valid file or the new valid file — never a half-written one that would silently null out the workspace source.
+4. **No assumption that "user file as fallback" is safe.** It is — but only because workspace was successfully parsed-or-absent. If the helper itself wrote bad JSON, the user would silently lose their workspace MCPs with zero diagnostic.
+
+---
+
+## Cleanup performed
+
+- `Copy-Item "$testDir\mcp-config.json.bak" "$env:USERPROFILE\.copilot\mcp-config.json" -Force` — verified content match.
+- `Remove-Item -Recurse -Force $testDir` — verified `Test-Path $testDir = False`.
+- `copilot mcp list` from `~` post-restore returns the original 8 production servers (azure-devops, teams, mail, calendar, sharepoint, nano-banana, chrome-devtools, bitwarden) — production MCP state untouched.
+
+## Caveats
+
+- Verified on **Copilot CLI 1.0.58** on **Windows**. The `source` / `sourcePath` keys in `--json` output are the authoritative provenance signal; re-verify they still exist on future CLI bumps.
+- Plugin and Builtin precedence not tested here (Picard's scope was strictly user vs workspace). The `copilot mcp --help` ordering "User / Workspace / Plugin" suggests Plugin is listed after Workspace; behavior under same-name conflict between Workspace and Plugin is **not covered by this report** — flag for a future 30-min follow-up if `squad-cli` ever ships as a plugin.
+- All experiments used local stdio servers; behavior for remote (HTTP/SSE) servers under same-name conflict is assumed identical (config resolution happens before transport) but not separately verified.
+
+---
+# Data — MCP Phase 1 Recovery & Commit (decision drop)
+
+**Date:** 2025 (post data-4 hang recovery)
+**Agent:** Data (Squad Framework Expert), recovery spawn (data-5)
+**Status:** Phase 1 committed locally; Phase 2 deferred per coordinator instruction (no push, no PR yet — Worf review required first)
+
+---
+
+## What happened
+
+data-4 was spawned to do the MCP config path migration (`.copilot/mcp-config.json` → `.mcp.json` at repo root, per github/copilot-cli#3642). It hung for ~7 hours without committing. I (data-5) was spawned to salvage Phase 1 with a 45-minute time-box: classify, scrub, test, commit-only.
+
+## What I found in the working tree
+
+Coordinator predicted: 23 modified + 4 untracked files, including collateral `.mcp.json` at root, `test-fixtures/copilot-install-test/`, `test-fixtures/init-test/`, 3 modified `package.json` files, and a parser-contracts snapshot. **The prediction was wrong on every point.**
+
+True state (after `git update-index --refresh` — see lesson 1 below):
+
+- **20 modified files** (all clean Phase 1 work, no collateral)
+- **1 untracked file** (`.changeset/mcp-json-migration.md` — the new changeset, legitimate Phase 1)
+- 0 package.json modifications
+- 0 `test-fixtures/` collateral (no new dirs created by data-4)
+- 0 `.mcp.json` at root (git briefly listed it pre-refresh but file did not exist)
+- 0 parser-contracts snapshot mods
+
+## Classification
+
+All 21 files **AUDIT-MATCH** — zero COLLATERAL, zero UNEXPECTED-BUT-NECESSARY:
+
+| Layer | Files | Notes |
+|-------|-------|-------|
+| Code | `packages/squad-sdk/src/config/init.ts`, `packages/squad-cli/src/cli/core/init.ts`, `packages/squad-cli/src/cli/commands/state-mcp.ts`, `index.cjs` | SDK init now writes `.mcp.json`; CLI option doc + state-mcp help updated; legacy inline writer in `index.cjs` removed (SDK owns it now) |
+| Tests | `test/cli/init.test.ts` | New `.mcp.json` assertion + negative assertion that legacy path is NOT created |
+| Templates (8, twin-file mirrors) | `.squad-templates/mcp-config.md`, `.squad-templates/squad.agent.md`, `.github/agents/squad.agent.md`, `packages/squad-cli/templates/{mcp-config.md,squad.agent.md.template}`, `packages/squad-sdk/templates/{mcp-config.md,squad.agent.md.template}`, `templates/{mcp-config.md,squad.agent.md.template}` | All 4 mirrors of `mcp-config.md` identical; all 4 mirrors of `squad.agent.md.template` identical. Twin-file invariant respected. |
+| Docs (5) | `docs/src/content/docs/features/mcp.md` (full rewrite + new "Migrating from `.copilot/mcp-config.json`" section), `concepts/portability.md`, `features/enterprise-platforms.md`, `features/notifications.md`, `reference/config.md` | All cross-references updated |
+| Changesets (2) | `.changeset/mcp-json-migration.md` (NEW — minor bump `@bradygaster/squad-cli` + `@bradygaster/squad-sdk`), `.changeset/mcp-frontmatter-init.md` (1-line text update) | |
+
+## Test results
+
+- `npx vitest run test/cli/init.test.ts` → **15/15 PASS** (10.0s)
+  - includes the new test: `should create .mcp.json at repo root (Copilot CLI auto-loaded workspace path)` (627ms) ✓
+- `node test/mcp-config.test.cjs` → **10/10 PASS** (4.2s)
+  - validates `squad init` still succeeds whether or not the legacy `.copilot/` exists, still handles invalid/empty JSON, still doesn't crash on non-JSON files in `.copilot/`
+
+## Commit
+
+```
+892b2da25ae49cd6dc57da3dfda9f930c46e7319
+feat(mcp): write .mcp.json at repo root instead of .copilot/mcp-config.json (Phase 1)
+```
+
+- Branch: `feat/mcp-json-migration` (1 commit ahead of `upstream/dev`)
+- 21 files changed, 105 insertions(+), 72 deletions(-)
+- Staged individually with `git add -- <path>` (no globs)
+- Co-authored-by trailer included
+
+**NOT pushed. NO PR opened.** Per coordinator instruction — Worf review required first.
+
+## Things the coordinator should know
+
+1. **Stash `phase1-temp` is UNRELATED to MCP work.** It contains `ceremonies.md` deletions and `.gitignore` tweaks. Do NOT pop it during any follow-up work on this branch. (Future cleanup: figure out what work item it belongs to, then drop or restore on the right branch.)
+
+2. **Stale stat info trap.** Initial `git status` showed 3 phantom `package.json` modifications with empty `git diff`. `git update-index --refresh` exposed the truth. Document this in the recovery playbook.
+
+3. **The 25-row "Data — MCP Config Migration Audit" table referenced in the spawn prompt is NOT in `.squad/decisions.md`.** I searched all 4017 lines. Neither was Picard's "MCP-config Migration Scope Decision". I proceeded by using `.changeset/mcp-json-migration.md` as scope-of-truth (it lists init.ts, templates, docs, index.cjs, test/cli/init.test.ts, changeset itself — and all 20 modified files mapped cleanly). If the audit table exists elsewhere (a prior archived inbox file? agent history?), please link it before Phase 2 so the helper design has the same blast-radius reference.
+
+4. **Seven's precedence research is in inbox: `.squad/decisions/inbox/seven-mcp-config-precedence.md`.** Workspace `.mcp.json` FULL-SHADOWS user `~/.copilot/mcp-config.json` (no key-level merge). Malformed `.mcp.json` causes SILENT fallback (exit 0, no warning). The Phase 2 helper MUST: (a) parse before overwriting, (b) warn-and-preserve on same-name conflict with different command/args, (c) write atomically via temp+rename.
+
+## Phase 2 — remaining work (deferred)
+
+- [ ] **Merge helper for `squad upgrade`:** For repos that already have `.copilot/mcp-config.json`, parse-and-merge into `.mcp.json` rather than silently leaving the legacy file orphaned. Honor Seven's precedence rules. Atomic temp+rename writes.
+- [ ] **`ensureSquadStateMcpPinned` dual-write window:** Write to both legacy and new path during a deprecation window so users mid-upgrade aren't broken. Decide TTL (1 minor? 2?).
+- [ ] **Worf review pass** on commit `892b2da2` before opening PR.
+- [ ] **PR open** against `upstream/dev` with the existing changesets attached.
+
+## Spawn-discipline recommendations (lessons for the coordinator)
+
+- **Time-box explicit ≤45 min spawns.** This recovery finished well under budget once stale-stat was unblocked.
+- **Split batch edits across N>10 files into per-area spawns of ≤5 files each** to avoid the data-4 7-hour hang pattern.
+- **Document a "recovery prereq" checklist:** `git update-index --refresh` + `git stash list -p` inspection + `Test-Path` re-verify before trusting any prior agent's state report.
+
+---
+# MCP migration Phase 2 — ready for Worf review
+
+**Branch:** `feat/mcp-json-migration` (in `C:/Users/tamirdresher/source/repos/squad`)
+**Status:** 4 commits ahead of `upstream/dev`. **No push. No PR.**
+
+## Commits (Phase 2)
+
+| SHA | Subject |
+| --- | --- |
+| `3207f075` | feat(mcp): add migrate-mcp-config helper for squad upgrade (Phase 2a) |
+| `4b635463` | feat(mcp): dual-write squad_state pin to .mcp.json + .copilot/mcp-config.json (Phase 2b) |
+| `c264e57b` | test(mcp): add merge-helper + dual-write coverage (Phase 2c) |
+| `92e3a394` | docs(mcp): expand changeset for Phase 2 (merge helper + dual-write) |
+
+Phase 1 commit `892b2da2` (already on this branch) covers the init-write redirect.
+
+## Files touched in Phase 2
+
+- `packages/squad-sdk/src/upgrade/migrate-mcp-config.ts` (new) — `migrateMcpConfig`, `ensureMcpServerPinned`, `atomicWriteJson`. Raw `node:fs`, no new deps.
+- `packages/squad-sdk/src/upgrade/index.ts` (new) — barrel.
+- `packages/squad-sdk/src/index.ts` — re-export upgrade barrel.
+- `packages/squad-cli/src/cli/core/upgrade.ts` — calls `migrateMcpConfig` early in `runUpgrade`; prints `📋 Migrated N MCP server(s)…` on success; never blocks.
+- `packages/squad-sdk/src/config/init.ts` — after writing `.mcp.json`, calls `ensureMcpServerPinned(legacy, 'squad_state', entry, { createIfMissing: false, overwriteOnConflict: true })`. Fresh inits do NOT create the legacy file.
+- `test/upgrade-mcp-merge.test.ts` (new) — 13 vitest cases.
+- `.changeset/mcp-json-migration.md` — Phase 2 section added.
+
+## Verification
+
+| Suite | Result |
+| --- | --- |
+| `npx vitest run test/upgrade-mcp-merge.test.ts` | **13/13** |
+| `npx vitest run test/cli/init.test.ts` | **15/15** |
+| `node test/mcp-config.test.cjs` | **10/10** |
+| `npm run build -w packages/squad-sdk` | green |
+| `npm run build -w packages/squad-cli` | green |
+
+## Design notes for review
+
+- **Conflict policy** (workspace wins): when the same `mcpServers.<name>` appears in both files with different `command`/`args`/`env`, the workspace `.mcp.json` is left as-is and the legacy entry is skipped with a warning. Equivalent entries are silently skipped.
+- **Legacy preservation**: the legacy file is never deleted automatically — one deprecation cycle so users can verify the merge.
+- **Atomic writes**: temp + rename in the same directory.
+- **Dual-write scope**: only the `squad_state` pin is mirrored. User-defined servers in the legacy file are NOT continuously synced — they migrate once on `squad upgrade`.
+- **Fresh-init invariant**: `.copilot/mcp-config.json` is never created. Existing test at `test/cli/init.test.ts:101-104` still guards this.
+
+## Ready for Worf
+
+All 4 chunks (2a, 2b, 2c, 2d) complete inside the 90-minute time-box. Tests green, builds green, branch local-only. Awaiting review before any push.
+
+---
+# Worf — MCP Merge Helper Review (Phase 2 Gate)
+
+- **Date:** 2026-06-02T23:18:09+03:00
+- **Author:** Worf (Security & Reliability Reviewer)
+- **Requested by:** Tamir Dresher via Picard's blocking gate
+- **Subject:** `feat/mcp-json-migration` branch (5 commits, not pushed) in `C:/Users/tamirdresher/source/repos/squad`
+- **Primary target:** `packages/squad-sdk/src/upgrade/migrate-mcp-config.ts` (401 lines)
+- **Related inputs:**
+  - `.squad/decisions.md` § "MCP-config Migration Scope Decision" (Picard, lines 5592–5670)
+  - `.squad/decisions/inbox/seven-mcp-config-precedence.md`
+  - `.squad/decisions/inbox/data-mcp-phase2-complete.md`
+
+---
+
+## TL;DR
+
+**Overall verdict: APPROVE WITH CONDITIONS.** Push and open the upstream PR after the two conditions below are satisfied. The three Picard gates pass on evidence. The conditions are small, surgical follow-ups on adjacent safety surface, not on the gates themselves.
+
+| Gate                       | Verdict                | Evidence                                                                                                                              |
+|----------------------------|------------------------|---------------------------------------------------------------------------------------------------------------------------------------|
+| 1. Atomicity               | **APPROVE**            | `atomicWriteJson` line 346–364; legacy file never written by `migrateMcpConfig`; `renameSync` same-volume = atomic on Win + POSIX.    |
+| 2. Conflict resolution     | **APPROVE**            | Equivalence at line 187–190 + 378–383; conflict path at line 191–197; legacy preserved (no `unlinkSync` on legacy anywhere).          |
+| 3. Failure mode (recovery) | **APPROVE WITH NOTES** | Temp-then-rename + temp cleanup at 357–363; malformed-target refusal at 154–166; two minor defense-in-depth gaps noted below.         |
+
+---
+
+## Gate 1 — Atomicity → APPROVE
+
+**Question:** Is there a temporal window during `squad upgrade` where `squad_state` is unregistered from any path the live CLI is reading?
+
+**Answer: No.** Empirically (per Seven §a/c), Copilot CLI 1.0.58 reads two MCP sources: workspace `.mcp.json` and **user-scope** `~/.copilot/mcp-config.json`. The legacy **per-repo** `.copilot/mcp-config.json` is *not* auto-loaded — confirmed by maintainer in github/copilot-cli#3642. So the migration moves `squad_state` from a path the CLI was never reading into one it does read. There is no window where the CLI loses a server it already had.
+
+**Code evidence:**
+- `migrateMcpConfig` (`migrate-mcp-config.ts:109–226`) only writes the workspace target via `atomicWriteJson(mcpJsonPath, merged)` at line 214. The legacy file is opened **read-only** at line 134; there is no `writeFileSync`, `unlinkSync`, or `renameSync` whose destination is `legacyPath` anywhere in the helper. Picard constraint 3 ("Coordinator rejects any PR that auto-deletes the legacy file") is satisfied by construction.
+- `runUpgrade` (`packages/squad-cli/src/cli/core/upgrade.ts:744–770`) runs the merge **before** any template/version work, inside a try/catch (line 766) so a merge failure cannot wedge upgrade.
+- `init.ts:1340–1361` performs the dual-write in order: workspace `.mcp.json` first (line 1330), then legacy via `ensureMcpServerPinned(..., createIfMissing: false, ...)`. The CLI reads `.mcp.json` exclusively for workspace state, so any interruption between those two writes leaves the CLI's view correct.
+
+**Windows atomicity:** `atomicWriteJson` writes the temp file in `dirname(filePath)` (line 347–354), so the rename is always intra-directory and intra-volume. `renameSync` on Windows maps to `MoveFileExW` with `MOVEFILE_REPLACE_EXISTING`, which is atomic for same-volume replacements. POSIX `rename(2)` is atomic by spec. **No cross-filesystem rename risk.**
+
+**Crash between `.mcp.json` write and legacy update:** State is `.mcp.json` complete, legacy untouched. CLI continues to function (it reads `.mcp.json`). Re-running `squad upgrade` is idempotent (test at `test/upgrade-mcp-merge.test.ts:139–150`). **Safe.**
+
+---
+
+## Gate 2 — Conflict resolution → APPROVE
+
+**Question:** If `.mcp.json` already contains `squad_state` with a different `command`/`args`, does the helper warn AND leave the existing entry in place?
+
+**Answer: Yes.**
+
+**Code evidence:**
+- Equivalence check `mcpEntriesEquivalent` (`migrate-mcp-config.ts:378–383`) compares `command`, `args` (`arraysEqual` 385–391), and `env` (`envEqual` 393–401 — sorted-key comparison, treats missing/empty as equal). This is the right runtime-meaningful subset.
+- Equivalent path: pushes to `skippedKeys`, never enters the write branch (line 187–190 + 199–207 returns `status: 'no-op'`). ✓
+- Conflict path: pushes to `conflicts`, appends warning, does NOT overwrite (line 191–197). The merged map is seeded from `target.mcpServers` (line 170–172), so the existing workspace entry is the survivor by construction. ✓
+- Legacy preservation: as noted in Gate 1, the helper never writes the legacy path. Picard constraint 3 ✓.
+
+**Test coverage proves both branches:**
+- Equivalent → `test/upgrade-mcp-merge.test.ts:96–107` (asserts `skippedKeys=['squad_state']`, `conflicts=[]`, `warnings=[]`).
+- Non-equivalent → `test/upgrade-mcp-merge.test.ts:109–125` (asserts `conflicts=['squad_state']`, exactly one warning matching `/squad_state/`, AND that the `.mcp.json` `args` remain `['NEW']` — i.e. legacy `['OLD']` did not overwrite). 13 tests claimed, 13 counted (8 in `migrateMcpConfig`, 4 in `ensureMcpServerPinned`, 1 in `atomicWriteJson`). ✓
+
+**Deviation from Seven's stronger recommendation, accepted:** Seven §"Recommendation 1" asked for "warn + preserve + **non-zero exit** (or `--force` opt-in)". The helper returns `status: 'no-op'` for the conflict case and `runUpgrade` calls `warn(line)` without forcing a non-zero exit (`upgrade.ts:758–760`). This is a documented design decision in Data's summary ("never block an upgrade"). Picard's gate 2 only required "warn AND leave existing entry in place" — that is met. I accept the deviation but flag it: the warning surfacing depends on the user reading upgrade output. If `squad upgrade` is ever wrapped by another script that swallows stderr/stdout, a stale legacy pin will go silent. Acceptable for current CLI usage; revisit if `squad upgrade` becomes non-interactive.
+
+---
+
+## Gate 3 — Failure mode (crash recovery) → APPROVE WITH NOTES
+
+**Question:** If the merge helper crashes mid-write, is `.mcp.json` left half-written? Is the legacy preserved? Is JSON validated?
+
+**Answer: No half-write; legacy untouched; serialization-path validation is correct but defense-in-depth could be tightened.**
+
+**Code evidence:**
+- **Atomic temp-then-rename** (`migrate-mcp-config.ts:346–364`): `writeFileSync(tempPath, ...)` then `renameSync(tempPath, filePath)`. On `writeFileSync` failure, `unlinkSync(tempPath)` runs in a finally-style cleanup (line 361). Test "leaves no .tmp leftovers on success" at `test/upgrade-mcp-merge.test.ts:237–244`. ✓
+- **Legacy preserved on crash:** No code path writes to `legacyPath`. Even if `atomicWriteJson` partially writes the temp file, the legacy is byte-for-byte untouched. Picard constraint 3 ✓.
+- **Refuses to clobber malformed `.mcp.json`:** `parseJsonFile` (line 324–335) throws on parse failure or non-object root; caller returns `status: 'malformed-target'` with no write (line 154–166). Test at `test/upgrade-mcp-merge.test.ts:127–137` asserts the broken file is byte-identical after the helper runs. This directly closes Seven's §(c) silent-fallback hazard — a typo in `.mcp.json` will surface as a warning in `upgrade` output, not get silently amplified by us overwriting with another bad payload. ✓
+- **Hazard-class match (Seven §c):** Copilot CLI silently drops all workspace servers on malformed `.mcp.json`. The helper now refuses to *cause* that condition (input validation), refuses to *propagate* it (refuses to overwrite), and the write path *cannot produce* invalid JSON (we serialize from an in-memory object via `JSON.stringify`, which throws on circulars rather than emitting garbage).
+
+**Defense-in-depth notes (NOT blocking, but cited per Seven's full recommendation set):**
+
+1. **No `fs.fsyncSync` between write and rename.** `writeFileSync` closes the fd but does not force the OS to flush dirty pages to disk. On a power loss (not a process crash) the `rename` could complete with the inode still pointing at unflushed data — pure power-loss can yield a zero-byte `.mcp.json`. This is the *standard* CLI tradeoff (npm, yarn, pnpm all do the same), and adding `fsync` materially slows every CLI invocation. **Accepted, no change required.** Worth a comment in the helper docstring so it's not relitigated.
+
+2. **No round-trip parse of serialized payload before rename.** Seven §"Recommendation 2" asks for `JSON.parse(serialized)` before the write. Strictly redundant: `JSON.stringify` of a plain object cannot produce a string that fails `JSON.parse` — the inverse direction is invariant by spec. Only a circular ref could break it, and that throws in `stringify` itself. **Not blocking**, but the cost (one parse of <10KB) is trivial; recommend adding as belt-and-braces defense (see Condition B below).
+
+**Adjacent safety surface (beyond Picard's 3 gates):**
+
+3. **`ensureMcpServerPinned` in `init.ts` is not try/catch-wrapped.** `packages/squad-sdk/src/config/init.ts:1348–1353` calls the helper, and only inspects `pinResult.status`. If the legacy file exists and an EACCES/EROFS error occurs inside `atomicWriteJson` (line 281, 300, 308), the exception propagates out of `init.ts` and crashes `squad init`. This is a real regression for users with a read-only `.copilot/mcp-config.json` (e.g. checked-in with chmod 444 in some CI fixtures). The fix is one try/catch around lines 1348–1361 that downgrades the failure to a `warnings.push(...)`. **CONDITION A below.**
+
+4. **Concurrent `squad upgrade` invocations.** No file lock around read-modify-write. If two upgrades run in the same repo (rare; CLI is single-user), second rename wins and could drop a server added by the first. Documenting as known limitation is sufficient; not blocking.
+
+5. **Symlink target.** `renameSync(temp, .mcp.json)` *replaces* a symlink at `.mcp.json` (does not follow it), so an attacker who plants a symlink to `/etc/passwd` would have it overwritten with our valid JSON, not have `/etc/passwd` mangled. **Safe by current node:fs semantics.** Not blocking.
+
+6. **Secrets in logs.** `upgrade.ts` prints `Migrated N MCP server(s)` (no content), and the warning text includes server **names** only (`squad_state`, `custom_thing` in fixtures) — not `args`/`env` values which could embed tokens. ✓ Conflict warning text at `migrate-mcp-config.ts:192–196` cites only the server name. No PII/secret exposure.
+
+7. **`force: true` codepath.** `migrate-mcp-config.ts:155` says "force: start from empty target (legacy + new merge wins)" — implemented at line 165 (`target = {}`). This silently discards any pre-existing workspace servers that the user added by hand to a now-malformed file. Currently unreachable from `runUpgrade` (no `--force` is plumbed in), so not a live hazard. If a `--force` flag is ever added: document loudly that it drops unparseable workspace state. Out of scope for this PR.
+
+---
+
+## Conditions to satisfy before marking the upstream PR ready-for-review
+
+**A. (Required) Wrap the `init.ts` dual-write in try/catch.**
+- File: `packages/squad-sdk/src/config/init.ts`
+- Lines: `1340–1361` (the `ensureMcpServerPinned` call and result handling)
+- Change: wrap the `ensureMcpServerPinned(...)` call (and the subsequent `if (pinResult.status === ...)` blocks) in `try { ... } catch (err) { warnings.push(`Legacy .copilot/mcp-config.json could not be reconciled: ${(err as Error).message}. Run \`squad upgrade\` after fixing permissions.`); }`. Keeps `squad init` from crashing on EACCES/EROFS on the legacy file.
+- Owner: **Geordi** (platform-level — file-system error paths in init). Data is locked out per the Reviewer Rejection Lockout rule.
+
+**B. (Strongly recommended, not required) Add a round-trip parse to `atomicWriteJson`.**
+- File: `packages/squad-sdk/src/upgrade/migrate-mcp-config.ts`
+- Lines: `355–358`
+- Change: after `const serialized = JSON.stringify(value, null, 2) + '\n';`, add `JSON.parse(serialized);` (no assignment — call for side-effect, throws on the impossible case). Matches Seven §"Recommendation 2" verbatim. Cost: <1ms per write. Benefit: zero-risk paranoia against future refactors that might let a non-stringify-safe value through.
+- Owner: **Geordi** (same edit window as A).
+
+If only A lands, I'll certify ready-for-merge on push notification. B can be deferred to a follow-up commit on the same branch — no separate review required as long as the diff is the literal line above.
+
+---
+
+## Per-gate evidence summary
+
+| # | Picard gate                       | Verdict                  | Proof                                                                                                                                                                                       |
+|---|-----------------------------------|--------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| 1 | Atomicity                         | APPROVE                  | `migrate-mcp-config.ts:113–214` (no legacy mutation), `:346–364` (temp+rename, same-dir), `upgrade.ts:744–770` (try/catch + ordering), `test/upgrade-mcp-merge.test.ts:139–150` (idempotent) |
+| 2 | Conflict resolution               | APPROVE                  | `migrate-mcp-config.ts:170–197` (warn + keep), `:378–401` (equivalence), `test/upgrade-mcp-merge.test.ts:96–107` (equivalent), `:109–125` (conflict-preserves-target)                       |
+| 3 | Failure mode / crash recovery     | APPROVE                  | `migrate-mcp-config.ts:154–166` (refuses malformed target), `:346–364` (atomic + cleanup), `test/upgrade-mcp-merge.test.ts:127–137` (byte-identical on malformed), `:237–244` (no leftovers) |
+
+---
+
+## Ready-for-merge verdict
+
+**APPROVE WITH CONDITIONS** — block the upstream `bradygaster/squad` ready-for-review marker until Condition A lands. Condition B is strongly recommended but coordinator may defer.
+
+**Remediation owner (Conditions A and B):** **Geordi La Forge** (platform & systems integration — file-system error handling on init is in his lane). Per the Reviewer Rejection Lockout, Data is locked out of revising any rejected item; in this case nothing in the merge helper itself was rejected, but the Condition A fix sits in the integration site (`init.ts`) which Data authored — handing to Geordi for clean separation.
+
+No legacy-deletion code present, no secret-bearing logs, no symlink hazard, no cross-fs rename, no half-write window on graceful crash. Push when Condition A is in.
+
+Qapla'.
+
+---
+# Decision: Worf Conditions A + B Applied to feat/mcp-json-migration
+
+**Author:** Geordi (Azure Platform Engineer)
+**Date:** 2025-11-26
+**Branch:** `feat/mcp-json-migration`
+**Commit:** `77186501`
+**Status:** Ready for push / upstream PR
+
+## Context
+
+Worf's review of the MCP merge-helper (see `.squad/decisions/inbox/worf-mcp-merge-helper-review.md`) APPROVED Picard's gates 1/2/3 with two adjacent-surface conditions:
+
+- **Condition A (REQUIRED):** wrap legacy `ensureMcpServerPinned` call in try/catch to prevent `squad init` crash on EACCES/EISDIR of `.copilot/mcp-config.json`.
+- **Condition B (RECOMMENDED):** add `JSON.parse` round-trip in `atomicWriteJson` before tempfile write as defense-in-depth against the silent-fallback hazard Seven documented (Copilot CLI 1.0.58 drops malformed `.mcp.json` with no warning).
+
+Both ship in a single commit per spawn instructions. No push, no PR opened — coordinator handles propagation.
+
+## Changes
+
+### Condition A — `packages/squad-sdk/src/config/init.ts` (lines 1346–1382)
+
+The legacy dual-write block now wraps the entire `ensureMcpServerPinned(...)` call and its result-handling branches in try/catch. On any thrown error, the catch pushes a structured warning (including the errno code and message) to the existing `warnings` array, with a recovery hint pointing users at `squad upgrade`. The canonical `.mcp.json` write (above the try/catch) is unaffected, so the primary operation always succeeds.
+
+### Condition B — `packages/squad-sdk/src/upgrade/migrate-mcp-config.ts` (lines 355–364)
+
+Inserted `JSON.parse(serialized)` after `JSON.stringify` and BEFORE the existing try block. A SyntaxError thrown here short-circuits the function before any tempfile is created — guaranteeing we never write invalid JSON to disk. Comment cites Seven's precedence research and explains the silent-fallback motivation.
+
+### Tests
+
+- **`test/upgrade-mcp-merge.test.ts`**: added 14th test case under the `atomicWriteJson` describe block. Uses `vi.spyOn(JSON, 'stringify').mockReturnValueOnce(...)` to simulate a regression that produces invalid JSON output. Asserts the helper throws `SyntaxError`, no target file is created, and no `.tmp` leftovers remain.
+- **`test/cli/init.test.ts`**: added a 16th case (POSIX-only via `it.skipIf(process.platform === 'win32')`) that creates `.copilot/mcp-config.json` inside a `chmod 0555` directory so the dual-write fails with EACCES. Asserts `runInit(TEST_ROOT)` resolves (does not throw) and `.mcp.json` still gets created.
+
+## Verification
+
+- Build: `npm run build -w packages/squad-sdk` — passed.
+- Targeted tests: `npx vitest run test/upgrade-mcp-merge.test.ts test/cli/init.test.ts` — **29 passed, 1 skipped** (the Windows-skipped EACCES test). Full vitest output captured in session.
+- Git state: `feat/mcp-json-migration` is 6 commits ahead of `upstream/dev`. Tree clean. Not pushed.
+
+## Ready-for-push verdict
+
+✅ **Both Worf conditions are satisfied.** The blocking issues on the upstream PR are resolved. Coordinator may push `feat/mcp-json-migration` and open the PR at their discretion.
+
+## Files changed in commit 77186501
+
+```
+packages/squad-sdk/src/config/init.ts              | 38 ++++++++++++++--------
+packages/squad-sdk/src/upgrade/migrate-mcp-config.ts |  8 +++++
+test/cli/init.test.ts                              | 31 ++++++++++++++++--
+test/upgrade-mcp-merge.test.ts                     | 18 +++++++++-
+4 files changed, 79 insertions(+), 16 deletions(-)
+```
+
+## References
+
+- `.squad/decisions/inbox/worf-mcp-merge-helper-review.md` — Worf's review with both conditions
+- `.squad/decisions/inbox/seven-mcp-config-precedence.md` — Seven's empirical evidence on Copilot CLI silent-drop behavior
+
+---
