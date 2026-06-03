@@ -6,6 +6,9 @@ Feature: Subcommand --help intercept (#1201)
     Then the output contains "squad init"
     And the output contains "Usage:"
     And the exit code is 0
+    And the temp directory has no ".squad" entry
+    And the temp directory has no ".github" entry
+    And the temp directory has no ".gitignore" entry
 
   Scenario: triage --help prints help instead of starting a polling loop
     When I run "squad triage --help"
