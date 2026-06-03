@@ -14,6 +14,10 @@ Migrate per-repo MCP server config from `.copilot/mcp-config.json` to `.mcp.json
 - Templates, internal docs, and user-facing docs (`features/mcp.md`, `concepts/portability.md`, `reference/config.md`, `features/enterprise-platforms.md`, `features/notifications.md`) now lead with `.mcp.json` and explain `~/.copilot/mcp-config.json` as the user-level fallback.
 - The JSON schema (`{ mcpServers: { ... } }`) is unchanged — only the file path moves.
 
-**Migration (manual until `squad upgrade` ships a guided merge in a follow-up):**
+**Migration (Phase 2 — automatic):**
 
-If your repo already has `.copilot/mcp-config.json`, it is **not** touched by this release. Copy any custom `mcpServers.*` entries into the new `.mcp.json` and delete the old file. See the "Migrating from `.copilot/mcp-config.json`" section in `docs/features/mcp.md` for the full recipe. The user-level `~/.copilot/mcp-config.json` path is unaffected and remains valid for personal config.
+`squad upgrade` now folds any pre-existing `.copilot/mcp-config.json` into `.mcp.json` at the repo root and reports the count migrated. Conflict policy: when the same server name is defined in both files with different `command`/`args`/`env`, the workspace `.mcp.json` wins and a warning is printed so the user can reconcile. The legacy file is preserved (not deleted) for one deprecation cycle so users can verify the merge — delete it manually once you have confirmed the new file works.
+
+During the same window, `squad init` dual-writes the `squad_state` pin into both `.mcp.json` (always) and a pre-existing `.copilot/mcp-config.json` (only if already present). Fresh inits never create the legacy file — the migration is one-way. The user-level `~/.copilot/mcp-config.json` path is unaffected.
+
+If you prefer to migrate by hand, the recipe in `docs/features/mcp.md` still applies — `squad upgrade` just does it for you.
