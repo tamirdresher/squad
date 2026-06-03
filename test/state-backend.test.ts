@@ -659,6 +659,57 @@ describe('ToolRegistry state tools with git-native backend', () => {
     expect(existsSync(join(squadDir(), 'decisions', 'inbox'))).toBe(false);
     expect(git('status --porcelain')).toBe('');
   });
+
+  // Regression test for NEW-4: MCP tool layer writing empty blob (e69de29bb) when
+  // content is missing from the JSON-RPC payload (args.content === undefined at runtime).
+  it('squad_state_write with undefined content returns failure, does not write empty blob (NEW-4)', { timeout: 20_000 }, async () => {
+    const backend = new OrphanBranchBackend(TMP);
+    const adapter = new StateBackendStorageAdapter(backend, squadDir());
+    const registry = new ToolRegistry(squadDir(), undefined, adapter);
+    const write = registry.getTool('squad_state_write')!;
+
+    // Simulate MCP payload where content is missing (parseObject returns {} missing 'content').
+    // Cast to any to bypass TypeScript's type checking, as the MCP layer does at runtime.
+    const result = await write.handler({ key: 'agents/scribe/history.md', content: undefined as unknown as string });
+
+    expect(result.resultType).toBe('failure');
+    expect(result.textResultForLlm).toContain('content is required');
+    // Backend must NOT have written an empty blob
+    expect(backend.exists('agents/scribe/history.md')).toBe(false);
+    expect(git('status --porcelain')).toBe('');
+  });
+
+  it('squad_state_write with valid content writes correct non-empty content (NEW-4)', { timeout: 20_000 }, async () => {
+    const backend = new OrphanBranchBackend(TMP);
+    const adapter = new StateBackendStorageAdapter(backend, squadDir());
+    const registry = new ToolRegistry(squadDir(), undefined, adapter);
+    const write = registry.getTool('squad_state_write')!;
+
+    const content = '# Scribe History\n\n## Session 1\nCompleted replay without branch choreography.\n';
+    const result = await write.handler({ key: 'agents/scribe/history.md', content });
+
+    expect(result.resultType).toBe('success');
+    expect(backend.read('agents/scribe/history.md')).toBe(content);
+    // Ensure the blob is not the empty-content sentinel
+    expect(backend.read('agents/scribe/history.md')).not.toBe('');
+  });
+
+  it('squad_state_append with undefined content returns failure, does not corrupt existing content (NEW-4)', { timeout: 20_000 }, async () => {
+    const backend = new OrphanBranchBackend(TMP);
+    const adapter = new StateBackendStorageAdapter(backend, squadDir());
+    const registry = new ToolRegistry(squadDir(), undefined, adapter);
+    const write = registry.getTool('squad_state_write')!;
+    const append = registry.getTool('squad_state_append')!;
+
+    await write.handler({ key: 'agents/data/history.md', content: '# Data\n' });
+
+    const result = await append.handler({ key: 'agents/data/history.md', content: undefined as unknown as string });
+
+    expect(result.resultType).toBe('failure');
+    expect(result.textResultForLlm).toContain('content is required');
+    // Existing content must be unchanged
+    expect(backend.read('agents/data/history.md')).toBe('# Data\n');
+  });
 });
 
 describe('downloaded session replay regressions', () => {
