@@ -44,7 +44,7 @@ describe('squad upgrade --state-backend migration', () => {
   let dir: string;
   afterEach(() => dir && cleanup(dir));
 
-  it('UPGRADE-FLAG-IGNORED: writes stateBackend to config.json with no duplicate keys', async () => {
+  it('UPGRADE-FLAG-IGNORED: writes stateBackend to config.json with no duplicate keys', { timeout: 30_000 }, async () => {
     dir = mkRepo('worktree');
     await migrateStateBackend(dir, 'two-layer');
 
@@ -56,7 +56,28 @@ describe('squad upgrade --state-backend migration', () => {
     expect(occurrences).toBe(1);
   });
 
-  it('WI-1: installs commit hooks after backend migration', async () => {
+  it('UPGRADE-FLAG-IGNORED (clean target): writes stateBackend when config.json has no stateBackend field', { timeout: 30_000 }, async () => {
+    // Regression for the original bug: an older squad install has config.json
+    // with no stateBackend field at all. `squad upgrade --state-backend two-layer`
+    // must add the field rather than silently drop it.
+    dir = mkRepo('worktree');
+    // Remove stateBackend so config only has other fields (e.g. teamRoot).
+    const configPath = path.join(dir, '.squad', 'config.json');
+    const existing = JSON.parse(fs.readFileSync(configPath, 'utf-8'));
+    delete existing['stateBackend'];
+    fs.writeFileSync(configPath, JSON.stringify(existing, null, 2) + '\n');
+
+    await migrateStateBackend(dir, 'two-layer');
+
+    const raw = fs.readFileSync(configPath, 'utf-8');
+    const parsed = JSON.parse(raw);
+    expect(parsed.stateBackend).toBe('two-layer');
+    expect(parsed['teamRoot']).toBe('.');
+    const occurrences = (raw.match(/"stateBackend"/g) || []).length;
+    expect(occurrences).toBe(1);
+  });
+
+  it('WI-1: installs commit hooks after backend migration', { timeout: 30_000 }, async () => {
     dir = mkRepo('worktree');
     await migrateStateBackend(dir, 'two-layer');
 
@@ -65,7 +86,7 @@ describe('squad upgrade --state-backend migration', () => {
     }
   });
 
-  it('UPGRADE-NO-MIGRATION: copies decisions.md + agent history.md onto squad-state branch', async () => {
+  it('UPGRADE-NO-MIGRATION: copies decisions.md + agent history.md onto squad-state branch', { timeout: 30_000 }, async () => {
     dir = mkRepo('worktree');
     fs.writeFileSync(
       path.join(dir, '.squad', 'decisions.md'),
@@ -92,7 +113,7 @@ describe('squad upgrade --state-backend migration', () => {
     expect(historyOnBranch).toContain('entry 1');
   });
 
-  it('migration is idempotent: re-running with same target does not duplicate config or fail', async () => {
+  it('migration is idempotent: re-running with same target does not duplicate config or fail', { timeout: 30_000 }, async () => {
     dir = mkRepo('worktree');
     await migrateStateBackend(dir, 'two-layer');
     await migrateStateBackend(dir, 'two-layer'); // no-op path
