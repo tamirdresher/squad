@@ -36,3 +36,8 @@ active_agents: []
 - Upstream maintainer (Brady) review of PR #1209
 - Approval and squash-merge to bradygaster/squad:dev
 - Post-merge: Tamir restarts Squad session (`.squad-templates/squad.agent.md` change)
+
+## Recently Completed
+
+- PR #1209 commit d38088ae addresses 3 Copilot-bot review nits (hardlink Windows portability + Copilot CLI paths framing accuracy)
+

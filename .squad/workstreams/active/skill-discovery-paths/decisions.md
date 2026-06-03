@@ -1,12 +1,51 @@
 # Skill Discovery Path Coverage — Decisions
 
-**Last Updated:** 2026-06-02T21:10:16+03:00  
+**Last Updated:** 2026-06-03T04:37:29Z  
 **Scope:** Coordinator skill-aware routing across all 5 official Copilot CLI project skill paths  
 **Format:** Append-only. New decisions prepended under `## Active Decisions`.
 
 ---
 
 ## Active Decisions
+
+---
+
+### 2026-06-03T07:37:29.527+03:00: PR #1209 — Copilot-bot review nits addressed
+
+**Date:** 2026-06-03T07:37:29.527+03:00
+**Author:** Picard
+**Workstream:** [ws:skill-discovery-paths]
+**PR:** https://github.com/bradygaster/squad/pull/1209
+**Review:** copilot-pull-request-reviewer[bot] review #4415423035 (COMMENTED, non-blocking)
+
+## Summary
+
+Addressed all 3 Copilot-bot review nits in one revision. Lockout did not apply — Copilot-bot is not a Squad team reviewer. All 3 nits were factually correct.
+
+## The 3 fixes
+
+1. **Hardlink portability (`squad.agent.md:314`)** — Replaced "use a hardlink or copy the directory" with "copy or vendor the directory ... directory hardlinks are not portable — NTFS hardlinks are file-only on Windows." Directory hardlinks do not exist on Windows NTFS; recommending them misled cross-platform users.
+
+2. **HTML sync comment overclaim (`squad.agent.md:306`)** — Replaced the single-line "Sync with Copilot CLI skill paths" comment with explicit delineation: 3 paths (`.github/skills/`, `.claude/skills/`, `.agents/skills/`) are official Copilot CLI; 2 (`.squad/skills/`, `.copilot/skills/`) are Squad-specific conventions. Maintenance instruction added.
+
+3. **Changeset overclaim (`.changeset/skill-discovery-paths.md`)** — Same correction: the leading sentence now says "5 project skill directories" (not "5 official Copilot CLI project skill paths") and explicitly attributes the 3 official paths vs. Squad's 2 conventions. Rest of changeset (personal paths note, precedence list) preserved.
+
+## Commits
+
+- **Upstream (bradygaster/squad fork tamirdresher/squad):** `d38088aead17e4d1083911a124fbbf80f6b6405e` on `feat/skill-discovery-paths`
+- **Lockstep (squad-squad master):** `c75775f2eee7deffab2261f5547be1a52db67923`
+
+## Verification
+
+- 5-mirror SHA-256 after sync: `D53D1925889D8A844BBBD89B02D1EAF0FEB53B9E8280EE2DED8A5BCF10834FA6`
+- Targeted tests: **261/261 passed** (`template-sync`, `agent-doc`, `skills`, `builtin-skills`)
+- Pushes confirmed for both repos (account switch needed: tamirdresher for upstream fork, tamirdresher_microsoft for squad-squad)
+
+## Out of scope (as directed)
+
+- No Worf re-review (user explicitly waived; Copilot-bot non-blocking)
+- No other PR-body edits
+- No non-skill-discovery sections touched
 
 ---
 
