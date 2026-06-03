@@ -247,3 +247,51 @@ The iter-5 smoke surfaced two distinct issues affecting validation:
 
 ### Verdict
 🟡 READY FOR RE-SMOKE. The local-install fallback unblocks smoke-testing the locally-installed tarball's state-mcp (resolves the iter-5 orphan-Δ=0 root cause). Windows quoting fix removes the `cmd /c '"…"'` workaround. Re-run the 4-repo validation against `0.9.6-preview.12` tarballs.
+
+---
+
+## Iteration 7 (2026-06-03) — Pivot: simplify mcp-spec + delete run-copilot + HOME-write squad_state
+
+### Branch & PR
+- Branch: `squad/state-backend-upgrade-fixes` @ `5562efe2` (was `f25e400e`)
+- PR: https://github.com/bradygaster/squad/pull/1200
+- Pushed by: `tamirdresher` on 2026-06-03
+- Version: `0.9.6-preview.13`
+
+### Tarballs (mirrored)
+- `C:\Users\tamirdresher\squad-validation\bradygaster-squad-sdk-combined-fixes.tgz` (806 KB) — SHA256: `2EA850BB618E9EAB653EA6B01BB1A853CCD267E604DFDD16BBF866583318CB75`
+- `C:\Users\tamirdresher\squad-validation\bradygaster-squad-cli-combined-fixes.tgz` (595 KB) — SHA256: `61478895B80F3B7D6D8861745987EB0FA6605C457B2444D130F7319E5E68356A`
+
+### Commits (in order)
+- `d979560b` — `refactor(mcp-spec): simplify resolver to 2-tier (pinned npx / @insider fallback)`. Iter-6 added a 4-tier resolver (pinned → @insider → local-install → throw) that ended up dead code — local-install path was never reached because pinned always resolves once the tarball lands on npm. Rewrote `mcp-spec.ts` 228→78 lines. `source` now `'pinned' | 'insider'`. `publishedCheck` is now opt-in. New 8-test `mcp-spec-init.test.ts`.
+- `1d0d4db5` — `refactor(cli): delete run-copilot wrapper subcommand`. Removed entire `squad run-copilot` wrapper (220 LOC) + handler + help block + 276-line test. The wrapper existed only to inject `--additional-mcp-config @<project>/.copilot/mcp-config.json` so copilot would find `squad_state`. With HOME-write (commit 3) copilot auto-loads it, so the wrapper is obsolete.
+- `00bde061` — `feat(init,upgrade): write squad_state MCP entry to ~/.copilot/mcp-config.json`. New `mcp-home.ts` (167 lines) with `ensureSquadStateMcpInHome` + `tombstoneProjectSquadStateMcp`. Per-project namespacing via `squad_state_<sha256-8>` so multiple Squad projects coexist. `_squadProjects` meta key for forensic debugging. Init/upgrade now HOME-write + tombstone project copy. Deleted obsolete `ensureSquadStateMcpPinned` (~67 LOC) and `test/mcp-bridge-pinning.test.ts` (157 LOC). New 11-test `mcp-home-write.test.ts`. `SQUAD_HOME_DIR_OVERRIDE` env var added for test isolation.
+- `e00ff4b3` — `docs(state-backends): clarify default backend is local`. Callout block in `docs/src/content/docs/features/state-backends.md`.
+- `5562efe2` — `chore(release): bump to 0.9.6-preview.13`.
+
+### Files
+- `packages/squad-cli/src/cli/core/mcp-spec.ts` — 228→78 lines (2-tier resolver)
+- `packages/squad-cli/src/cli/core/mcp-home.ts` — NEW (167 lines)
+- `packages/squad-cli/src/cli/core/upgrade.ts` — HOME-write integration, `ensureSquadStateMcpPinned` deleted
+- `packages/squad-cli/src/cli/core/init.ts` — HOME-write + tombstone in both branches
+- `packages/squad-cli/src/cli-entry.ts` — removed `run-copilot` help+handler
+- `packages/squad-cli/src/cli/commands/run-copilot.ts` — DELETED (219 lines)
+- `test/mcp-home-write.test.ts` — NEW (11 tests)
+- `test/mcp-spec-init.test.ts` — rewritten (8 tests, new API)
+- `test/run-copilot-wrapper.test.ts` — DELETED (276 lines)
+- `test/mcp-bridge-pinning.test.ts` — DELETED (156 lines)
+- `test/cli/{init,upgrade}.test.ts` — `SQUAD_HOME_DIR_OVERRIDE` isolation
+- `docs/src/content/docs/features/state-backends.md` — default-is-local callout
+
+### Tests
+- 11 new `mcp-home-write.test.ts`: ✅
+- 8 rewritten `mcp-spec-init.test.ts`: ✅
+- 54 regression (`cli/init`, `cli/upgrade`): ✅
+- Baseline failures (`state-backend.test.ts`, `npm-registry-fallback.test.ts`) unchanged — not iter-7 regressions
+- Smoke install of mirrored tarballs in fresh dir: `npx squad --version` → `0.9.6-preview.13` ✅; `npx squad run-copilot --help` → `Unknown command` ✅
+
+### Net delta vs iter-6
+- `13 files changed, +500 / -1013 = -513 lines`. Net-negative iteration. Major deletions: `run-copilot.ts` (-219), `mcp-spec.ts` (-150), `run-copilot-wrapper.test.ts` (-276), `mcp-bridge-pinning.test.ts` (-156).
+
+### Verdict
+🟢 SHIPPED. Iter-7 simplifies the iter-5/6 mcp-spec stack and obviates the run-copilot wrapper by writing `squad_state` to the HOME copilot config (auto-loaded by copilot without `--additional-mcp-config`). Validation can now run `copilot --resume` directly without the squad shim.
