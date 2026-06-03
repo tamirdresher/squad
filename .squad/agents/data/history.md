@@ -230,3 +230,6 @@ Full archive: .squad/agents/data/history-archive.md
 **Deferral:** None — feature complete, PR open, awaiting upstream maintainer merge on PR #1208 (bradygaster/squad)
 
 **Batch status:** ✅ CLOSED (PR #1208 opened; issue #3642 resolved in implementation)
+
+## 2026-06-03T06:56:20+03:00 — Iter-4 re-validation synthesis (5/6 cross-repo)
+Synthesized 5 per-repo iter-4 re-val reports + Data-15 RCA + Data-17 alias proof + iter-3 final into .squad/files/validation/6REPO-REVAL-ITER4-FINAL.md (~14 KB). Verdict: 8 build-time fixes confirmed across 5/5 reporting repos including worst-case (tamir-squad-hq). Runtime MCP via direct user invocation still blocked by two newly-pinpointed root causes: (1) USER-INVOCATION-BYPASSES-MCP-CONFIG — wrap fix only intercepts squad-internal copilot spawns; (2) INIT-VS-UPGRADE-ASYMMETRY — REGISTRY-PIN fallback only in upgrade.ts, not init.ts. Iter-5 in flight (peer spawn): squad copilot wrapper (~25 LOC), init.ts MCP-spec mirror (~15 LOC), UPGRADE-TEMPLATE-DOC-FLATTEN (~20 LOC). Sample completeness 5/6 — data-23 (squad-ai-vulns) hung 8h+, documented as measurement gap. Recommendation: 🟡 MERGE-AFTER-ITER-5 + 2-repo re-smoke (hq upgrade + travel fresh-init), pass = orphan SHA grows.
