@@ -107,5 +107,26 @@ Audited all iter-9 (v0.9.6-preview.15) user-facing docs for accuracy against shi
 
 ---
 
+## 2026-06-03 — NEW-4: MCP squad_state_write empty-blob fix
+
+**Bug:** `squad_state_write` via MCP tool layer wrote empty content (blob SHA `e69de29bb2d1d6434b8b29ae775ad8c2e48c5391`) to the orphan branch while direct `OrphanBranchBackend.write()` worked correctly.
+
+**Root cause (confirmed by call-chain trace):**
+`parseObject()` in `state-mcp.ts` casts `params['arguments']` to `Record<string,unknown>` with no validation. When the MCP payload omits `content`, `args.content` is `undefined` at runtime despite `StateWriteRequest` typing it `string`. `StateBackendStorageAdapter.writeSync(path, undefined)` passes `undefined` to `OrphanBranchBackend.write()`, then to `gitExecWithInput(['hash-object', '-w', '--stdin'], undefined, cwd)`. Node.js `execFileSync` with `input: undefined` passes no stdin bytes → git hashes empty input → empty blob.
+
+**Fix:** Added runtime content guards in `stateWrite` and `stateAppend` handlers (`packages/squad-sdk/src/tools/index.ts`) that check `args.content == null || typeof args.content !== 'string'` and return `{ resultType: 'failure', error: 'content is required' }` before reaching the backend. Does NOT coerce to `""` (would mask caller error).
+
+**Files changed:**
+| File | Change |
+|------|--------|
+| `packages/squad-sdk/src/tools/index.ts` | Add runtime content guard in `stateWrite` (+8 lines) and `stateAppend` (+8 lines) handlers |
+| `test/state-backend.test.ts` | Add 3 regression tests in `ToolRegistry state tools with git-native backend` describe block |
+
+**Commit:** `debd05c4` on branch `squad/state-backend-upgrade-fixes` in `tamirdresher/squad`  
+**Tests:** 3 new tests all pass; 2 pre-existing failures in `state-backend.test.ts` unchanged  
+**Auth state:** pushed as `tamirdresher`, restored to `tamirdresher_microsoft`
+
+---
+
 **Last Updated:** 2026-06-03T22:15:00Z  
 **Archive:** See `.squad/agents/data/history-archive.md` for all 2026-06-02 and earlier entries.
