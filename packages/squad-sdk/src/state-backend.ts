@@ -214,6 +214,93 @@ function gitExecOrThrow(args: string, cwd: string): string {
   }
 }
 
+// ── Optimistic concurrency (compare-and-swap) ───────────────────────
+
+/** Maximum CAS retry attempts before surfacing as concurrency error. */
+const CAS_MAX_ATTEMPTS = 5;
+/** Base delay for jittered exponential backoff: 50, 100, 200, 400, 800 ms. */
+const CAS_BASE_DELAY_MS = 50;
+/** Git's canonical "ref must not exist" sentinel for update-ref CAS. */
+const GIT_NULL_OID = '0000000000000000000000000000000000000000';
+
+/**
+ * Thrown when an optimistic CAS write (update-ref expected-old) fails after
+ * exhausting all retry attempts. Callers may surface, requeue, or retry with
+ * application-level coordination. Distinct from GitExecError, which signals
+ * a real git failure (corruption, permission, broken repo).
+ */
+export class StateBackendConcurrencyError extends Error {
+  readonly name = 'StateBackendConcurrencyError';
+  constructor(
+    public readonly operation: string,
+    public readonly attempts: number,
+    public readonly lastStderr: string,
+  ) {
+    super(`State backend concurrency conflict on '${operation}' after ${attempts} attempts: ${lastStderr || 'ref moved between read and write'}`);
+  }
+}
+
+/**
+ * Jittered exponential backoff in milliseconds for attempt N (0-indexed):
+ * 50, 100, 200, 400, 800 ms base, with ±25% jitter to avoid thundering herd.
+ */
+function jitteredBackoffMs(attempt: number): number {
+  const base = CAS_BASE_DELAY_MS * Math.pow(2, attempt);
+  const jitter = (Math.random() - 0.5) * 0.5 * base;
+  return Math.max(1, Math.round(base + jitter));
+}
+
+/**
+ * Patterns indicating an `update-ref` CAS conflict (retryable) rather than
+ * a hard failure. We classify any "ref ... is at ... but expected ..." or
+ * lock contention as retryable so the caller can re-read and re-attempt.
+ */
+const GIT_UPDATE_REF_CAS_RE = /is at .* but expected|cannot lock ref|reference already exists|cas_error/i;
+
+/**
+ * Attempt an atomic ref update with compare-and-swap semantics.
+ *
+ * `expectedOldSha` of `null` means "create only if does not exist"
+ * (passed as 40 zeros, git's canonical no-such-ref sentinel).
+ *
+ * Returns `{ ok: true }` on success, `{ ok: false, stderr }` on CAS conflict,
+ * and re-throws any non-CAS git failure (corruption, permission, etc.).
+ */
+function tryUpdateRef(ref: string, newSha: string, expectedOldSha: string | null, cwd: string): { ok: boolean; stderr: string } {
+  if (_casInjector) {
+    const forced = _casInjector(ref);
+    if (forced) return forced;
+  }
+  const expected = expectedOldSha ?? GIT_NULL_OID;
+  try {
+    execFileSync('git', ['update-ref', ref, newSha, expected], {
+      cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'], maxBuffer: GIT_MAX_BUFFER,
+    });
+    return { ok: true, stderr: '' };
+  } catch (err: unknown) {
+    const stderr = (err as { stderr?: string }).stderr ?? '';
+    if (GIT_UPDATE_REF_CAS_RE.test(stderr)) {
+      return { ok: false, stderr };
+    }
+    throw err;
+  }
+}
+
+/**
+ * Test-only injector for forcing CAS-conflict / success outcomes deterministically.
+ * Production callers never set this. @internal
+ */
+let _casInjector: ((ref: string) => { ok: boolean; stderr: string } | null) | null = null;
+export function _setCasInjectorForTesting(fn: ((ref: string) => { ok: boolean; stderr: string } | null) | null): void {
+  _casInjector = fn;
+}
+
+/**
+ * Internal CAS primitive — exported for unit tests only.
+ * @internal
+ */
+export const _tryUpdateRefForTesting = tryUpdateRef;
+
 // ── Backends ────────────────────────────────────────────────────────
 
 export class WorktreeBackend implements StateBackend {
@@ -309,9 +396,26 @@ export class GitNotesBackend implements StateBackend {
     return this._rootCommit;
   }
 
-  private loadBlob(): Record<string, string> {
+  /** Resolve the current SHA of refs/notes/<ref>, or null if it doesn't exist. */
+  private readNotesRef(): string | null {
+    return gitExecMaybeMissing(`rev-parse --verify refs/notes/${this.ref}`, this.cwd);
+  }
+
+  /**
+   * Load the JSON blob attached to the root commit at a SPECIFIC notes ref SHA.
+   * Reading at a pinned SHA (not the live ref tip) is the foundation of the CAS
+   * loop — without it, a writer could observe state at version N, build version
+   * N+1, but race against another writer who already advanced to N+1' (losing
+   * data). With a pinned read, the subsequent update-ref CAS catches the race.
+   *
+   * NOTE: this relies on the notes tree having no fanout. Git uses fanout
+   * (ab/cdef.../) only when many notes are present; we only ever store a single
+   * note (on the root commit), so the path is just `<refSha>:<anchor>`.
+   */
+  private loadBlobAt(refSha: string | null): Record<string, string> {
+    if (!refSha) return {};
     const anchor = this.rootCommit();
-    const raw = gitExecMaybeMissing(`notes --ref=${this.ref} show ${anchor}`, this.cwd);
+    const raw = gitExecMaybeMissing(`show ${refSha}:${anchor}`, this.cwd, false);
     if (!raw) return {};
     try {
       const parsed: unknown = JSON.parse(raw);
@@ -322,19 +426,54 @@ export class GitNotesBackend implements StateBackend {
     } catch { return {}; }
   }
 
-  private saveBlob(blob: Record<string, string>): void {
+  /** Convenience reader at the live ref tip (used for read-only operations). */
+  private loadBlob(): Record<string, string> {
+    return this.loadBlobAt(this.readNotesRef());
+  }
+
+  /**
+   * Build a new notes commit and attempt to atomically swing refs/notes/<ref>
+   * from `expectedOldRefSha` to it. Returns the same `{ ok, stderr }` shape as
+   * tryUpdateRef so the caller's retry loop can act.
+   */
+  private atomicSaveBlob(blob: Record<string, string>, expectedOldRefSha: string | null): { ok: boolean; stderr: string } {
     const anchor = this.rootCommit();
     const json = JSON.stringify(blob, null, 2);
+    let blobSha: string;
+    let treeSha: string;
+    let commitSha: string;
     try {
-      gitExecWithInputAndRetry(
-        ['notes', `--ref=${this.ref}`, 'add', '-f', '--file', '-', anchor],
-        this.cwd,
-        json,
-      );
+      blobSha = gitExecWithInputAndRetry(['hash-object', '-w', '--stdin'], this.cwd, json);
+      treeSha = gitExecWithInputAndRetry(['mktree'], this.cwd, `100644 blob ${blobSha}\t${anchor}\n`);
+      const parentArgs = expectedOldRefSha ? ['-p', expectedOldRefSha] : [];
+      commitSha = gitExecWithRetry(['commit-tree', treeSha, ...parentArgs, '-m', 'Update squad state'], this.cwd);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      throw new Error(`git-notes backend: failed to write note on root commit — ${msg}`);
+      throw new Error(`git-notes backend: failed to build notes commit — ${msg}`);
     }
+    return tryUpdateRef(`refs/notes/${this.ref}`, commitSha, expectedOldRefSha, this.cwd);
+  }
+
+  /**
+   * Run a mutator under optimistic CAS. The mutator receives the current blob
+   * (re-read on every attempt) and may mutate it; its return value is forwarded
+   * to the caller on success. On CAS conflict, the loop retries with jittered
+   * backoff up to CAS_MAX_ATTEMPTS times, then throws StateBackendConcurrencyError.
+   */
+  private mutateBlob<T>(operation: string, mutator: (blob: Record<string, string>) => T): T {
+    let lastStderr = '';
+    for (let attempt = 0; attempt < CAS_MAX_ATTEMPTS; attempt++) {
+      const oldRefSha = this.readNotesRef();
+      const blob = this.loadBlobAt(oldRefSha);
+      const result = mutator(blob);
+      const writeResult = this.atomicSaveBlob(blob, oldRefSha);
+      if (writeResult.ok) return result;
+      lastStderr = writeResult.stderr;
+      if (attempt < CAS_MAX_ATTEMPTS - 1) {
+        sleepSync(jitteredBackoffMs(attempt));
+      }
+    }
+    throw new StateBackendConcurrencyError(operation, CAS_MAX_ATTEMPTS, lastStderr);
   }
 
   read(relativePath: string): string | undefined {
@@ -345,9 +484,9 @@ export class GitNotesBackend implements StateBackend {
   }
   write(relativePath: string, content: string): void {
     this.breaker.execute(() => {
-      const blob = this.loadBlob();
-      blob[normalizeKey(relativePath)] = content;
-      this.saveBlob(blob);
+      this.mutateBlob(`git-notes:write(${relativePath})`, (blob) => {
+        blob[normalizeKey(relativePath)] = content;
+      });
     }, `git-notes:write(${relativePath})`);
   }
   exists(relativePath: string): boolean {
@@ -373,18 +512,22 @@ export class GitNotesBackend implements StateBackend {
     }, `git-notes:list(${relativeDir})`);
   }
   delete(relativePath: string): boolean {
-    const blob = this.loadBlob();
-    const key = normalizeKey(relativePath);
-    if (!Object.hasOwn(blob, key)) return false;
-    delete blob[key];
-    this.saveBlob(blob);
-    return true;
+    return this.breaker.execute(() => {
+      const key = normalizeKey(relativePath);
+      return this.mutateBlob(`git-notes:delete(${relativePath})`, (blob) => {
+        if (!Object.hasOwn(blob, key)) return false;
+        delete blob[key];
+        return true;
+      });
+    }, `git-notes:delete(${relativePath})`);
   }
   append(relativePath: string, content: string): void {
-    const blob = this.loadBlob();
-    const key = normalizeKey(relativePath);
-    blob[key] = (blob[key] ?? '') + content;
-    this.saveBlob(blob);
+    this.breaker.execute(() => {
+      this.mutateBlob(`git-notes:append(${relativePath})`, (blob) => {
+        const key = normalizeKey(relativePath);
+        blob[key] = (blob[key] ?? '') + content;
+      });
+    }, `git-notes:append(${relativePath})`);
   }
 }
 
@@ -416,7 +559,15 @@ export class OrphanBranchBackend implements StateBackend {
       const msg = err instanceof Error ? err.message : String(err);
       throw new Error(`orphan backend: failed to create initial commit — ${msg}`);
     }
-    gitExecOrThrow(`update-ref refs/heads/${this.branch} ${commit}`, this.cwd);
+    // CAS create: succeeds only if the ref still doesn't exist. If a concurrent
+    // writer created it between our check and now, fall through silently — the
+    // caller's mutation loop will pick up the new head on its next iteration.
+    const writeResult = tryUpdateRef(`refs/heads/${this.branch}`, commit, null, this.cwd);
+    if (!writeResult.ok) {
+      // Re-verify someone else created it; if so, we're done.
+      if (gitExecMaybeMissing(`rev-parse --verify refs/heads/${this.branch}`, this.cwd)) return;
+      throw new Error(`orphan backend: failed to initialize branch — ${writeResult.stderr}`);
+    }
   }
 
   read(relativePath: string): string | undefined {
@@ -430,6 +581,8 @@ export class OrphanBranchBackend implements StateBackend {
     this.breaker.execute(() => {
       this.ensureBranch();
       const key = normalizeKey(relativePath);
+
+      // Blob is content-addressed, so hash once outside the CAS loop.
       let blobHash: string;
       try {
         blobHash = gitExecWithInputAndRetry(['hash-object', '-w', '--stdin'], this.cwd, content);
@@ -438,31 +591,43 @@ export class OrphanBranchBackend implements StateBackend {
         throw new Error(`orphan backend: failed to hash content for ${key} — ${msg}`);
       }
 
-      let currentTree: string;
-      const treeResult = gitExecMaybeMissing(`log --format=%T -1 ${this.branch}`, this.cwd);
-      if (!treeResult) {
+      let lastStderr = '';
+      for (let attempt = 0; attempt < CAS_MAX_ATTEMPTS; attempt++) {
+        // Re-read the ref every iteration so we rebuild on top of the latest tree.
+        const parentCommit = gitExecMaybeMissing(`rev-parse --verify refs/heads/${this.branch}`, this.cwd);
+        let currentTree: string;
+        if (parentCommit) {
+          const treeResult = gitExecMaybeMissing(`rev-parse ${parentCommit}^{tree}`, this.cwd);
+          currentTree = treeResult ?? gitExecWithInputAndRetry(['mktree'], this.cwd, '');
+        } else {
+          try { currentTree = gitExecWithInputAndRetry(['mktree'], this.cwd, ''); }
+          catch (err: unknown) {
+            const msg = err instanceof Error ? err.message : String(err);
+            throw new Error(`orphan backend: failed to create empty tree — ${msg}`);
+          }
+        }
+
+        const newTree = this.updateTree(currentTree, key.split('/'), blobHash);
+        let newCommit: string;
         try {
-          currentTree = gitExecWithInputAndRetry(['mktree'], this.cwd, '');
+          const parentArgs = parentCommit ? ['-p', parentCommit] : [];
+          newCommit = gitExecWithRetry(
+            ['commit-tree', newTree, ...parentArgs, '-m', `Update ${key}`],
+            this.cwd,
+          );
         } catch (err: unknown) {
           const msg = err instanceof Error ? err.message : String(err);
-          throw new Error(`orphan backend: failed to create empty tree — ${msg}`);
+          throw new Error(`orphan backend: failed to commit update for ${key} — ${msg}`);
         }
-      } else { currentTree = treeResult; }
 
-      const newTree = this.updateTree(currentTree, key.split('/'), blobHash);
-      const parentCommit = gitExecMaybeMissing(`rev-parse ${this.branch}`, this.cwd);
-      let newCommit: string;
-      try {
-        const parentArgs = parentCommit ? ['-p', parentCommit] : [];
-        newCommit = gitExecWithRetry(
-          ['commit-tree', newTree, ...parentArgs, '-m', `Update ${key}`],
-          this.cwd,
-        );
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        throw new Error(`orphan backend: failed to commit update for ${key} — ${msg}`);
+        const writeResult = tryUpdateRef(`refs/heads/${this.branch}`, newCommit, parentCommit, this.cwd);
+        if (writeResult.ok) return;
+        lastStderr = writeResult.stderr;
+        if (attempt < CAS_MAX_ATTEMPTS - 1) {
+          sleepSync(jitteredBackoffMs(attempt));
+        }
       }
-      gitExecOrThrow(`update-ref refs/heads/${this.branch} ${newCommit}`, this.cwd);
+      throw new StateBackendConcurrencyError(`orphan:write(${relativePath})`, CAS_MAX_ATTEMPTS, lastStderr);
     }, `orphan:write(${relativePath})`);
   }
 
@@ -488,23 +653,38 @@ export class OrphanBranchBackend implements StateBackend {
       const key = normalizeKey(relativePath);
       if (gitExecMaybeMissing(`cat-file -t ${this.branch}:${key}`, this.cwd) === null) return false;
       this.ensureBranch();
-      const treeResult = gitExecMaybeMissing(`log --format=%T -1 ${this.branch}`, this.cwd);
-      if (!treeResult) return false;
-      const newTree = this.removeFromTree(treeResult, key.split('/'));
-      const parentCommit = gitExecMaybeMissing(`rev-parse ${this.branch}`, this.cwd);
-      let newCommit: string;
-      try {
-        const parentArgs = parentCommit ? ['-p', parentCommit] : [];
-        newCommit = gitExecWithRetry(
-          ['commit-tree', newTree, ...parentArgs, '-m', `Delete ${key}`],
-          this.cwd,
-        );
-      } catch (err: unknown) {
-        const msg = err instanceof Error ? err.message : String(err);
-        throw new Error(`orphan backend: failed to commit delete for ${key} — ${msg}`);
+
+      let lastStderr = '';
+      for (let attempt = 0; attempt < CAS_MAX_ATTEMPTS; attempt++) {
+        const parentCommit = gitExecMaybeMissing(`rev-parse --verify refs/heads/${this.branch}`, this.cwd);
+        if (!parentCommit) return false;
+        const treeResult = gitExecMaybeMissing(`rev-parse ${parentCommit}^{tree}`, this.cwd);
+        if (!treeResult) return false;
+
+        // Re-check existence at the freshly-read tree — a concurrent delete may
+        // have already removed our key, in which case there's nothing to do.
+        if (gitExecMaybeMissing(`cat-file -t ${parentCommit}:${key}`, this.cwd) === null) return false;
+
+        const newTree = this.removeFromTree(treeResult, key.split('/'));
+        let newCommit: string;
+        try {
+          newCommit = gitExecWithRetry(
+            ['commit-tree', newTree, '-p', parentCommit, '-m', `Delete ${key}`],
+            this.cwd,
+          );
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          throw new Error(`orphan backend: failed to commit delete for ${key} — ${msg}`);
+        }
+
+        const writeResult = tryUpdateRef(`refs/heads/${this.branch}`, newCommit, parentCommit, this.cwd);
+        if (writeResult.ok) return true;
+        lastStderr = writeResult.stderr;
+        if (attempt < CAS_MAX_ATTEMPTS - 1) {
+          sleepSync(jitteredBackoffMs(attempt));
+        }
       }
-      gitExecOrThrow(`update-ref refs/heads/${this.branch} ${newCommit}`, this.cwd);
-      return true;
+      throw new StateBackendConcurrencyError(`orphan:delete(${relativePath})`, CAS_MAX_ATTEMPTS, lastStderr);
     }, `orphan:delete(${relativePath})`);
   }
 

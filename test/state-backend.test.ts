@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdirSync, rmSync, writeFileSync, readFileSync, existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { execSync } from 'node:child_process';
+import { execSync, execFileSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { tmpdir } from 'node:os';
 import { WorktreeBackend, GitNotesBackend, OrphanBranchBackend, TwoLayerBackend, CircuitBreaker, GitExecError, resolveStateBackend, validateStateKey, StateBackendStorageAdapter, verifyStateBackend, _resetGitNotesMigrationWarnForTesting } from '../packages/squad-sdk/src/state-backend.js';
@@ -1189,4 +1189,230 @@ describe('TwoLayerBackend.promoteNotes / readNote / observability', () => {
     expect(warnings.some((w) => w.includes('notes append failed for history/foo.md') && w.includes('boom-append'))).toBe(true);
     expect(warnings.some((w) => w.includes('notes delete failed for decisions/foo.md') && w.includes('boom-delete'))).toBe(true);
   }, 30000);
+});
+
+// ───────────────────────────────────────────────────────────────────
+// Compare-and-swap (CAS) tests for GitNotesBackend + OrphanBranchBackend.
+// These cover the optimistic-concurrency refactor that replaced the
+// silently-clobbering `git notes add -f` and unconditional update-ref
+// with a read → mutate → update-ref-with-expected-old loop.
+// ───────────────────────────────────────────────────────────────────
+
+describe('tryUpdateRef (CAS primitive)', () => {
+  beforeEach(() => { if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); initRepo(); });
+  afterEach(() => { if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); });
+
+  it('succeeds when ref is at the expected SHA', async () => {
+    const { _tryUpdateRefForTesting } = await import('../packages/squad-sdk/src/state-backend.js');
+    const headSha = git('rev-parse HEAD');
+    // Create a target ref pointing at HEAD, then CAS-update it to itself.
+    git(`update-ref refs/test/cas ${headSha}`);
+    const result = _tryUpdateRefForTesting('refs/test/cas', headSha, headSha, TMP);
+    expect(result.ok).toBe(true);
+  });
+
+  it('returns ok:false with stderr on CAS conflict (expected-old mismatch)', async () => {
+    const { _tryUpdateRefForTesting } = await import('../packages/squad-sdk/src/state-backend.js');
+    const headSha = git('rev-parse HEAD');
+    git(`update-ref refs/test/cas2 ${headSha}`);
+    // Lie about the expected old SHA -> CAS must reject.
+    const bogus = '0123456789abcdef0123456789abcdef01234567';
+    const result = _tryUpdateRefForTesting('refs/test/cas2', headSha, bogus, TMP);
+    expect(result.ok).toBe(false);
+    expect(result.stderr.length).toBeGreaterThan(0);
+  });
+
+  it('returns ok:false when creating a ref that already exists (expected-old = null)', async () => {
+    const { _tryUpdateRefForTesting } = await import('../packages/squad-sdk/src/state-backend.js');
+    const headSha = git('rev-parse HEAD');
+    git(`update-ref refs/test/cas3 ${headSha}`);
+    // null expectedOld -> tryUpdateRef sends 40 zeros == "must not exist".
+    const result = _tryUpdateRefForTesting('refs/test/cas3', headSha, null, TMP);
+    expect(result.ok).toBe(false);
+  });
+
+  it('throws (not returns) on non-CAS failures (e.g., bogus SHA)', async () => {
+    const { _tryUpdateRefForTesting } = await import('../packages/squad-sdk/src/state-backend.js');
+    // Reference a non-existent object — this is a real git error, not a CAS conflict.
+    expect(() => _tryUpdateRefForTesting('refs/test/cas4', 'deadbeef'.repeat(5), null, TMP)).toThrow();
+  });
+});
+
+describe('GitNotesBackend CAS retry semantics', () => {
+  beforeEach(() => { if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); initRepo(); });
+  afterEach(async () => {
+    const { _setCasInjectorForTesting } = await import('../packages/squad-sdk/src/state-backend.js');
+    _setCasInjectorForTesting(null);
+    if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true });
+  });
+
+  it('write succeeds on first try when ref is uncontended', { timeout: 15_000 }, () => {
+    const b = new GitNotesBackend(TMP);
+    b.write('a.md', 'A');
+    expect(b.read('a.md')).toBe('A');
+  });
+
+  it('two sequential writes preserve both keys (no clobber)', { timeout: 15_000 }, () => {
+    const b = new GitNotesBackend(TMP);
+    b.write('a.md', 'A');
+    b.write('b.md', 'B');
+    expect(b.read('a.md')).toBe('A');
+    expect(b.read('b.md')).toBe('B');
+  });
+
+  it('rebuilds on top of out-of-band ref advancement (CAS retry converges)', { timeout: 20_000 }, () => {
+    // Seed the notes ref with one key.
+    const b = new GitNotesBackend(TMP);
+    b.write('seed.md', 'S');
+    const refBefore = git('rev-parse refs/notes/squad');
+
+    // Out-of-band advance: another writer added a key while we weren't looking.
+    // Build the new note via plumbing (use execFileSync to bypass cmd.exe `^` escaping).
+    const anchor = git('rev-list --max-parents=0 HEAD');
+    const existingRaw = execSync(`git show ${refBefore}:${anchor}`, { cwd: TMP, encoding: 'utf-8' });
+    const existingJson = JSON.parse(existingRaw);
+    existingJson['outOfBand.md'] = 'OOB';
+    const newJson = JSON.stringify(existingJson, null, 2);
+    const blobSha = execSync('git hash-object -w --stdin', { cwd: TMP, encoding: 'utf-8', input: newJson }).trim();
+    const treeSha = execSync('git mktree', { cwd: TMP, encoding: 'utf-8', input: `100644 blob ${blobSha}\t${anchor}\n` }).trim();
+    const newCommit = execSync(`git commit-tree ${treeSha} -p ${refBefore} -m "oob"`, { cwd: TMP, encoding: 'utf-8' }).trim();
+    git(`update-ref refs/notes/squad ${newCommit} ${refBefore}`);
+
+    // SDK writes again. Under old `notes add -f` this would clobber outOfBand.md.
+    // Under CAS the rebuild reads the latest tip and preserves OOB.
+    b.write('postBand.md', 'P');
+    expect(b.read('seed.md')).toBe('S');
+    expect(b.read('outOfBand.md')).toBe('OOB');
+    expect(b.read('postBand.md')).toBe('P');
+  });
+
+  it('converges after exactly one CAS conflict via injector', { timeout: 20_000 }, async () => {
+    const { _setCasInjectorForTesting } = await import('../packages/squad-sdk/src/state-backend.js');
+    const b = new GitNotesBackend(TMP);
+    b.write('seed.md', 'S');
+
+    let injectCount = 0;
+    _setCasInjectorForTesting((ref) => {
+      if (ref !== 'refs/notes/squad') return null;
+      if (injectCount++ < 1) return { ok: false, stderr: 'simulated CAS mismatch' };
+      return null; // subsequent attempts go through to real git
+    });
+
+    b.write('retry.md', 'R');
+    expect(injectCount).toBe(2); // attempt 1 forced fail, attempt 2 real success
+    expect(b.read('seed.md')).toBe('S');
+    expect(b.read('retry.md')).toBe('R');
+  });
+
+  it('converges after 4 CAS conflicts (right at the retry budget edge)', { timeout: 20_000 }, async () => {
+    const { _setCasInjectorForTesting } = await import('../packages/squad-sdk/src/state-backend.js');
+    const b = new GitNotesBackend(TMP);
+    b.write('seed.md', 'S');
+
+    let injectCount = 0;
+    _setCasInjectorForTesting((ref) => {
+      if (ref !== 'refs/notes/squad') return null;
+      if (injectCount++ < 4) return { ok: false, stderr: 'simulated CAS mismatch' };
+      return null; // 5th attempt goes through
+    });
+
+    b.write('edge.md', 'E');
+    expect(b.read('seed.md')).toBe('S');
+    expect(b.read('edge.md')).toBe('E');
+  });
+
+  it('throws StateBackendConcurrencyError after exhausting all 5 attempts', { timeout: 20_000 }, async () => {
+    const { _setCasInjectorForTesting, StateBackendConcurrencyError } = await import('../packages/squad-sdk/src/state-backend.js');
+    const b = new GitNotesBackend(TMP);
+    b.write('seed.md', 'S');
+
+    _setCasInjectorForTesting((ref) => {
+      if (ref !== 'refs/notes/squad') return null;
+      return { ok: false, stderr: 'simulated nonstop CAS mismatch' };
+    });
+
+    let caught: unknown;
+    try { b.write('boom.md', 'X'); } catch (e) { caught = e; }
+    expect(caught).toBeInstanceOf(StateBackendConcurrencyError);
+    expect((caught as Error).message).toContain('git-notes:write(boom.md)');
+    expect((caught as Error).message).toContain('5 attempts');
+  });
+});
+
+describe('OrphanBranchBackend CAS retry semantics', () => {
+  beforeEach(() => { if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); initRepo(); });
+  afterEach(async () => {
+    const { _setCasInjectorForTesting } = await import('../packages/squad-sdk/src/state-backend.js');
+    _setCasInjectorForTesting(null);
+    if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true });
+  });
+
+  it('write rebuilds on top of out-of-band branch advancement', { timeout: 20_000 }, () => {
+    const b = new OrphanBranchBackend(TMP);
+    b.write('seed.md', 'S');
+    const refBefore = git('rev-parse refs/heads/squad-state');
+
+    // Out-of-band: append a new file to the orphan branch via plumbing.
+    // Use array-form execFileSync to bypass cmd.exe interpreting `^` in `^{tree}`.
+    const treeBefore = execFileSync('git', ['rev-parse', `${refBefore}^{tree}`], { cwd: TMP, encoding: 'utf-8' }).trim();
+    const blobSha = execSync('git hash-object -w --stdin', { cwd: TMP, encoding: 'utf-8', input: 'OOB' }).trim();
+    const existingTree = execSync(`git ls-tree ${treeBefore}`, { cwd: TMP, encoding: 'utf-8' }).split('\n').filter(Boolean);
+    existingTree.push(`100644 blob ${blobSha}\toutOfBand.md`);
+    const newTree = execSync('git mktree', { cwd: TMP, encoding: 'utf-8', input: existingTree.join('\n') + '\n' }).trim();
+    const newCommit = execSync(`git commit-tree ${newTree} -p ${refBefore} -m "oob"`, { cwd: TMP, encoding: 'utf-8' }).trim();
+    git(`update-ref refs/heads/squad-state ${newCommit} ${refBefore}`);
+
+    b.write('postBand.md', 'P');
+    expect(b.read('seed.md')).toBe('S');
+    expect(b.read('outOfBand.md')).toBe('OOB');
+    expect(b.read('postBand.md')).toBe('P');
+  });
+
+  it('converges after one CAS conflict via injector', { timeout: 20_000 }, async () => {
+    const { _setCasInjectorForTesting } = await import('../packages/squad-sdk/src/state-backend.js');
+    const b = new OrphanBranchBackend(TMP);
+    b.write('seed.md', 'S');
+
+    let injectCount = 0;
+    _setCasInjectorForTesting((ref) => {
+      if (ref !== 'refs/heads/squad-state') return null;
+      if (injectCount++ < 1) return { ok: false, stderr: 'simulated CAS mismatch' };
+      return null;
+    });
+
+    b.write('retry.md', 'R');
+    expect(b.read('seed.md')).toBe('S');
+    expect(b.read('retry.md')).toBe('R');
+  });
+
+  it('throws StateBackendConcurrencyError after exhausting all 5 attempts on write', { timeout: 20_000 }, async () => {
+    const { _setCasInjectorForTesting, StateBackendConcurrencyError } = await import('../packages/squad-sdk/src/state-backend.js');
+    const b = new OrphanBranchBackend(TMP);
+    b.write('seed.md', 'S');
+
+    _setCasInjectorForTesting((ref) => {
+      if (ref !== 'refs/heads/squad-state') return null;
+      return { ok: false, stderr: 'simulated nonstop CAS mismatch' };
+    });
+
+    let caught: unknown;
+    try { b.write('boom.md', 'X'); } catch (e) { caught = e; }
+    expect(caught).toBeInstanceOf(StateBackendConcurrencyError);
+    expect((caught as Error).message).toContain('orphan:write(boom.md)');
+  });
+
+  it('delete throws StateBackendConcurrencyError after exhausting retries', { timeout: 20_000 }, async () => {
+    const { _setCasInjectorForTesting, StateBackendConcurrencyError } = await import('../packages/squad-sdk/src/state-backend.js');
+    const b = new OrphanBranchBackend(TMP);
+    b.write('seed.md', 'S');
+
+    _setCasInjectorForTesting((ref) => {
+      if (ref !== 'refs/heads/squad-state') return null;
+      return { ok: false, stderr: 'simulated nonstop CAS mismatch' };
+    });
+
+    let caught: unknown;
+    try { b.delete('seed.md'); } catch (e) { caught = e; }
+    expect(caught).toBeInstanceOf(StateBackendConcurrencyError);
+  });
 });
