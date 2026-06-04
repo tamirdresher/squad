@@ -1,8 +1,49 @@
 # Squad Decisions
 
-**Last Updated:** 2026-06-04T05:38:00Z
+**Last Updated:** 2026-06-04T18:30:00Z
 
 ## Active Decisions
+
+---
+
+### 2026-06-04T18:30:00Z: PR #1200 (`--state-backend two-layer`) — APPROVED [ws:squad-agents-ai]
+
+**Author**: B'Elanna
+
+**Date**: 2026-06-04
+
+**Status**: approved
+
+**Scope**: squad-agents-ai
+
+**Related**: PR #1200 (`@squad/sdk` + `@squad/cli` v0.9.6-preview.21, HEAD `aaec183f`)
+
+**Evidence**: [`SIX-REPO-LONG-SESSION-TWO-LAYER-TEST.md`](../../../../files/validation/SIX-REPO-LONG-SESSION-TWO-LAYER-TEST.md)
+
+## Verdict
+
+**Ship PR #1200 to main.** Two-layer state backend correctness is empirically verified across 6 repos × 7 invariants × 30-turn long sessions. 4/6 repos fully PASS C1–C7. 2/6 PARTIAL results are caused by pre-existing `spawnSync git ENOBUFS` issues in the wider SDK (not introduced by PR #1200), which two-layer exercises more aggressively on huge / large-orphan repos.
+
+## What was verified
+
+For each repo: clone → `upgrade --state-backend two-layer` → 30-turn simulation → 7-check verification (C1 orphan content, C2 no working-tree leak, C3 separator integrity, C4 promote correctness, C5 branch-switch persistence, C6 sequential appends, C7 HOME mcp-config unchanged).
+
+Repos: `travel-assistant`, `gh-ai-adoption2026`, `multiplayer-sudoku`, `holocaust-research-wasserman`, `squad-ai-vulns`, `tamir-squad-hq`.
+
+## What still needs work (NOT blocking PR #1200)
+
+File as separate issues against `@squad/sdk`:
+
+1. **promoteNotes ENOBUFS** on `git rev-list HEAD` for repos with large commit graph. Fix: pass `maxBuffer: 100MB` or stream via `spawn`.
+2. **scribe ENOBUFS** on `git show squad-state:<path>` when existing orphan-file content >1MB. Fix: same — `maxBuffer` or `git cat-file -p` via streamed `spawn`.
+
+Both are pre-existing SDK plumbing limits, not two-layer regressions.
+
+## Decision
+
+- ✅ Merge PR #1200.
+- 📝 Open 2 follow-up issues for the `spawnSync` buffer limits above.
+- 📝 Open a low-priority harness improvement: C1 should baseline-diff (like C2 now does) so repos with pre-existing orphan content aren't false-failed.
 
 ---
 
