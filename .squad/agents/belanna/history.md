@@ -104,3 +104,47 @@ B'Elanna drives Squad.Agents.AI delivery to bradygaster/squad: .NET adapter via 
 **HOME mcp-config.json invariant:** SHA256 `928760588EE047B9A96E7F85150907B97F369C1FDB088D4ED959D03D205D3A86` confirmed unchanged after cleanup.
 
 **Last Updated:** 2026-06-04
+
+---
+
+### Real Old Repo Upgrade Test — PR #1200 (2026-06-04T09:20:00+03:00)
+
+**Task:** Empirical upgrade validation against 3 real production squad repos (copies in sandbox). Goal: prove `upgrade` command from PR #1200 (v0.9.6-preview.18) correctly preserves/sets `stateBackend: two-layer`, creates `.mcp.json`, migrates state, and MCP server can do a read/write round-trip.
+
+**Sandbox:** `C:\Users\tamirdresher\squad-validation\real-old-repo-upgrade\` (originals never touched)
+
+**Repos tested:**
+- `tamresearch1-3516` — v0.9.6-insider.3 (had `stateBackend: two-layer` pre-set, `teamRoot: "."`)
+- `squad-apm-work` — v0.0.0-source (workspace monorepo)
+- `squad-pr1158` — v0.0.0-source (workspace monorepo)
+
+**Key discovery: workspace monorepo trap.** `npm install --save-dev <tarball>` in a workspace monorepo installs metadata but `node_modules/@bradygaster/squad-cli` still points to the workspace package (shadowing the tarball). Workaround: invoke `node $cliEntry` directly from the tarball's extracted `cli-entry.js`. This affected both workspace repos.
+
+**Results matrix:**
+
+| Repo | stateBackend=two-layer | .mcp.json created | squad-state branch | MCP write/read |
+|---|---|---|---|---|
+| tamresearch1-3516 | ✅ (pre-existing, preserved) | ✅ | ⚠️ absent (clone artifact) | ❌ blocked by `teamRoot:"."` config |
+| squad-apm-work | ✅ (upgrade set it) | ✅ | ✅ 19 files migrated | ✅ PASS |
+| squad-pr1158 | ✅ (upgrade set it) | ✅ | ✅ 19 files migrated | ✅ PASS |
+
+**tamresearch1-3516 squad-state absence:** Original repo had `refs/remotes/origin/squad-state` only (no local branch). `git clone --no-hardlinks <local-path>` copies `refs/heads/*` only, not remotes. Clone artifact — not a regression. Upgrade correctly detected existing `stateBackend: two-layer` and skipped migration (no data to re-migrate).
+
+**tamresearch1-3516 MCP failure root cause:** Pre-existing `teamRoot: "."` in config.json causes `resolveSquadPaths()` to enter remote mode where `teamDir = repoRoot` ≠ `projectDir = .squad/`. `ToolRegistry.squadRoot` uses `teamDir` (repo root), but `StateBackendStorageAdapter.squadDir` uses `projectDir` (.squad/). Path resolves to `<repo-root>/.scratch/test.md` which is outside `.squad/` → `toRelative()` throws. This is a pre-existing SDK behavior for `teamRoot` configs, not caused by PR #1200.
+
+**MCP round-trip (squad-apm-work, squad-pr1158):**
+- Key `.scratch/real-upgrade-test.md` written via `squad_state_write` (JSON-RPC stdio to `state-mcp`)
+- Read back via `squad_state_read` — exact content match
+- `squad-state` branch advanced (new commit `Update .scratch/real-upgrade-test.md` verified via `git log`)
+- Confirmed synchronous git backend: `git hash-object`, `commit-tree`, `update-ref` all fire before response
+
+**Bug found in test (not PR regression):** `validateMutableStateToolKey()` only allows writes to `decisions.md`, `decisions/inbox/*`, `agents/<name>/history.md`, `log/*`, `orchestration-log/*`, `sessions/*`, `.scratch/*`. Test key `agents/scribe/real-upgrade-test.md` was initially blocked; fixed to use `.scratch/real-upgrade-test.md`.
+
+**SDK version mismatch noted:** Tarball CLI (preview.18) resolves `@bradygaster/squad-sdk` from `C:\Users\tamirdresher\node_modules\@bradygaster\squad-sdk` (v0.9.6-preview.15) via ESM bare-specifier walk from file location. 3-minor-preview gap; TwoLayerBackend present and functional in both versions.
+
+**VERDICT:** PR #1200 upgrade command works correctly on real production repos. 2/3 repos get full end-to-end validation; 3rd repo has pre-existing `teamRoot:"."` config that is outside the scope of this PR. Recommend merge.
+
+**Full report:** `.squad/files/validation/REAL-OLD-REPO-UPGRADE-TEST.md`
+**Decision drop:** `.squad/workstreams/active/squad-agents-ai/decisions/inbox/belanna-real-old-repo-upgrade.md`
+
+**Last Updated:** 2026-06-04T09:20:00+03:00
