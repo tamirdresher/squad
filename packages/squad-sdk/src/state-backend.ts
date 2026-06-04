@@ -38,11 +38,12 @@ function sleepSync(ms: number): void {
  * Execute a git command with retry for transient errors.
  * Throws on failure after exhausting retries.
  */
-function gitExecWithRetry(args: string[], cwd: string): string {
+function gitExecWithRetry(args: string[], cwd: string, trimOutput = true): string {
   let lastError: unknown;
   for (let attempt = 0; attempt <= RETRY_MAX; attempt++) {
     try {
-      return execFileSync('git', args, { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] }).trim();
+      const raw = execFileSync('git', args, { cwd, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'] });
+      return trimOutput ? raw.trim() : raw;
     } catch (err: unknown) {
       lastError = err;
       const stderr = (err as { stderr?: string }).stderr ?? '';
@@ -179,9 +180,9 @@ export class CircuitBreaker {
  * Throws GitExecError for real failures (permission denied, corruption, broken repo).
  * Retries transient errors before classifying.
  */
-function gitExecMaybeMissing(args: string, cwd: string): string | null {
+function gitExecMaybeMissing(args: string, cwd: string, trimOutput = true): string | null {
   try {
-    return gitExecWithRetry(args.split(' '), cwd);
+    return gitExecWithRetry(args.split(' '), cwd, trimOutput);
   } catch (err: unknown) {
     if (isExpectedMissing(err)) return null;
     const stderr = (err as { stderr?: string }).stderr ?? '';
@@ -400,7 +401,7 @@ export class OrphanBranchBackend implements StateBackend {
 
   read(relativePath: string): string | undefined {
     return this.breaker.execute(() => {
-      const result = gitExecMaybeMissing(`show ${this.branch}:${normalizeKey(relativePath)}`, this.cwd);
+      const result = gitExecMaybeMissing(`show ${this.branch}:${normalizeKey(relativePath)}`, this.cwd, false);
       return result ?? undefined;
     }, `orphan:read(${relativePath})`);
   }
