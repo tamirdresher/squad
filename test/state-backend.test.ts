@@ -1067,3 +1067,126 @@ describe('GitExecError (missing vs real failure)', () => {
     }
   });
 });
+describe('TwoLayerBackend.promoteNotes / readNote / observability', () => {
+  beforeEach(() => { if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); initRepo(); });
+  afterEach(() => { if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); vi.restoreAllMocks(); });
+
+  function addCommit(filename: string): string {
+    writeFileSync(join(TMP, filename), `content of ${filename}\n`);
+    git(`add ${filename}`);
+    git(`commit -m "add ${filename}"`);
+    return git('rev-parse HEAD');
+  }
+
+  function addNote(ref: string, commitSha: string, payload: object): void {
+    const body = JSON.stringify(payload);
+    // Write to a temp file so quoting/newlines don't get mangled by execSync.
+    const noteFile = join(TMP, `.note-${randomBytes(4).toString('hex')}.json`);
+    writeFileSync(noteFile, body);
+    git(`notes --ref=${ref} add -F "${noteFile}" ${commitSha}`);
+    rmSync(noteFile);
+  }
+
+  it('promoteNotes moves promote_to_permanent notes to orphan and removes source', () => {
+    const b = new TwoLayerBackend(TMP);
+    const sha = addCommit('feature.ts');
+    addNote('squad/picard', sha, { promote_to_permanent: true, decision: 'ship it' });
+
+    const result = b.promoteNotes('squad/picard');
+
+    expect(result.promoted).toHaveLength(1);
+    expect(result.promoted[0]).toBe(`promoted/squad/picard/${sha}.json`);
+    expect(result.archived).toHaveLength(0);
+    expect(result.skipped).toBe(0);
+
+    // Orphan layer received the payload.
+    const stored = b.orphan.read(`promoted/squad/picard/${sha}.json`);
+    expect(stored).toBeDefined();
+    expect(JSON.parse(stored!).decision).toBe('ship it');
+
+    // Source note was removed.
+    expect(() => git(`notes --ref=squad/picard show ${sha}`)).toThrow();
+  }, 30000);
+
+  it('promoteNotes copies archive_on_close notes to orphan archive/ without removing source', () => {
+    const b = new TwoLayerBackend(TMP);
+    const sha = addCommit('research.ts');
+    addNote('squad/research', sha, { archive_on_close: true, notes: 'investigation log' });
+
+    const result = b.promoteNotes('squad/research');
+
+    expect(result.archived).toHaveLength(1);
+    expect(result.archived[0]).toBe(`archive/squad/research/${sha}.json`);
+    expect(result.promoted).toHaveLength(0);
+    expect(result.skipped).toBe(0);
+
+    // Orphan layer received the archive.
+    const stored = b.orphan.read(`archive/squad/research/${sha}.json`);
+    expect(stored).toBeDefined();
+    expect(JSON.parse(stored!).notes).toBe('investigation log');
+
+    // Source note is KEPT (archive = copy).
+    expect(git(`notes --ref=squad/research show ${sha}`)).toContain('investigation log');
+  }, 30000);
+
+  it('promoteNotes skips notes without either flag', () => {
+    const b = new TwoLayerBackend(TMP);
+    const sha = addCommit('chat.ts');
+    addNote('squad/data', sha, { ephemeral: true, message: 'just a thought' });
+
+    const result = b.promoteNotes('squad/data');
+
+    expect(result.promoted).toHaveLength(0);
+    expect(result.archived).toHaveLength(0);
+    expect(result.skipped).toBe(1);
+
+    // Source note is left in place.
+    expect(git(`notes --ref=squad/data show ${sha}`)).toContain('just a thought');
+  }, 30000);
+
+  it('readNote returns null when no note exists', () => {
+    const b = new TwoLayerBackend(TMP);
+    const sha = git('rev-parse HEAD');
+    expect(b.readNote('squad/picard', sha)).toBeNull();
+  });
+
+  it('readNote returns parsed JSON when note exists', () => {
+    const b = new TwoLayerBackend(TMP);
+    const sha = git('rev-parse HEAD');
+    addNote('squad/picard', sha, { type: 'decision', body: 'approved' });
+
+    const parsed = b.readNote('squad/picard', sha) as { type: string; body: string };
+    expect(parsed).toEqual({ type: 'decision', body: 'approved' });
+  });
+
+  it('verifyStateBackend fails when TwoLayerBackend notes layer is broken', () => {
+    const b = new TwoLayerBackend(TMP);
+    // Make the orphan layer report healthy by stubbing list.
+    vi.spyOn(b.orphan, 'list').mockReturnValue([]);
+    // Break the notes layer.
+    vi.spyOn(b.notes, 'list').mockImplementation(() => { throw new Error('notes ref corrupt'); });
+
+    const result = verifyStateBackend(b);
+    expect(result.ok).toBe(false);
+    expect(result.error).toMatch(/notes layer unhealthy/);
+    expect(result.error).toMatch(/notes ref corrupt/);
+  });
+
+  it('write/delete/append failures on notes layer log console.warn', () => {
+    const b = new TwoLayerBackend(TMP);
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => { /* swallow */ });
+
+    vi.spyOn(b.notes, 'write').mockImplementation(() => { throw new Error('boom-write'); });
+    vi.spyOn(b.notes, 'append').mockImplementation(() => { throw new Error('boom-append'); });
+    vi.spyOn(b.notes, 'delete').mockImplementation(() => { throw new Error('boom-delete'); });
+
+    b.write('decisions/foo.md', 'hi');
+    b.append('history/foo.md', 'more');
+    b.delete('decisions/foo.md');
+
+    const warnings = warnSpy.mock.calls.map((c) => String(c[0]));
+    expect(warnings.some((w) => w.includes('notes write failed for decisions/foo.md') && w.includes('boom-write'))).toBe(true);
+    expect(warnings.some((w) => w.includes('notes append failed for history/foo.md') && w.includes('boom-append'))).toBe(true);
+    expect(warnings.some((w) => w.includes('notes delete failed for decisions/foo.md') && w.includes('boom-delete'))).toBe(true);
+  }, 30000);
+});

@@ -701,19 +701,37 @@ export class StateBackendStorageAdapter implements StorageProvider {
 }
 
 /**
+ * Result of promoteNotes — how many notes were moved, archived, or skipped.
+ */
+export interface PromoteNotesResult {
+  /** Orphan keys written for notes flagged `promote_to_permanent`. */
+  promoted: string[];
+  /** Orphan keys written for notes flagged `archive_on_close`. */
+  archived: string[];
+  /** Count of notes that had neither flag and were left in place. */
+  skipped: number;
+}
+
+/**
  * Two-Layer Backend — combines git-notes (commit-scoped annotations) with orphan
  * branch (permanent state). Reads from orphan for bulk state, writes to both:
  * - Git notes for commit-scoped "why" annotations (per-agent namespace)
  * - Orphan branch for permanent state (decisions, histories, logs)
  *
- * Ralph promotes notes with promote_to_permanent after PR merge.
+ * The notes layer is a real, callable consumer in this backend: call
+ * {@link TwoLayerBackend.promoteNotes} after a PR merges to move notes flagged
+ * with `promote_to_permanent` into the orphan store, and copy notes flagged
+ * with `archive_on_close` into `archive/`. {@link TwoLayerBackend.readNote}
+ * returns a single note's payload.
  */
 export class TwoLayerBackend implements StateBackend {
   readonly name = 'two-layer';
-  private readonly notes: GitNotesBackend;
-  private readonly orphan: OrphanBranchBackend;
+  readonly notes: GitNotesBackend;
+  readonly orphan: OrphanBranchBackend;
+  private readonly repoRoot: string;
 
   constructor(repoRoot: string) {
+    this.repoRoot = repoRoot;
     this.notes = new GitNotesBackend(repoRoot);
     this.orphan = new OrphanBranchBackend(repoRoot);
   }
@@ -726,7 +744,12 @@ export class TwoLayerBackend implements StateBackend {
   /** Write to orphan (permanent state) AND git notes (commit-scoped annotation) */
   write(key: string, value: string): void {
     this.orphan.write(key, value);
-    try { this.notes.write(key, value); } catch { /* notes are best-effort */ }
+    try {
+      this.notes.write(key, value);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[two-layer] notes write failed for ${key}: ${msg}`);
+    }
   }
 
   list(dir: string): string[] {
@@ -739,13 +762,130 @@ export class TwoLayerBackend implements StateBackend {
 
   delete(key: string): boolean {
     const result = this.orphan.delete(key);
-    try { this.notes.delete(key); } catch { /* best-effort */ }
+    try {
+      this.notes.delete(key);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[two-layer] notes delete failed for ${key}: ${msg}`);
+    }
     return result;
   }
 
   append(key: string, value: string): void {
     this.orphan.append(key, value);
-    try { this.notes.append(key, value); } catch { /* best-effort */ }
+    try {
+      this.notes.append(key, value);
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[two-layer] notes append failed for ${key}: ${msg}`);
+    }
+  }
+
+  /**
+   * Read a single git-notes payload as parsed JSON.
+   *
+   * Returns `null` if no note exists on the given commit for the given ref,
+   * or if the note body is not valid JSON.
+   */
+  readNote(ref: string, commitSha: string): unknown | null {
+    if (!this.isSafeRef(ref) || !this.isSafeCommitSha(commitSha)) return null;
+    const raw = gitExecMaybeMissing(`notes --ref=${ref} show ${commitSha}`, this.repoRoot, false);
+    if (raw === null) return null;
+    try { return JSON.parse(raw); } catch { return null; }
+  }
+
+  /**
+   * Walk all notes attached to commits reachable from HEAD on the given ref
+   * and act based on their flags:
+   *
+   * - `promote_to_permanent: true` — write payload to the orphan layer under
+   *   `promoted/<ref>/<sha>.json` and REMOVE the source note (the note has
+   *   been promoted to permanent state and is no longer needed).
+   * - `archive_on_close: true` — copy payload to the orphan layer under
+   *   `archive/<ref>/<sha>.json` and KEEP the source note (archive = copy).
+   * - Otherwise — leave the note alone (ephemeral, not worth promoting).
+   *
+   * Notes that fail to parse as JSON are counted as skipped.
+   */
+  promoteNotes(ref: string): PromoteNotesResult {
+    const result: PromoteNotesResult = { promoted: [], archived: [], skipped: 0 };
+    if (!this.isSafeRef(ref)) {
+      throw new Error(`[two-layer] promoteNotes: unsafe ref '${ref}'`);
+    }
+
+    const listing = gitExecMaybeMissing(`notes --ref=${ref} list`, this.repoRoot);
+    if (!listing) return result;
+
+    // git notes list output: "<noteSha> <commitSha>" per line.
+    const noteCommitPairs: Array<{ commitSha: string }> = [];
+    for (const line of listing.split('\n')) {
+      const parts = line.trim().split(/\s+/);
+      if (parts.length < 2) continue;
+      const commitSha = parts[1]!;
+      if (this.isSafeCommitSha(commitSha)) noteCommitPairs.push({ commitSha });
+    }
+    if (noteCommitPairs.length === 0) return result;
+
+    // Reachability filter: only commits reachable from HEAD.
+    const reachableRaw = gitExecMaybeMissing('rev-list HEAD', this.repoRoot);
+    if (!reachableRaw) return result;
+    const reachable = new Set(reachableRaw.split('\n').map((s) => s.trim()).filter(Boolean));
+
+    const refKeySegment = this.sanitizeRefForKey(ref);
+
+    for (const { commitSha } of noteCommitPairs) {
+      if (!reachable.has(commitSha)) continue;
+
+      const raw = gitExecMaybeMissing(`notes --ref=${ref} show ${commitSha}`, this.repoRoot, false);
+      if (raw === null) continue;
+
+      let payload: unknown;
+      try { payload = JSON.parse(raw); } catch { result.skipped++; continue; }
+
+      const flags = payload as { promote_to_permanent?: unknown; archive_on_close?: unknown };
+      const shouldPromote = flags?.promote_to_permanent === true;
+      const shouldArchive = flags?.archive_on_close === true;
+
+      if (!shouldPromote && !shouldArchive) { result.skipped++; continue; }
+
+      // Stringify payload deterministically (2-space indent matches existing pattern).
+      const body = JSON.stringify(payload, null, 2);
+
+      if (shouldPromote) {
+        const key = `promoted/${refKeySegment}/${commitSha}.json`;
+        this.orphan.write(key, body);
+        try {
+          gitExecOrThrow(`notes --ref=${ref} remove ${commitSha}`, this.repoRoot);
+        } catch (err: unknown) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.warn(`[two-layer] promoteNotes: removed-source failed for ${commitSha} on ${ref}: ${msg}`);
+        }
+        result.promoted.push(key);
+      }
+
+      if (shouldArchive) {
+        const key = `archive/${refKeySegment}/${commitSha}.json`;
+        this.orphan.write(key, body);
+        result.archived.push(key);
+      }
+    }
+
+    return result;
+  }
+
+  /** True for refs that look like `squad/<name>` — alphanumerics, dash, underscore, slash. */
+  private isSafeRef(ref: string): boolean {
+    return /^[A-Za-z0-9_\-./]+$/.test(ref) && !ref.includes('..');
+  }
+
+  /** True for SHA-1 hex (40 chars) or SHA-256 hex (64 chars). */
+  private isSafeCommitSha(sha: string): boolean {
+    return /^[a-f0-9]{40}$|^[a-f0-9]{64}$/.test(sha);
+  }
+
+  /** Pass the ref through as path segments; normalizeKey will validate each. */
+  private sanitizeRefForKey(ref: string): string {
+    return ref.split('/').filter(Boolean).join('/');
   }
 }
 
@@ -782,15 +922,29 @@ export function resolveStateBackend(squadDir: string, repoRoot: string, cliOverr
 /**
  * Read-only health check for a state backend.
  * Verifies the backend is accessible without mutating state.
+ *
+ * For {@link TwoLayerBackend}, both layers are probed independently — the
+ * notes layer can fail (corrupt notes ref, missing commits) even when the
+ * orphan layer is healthy, and we surface that explicitly.
  */
 export function verifyStateBackend(backend: StateBackend): { ok: boolean; error?: string } {
   try {
     backend.list('');
-    return { ok: true };
   } catch (err: unknown) {
     const msg = err instanceof Error ? err.message : String(err);
     return { ok: false, error: `Backend '${backend.name}' verification failed: ${msg}` };
   }
+
+  if (backend instanceof TwoLayerBackend) {
+    try {
+      backend.notes.list('');
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return { ok: false, error: `Backend '${backend.name}' notes layer unhealthy: ${msg}` };
+    }
+  }
+
+  return { ok: true };
 }
 
 function isValidBackendType(value: string): value is StateBackendType {
