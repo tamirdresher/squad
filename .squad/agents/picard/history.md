@@ -156,5 +156,30 @@ expect(spec).toEqual({
 
 **2026-06-03T21:05:00Z — PR #1200 FULLY GREEN (all 6 CI jobs pass) after this iter-9 test drift fix (commit 3f0a16d6).**
 
-**Last Updated:** 2026-06-03T21:05:00Z  
+---
+
+## 2026-06-04 — PR #1200: Copilot Reviewer Follow-up (5 inline comments)
+
+**Status:** COMPLETE — 5 commits pushed, CI running
+
+**Date:** 2026-06-04T07:36:00+03:00
+
+**Reviewer comments addressed:**
+
+| # | Comment | Fix | Commit |
+|---|---------|-----|--------|
+| 1 | `loadLatestSession` / `saveSession` ignore `stateDir` | Added optional `stateDir?` to all 5 session-store functions; threaded through `shell/index.ts` | `8f3208ac` |
+| 2 | `checkGitSyncHooks` uses hardcoded `.git/hooks`, breaks worktrees | 3-step resolution: `core.hooksPath` → `git rev-parse --git-dir` → fallback | `dab1d9e8` |
+| 3 | `'approved'` kind not deprecated / no backward-compat normalization | `@deprecated` in `types.ts`; normalize wrapper in `client.ts`; `knock-knock` updated | `55e843c0` |
+| 4 | `resolveGlobalSquadPath()` writes to real user APPDATA in tests | Top-level `beforeEach`/`afterEach` stubs `APPDATA`/`XDG_CONFIG_HOME` | `3a02478f` |
+| 5 | Same as #4 for `XDG_CONFIG_HOME` | Same commit | `3a02478f` |
+
+**Regression tests:** `c9e5b755` — 3 new stateDir tests in `session-store.test.ts`; 4 refactored + 2 new git-dir tests in `doctor.test.ts`. All 54 tests pass.
+
+**Key engineering decisions:**
+- Hook tests use `checkGitSyncHooks` directly (not `runDoctor`) to avoid `scaffold()` + `git init` exceeding 5000ms vitest timeout.
+- Each hook test calls `git init` in `TEST_ROOT` so `git rev-parse --git-dir` resolves locally and doesn't bleed into the outer repo's `.git`.
+- `'approved'` normalization lives in `client.ts` adapter boundary — not in core session logic — to keep the SDK type-pure.
+
+**Last Updated:** 2026-06-04T07:36:00+03:00  
 **Archive:** `.squad/agents/picard/history-archive.md` (2026-06-02 decisions and learnings)
