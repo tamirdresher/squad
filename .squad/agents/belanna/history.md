@@ -53,3 +53,54 @@ B'Elanna drives Squad.Agents.AI delivery to bradygaster/squad: .NET adapter via 
 **Archive:** See `.squad/agents/belanna/history-archive.md` for all 2026-06-02 and earlier entries.
 
 **[2026-06-04 Cross-Agent Update]** PR #1200 now has all 5 pre-existing Copilot bot review comments addressed by Picard. Final state: 45 commits, all green, mergeable. Ready to merge.
+
+---
+
+## 2026-06-04 Entries
+
+### Final Confidence Dogfood — Two-Layer State Backend (PR #1200, commit c9e5b755)
+
+**Task:** Durable systems confidence check before merge. 4 scenarios: A (new init), B (upgrade from legacy), C (MCP write e2e), D (branch-switch persistence). Built fresh preview.18 tarballs from c9e5b755 source.
+
+**VERDICT: YES — merge with confidence.**
+
+#### Scenario A — New init with `--state-backend two-layer` ✅ PASS
+
+- `npx @bradygaster/squad-cli init --state-backend two-layer` in clean git repo
+- `.squad/config.json` → `{"stateBackend":"two-layer","version":1}` ✅
+- `squad-state` orphan branch created with 2 commits (init + migrate) ✅
+- `.mcp.json` has `squad_state` entry (`@bradygaster/squad-cli@insider state-mcp`) ✅
+- Mutable files removed from working tree after migration ✅
+- HOME mcp-config.json SHA256 unchanged ✅
+
+#### Scenario B — Upgrade from preview.13 (legacy local backend) ✅ PASS (with noted behavior)
+
+- Old preview.13 CLI ran `init` (ignores `--help` flag — known limitation), polluted HOME mcp-config with `squad_state_1db4e17d` (expected pre-fix behavior)
+- Added `decisions.md` + `agents/scribe/history.md`, committed to main
+- Installed preview.18 tarballs; ran `upgrade --state-backend two-layer`
+- All 4 state files migrated to `squad-state` branch ✅
+- `.mcp.json` updated, `config.json` → `stateBackend=two-layer` ✅
+- **Noted behavior:** `upgrade` does NOT delete files from working tree (by design — they were committed to main; `init` path DOES delete them via `fs.unlinkSync`). This is correct.
+- **Noted behavior:** `upgrade` does NOT clean HOME mcp-config entries left by old CLI. Manual cleanup required. SHA256 restored to `928760588EE047B9A96E7F85150907B97F369C1FDB088D4ED959D03D205D3A86` after removing `squad_state_1db4e17d` from both `mcpServers` and `_squadProjects`.
+
+#### Scenario C — MCP write end-to-end ✅ PASS
+
+- Sent `squad_state_write` via JSON-RPC stdio to `npx @bradygaster/squad-cli state-mcp`
+- Server responded `"State written: agents/scribe/history.md"` with `isError: false`
+- `squad_state_read` round-trip confirmed content
+- `git show refs/heads/squad-state:agents/scribe/history.md` shows new commit on branch ✅
+- `squad_state_health` reports `StateBackendStorageAdapter` (not FSStorageProvider) ✅
+- NEW-4 fix confirmed working: write with content succeeds, no empty blob ✅
+
+#### Scenario D — Branch-switch persistence ✅ PASS
+
+- `git checkout -b feature/test-branch-switch` → squad-state readable from feature branch ✅
+- MCP write from feature branch → commit landed on squad-state ✅
+- `git checkout main` → squad-state still up-to-date, latest write visible ✅
+- squad-state is a separate orphan branch; not affected by working-tree branch switches ✅
+
+**Architecture note:** squad-state is a refs/heads orphan branch with no parent. It is independent of the working-tree branch. All writes are commits on that branch regardless of which branch is checked out. This is the core correctness guarantee of the two-layer design.
+
+**HOME mcp-config.json invariant:** SHA256 `928760588EE047B9A96E7F85150907B97F369C1FDB088D4ED959D03D205D3A86` confirmed unchanged after cleanup.
+
+**Last Updated:** 2026-06-04
