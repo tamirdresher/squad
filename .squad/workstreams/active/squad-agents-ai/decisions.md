@@ -1,7 +1,165 @@
 # Squad.Agents.AI — Workstream Decisions
 
-**Last Updated:** 2026-06-04T11:46:29Z`tamirdresher/squad`, branch `feature/squad-agents-ai`)  
+**Last Updated: 2026-06-04T19:10:00Z
 **Format:** Append-only. New decisions prepended under `## Active Decisions`.
+### [2026-06-04T19:10:00Z] B'Elanna — Round 4 Full Two-Layer Validation [ws:squad-agents-ai]
+
+# Round 4 — Two-Layer State Backend — Full Validation
+
+**Owner:** B'Elanna
+**Status:** Decision Required
+**Target:** PR #1200 (two-layer state backend), Issue #1211
+**Recommendation:** **HOLD MERGE** until B1 + B2 maxBuffer fix lands. B4 must follow shortly after.
+
+## Headline findings
+
+1. **B2 (HIGH, live-reproduced):** Orphan reads >1 MB throw `ENOBUFS`. Wrote a 2 MB file; `backend.write` succeeded; `backend.read` threw `git command failed: git show squad-state:agents/b2test/big.md — spawnSync git ENOBUFS`. State-backend.js:374 → execFileSync at line 37 has no `maxBuffer`. **Silent data-loss bug.**
+
+2. **B1 (HIGH, code-verified):** Same root cause as B2 at `state-backend.js:790`. `promoteNotes` calls `rev-list HEAD` which blows the default 1 MB stdout buffer at ~25,576 reachable commits.
+
+3. **B4 (HIGH, scope-limited, live-reproduced):** `GitNotesBackend` lost-update race. 5 parallel writers × 20 writes each → only 25/100 keys persisted (75% data loss). Two-layer backend does NOT use git-notes for state storage so two-layer users are not directly affected, but legacy git-notes mode is broken under any concurrency. `promoteNotes` itself uses notes and could race.
+
+4. **A3 (MED, dead code):** `promoteNotes` is defined in SDK but has **zero callers** in `squad-cli`. Agent markers `promote_to_permanent` / `archive_on_close` are written but never processed. Must wire into Ralph/CLI or remove from agent API.
+
+5. **F1 (LOW):** `squad upgrade --state-backend two-layer --yes` migrates state into the orphan branch but does NOT clean up the 8 pre-existing `.squad/*` files on the working branch. Working-branch and orphan-branch state silently diverge on subsequent writes.
+
+6. **B3 NOT_REPRODUCED:** My pre-flight concern was wrong. Orphan `delete(subtree-key)` removes the tree entry from the parent tree, making the entire subtree unreachable atomically. Non-recursive `ls-tree` is the correct granularity.
+
+## Single-PR unblock
+
+Two-character change at two sites:
+- `state-backend.js:37` → add `maxBuffer: 100 * 1024 * 1024`
+- `state-backend.js:61` → add `maxBuffer: 100 * 1024 * 1024`
+
+Closes B1 and B2. After this lands and is re-validated, the two-layer backend is mergeable. B4 + A3 + F1 in follow-up PRs.
+
+## Test artifacts
+
+- `C:\Users\tamirdresher\squad-validation\round4\sandbox-A1\result-A{1..7}.json`
+- `C:\Users\tamirdresher\squad-validation\round4\sandbox-A1\result-B{1..4}.json`
+- `C:\Users\tamirdresher\squad-validation\round4\sandbox-A1\{a2,a6,b2,b3,b4}-driver.mjs` + outputs
+- Full report: `.squad/files/validation/ROUND-4-FULL-TWO-LAYER-VALIDATION.md`
+
+## HOME safety
+
+`mcp-config.json` sha256 = `928760588EE047B9A96E7F85150907B97F369C1FDB088D4ED959D03D205D3A86` — unchanged across the entire validation. No source repos modified. No GitHub pushes. Round 3 tarballs not rebuilt.
+
+## Decision needed
+
+- [ ] **HOLD** PR #1200 until B1+B2 fix lands (recommended)
+- [ ] Accept B4 risk and merge (only safe if two-layer is mandatory and git-notes is deprecated in the same release)
+- [ ] Schedule follow-up issues for B4, A3 (dead-code wiring), F1 (upgrade cleanup)
+
+
+---
+
+### [2026-06-04T19:10:00Z] Data — Round 4 Phase B: ENOBUFS Fixes [ws:squad-agents-ai]
+
+# Decision — Round 4 Phase B: Fix ENOBUFS in state-backend git wrappers
+
+**Author:** Data
+**Round:** 4 Phase B
+**Date:** 2026-06-04
+**Status:** Proposed (validation evidence in `.squad/files/validation/ROUND-4-PHASE-B-DATA.md`)
+
+## Context
+
+PR #1200 introduced the two-layer state backend. Two ENOBUFS failures were reported in #1211:
+
+- **B1:** `promoteNotes()` calls `git rev-list HEAD`; on repos with > ~25k commits the stdout exceeds Node's default `execFileSync` `maxBuffer` of 1 MB → throws `spawnSync git ENOBUFS`.
+- **B2:** `OrphanBranchBackend.read()` calls `git show <branch>:<path>`; on any single state file > 1 MB stored on the orphan branch, same crash. Reproduced organically on `tamir-squad-hq` where `decisions.md` is already 1,083,671 bytes.
+
+Both calls go through the same two helpers in `state-backend.ts`:
+
+- `gitExecWithRetry` (every read git command)
+- `gitExecWithInputAndRetry` (every write/stdin git command)
+
+Neither passes a `maxBuffer` option, so both inherit the 1 MB default.
+
+## Decision
+
+Add `maxBuffer: 256 * 1024 * 1024` (256 MB) to the `execFileSync` options in BOTH wrappers.
+
+```diff
+- execFileSync('git', args, { cwd, encoding: 'utf-8', stdio: ['pipe','pipe','pipe'] })
++ execFileSync('git', args, { cwd, encoding: 'utf-8', stdio: ['pipe','pipe','pipe'], maxBuffer: 256 * 1024 * 1024 })
+```
+
+(Same change in both `gitExecWithRetry` and `gitExecWithInputAndRetry`.)
+
+## Rationale
+
+- **Single fix point.** Every git invocation in the SDK funnels through these two helpers, so one patch covers B1, B2, and every other current and future caller (`ls-tree`, `hash-object`, `rev-list --max-parents=0`, etc.).
+- **No callsite churn.** Patching individual callsites is brittle and will miss future regressions.
+- **256 MB is safe.** It covers ~6 M commits in `rev-list HEAD` and any plausible state file, while still bounded enough to fail loudly on truly pathological input.
+- **No behavior change for small repos.** `maxBuffer` only kicks in if exceeded; existing tests continue to pass.
+
+## Suggested action
+
+- Land as a follow-up PR (small, targeted): `fix(squad-sdk): raise execFileSync maxBuffer in state-backend git wrappers`.
+- Update issue #1211 noting that both B1 and B2 share root cause and are addressed by the same diff.
+- Optionally add a regression test: synthesize a small "huge stdout" scenario (e.g., `git log --pretty=oneline` on a fast-import'd 5k-commit repo) and assert `promoteNotes` does not throw.
+
+## Out of scope
+
+- The `git notes show` argument-splitting bug observed incidentally in B2's post-fix output (separate issue — `gitExecMaybeMissing` `args.split(' ')` mishandles whitespace in arg values).
+- B3 (`deleteDir` orphan leak) and B4 (concurrent writer race) — owned by Worf.
+
+## Evidence
+
+- Full report: `.squad/files/validation/ROUND-4-PHASE-B-DATA.md`
+- Result JSON: `sandbox-D-B1/result-B1.json`, `sandbox-D-B2/result-B2.json`
+- Before/after captures: `sandbox-D-B1/result-B1-{before,after}.txt`, `sandbox-D-B2/sandbox-D-B2-clone/result-B2-{before,after}.txt`
+
+
+---
+
+### [2026-06-04T19:10:00Z] Worf — Round 4 Phase B3+B4 Reliability Findings [ws:squad-agents-ai]
+
+# worf-round4-reliability-findings
+
+**Reviewer:** Worf
+**Round:** 4 — Phase B3 + B4 empirical validation
+**Subject:** two-layer state backend in `@bradygaster/squad-{sdk,cli}@0.9.6-preview.21`
+**Disposition requested:** **DO NOT promote two-layer to default in #1211** until two fixes ship.
+
+## Quantified findings
+
+1. **Concern E — `deleteDir()` leaks nested subtrees.**
+   - `local`: 5/6 nested keys leak, plus `deleteDirSync` throws `EPERM` partway through (Windows can't `unlinkSync` a directory).
+   - `git-notes`: 4/6 keys leak silently.
+   - `orphan`: 0/6 (incidental — name-based `mktree` filter happens to wipe subtrees).
+   - **TwoLayerBackend reads from git-notes first → end-to-end leaky.**
+2. **Concern A — concurrent git-notes writers silently lose data.**
+
+   | Writers × Writes | Attempted | Persisted | **Lost** | Loss % | All exit 0 |
+   |---|---:|---:|---:|---:|:---:|
+   | 2 × 10  |  20 | 10 | 10 | **50 %** | ✓ |
+   | 5 × 20  | 100 | 22 | 78 | **78 %** | ✓ |
+   | 10 × 10 | 100 | 14 | 86 | **86 %** | ✓ |
+
+   Writers report success, exit code 0. `git notes add -f --file -` overwrites unconditionally; no CAS, no advisory lock, no retry.
+
+## Ship guidance
+
+- **Block** promotion of two-layer to default until:
+  1. `StateBackendStorageAdapter.deleteDir` is made recursive AND each backend's `delete` handles directory-shaped paths (fs.rmSync recursive for local; prefix-match delete for git-notes).
+  2. `GitNotesBackend.saveBlob` is replaced with a CAS loop: capture pre-OID, attempt `git update-ref refs/notes/squad <new> <expected-old>`, retry on stale, fail-loud after bounded attempts.
+  3. Both test harnesses (`test-b3-multi.mjs`, `run-harness.ps1`) are added as CI gates.
+- **Supported interim configurations:** single-writer per repo, OR `orphan` backend.
+- **Documentation must call out** that any multi-process workflow against the two-layer backend can silently lose state today.
+
+## Evidence
+- `sandbox-W-B3/result-B3-evidence.txt`, `result-B3.json`, `test-b3-multi.mjs`
+- `sandbox-W-B4/result-B4-evidence.txt`, `result-B4.json`, `writer.mjs`, `reader.mjs`, `run-harness.ps1`
+- Full report: `.squad/files/validation/ROUND-4-PHASE-B-WORF.md`
+
+## Status
+- HOME `mcp-config.json` SHA256 unchanged: `928760588EE047B9A96E7F85150907B97F369C1FDB088D4ED959D03D205D3A86` ✓
+- Sandboxes cleaned.
+
+
+---
 
 > **Note on earlier decisions:** This file contains the 8 most-relevant decisions seeded at workstream bootstrap (2026-06-02). All earlier decisions from the flat ledger — including the full onboarding fan-out (5-agent report), state-backend triage, and archive entries — remain in `../../../decisions.md` until a future migration pass moves them here.
 
@@ -1590,4 +1748,5 @@ The `toLowerCase()` comparison means `C:\foo` and `c:\foo` match correctly. The 
 
 **PR #1200 is safe to ship on Bugs C and F.** Both are fixed with tests and documentation.  
 **Bug G blocks ship (or requires explicit deferral)** — the retry/circuit-breaker implementation exists on a separate branch but was not included in PR #1200. Transient git failures will still hard-error in production.
+
 
