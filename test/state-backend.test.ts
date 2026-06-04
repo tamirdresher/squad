@@ -1035,7 +1035,7 @@ describe('GitExecError (missing vs real failure)', () => {
 
   it('git-notes throws GitExecError for real failures (not a git repo)', () => {
     // Must be OUTSIDE any git repo — using os.tmpdir() to avoid inheriting parent .git
-    const nonGitDir = join(tmpdir(), .test-nongit-);
+    const nonGitDir = join(tmpdir(), `.test-nongit-${randomBytes(4).toString('hex')}`);
     mkdirSync(nonGitDir, { recursive: true });
     try {
       const b = new GitNotesBackend(nonGitDir);
@@ -1046,7 +1046,7 @@ describe('GitExecError (missing vs real failure)', () => {
   });
 
   it('orphan exists throws GitExecError for real failures (not a git repo)', () => {
-    const nonGitDir = join(tmpdir(), .test-nongit-);
+    const nonGitDir = join(tmpdir(), `.test-nongit-${randomBytes(4).toString('hex')}`);
     mkdirSync(nonGitDir, { recursive: true });
     try {
       const b = new OrphanBranchBackend(nonGitDir);
@@ -1057,7 +1057,7 @@ describe('GitExecError (missing vs real failure)', () => {
   });
 
   it('orphan list throws GitExecError for real failures (not a git repo)', () => {
-    const nonGitDir = join(tmpdir(), .test-nongit-);
+    const nonGitDir = join(tmpdir(), `.test-nongit-${randomBytes(4).toString('hex')}`);
     mkdirSync(nonGitDir, { recursive: true });
     try {
       const b = new OrphanBranchBackend(nonGitDir);
