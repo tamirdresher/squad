@@ -1,6 +1,6 @@
 # Squad Decisions
 
-**Last Updated:** 2026-06-03T21:05:00Z
+**Last Updated:** 2026-06-04T04:36:00Z
 
 ## Active Decisions
 
@@ -6542,3 +6542,45 @@ Brady / CLI maintainer should decide:
 Finding F3 should remain open until one of these options is implemented and validated.
 
 
+
+---
+
+### 2026-06-04T04:36:00Z: PR #1200 Copilot Reviewer Follow-up — 5 Inline Comments [ws:squad-agents-ai]
+
+**By:** Picard (Lead Architect)
+
+**Context:** Copilot Code Review left 5 inline comments on PR #1200 (squad/state-backend-upgrade-fixes). All 5 were addressed with production fixes + regression tests in a single session.
+
+**Decisions Made:**
+
+1. **stateDir threading through session-store (Finding 1)** — Add optional stateDir? as last parameter to all 5 public session-store functions. When provided, sessions live at join(stateDir, 'sessions') instead of join(teamRoot, '.squad', 'sessions'). Thread through shell/index.ts call-sites. Backward-compatible, matches established pattern.
+
+2. **Hook path resolution in checkGitSyncHooks (Finding 2)** — Use same 3-step hook-path resolution as install-hooks: (1) git config --get core.hooksPath, (2) git rev-parse --git-dir, (3) fallback to .git/hooks. Ensures worktree-aware resolution.
+
+3. **'approved' permission kind normalization (Finding 3)** — Mark 'approved' as deprecated in 	ypes.ts. Add normalization wrapper in client.ts createSession() that translates { kind: 'approved' } → { kind: 'approve-once' }. Normalization at adapter boundary keeps SDK types pure.
+
+4+5. **Env-var stubbing for resolveGlobalSquadPath() in tests (Findings 4+5)** — Add top-level eforeEach/fterEach to 	est/effective-squad-dir.test.ts that stubs APPDATA/XDG_CONFIG_HOME to unique temp dir. Ensures tests never pollute real user config on any platform.
+
+6. **Hook test isolation strategy (Engineering)** — Refactor 4 hook tests in doctor.test.ts to call checkGitSyncHooks directly instead of full unDoctor. Direct calls ~700ms vs ~2500ms+ for full pipeline. Only tests verify hook logic, not full doctor.
+
+**Commits:**
+- 8f3208ac fix(shell): use effective state dir when resuming sessions
+- dab1d9e8 fix(doctor): match install-hooks git-dir resolution for worktrees
+- 55e843c0 fix(types): normalize legacy 'approved' permission kind (deprecated, wrapper normalizes to new value)
+- 3a02478f test(effective-squad-dir): stub global Squad path env vars
+- c9e5b755 test(session-store,doctor): regression tests (54/54 pass)
+
+**Files Changed:**
+- packages/squad-cli/src/cli/shell/session-store.ts — optional stateDir on 5 functions
+- packages/squad-cli/src/cli/shell/index.ts — thread stateDir through load/save
+- packages/squad-cli/src/cli/commands/doctor.ts — 3-step hook-path resolution
+- packages/squad-sdk/src/adapter/types.ts — @deprecated on 'approved'
+- packages/squad-sdk/src/adapter/client.ts — normalization wrapper
+- samples/knock-knock/index.ts — 'approve-once' direct usage
+- 	est/effective-squad-dir.test.ts — env-var stubbing
+- 	est/session-store.test.ts — 3 new stateDir regression tests
+- 	est/cli/doctor.test.ts — 4 refactored + 2 new git-dir tests
+
+**CI Status:** ALL 6 GREEN (actions/checkout, build@node20, build@node22, test@node20, test@node22, lint). Mergeable=true. Head=c9e5b755.
+
+---
