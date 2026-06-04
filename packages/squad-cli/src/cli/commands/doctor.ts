@@ -493,11 +493,24 @@ export function checkGitSyncHooks(cwd: string, squadDir: string): DoctorCheck | 
       encoding: 'utf-8',
       stdio: ['pipe', 'pipe', 'pipe'],
     }).trim();
-    hooksDir = customPath
-      ? (path.isAbsolute(customPath) ? customPath : path.resolve(cwd, customPath))
-      : path.join(cwd, '.git', 'hooks');
+    if (customPath) {
+      hooksDir = path.isAbsolute(customPath) ? customPath : path.resolve(cwd, customPath);
+    } else {
+      throw new Error('empty hooksPath');
+    }
   } catch {
-    hooksDir = path.join(cwd, '.git', 'hooks');
+    // core.hooksPath not configured — resolve via git rev-parse --git-dir
+    // This handles git worktrees correctly (unlike hardcoding .git/hooks)
+    try {
+      const gitDir = execFileSync('git', ['rev-parse', '--git-dir'], {
+        cwd,
+        encoding: 'utf-8',
+        stdio: ['pipe', 'pipe', 'pipe'],
+      }).trim();
+      hooksDir = path.resolve(cwd, gitDir, 'hooks');
+    } catch {
+      hooksDir = path.join(cwd, '.git', 'hooks');
+    }
   }
 
   const missingHooks: string[] = [];
