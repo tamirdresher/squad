@@ -134,3 +134,5 @@ Audited all iter-9 (v0.9.6-preview.15) user-facing docs for accuracy against shi
 **Archive:** See `.squad/agents/data/history-archive.md` for all 2026-06-02 and earlier entries.
 
 **[2026-06-04 Cross-Agent Update]** PR #1200 now has all 5 pre-existing Copilot bot review comments addressed by Picard. Final state: 45 commits, all green, mergeable. Ready to merge.
+
+**2026-06-04:** B'Elanna 4-scenario dogfood validates PR #1200 fixes published-insider-3 gap (preview.18 c9e5b755 all pass)

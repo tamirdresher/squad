@@ -181,5 +181,40 @@ expect(spec).toEqual({
 - Each hook test calls `git init` in `TEST_ROOT` so `git rev-parse --git-dir` resolves locally and doesn't bleed into the outer repo's `.git`.
 - `'approved'` normalization lives in `client.ts` adapter boundary — not in core session logic — to keep the SDK type-pure.
 
-**Last Updated:** 2026-06-04T07:36:00+03:00  
+---
+
+## 2026-06-04 — Task 1: tamresearch1 live upgrade to insider.3
+
+**Objective:** Upgrade production repo `tamresearch1` from squad-cli 0.9.4 to 0.9.6-insider.3 with full safety protocol.
+
+**Outcome:** ✅ Complete (with 2 manual interventions)
+
+**Key findings:**
+1. `squad upgrade` updates templates/workflows/skills/agent.md but does NOT create `.mcp.json` or update the npm devDependency pin.
+2. `.mcp.json` manually created with validated SMOKE-ITER8 spec (`squad_state` → `npx @bradygaster/squad-cli@insider state-mcp`).
+3. npm pin updated via `npm install --save-dev @bradygaster/squad-cli@insider` → `0.9.6-insider.3`.
+4. `config.json` with `stateBackend: "two-layer"` preserved unchanged. HOME mcp-config untouched. Ralph watch unaffected.
+5. E2E MCP write proof (steps 23-24) requires interactive Copilot CLI session — deferred to Tamir.
+
+**Artifacts:** `decisions/inbox/picard-tamresearch1-upgrade-evidence.md`
+
+---
+
+## 2026-06-04 — Task 2: MCP front-matter injection research
+
+**Objective:** Determine if MCP server config can be injected when squad spawns CLI subagents.
+
+**Outcome:** ❌ Not possible with current platform. Recommendation: Option A+B (graceful fallback + documentation).
+
+**Key findings:**
+1. CLI `task` tool has no `additional_mcp_config` parameter — subagents are isolated processes.
+2. VS Code `runSubagent` inherits parent MCP tools; CLI `task` does not.
+3. The "Passing MCP Context" block in squad.agent.md is informational only — tells subagents about tools but doesn't inject them.
+4. Recommended approach: document the limitation, instruct subagents to use file-based state writes, and file a platform feature request.
+
+**Artifacts:** `decisions/inbox/picard-mcp-front-matter-investigation.md`
+
+**Last Updated:** 2026-06-04T08:30:00+03:00  
 **Archive:** `.squad/agents/picard/history-archive.md` (2026-06-02 decisions and learnings)
+
+**2026-06-04:** B'Elanna's preview.18 tarballs (c9e5b755) empirically close published-insider-3 gap; real-world tamresearch1 upgrade validation confirms GAP-1/GAP-2 fixes needed
