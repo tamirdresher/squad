@@ -214,6 +214,51 @@ export async function migrateStateBackend(dest: string, target: string): Promise
         for (const f of files) {
           console.log(`      ${DIM}.squad/${f.relPath}${RESET}`);
         }
+
+        // F1 fix (Round 5, P1.1): the working-tree copies are now stale — the
+        // orphan branch is the source of truth for an orphan/two-layer backend.
+        // Remove them so `git status` is clean and post-upgrade agents can't
+        // accidentally read stale content. Mirrors liftInitMutableStateOntoOrphan
+        // behavior. Only files we just successfully migrated are removed; we
+        // never touch config.json, charter.md, team.md, casting/, templates/, etc.
+        const squadDir = path.join(dest, '.squad');
+        const removed: string[] = [];
+        const removeFailed: string[] = [];
+        for (const f of files) {
+          const full = path.join(squadDir, f.relPath);
+          try {
+            if (fs.existsSync(full)) fs.unlinkSync(full);
+            removed.push(f.relPath);
+          } catch {
+            removeFailed.push(f.relPath);
+          }
+        }
+        // Clean up now-empty agent directories (e.g. .squad/agents/data/) so
+        // they don't leak as zero-content folders post-upgrade.
+        const agentsDir = path.join(squadDir, 'agents');
+        if (fs.existsSync(agentsDir) && fs.statSync(agentsDir).isDirectory()) {
+          for (const agentName of fs.readdirSync(agentsDir)) {
+            const agentDir = path.join(agentsDir, agentName);
+            try {
+              if (
+                fs.statSync(agentDir).isDirectory() &&
+                fs.readdirSync(agentDir).length === 0
+              ) {
+                fs.rmdirSync(agentDir);
+              }
+            } catch { /* best-effort */ }
+          }
+        }
+
+        if (removed.length > 0) {
+          console.log(`  ${GREEN}✓${RESET} removed ${removed.length} stale working-tree file(s) (now sourced from squad-state):`);
+          for (const r of removed) {
+            console.log(`      ${DIM}.squad/${r}${RESET}`);
+          }
+        }
+        if (removeFailed.length > 0) {
+          console.log(`  ${YELLOW}⚠${RESET} could not remove: ${removeFailed.join(', ')} (will appear in git status)`);
+        }
       } else if (wrote === 0) {
         console.log(`  ${DIM}no working-tree state files to migrate${RESET}`);
       }

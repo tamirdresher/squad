@@ -113,6 +113,34 @@ describe('squad upgrade --state-backend migration', () => {
     expect(historyOnBranch).toContain('entry 1');
   });
 
+  it('F1 (Round 5): migrated working-tree state files are removed after upgrade', { timeout: 30_000 }, async () => {
+    dir = mkRepo('worktree');
+    fs.writeFileSync(
+      path.join(dir, '.squad', 'decisions.md'),
+      '# Squad Decisions\n\n## D1 — pre-upgrade decision\n',
+    );
+    fs.writeFileSync(
+      path.join(dir, '.squad', 'agents', 'data', 'history.md'),
+      '# Data history\n',
+    );
+    // A static file that must NOT be touched by the cleanup.
+    fs.writeFileSync(
+      path.join(dir, '.squad', 'charter.md'),
+      '# Charter\nStatic content — do not delete on upgrade.\n',
+    );
+
+    await migrateStateBackend(dir, 'two-layer');
+
+    // Working-tree mutable state must be gone (orphan branch is authoritative).
+    expect(fs.existsSync(path.join(dir, '.squad', 'decisions.md'))).toBe(false);
+    expect(fs.existsSync(path.join(dir, '.squad', 'agents', 'data', 'history.md'))).toBe(false);
+    // The now-empty agent directory should also be cleaned up.
+    expect(fs.existsSync(path.join(dir, '.squad', 'agents', 'data'))).toBe(false);
+    // Static / config files must remain untouched.
+    expect(fs.existsSync(path.join(dir, '.squad', 'charter.md'))).toBe(true);
+    expect(fs.existsSync(path.join(dir, '.squad', 'config.json'))).toBe(true);
+  });
+
   it('migration is idempotent: re-running with same target does not duplicate config or fail', { timeout: 30_000 }, async () => {
     dir = mkRepo('worktree');
     await migrateStateBackend(dir, 'two-layer');
