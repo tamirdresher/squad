@@ -11,6 +11,26 @@ import { resolveGlobalSquadPath } from '@bradygaster/squad-sdk/resolution';
 
 const TMP = join(process.cwd(), `.test-effective-squad-dir-${randomBytes(4).toString('hex')}`);
 
+// Stub platform env vars so resolveGlobalSquadPath() points inside TMP (not the real user dir)
+const origAppData = process.env['APPDATA'];
+const origXdgConfig = process.env['XDG_CONFIG_HOME'];
+beforeEach(() => {
+  if (process.platform === 'win32') {
+    process.env['APPDATA'] = TMP;
+  } else {
+    process.env['XDG_CONFIG_HOME'] = TMP;
+  }
+});
+afterEach(() => {
+  if (process.platform === 'win32') {
+    if (origAppData === undefined) delete process.env['APPDATA'];
+    else process.env['APPDATA'] = origAppData;
+  } else {
+    if (origXdgConfig === undefined) delete process.env['XDG_CONFIG_HOME'];
+    else process.env['XDG_CONFIG_HOME'] = origXdgConfig;
+  }
+});
+
 function scaffold(...dirs: string[]): void {
   for (const d of dirs) {
     mkdirSync(join(TMP, d), { recursive: true });
@@ -59,9 +79,6 @@ describe('resolveStateDir()', () => {
     const globalDir = resolveGlobalSquadPath();
     const expected = join(globalDir, 'projects', projectKey);
     expect(result).toBe(expected);
-
-    // Cleanup external dir
-    if (existsSync(expected)) rmSync(expected, { recursive: true, force: true });
   });
 
   it('returns local path when stateLocation is external but projectKey is missing', () => {
@@ -109,10 +126,6 @@ describe('effectiveSquadDir()', () => {
 
     const globalDir = resolveGlobalSquadPath();
     expect(stateDir).toBe(join(globalDir, 'projects', projectKey));
-
-    // Cleanup
-    const extDir = join(globalDir, 'projects', projectKey);
-    if (existsSync(extDir)) rmSync(extDir, { recursive: true, force: true });
   });
 
   it('preserves SquadDirInfo metadata in local field', () => {
