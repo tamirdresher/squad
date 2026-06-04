@@ -148,3 +148,32 @@ B'Elanna drives Squad.Agents.AI delivery to bradygaster/squad: .NET adapter via 
 **Decision drop:** `.squad/workstreams/active/squad-agents-ai/decisions/inbox/belanna-real-old-repo-upgrade.md`
 
 **Last Updated:** 2026-06-04T09:20:00+03:00
+
+---
+
+### Six-Repo Upgrade Validation — PR #1200 (2026-06-04)
+
+**Task:** Full empirical `upgrade --state-backend two-layer` validation across 6 real production repos (3 personal, 3 EMU), built from HEAD `212365ec` (v0.9.6-preview.20).
+
+**Sandbox:** `C:\Users\tamirdresher\squad-validation\6-repo-upgrade-test\` (clones only, originals never touched)
+
+**Repos:** `travel-assistant`, `holocaust-research-wasserman`, `gh-ai-adoption2026` (tamirdresher); `squad-ai-vulns`, `multiplayer-sudoku`, `tamir-squad-hq` (tamirdresher_microsoft EMU)
+
+**Results — 9-check matrix:**
+
+All 6 repos: C1 (stateBackend=two-layer) ✅ · C2 (.mcp.json) ✅ · C3 (squad-state branch) ✅ · C4 (state files migrated) ✅ · C5 (decisions.md on branch) ✅ · C6 (6 hooks installed) ✅ · C7 (.gitignore updated) ✅ · C8 (HOME sha256 unchanged) ✅ · C9 (clean tree) ✅
+
+**MCP round-trip results:**
+- `travel-assistant` ✅ · `gh-ai-adoption2026` ✅ · `multiplayer-sudoku` ✅ — proof blobs confirmed on squad-state
+- `holocaust-research-wasserman` ❌ · `squad-ai-vulns` ❌ · `tamir-squad-hq` ❌ — stale `teamRoot` causes `path is outside squadDir`
+
+**Bug found:** `upgrade` preserves stale absolute `teamRoot` without validation. When teamRoot points to a different path than the clone location, `StateBackendStorageAdapter` rejects all keys. Recommended fix: validate/clear absolute `teamRoot` during migration if it doesn't match repo root.
+
+**HOME sha256 invariant:** `928760588EE047B9A96E7F85150907B97F369C1FDB088D4ED959D03D205D3A86` ✅ confirmed unchanged throughout all 6 tests.
+
+**VERDICT: YES — merge PR #1200 with open follow-up issue for teamRoot validation.** Core migration logic is correct. 3 full passes + 3 structural passes; MCP failures are pre-existing behavior not introduced by this PR.
+
+**Full report:** `.squad/files/validation/SIX-REPO-UPGRADE-TEST.md`  
+**Decision drop:** `.squad/workstreams/active/squad-agents-ai/decisions/inbox/belanna-six-repo-upgrade.md`
+
+**Last Updated:** 2026-06-04
