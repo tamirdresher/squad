@@ -217,7 +217,7 @@ export async function runShell(): Promise<void> {
   const hasTeam = storage.existsSync(join(stateDir, 'team.md'));
   const isFirstRun = storage.existsSync(join(stateDir, '.first-run'));
   let persistedSession: SessionData = createSession();
-  const recentSession = (hasTeam && !isFirstRun) ? loadLatestSession(teamRoot) : null;
+  const recentSession = (hasTeam && !isFirstRun) ? loadLatestSession(teamRoot, stateDir) : null;
   if (recentSession) {
     persistedSession = recentSession;
     debugLog('resuming recent session', persistedSession.id);
@@ -1197,7 +1197,7 @@ export async function runShell(): Promise<void> {
   let shellMessages: ShellMessage[] = [];
   function autoSave(): void {
     persistedSession.messages = shellMessages;
-    try { saveSession(teamRoot, persistedSession); } catch (err) { debugLog('autoSave failed:', err); }
+    try { saveSession(teamRoot, persistedSession, stateDir); } catch (err) { debugLog('autoSave failed:', err); }
   }
 
   /** Callback for /resume command — replaces current messages with restored session. */
