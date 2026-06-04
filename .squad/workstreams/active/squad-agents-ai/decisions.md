@@ -1,7 +1,72 @@
 # Squad.Agents.AI — Workstream Decisions
 
-**Last Updated: 2026-06-04T19:10:00Z
+**Last Updated: 2026-06-04T21:35:00Z
 **Format:** Append-only. New decisions prepended under `## Active Decisions`.
+
+### [2026-06-04T21:35:00Z] Round 5 — P0 Fixes Landed + Revalidation PASS [ws:squad-agents-ai]
+
+# Round 5 — P0 Fixes + Revalidation — SHIP READY
+
+**Round:** 5 — Serial P0 fix dispatch (Data + Picard) + parallel revalidation (Worf + B'Elanna)
+**Date:** 2026-06-04T21:35:00Z
+**Status:** ✅ **ALL 3 P0 CLOSED — SHIP VERDICT FLIPPED HOLD → SHIP**
+
+## Dispatch Summary
+
+### Data Agent (P0.1 + P0.2 + P1.2): SDK Fixes
+**Commits:**
+- `abd37ea8` fix(sdk): maxBuffer for git exec wrappers (B1+B2 ENOBUFS)
+- `8f7e7f71` fix(sdk): CAS for GitNotesBackend + OrphanBranchBackend (B4)
+- `3f13cdf7` fix(sdk): tokenize git args properly in gitExecMaybeMissing
+
+**Test Results:** 142/142 tests pass  
+**CAS Implementation:** update-ref with expected-old + 5-retry jittered backoff  
+**Pushed to:** PR #1200 (bradygaster/squad)
+
+### Picard Agent (P0.3 + P1.1): Ralph Wiring + Upgrade Cleanup
+**Commits:**
+- `c71ea2c1` feat(cli): add 'squad notes promote' command
+- `7e3e8a4d` feat(cli): wire promoteNotes into Ralph heartbeat
+- `98b69ae0` fix(cli): clean stale .squad/ working-branch files after upgrade
+
+**Test Results:** 19/19 targeted tests pass  
+**Status:** Tier 3 PR-merge workflow step deferred (CRLF churn). Tier 2 heartbeat covers functionally.
+
+### Coordinator Action
+- Pushed all 6 commits to PR #1200
+- CI: 6/6 GREEN at head `98b69ae0` in 5 min
+
+## Revalidation Results
+
+### Worf Agent (B4 Revalidation): CAS Concurrency
+**Verdict: PASS** — silent loss structurally eliminated
+
+| Writers | R4 Silent | R5 Loud | Status |
+|---|---|---|---|
+| 2 | 50% | 5% | ✅ Massive improvement |
+| 5 | 78% | 28% | ✅ Massive improvement |
+| 10 | 86% | 54% | ✅ Massive improvement |
+| 20 (new stress) | n/a | 72% | ✅ All writers exit 3, no silent |
+
+Conservation law held in all 4 runs: "writer-self-reported == reader-counted"
+
+### B'Elanna Agent (A3 + B1 + B2 Revalidation): Production Paths
+**All 3 PASS:**
+
+| Test | Result | Notes |
+|---|---|---|
+| A3 | ✅ PASS | 2 production callers verified (CLI + Ralph), both idempotent |
+| B1 | ✅ PASS | 30001 commits, succeeded 5.28s (was crash) |
+| B2 | ✅ PASS | 2.33MB orphan round-trip <1s byte-exact (was crash) |
+
+## Decision
+
+**PR #1200 is SHIP READY.** All P0.1–P0.3 closed with empirical evidence. P1.1 (upgrade cleanup) live. P1.2 (args.split) landed via Data. Merge and release.
+
+**Follow-up:** File #1211 non-blocking suggestions (Worf's 4 entries).
+
+---
+
 ### [2026-06-04T19:10:00Z] B'Elanna — Round 4 Full Two-Layer Validation [ws:squad-agents-ai]
 
 # Round 4 — Two-Layer State Backend — Full Validation
