@@ -4,7 +4,7 @@ import { join } from 'node:path';
 import { execSync } from 'node:child_process';
 import { randomBytes } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { WorktreeBackend, GitNotesBackend, OrphanBranchBackend, TwoLayerBackend, resolveStateBackend, validateStateKey, StateBackendStorageAdapter, _resetGitNotesMigrationWarnForTesting } from '../packages/squad-sdk/src/state-backend.js';
+import { WorktreeBackend, GitNotesBackend, OrphanBranchBackend, TwoLayerBackend, CircuitBreaker, GitExecError, resolveStateBackend, validateStateKey, StateBackendStorageAdapter, verifyStateBackend, _resetGitNotesMigrationWarnForTesting } from '../packages/squad-sdk/src/state-backend.js';
 import type { StateBackendType } from '../packages/squad-sdk/src/state-backend.js';
 import { resolveSquadState, clearResolveSquadCache } from '../packages/squad-sdk/src/resolution.js';
 import { ToolRegistry } from '../packages/squad-sdk/src/tools/index.js';
@@ -902,5 +902,168 @@ describe('downloaded session replay regressions', () => {
 
     expect(existsSync(squadDir())).toBe(true);
     expectWorktreeUnmoved(initialBranch, initialHead);
+  });
+});
+describe('CircuitBreaker', () => {
+  it('starts in closed state', () => {
+    const cb = new CircuitBreaker(3, 1000);
+    expect(cb.currentState).toBe('closed');
+    expect(cb.consecutiveFailures).toBe(0);
+  });
+
+  it('passes through successful operations', () => {
+    const cb = new CircuitBreaker(3, 1000);
+    const result = cb.execute(() => 42, 'test');
+    expect(result).toBe(42);
+    expect(cb.consecutiveFailures).toBe(0);
+  });
+
+  it('tracks consecutive failures', () => {
+    const cb = new CircuitBreaker(3, 1000);
+    for (let i = 0; i < 2; i++) {
+      try { cb.execute(() => { throw new Error('fail'); }, 'test'); } catch { /* expected */ }
+    }
+    expect(cb.consecutiveFailures).toBe(2);
+    expect(cb.currentState).toBe('closed');
+  });
+
+  it('trips open after threshold failures', () => {
+    const cb = new CircuitBreaker(3, 1000);
+    for (let i = 0; i < 3; i++) {
+      try { cb.execute(() => { throw new Error('fail'); }, 'test'); } catch { /* expected */ }
+    }
+    expect(cb.currentState).toBe('open');
+    expect(cb.consecutiveFailures).toBe(3);
+  });
+
+  it('fast-fails when open', () => {
+    const cb = new CircuitBreaker(3, 1000);
+    for (let i = 0; i < 3; i++) {
+      try { cb.execute(() => { throw new Error('fail'); }, 'test'); } catch { /* expected */ }
+    }
+    expect(() => cb.execute(() => 42, 'test')).toThrow(/Circuit breaker OPEN/);
+  });
+
+  it('resets on success', () => {
+    const cb = new CircuitBreaker(3, 1000);
+    try { cb.execute(() => { throw new Error('fail'); }, 'test'); } catch { /* expected */ }
+    expect(cb.consecutiveFailures).toBe(1);
+    cb.execute(() => 'ok', 'test');
+    expect(cb.consecutiveFailures).toBe(0);
+    expect(cb.currentState).toBe('closed');
+  });
+
+  it('transitions to half-open after cooldown', () => {
+    const cb = new CircuitBreaker(2, 50); // 50ms cooldown for test speed
+    for (let i = 0; i < 2; i++) {
+      try { cb.execute(() => { throw new Error('fail'); }, 'test'); } catch { /* expected */ }
+    }
+    expect(cb.currentState).toBe('open');
+
+    // Wait for cooldown
+    Atomics.wait(new Int32Array(new SharedArrayBuffer(4)), 0, 0, 60);
+
+    // Next call should go through (half-open probe)
+    const result = cb.execute(() => 'recovered', 'test');
+    expect(result).toBe('recovered');
+    expect(cb.currentState).toBe('closed');
+  });
+});
+
+describe('verifyStateBackend()', () => {
+  const squadDir = () => join(TMP, '.squad');
+  beforeEach(() => { if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); initRepo(); mkdirSync(squadDir(), { recursive: true }); });
+  afterEach(() => { if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); });
+
+  it('worktree backend passes verification', () => {
+    const backend = new WorktreeBackend(squadDir());
+    const result = verifyStateBackend(backend);
+    expect(result.ok).toBe(true);
+    expect(result.error).toBeUndefined();
+  });
+
+  it('git-notes backend passes verification', () => {
+    const backend = new GitNotesBackend(TMP);
+    const result = verifyStateBackend(backend);
+    expect(result.ok).toBe(true);
+  });
+
+  it('orphan backend passes verification', () => {
+    const backend = new OrphanBranchBackend(TMP);
+    const result = verifyStateBackend(backend);
+    expect(result.ok).toBe(true);
+  });
+
+  it('returns error for broken backend', () => {
+    const brokenBackend = {
+      name: 'broken',
+      read: () => undefined,
+      write: () => {},
+      exists: () => false,
+      list: () => { throw new Error('backend is broken'); },
+    };
+    const result = verifyStateBackend(brokenBackend);
+    expect(result.ok).toBe(false);
+    expect(result.error).toContain('backend is broken');
+  });
+});
+
+describe('GitExecError (missing vs real failure)', () => {
+  beforeEach(() => { if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); initRepo(); });
+  afterEach(() => { if (existsSync(TMP)) rmSync(TMP, { recursive: true, force: true }); });
+
+  it('GitExecError has command, reason, and stderr fields', () => {
+    const err = new GitExecError('git show HEAD:x', 'file not found', 'fatal: path does not exist');
+    expect(err.name).toBe('GitExecError');
+    expect(err.command).toBe('git show HEAD:x');
+    expect(err.reason).toBe('file not found');
+    expect(err.stderr).toBe('fatal: path does not exist');
+    expect(err.message).toContain('git show HEAD:x');
+    expect(err).toBeInstanceOf(Error);
+  });
+
+  it('git-notes read returns undefined for missing note (not throw)', () => {
+    // In a valid git repo with no notes, read should return undefined (expected missing)
+    const b = new GitNotesBackend(TMP);
+    expect(b.read('nonexistent.md')).toBeUndefined();
+  });
+
+  it('orphan read returns undefined for missing path (not throw)', () => {
+    const b = new OrphanBranchBackend(TMP);
+    expect(b.read('nonexistent.md')).toBeUndefined();
+  });
+
+  it('git-notes throws GitExecError for real failures (not a git repo)', () => {
+    // Must be OUTSIDE any git repo — using os.tmpdir() to avoid inheriting parent .git
+    const nonGitDir = join(tmpdir(), .test-nongit-);
+    mkdirSync(nonGitDir, { recursive: true });
+    try {
+      const b = new GitNotesBackend(nonGitDir);
+      expect(() => b.read('team.md')).toThrow(GitExecError);
+    } finally {
+      rmSync(nonGitDir, { recursive: true, force: true });
+    }
+  });
+
+  it('orphan exists throws GitExecError for real failures (not a git repo)', () => {
+    const nonGitDir = join(tmpdir(), .test-nongit-);
+    mkdirSync(nonGitDir, { recursive: true });
+    try {
+      const b = new OrphanBranchBackend(nonGitDir);
+      expect(() => b.exists('team.md')).toThrow(GitExecError);
+    } finally {
+      rmSync(nonGitDir, { recursive: true, force: true });
+    }
+  });
+
+  it('orphan list throws GitExecError for real failures (not a git repo)', () => {
+    const nonGitDir = join(tmpdir(), .test-nongit-);
+    mkdirSync(nonGitDir, { recursive: true });
+    try {
+      const b = new OrphanBranchBackend(nonGitDir);
+      expect(() => b.list('')).toThrow(GitExecError);
+    } finally {
+      rmSync(nonGitDir, { recursive: true, force: true });
+    }
   });
 });
