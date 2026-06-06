@@ -1,8 +1,246 @@
 # Squad Decisions
 
-**Last Updated:** 2026-06-06T08:38:05Z
+**Last Updated:** 2026-06-06T14:08:46Z
 
 ## Active Decisions
+
+---
+
+### 2026-06-06T14:08:46Z: Picard — Triage: Jon Lester Review Suggestions on PR #1192
+
+**Date:** 2026-06-06  
+**Author:** Picard (Lead Architect)  
+**Context:** bradygaster/squad PR #1192 (permission-kind fix); Jon Lester review comments; background fix landed as commit `55e843c0` in merged #1200.
+
+## Suggestion 1 — Re-export `approveAll` handler from copilot-sdk
+
+**Verdict: DON'T FILE**
+
+**Reasoning:**
+- squad-cli is the sole consumer of the `() => ({ kind: 'approve-once' })` lambda. One consumer does not justify a public API surface entry.
+- The `55e843c0` shim already covers the failure mode this was supposed to prevent. Legacy values now silently normalize. The "centralizing the value prevents future contract breaks" argument is neutralized.
+- The propagation argument ("future changes flow via SDK update") is weakened because any breaking protocol change still requires mandatory SDK update regardless. Centralization changes where the literal lives, not whether an update is needed.
+- Surfacing an "approve everything" convenience function from the SDK nudges production SDK consumers toward auto-approval — a poor default for anything not running as a developer CLI. We don't want to make that pattern easy by publishing it.
+- Net: high maintenance cost (versioning, docs, semver surface), no safety benefit beyond the shim already in place, one internal call site.
+
+## Suggestion 2 — Protocol version validation warning at session start
+
+**Verdict: FILE — with specific, tight scope**
+
+**Reasoning:**
+- Bug #1191's worst property was diagnostic opacity: tools silently stopped working, nothing in logs pointed toward "Copilot CLI contract mismatch." A startup warning would have cut triage from hours to minutes.
+- Fleet/CI scenarios make this especially high-value. Silent failure in headless automation has no REPL fallback; a logged warning survives in CI output and gives both users and support a clear "check SDK compatibility" action item.
+- The failure mode of NOT doing this: the next protocol contract change produces the exact same bug report, with the exact same diagnostic difficulty.
+
+**Scope constraints (what the issue must specify):**
+- Check location: `startSession()` in squad-cli — not a generic SDK check. The SDK doesn't own startup UX; the CLI does.
+- Threshold: define a named constant `SUPPORTED_PROTOCOL_VERSION_MAX = 3` (or a supported range). Warn if `client.getStatus().protocolVersion > SUPPORTED_PROTOCOL_VERSION_MAX`.
+- Behavior: **warn only, never throw**. Headless sessions must continue. Message must include both the detected and expected version, and a suggested action ("check for squad-sdk updates").
+- Do NOT warn on every version bump — the constant must be updated intentionally when the SDK ships tested support for a new protocol version. That is the maintenance contract.
+- Acceptance criteria: Starting a squad session with a Copilot CLI whose `protocolVersion` is 4+ prints a visible warning to console output before the session begins. Starting with version ≤3 is fully silent on this check.
+
+**Cost:** ~5–10 lines of code, one constant, one warning message. Easily justified.
+
+## Summary
+
+| Suggestion | Verdict | Reason |
+|---|---|---|
+| Re-export approveAll from SDK | DON'T FILE | One consumer, shim already covers failure mode, bad production-default signal |
+| protocolVersion startup warning | FILE (tight scope) | High diagnostic value in silent-failure scenarios, low implementation cost |
+
+---
+
+### 2026-06-06T14:08:46Z: Data — Issue #600 — Two-Layer Backend as Hot/Cold: Team Verdict
+
+**Date:** 2026-06-06  
+**Author:** Data  
+**Related:** bradygaster/squad #600, PR #1200, PR #606, PR #637, .changeset/tiered-memory.md
+
+## Summary
+
+The two-layer state backend (PR #1200) implements hot/cold memory semantics **at the retention layer** — not the loading layer. This is a genuine architectural contribution toward #600 that Seven's prior analysis missed. However, it does not close #600, because #600 requires both retention semantics and conditional spawn-time context loading.
+
+## Architectural Mapping
+
+| Two-Layer Concept | #600 Tier Concept | Semantics |
+|---|---|---|
+| Git notes (`refs/notes/squad/*`) | Hot tier | Commit-scoped, ephemeral, evaporates on PR rejection |
+| Orphan branch (`squad-state`) | Cold tier | Repo-scoped, permanent, survives everything |
+| `promote_to_permanent: true` flag | Hot → Cold promotion | Ralph copies to decisions.md after PR merge |
+| `archive_on_close: true` flag | Relevance retention | Cold retention even on PR rejection |
+| Notes dropped on PR rejection | Hot eviction | Natural scope-based eviction |
+
+This is a correct and complete hot/cold **retention** model at the state/backend tier.
+
+## What's Still Missing (Runtime Layer)
+
+1. `TwoLayerBackend.read()` (`state-backend.ts:491`) always reads from orphan (cold) only. The hot tier is write-only from the read path — notes are never pulled into spawn context.
+2. `agent-source.ts:193-194` reads full `history.md` unconditionally regardless of tier.
+3. Spawn template (`spawn-reference.md:80`) reads `agents/{name}/history.md` with no tier selection.
+4. `spawn.ts:buildAgentPrompt()` has no `--include-cold` / `--include-wiki` processing.
+5. `.squad/memory/hot/`, `.squad/memory/cold/`, `.squad/memory/wiki/` paths don't exist — SKILL.md implementation checklist is entirely unchecked.
+
+## Recommended Language for Issue #600
+
+When commenting on #600, the team should say:
+
+> **The two-layer state backend (PR #1200) delivers the hot/cold retention semantics described in #600 at the state tier**: ephemeral notes (hot) promote to orphan branch (cold) via Ralph on PR merge, and are silently dropped on rejection. This is the lifecycle model #600 specifies.
+>
+> **What remains unimplemented is the runtime-loading dimension**: spawn templates still read full history.md unconditionally. The next PR needs to wire `spawnAgent()` to load only notes (hot) by default and add `--include-cold` to pull orphan history on demand.
+>
+> **Wiki tier** is structurally separate and tracked in #640.
+
+---
+
+### 2026-06-06T14:08:46Z: Data — Issue #600 — Real Source-Code Inventory
+
+**Date:** 2026-06-06  
+**Author:** Data  
+**Audience:** Team — bradygaster/squad contributors  
+**Re:** bradygaster/squad #600 "Tiered agent memory"  
+**Verified against:** `upstream/dev` HEAD `3eec7de5`
+
+## Decision
+
+**Issue #600 has partial retention-layer implementation and zero spawn-layer implementation.** The two must be tracked separately. Any PR claiming to close #600 must wire the spawn-time context loading path, not just the storage backend.
+
+## What IS implemented (source code, `.ts` files only)
+
+### Hot/cold retention model — 🟢 IMPLEMENTED
+
+`packages/squad-sdk/src/state-backend.ts` class `TwoLayerBackend` (line 922):
+
+- `write()` (line 940): dual-writes to both OrphanBranch (durable/"cold") and GitNotes (commit-scoped/"hot").
+- `promoteNotes()` (line 1005): walks `refs/notes/squad/*`, reads `promote_to_permanent` and `archive_on_close` flags from note JSON payloads, moves/copies to orphan layer.
+- `readNote()` (line 985): reads a single git-notes payload by commit SHA.
+
+**Two production callers for `promoteNotes()`:**
+1. `packages/squad-cli/src/cli/commands/notes.ts` — `squad notes promote` CLI command.
+2. `packages/squad-cli/src/cli/commands/watch/capabilities/notes-promote.ts` — Ralph's `housekeeping` heartbeat capability, runs every N rounds.
+
+**`read()` (line 935) reads ONLY from the orphan (permanent) layer.** Git notes are write/annotate-only — they are never read back by the backend's `read()` interface.
+
+## What is NOT implemented (markdown-only)
+
+### Wiki tier — ❌ MARKDOWN ONLY
+
+No `.ts`/`.js` file writes to or reads from any wiki path (`.squad/memory/wiki/`, `.squad/wiki/`). The `response-tiers.ts` file's `direct|lightweight|standard|full` tiers are about response complexity routing, not memory layers. Wiki is specified only in `packages/squad-cli/templates/skills/tiered-memory/SKILL.md`.
+
+### Conditional spawn-time context loading — ❌ NOT IMPLEMENTED
+
+`packages/squad-cli/src/cli/shell/spawn.ts` line 86: `buildAgentPrompt(charter, options?)` takes only `charter` + optional `systemContext`. There is no `--include-cold`, `--include-wiki`, warm-layer, or tier-selection code anywhere in spawn. Agents read their own `history.md` via tool calls during their session — this is an agent-side convention, not a spawn-time injection.
+
+### Issue-tag-based retention — 🟡 PARTIAL
+
+`archive_on_close` flag IS parsed by `promoteNotes()` at state-backend.ts:1042. However, NO source code queries GitHub issue state (no `gh issue view`, no issue-status API calls) to decide when to trigger archiving. The flag is caller-supplied naming convention, not system-enforced issue-tracker integration.
+
+### CLI flags — ❌ MARKDOWN ONLY
+
+`--include-cold`, `--include-wiki`, `--tier`, `--cold` have zero occurrences in any `.ts`/`.js` source file. They exist only in `tiered-memory/SKILL.md`.
+
+### `MemoryLoadGuidance` types — 🟡 PARTIAL
+
+`packages/squad-sdk/src/memory/index.ts` line 12 defines `'ALWAYS' | 'ON-DEMAND' | 'ARCHIVE' | 'NEVER'`. `LocalMemoryStore` (line 542) uses them for governance classification and routing. But `spawn.ts` never imports `LocalMemoryStore` — load guidance has no caller that selectively populates a spawn prompt.
+
+## Accurate one-sentence status of #600
+
+**The retention layer (hot/cold via TwoLayerBackend + `promoteNotes`) is fully implemented and has production callers; the spawn-layer (conditional context loading into agent prompts based on tier) is entirely unimplemented and its spec (`tiered-memory/SKILL.md`) remains unchecked.**
+
+## Next required PR to move #600 forward
+
+Wire `spawnAgent()` to read notes (hot tier) by default and add `--include-cold` flag to pull full `history.md` (orphan/cold) on demand. Changes needed: `spawn.ts` + `buildAgentPrompt()` signature + spawn-reference.md. The backend is ready; the loading path is not.
+
+---
+
+### 2026-06-06T14:08:46Z: Seven — Decision: bradygaster/squad #600 Status Assessment
+
+**Author:** Seven  
+**Date:** 2026-06-06  
+**Requested by:** Tamir Dresher  
+**Status:** Research complete — recommendation: keep open, split by sub-deliverable
+
+## Question
+
+Has recent work in squad-squad or upstream (bradygaster/squad) superseded or partially addressed
+bradygaster/squad issue #600 — "feat: Tiered agent memory — hot/cold/wiki layers for context management"?
+
+## Verdict: PARTIALLY ADDRESSED
+
+The **specification** side of #600 has been delivered. Three of four new runtime behaviors remain unimplemented.
+
+## Evidence Matrix
+
+### (1) Explicit hot/cold tier model with promotion/demotion logic
+
+**Status: 🟡 Partial**
+
+- Tiered-memory SKILL.md (hot/cold/wiki) merged in commit `e11b5d3f` (2026-03-28).
+  Files: `packages/squad-cli/templates/skills/tiered-memory/SKILL.md`, `packages/squad-sdk/templates/skills/tiered-memory/SKILL.md`.
+  Defines tiers, spawn template patterns, and 30-day Cold→Wiki promotion schedule. Normative guidance only.
+- Scribe archival thresholds added in commit `3cc22b4f` (2026-03-27, PR #637):
+  two-tier archive at 20KB/30-day then 50KB/7-day. Closest to "promotion logic" that shipped.
+- **Gap:** `agent-source.ts` lines 193–205 still loads full `history.md` unconditionally. No `readRecentHistory()` function exists anywhere in the SDK or CLI.
+
+### (2) Wiki as durable layer
+
+**Status: ❌ Not implemented**
+
+- Tiered-memory SKILL.md specifies `.squad/memory/wiki/` directory and `scribe:wiki-write` command.
+- Issue #686 research (diberry/Ralph, 2026-03-31) explicitly states: "Wiki deferred. Needs StorageProvider from #640."
+- No wiki directory, no wiki tooling, no Scribe charter update covering wiki writes.
+
+### (3) Issue-tag-based retention (keep entries tagged with open issues in hot layer)
+
+**Status: ❌ Not addressed**
+
+- No mention in any commit, PR, SKILL.md, charter, or issue comment (including #686 research).
+- Not present in nap.ts, agent-source.ts, or history-shadow.ts.
+- Tamir's own revision comment on #600 called this out as NEW behavior; no downstream work picked it up.
+
+### (4) Conditional cold-layer loading in spawn template
+
+**Status: 🟡 Partial**
+
+- Tiered-memory SKILL.md documents the `--include-cold` pattern with a spawn template example.
+  Normative guidance: coordinators should conditionally include cold tier when task needs history.
+- **Gap:** No runtime enforcement. `agent-source.ts` still loads full `history.md` at spawn. No `squad_history_read` tool for agents to pull archive on demand.
+- Issue #686 identified this as the primary implementation gap: "Add readRecentHistory(…, limit=5)
+  to history-shadow.ts" and "Add squad_history_read tool."
+
+## Related Issues and PRs
+
+| # | Title | Status | Relationship |
+|---|-------|--------|-------------|
+| #600 | feat: Tiered agent memory — hot/cold/wiki layers | OPEN | Main issue |
+| #686 | Research: Tiered memory implementation plan (#595 #600) | OPEN | Research done (Ralph comment); no implementation PR |
+| #595 | feat: Tiered history retrieval (hot/cold layer pattern) | OPEN | Subset of #600 (2-tier only); no implementation PR |
+| PR #606 / commit e11b5d3f | feat(memory): tiered agent memory skill — hot/cold/wiki tiers | MERGED 2026-03-28 | Delivers SKILL.md spec for all 3 tiers |
+| PR #637 / commit 3cc22b4f | fix(scribe): add HARD GATE archival with two-tier thresholds | MERGED 2026-03-27 | Delivers Scribe archival thresholds |
+| PR #1145 / commit c6148e76 | Memory governance provider (MemPalace, IndexServer) | MERGED ~2026-05-20 | External provider model; does NOT implement history tiering |
+
+## Recommendation
+
+**Do not close #600.** Do split it:
+
+1. **Close PR #606 / commit e11b5d3f work as "spec done"** — add a comment on #600 linking to e11b5d3f and noting the tiered-memory SKILL.md is the delivered artifact for the design spec.
+
+2. **Keep #595 open** as the tracker for hot-only spawning (readRecentHistory + agent-source.ts change + squad_history_read tool). The implementation is scoped and unambiguous per #686 research.
+
+3. **File a new issue for wiki tier runtime** — StorageProvider abstraction (#640) must land first; wiki tier depends on it.
+
+4. **File a new issue for issue-tag-based retention** — not tracked anywhere; kehansama's warm-tier suggestion could be combined here or filed separately.
+
+5. **Keep #600 open** as the superset tracker until all four behaviors are closed.
+
+## External Suggestion (kehansama, on #600 thread)
+
+Proposed **4-tier model**: Hot / Warm (relevance-loaded) / Cold (explicit search) / Wiki.
+Key additions:
+- Warm tier = cheaply loaded by detected relevance, not explicit flag
+- Wiki entries need provenance + confidence metadata (trust-level system)
+- Cold→Hot promotion when closed issues are reopened
+
+This extends #600 rather than superseding it. No decision required now, but worth noting if the implementation PR for #595 is scoped.
 
 ---
 

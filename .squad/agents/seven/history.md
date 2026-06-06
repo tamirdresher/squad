@@ -9,6 +9,14 @@
 
 Seven owns cross-repo learning & signal research. Key focus: state-backend community signal, memory research, ADC architecture validation, provenance documentation.
 
+## 2026-06-06 — Real Source Code vs Spec Gap Pattern (Issue #600 Analysis)
+
+**Lesson:** Always grep source code when evaluating implementation status. Template/spec docs are normative but can drift from actual shipped logic. Data's 2nd-pass archaeology found:
+- **Shipped:** TwoLayerBackend.promoteNotes() has 2 production callers (CLI command + Ralph heartbeat)
+- **Spec only:** spawn-time tier selection (`--include-cold`, `--include-wiki`) — zero callers in code
+
+Without real-code verification, Seven's earlier assessment missed the retention-layer shipping. Recommended workflow: (1) read spec, (2) identify feature surface (functions, CLI flags, config keys), (3) grep code for callers, (4) verify production paths.
+
 ## Key Learnings (Active)
 
 - **2026-06-02:** Use `copilot --yolo --autopilot --agent squad -p '<prompt>'` for unattended copilot CLI invocations
@@ -95,3 +103,52 @@ Data authored 11-auth-mode inventory for Squad.Agents.AI expansion (Decision cle
 ### Artifacts
 - Decision: `.squad/decisions/inbox/seven-mcp-config-precedence.md` (full reproducer + exact CLI output).
 - Production user config (`~/.copilot/mcp-config.json`) backed up before test, restored after, verified byte-equal; test temp dir removed.
+
+## Learnings — Squad Memory Architecture (2026-06-06)
+
+### What has landed in bradygaster/squad
+
+- **Tiered-memory skill** (SKILL.md): Merged in commit `e11b5d3f` (2026-03-28, PR #606). Defines hot/cold/wiki tiers fully in documentation form. Files: `packages/squad-cli/templates/skills/tiered-memory/SKILL.md`, `packages/squad-sdk/templates/skills/tiered-memory/SKILL.md`, `docs/proposals/tiered-memory.md`. Proposal links back to issue #600. This is spec-complete, not runtime-complete.
+
+- **Scribe archival thresholds** (charter update): Merged in commit `3cc22b4f` (2026-03-27, PR #637). Two-tier Scribe workflow: archive at 20KB/30-day then 50KB/7-day. Applies to `decisions.md`. All 7 Scribe charter templates updated. This is the closest thing to "promotion/demotion logic" that shipped — but it's size/age based, not issue-tag or semantic.
+
+- **Memory governance provider** (PR #1145, merged ~2026-05-20): MemoryProvider contract, MemPalace/IndexServer providers, governed memory with classification, write/search/promote/delete/audit. This is the external memory provider model, NOT history.md tiering. Related to StorageProvider abstraction (`26047dc5`).
+
+- **nap.ts hot/cold split**: Pre-dates #600. `compressHistory()` keeps last N sections, archives remainder to `history-archive.md`. HISTORY_THRESHOLD governs the trigger. Functional but not issue-tag-aware and does not integrate with spawn-time loading.
+
+### What is still missing for #600
+
+- **No `readRecentHistory()` or hot-only loading**: `agent-source.ts` (line 193–205) still reads full `history.md` at spawn — no hot-only filtering.
+- **No `squad_history_read` tool**: On-demand cold/archive access from agent prompts does not exist. Identified in #686 research as the key implementation gap.
+- **No wiki tier runtime**: `.squad/memory/wiki/` path and `scribe:wiki-write` tool are specced in the skill but not implemented. Issue #686 notes wiki is deferred pending StorageProvider (#640).
+- **No issue-tag-based retention**: Not in nap.ts, not in agent-source.ts, not in any PR or commit. Not referenced in #686 research either.
+- **No conditional cold-tier spawn loading**: `agent-source.ts` loads full history unconditionally.
+
+### Issue status (as of 2026-06-06)
+
+- #600 (main tiered memory): OPEN — skill merged, runtime not implemented
+- #686 (research spike): OPEN — research complete per Ralph comment, no implementation PR
+- #595 (hot/cold layer, subset of #600): OPEN — design done, no implementation PR
+- No merged PR addresses runtime hot-only spawning or wiki tier
+
+### Reusable insight
+
+The pattern in bradygaster/squad: spec/skill ships first (low-friction PR), runtime implementation follows as separate issue. The skill template is normative guidance for agents, not enforced by the runtime. When evaluating "is X done?" always check agent-source.ts / nap.ts / spawn template runtime in addition to SKILL.md.
+
+## Learnings — 4-Week Issue Triage (2026-05-09 → 2026-06-06)
+
+### Issue cadence observations (63 issues, bradygaster/squad)
+
+**What the team is focused on (high volume):**
+- **State backend plumbing** — multiple issues in flight: CAS safety (#1211), upgrade-pipeline gaps (#1190, #1185), bypass via prompt choreography (#1157, closed). Two-layer is the team's active P1; there are at least 4 open gaps that need to ship before the backend is fleet-safe.
+- **CI/release hygiene** — changelog gate (#1156, #1195), tarball/version (#1171, #1203), postinstall ESM patch (#1190). obit91 is the main contributor here; Brady and Tamir's CI work is attracting close follow-on scrutiny.
+- **Upgrade pipeline** — multiple reporters hit broken upgrades; `--state-backend` migration (#1185) and template duplication are actively hurting users.
+- **Plugin/registry extensibility** — mfrieman filed a coordinated burst of 6 issues (#1135–#1141) around `squad://` URI resolver, workstream installs, asset registry. Possibly pre-coordinated or AI-generated batch.
+
+**What is getting little attention:**
+- **Memory / tiered loading (#600, #595, #686)** — zero new issues in 4 weeks that directly track #600 runtime implementation. #1184 (idangutman) is a parallel external proposal, not an upstream continuation. The Hot-tier runtime gap (#686) is stalled.
+- **StorageProvider / wiki tier (#640)** — no new issues or PRs in this batch. The dependency is undisturbed.
+- **Spawn-API context loading** — no design doc filed; the gap identified in #686 (no `squad_history_read` tool, no hot-only spawn filter) has no new traction.
+- **Permission contract** — #1191 (jonlester) covers the breaking bug; the two follow-up suggestions (protocolVersion warning, approveAll re-export) were not filed separately.
+
+**Pattern worth noting:** External/community contributors (idangutman, ischrei, ralarcon, mfrieman, sytone) are filing issues faster than the core team is triaging them. Several issues lack labels and have no core-team response. This suggests a triage backlog is forming around memory and extensibility topics.
