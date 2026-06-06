@@ -1,6 +1,6 @@
 # Squad Decisions
 
-**Last Updated:** 2026-06-04T18:30:00Z
+**Last Updated:** 2026-06-06T08:38:05Z
 
 ## Active Decisions
 
@@ -6623,5 +6623,79 @@ Finding F3 should remain open until one of these options is implemented and vali
 - 	est/cli/doctor.test.ts — 4 refactored + 2 new git-dir tests
 
 **CI Status:** ALL 6 GREEN (actions/checkout, build@node20, build@node22, test@node20, test@node22, lint). Mergeable=true. Head=c9e5b755.
+
+---
+
+### 2026-06-06T08:38:05Z: PR #1195 Review (Data + Worf) — APPROVE WITH SUGGESTIONS [ws:squad-agents-ai]
+
+**Date:** 2026-06-06T08:38:05.874+03:00
+
+**PR:** bradygaster/squad#1195 — fix(ci): expand changelog gate to cover template and scaffolding paths
+
+**Author:** Ohad Beltzer (obit91)
+
+**Reviewers:** Data (Framework Correctness), Worf (CI Safety & Reliability)
+
+**Verdict:** APPROVE WITH SUGGESTIONS (non-blocking)
+
+## Decision Summary
+
+Both reviewers approve PR #1195 for merge. Key findings and recommendations documented below.
+
+## Data's Findings: Squad CI Conventions (Framework Correctness)
+
+### 1. CI gates must use externalized regex variables
+
+PR #1195 correctly extracts the path pattern into `SDK_CLI_PATH_REGEX` (shell variable), enabling tests to read it directly from the workflow YAML without regex duplication. This prevents gate/test drift.
+
+### 2. CONTRIBUTING.md is stale after merge
+
+Lines 190 and 217 still document "only `packages/squad-sdk/src/` or `packages/squad-cli/src/`" — must be updated to reflect the expanded gate scope when PR #1195 merges.
+
+### 3. `templates/` is append-only, not a pure mirror
+
+The `sync-templates.mjs` script appends to `templates/` but never deletes. Confirmed extra files (not in `.squad-templates/`): `ghost-protocol.md`, `loop.md`, `personal-charter.md`, `skills/rework-rate/SKILL.md`. Future PRs should not describe `templates/` as a "canonical mirror".
+
+### 4. `.squad/agents/*/charter.md` gap in regex
+
+The PR's regex scope intentionally covers `.squad-templates/` but does not explicitly mention `.squad/agents/*/charter.md` — which is also a generated sync target. If `charter.md` files become subject to changelog requirements, update the regex accordingly.
+
+## Worf's Findings: CI Safety & Reliability
+
+### 1. Regex correctness
+
+✅ All 4 patterns correct. No catastrophic backtracking. `\.` correctly escapes dots. `^templates/` intentionally broad with concrete justification (PR #1035). Escape hatch (`skip-changelog`) functional and wired at YAML `if:` level.
+
+### 2. Shell quoting safety
+
+✅ YAML `\|` block → bash single-quote assignment → bash double-quote expansion → grep argument. `\.` survives intact. Bash only transforms `\\`, `\"`, `\$`, backtick, `\!`, `\newline`. Safe.
+
+### 3. Top-level vitest assertions — anti-pattern
+
+⚠️ **Non-blocking suggestion:** `test/ci/changelog-gate.test.ts` places `expect(patternMatch, ...).not.toBeNull()` at module top level (outside `describe`/`it`/`beforeAll`). If `patternMatch` is null, vitest marks the entire file as a collection error (obscure "failed to collect tests" message) instead of a clean per-test failure.
+
+Recommended fix:
+```typescript
+describe('changelog gate path matching', () => {
+  let regex: RegExp;
+  beforeAll(() => {
+    const patternMatch = workflow.match(/SDK_CLI_PATH_REGEX='([^']+)'/);
+    expect(patternMatch, '...').not.toBeNull();
+    regex = new RegExp(patternMatch![1]);
+  });
+  // ...tests
+});
+```
+
+### 4. Pre-existing `|| true` grep error masking
+
+ℹ️ **Informational (pre-existing debt):** All changelog gate grep calls use `|| true`, which masks exit code 2 (genuine grep error) as "no match → gate passes". Not introduced by PR #1195. File as low-priority CI hygiene issue.
+
+## Action Items
+
+- ✅ Approve PR #1195 for merge.
+- 📝 Update `CONTRIBUTING.md` lines 190 & 217 in same PR or as immediate follow-up.
+- 📝 File follow-up issue: refactor top-level `expect()` in changelog-gate.test.ts to use `beforeAll` pattern.
+- 📝 File low-priority issue: improve `|| true` grep error handling in CI gates.
 
 ---
