@@ -4,7 +4,7 @@
  * regressions in governed source/template paths.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import path, { dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -14,10 +14,15 @@ const workflowPath = path.resolve(__dirname, '..', '..', '.github', 'workflows',
 const workflow = readFileSync(workflowPath, 'utf-8');
 const patternMatch = workflow.match(/SDK_CLI_PATH_REGEX='([^']+)'/);
 
-expect(patternMatch, 'Expected changelog gate SDK_CLI_PATH_REGEX to be defined in squad-ci.yml').not.toBeNull();
+let regex: RegExp;
 
-const pattern = patternMatch?.[1] ?? '';
-const regex = new RegExp(pattern);
+beforeAll(() => {
+  expect(
+    patternMatch,
+    'Expected changelog gate SDK_CLI_PATH_REGEX to be defined in squad-ci.yml',
+  ).not.toBeNull();
+  regex = new RegExp(patternMatch?.[1] ?? '');
+});
 
 const governedPaths = [
   'packages/squad-sdk/src/index.ts',
@@ -28,6 +33,7 @@ const governedPaths = [
   '.squad-templates/scribe-charter.md',
   'templates/skills/release-process/SKILL.md',
   'templates/casting/policy.json',
+  '.squad/agents/troi/charter.md',
 ];
 
 const unrelatedPaths = [
@@ -38,6 +44,8 @@ const unrelatedPaths = [
   'packages/squad-cli/package.json',
   'scripts/bump-build.mjs',
   'test/ci/changelog-gate.test.ts',
+  '.squad/agents/troi/notes.md',
+  '.squad/routing.md',
 ];
 
 describe('changelog gate path matching', () => {
