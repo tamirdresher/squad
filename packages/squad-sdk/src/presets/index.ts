@@ -10,7 +10,9 @@
  */
 
 import path from 'node:path';
+import os from 'node:os';
 import { readdirSync, statSync, lstatSync, rmSync } from 'node:fs';
+import { execSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { FSStorageProvider } from '../storage/fs-storage-provider.js';
 import { resolvePresetsDir, ensureSquadHome } from '../resolution.js';
@@ -272,6 +274,253 @@ export function savePreset(
   copyDirRecursive(agentsDir, path.join(destDir, 'agents'));
 
   return destDir;
+}
+
+/**
+ * Source descriptor for `installPresetFromSource`.
+ *
+ * A source is either:
+ * - A local filesystem path to either a single preset dir (contains `preset.json`)
+ *   OR a `presets/` collection dir (contains multiple preset subdirs).
+ * - A GitHub URL in one of these shapes (all shallow-cloned to a temp dir):
+ *     https://github.com/owner/repo[.git]
+ *     https://github.com/owner/repo[.git]#preset-name           — install only this subdir under <repo>/presets/
+ *     https://github.com/owner/repo/tree/<branch>/path/to/preset — install only this subpath
+ *     git@github.com:owner/repo.git
+ */
+export interface InstallPresetOptions {
+  /** Optional override for the installed preset name. Defaults to the source's preset name. */
+  name?: string;
+  /** Overwrite existing preset if it exists. */
+  force?: boolean;
+}
+
+export interface InstallPresetResult {
+  /** The name the preset was installed under. */
+  installedName: string;
+  /** Absolute path of the installed preset dir under SQUAD_HOME. */
+  installedDir: string;
+  /** Source the preset was installed from (verbatim from caller). */
+  source: string;
+}
+
+/**
+ * Install a preset from a remote git source or local path into `$SQUAD_HOME/presets/<name>/`.
+ *
+ * For git URLs, shallow-clones to an OS temp dir then copies the resolved preset.
+ * For local paths, copies directly. Cleans up the temp clone whether success or failure.
+ *
+ * Resolution rules for finding the preset within the source:
+ * 1. If the source dir/subdir contains `preset.json` → install that as a single preset
+ * 2. Else if it contains a `presets/` subdir (multi-preset collection) → require `options.name`
+ *    to pick which subdir to install
+ * 3. Else error — source is not a recognizable preset
+ *
+ * @throws Error on any validation failure, manifest invalidity, or destination collision.
+ */
+export function installPresetFromSource(source: string, options: InstallPresetOptions = {}): InstallPresetResult {
+  if (!source || typeof source !== 'string') {
+    throw new Error('Source is required.');
+  }
+
+  // Resolve the source into a local working directory + optional sub-path inside it.
+  // Returns { workDir, subPath, cleanup } — caller must call cleanup() in a finally.
+  const { workDir, subPath, cleanup } = resolveInstallSource(source);
+
+  try {
+    // Locate the actual preset directory inside workDir
+    const startDir = subPath ? path.join(workDir, subPath) : workDir;
+    if (!storage.existsSync(startDir) || !isDirSync(startDir)) {
+      throw new Error(`Source path does not exist or is not a directory: ${startDir}`);
+    }
+
+    const { presetDir, defaultName } = locatePresetWithinSource(startDir, options.name);
+
+    // Validate manifest before doing anything destructive
+    const manifest = loadPresetManifest(presetDir);
+    if (!manifest) {
+      throw new Error(`No valid preset.json found at ${presetDir}. Expected fields: name, agents[].`);
+    }
+
+    // Verify agents/ dir exists (preset is useless without it)
+    const sourceAgentsDir = path.join(presetDir, 'agents');
+    if (!storage.existsSync(sourceAgentsDir) || !isDirSync(sourceAgentsDir)) {
+      throw new Error(`Preset is missing agents/ directory at ${sourceAgentsDir}`);
+    }
+
+    // Decide installed name: caller override > manifest.name > defaultName from path
+    // Prefer manifest.name when the user didn't specify --name because that's the preset's
+    // declared identity (e.g. a temp clone dir's basename shouldn't become the preset name).
+    const installedName = options.name ?? manifest.name ?? defaultName;
+    validateName(installedName, 'preset');
+
+    const homeDir = ensureSquadHome();
+    const destDir = path.join(homeDir, 'presets', installedName);
+
+    if (storage.existsSync(destDir)) {
+      if (!options.force) {
+        throw new Error(`Preset '${installedName}' already exists at ${destDir}. Use --force to overwrite.`);
+      }
+      rmSync(destDir, { recursive: true, force: true });
+    }
+
+    // Copy the preset (preset.json + agents/)
+    storage.mkdirSync(destDir, { recursive: true });
+
+    // Stamp manifest.name with the installed name if it was renamed (so list/show stay consistent)
+    const finalManifest: PresetManifest = options.name && options.name !== manifest.name
+      ? { ...manifest, name: installedName }
+      : manifest;
+    storage.writeSync(path.join(destDir, 'preset.json'), JSON.stringify(finalManifest, null, 2));
+    copyDirRecursive(sourceAgentsDir, path.join(destDir, 'agents'));
+
+    return { installedName, installedDir: destDir, source };
+  } finally {
+    cleanup();
+  }
+}
+
+/**
+ * Resolve `source` to a working directory on disk. Handles:
+ *  - Local absolute/relative paths (no clone needed; cleanup is a no-op)
+ *  - GitHub HTTPS URLs (https://github.com/owner/repo[#ref-or-name][/tree/branch/path])
+ *  - GitHub SSH URLs (git@github.com:owner/repo.git)
+ *  - Any other git-cloneable URL (treated as plain git URL)
+ *
+ * Returns { workDir, subPath, cleanup }:
+ *  - workDir = the local dir containing the cloned/referenced content
+ *  - subPath = optional path INSIDE workDir to descend into before searching for preset
+ *  - cleanup = function to call when done (rm -rf temp clones)
+ */
+function resolveInstallSource(source: string): { workDir: string; subPath: string | null; cleanup: () => void } {
+  const looksLikeUrl = /^(https?:\/\/|git@)/i.test(source);
+
+  if (!looksLikeUrl) {
+    // Local path: pass-through, no cleanup needed
+    const resolved = path.resolve(source);
+    return { workDir: resolved, subPath: null, cleanup: () => {} };
+  }
+
+  // Parse out: cloneUrl, ref (branch/tag), subPath (path inside repo), nameHint (after #)
+  // Supported shapes:
+  //   https://github.com/owner/repo
+  //   https://github.com/owner/repo.git
+  //   https://github.com/owner/repo#preset-name             — fragment treated as preset name hint AND/OR ref
+  //   https://github.com/owner/repo/tree/branch/path/to/preset
+  //   git@github.com:owner/repo.git
+  let cloneUrl = source;
+  let ref: string | null = null;
+  let subPath: string | null = null;
+
+  // Extract fragment (#...) — used as ref OR as preset-name hint (resolved later)
+  const fragmentIdx = source.indexOf('#');
+  if (fragmentIdx >= 0) {
+    const frag = source.substring(fragmentIdx + 1);
+    cloneUrl = source.substring(0, fragmentIdx);
+    // Heuristic: if the fragment contains a '/', treat it as a sub-path; otherwise as a ref/name hint
+    if (frag.includes('/')) {
+      subPath = frag;
+    } else {
+      // Defer interpretation — could be a branch name OR a preset name. Try as branch first;
+      // if checkout fails the user will see git's error. For simplicity, treat as preset-name
+      // hint that's also used as the default branch ref when no /tree/<branch>/ path is present.
+      // Most common case: user wrote `repo#my-preset` meaning "subdir my-preset on default branch".
+      subPath = frag;
+    }
+  }
+
+  // Extract /tree/<branch>/<sub-path> if present
+  const treeMatch = cloneUrl.match(/^(https?:\/\/[^/]+\/[^/]+\/[^/]+)\/tree\/([^/]+)(?:\/(.+))?$/);
+  if (treeMatch) {
+    cloneUrl = treeMatch[1]!;
+    ref = treeMatch[2]!;
+    if (treeMatch[3]) subPath = treeMatch[3]!;
+  }
+
+  // Normalize: ensure .git suffix on cloneUrl for portability (gh clone accepts both)
+  if (!/\.git$/i.test(cloneUrl) && /^https?:\/\/github\.com\//i.test(cloneUrl)) {
+    cloneUrl = cloneUrl + '.git';
+  }
+
+  // Shallow clone to a temp dir
+  const tmpBase = path.join(os.tmpdir(), `squad-preset-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`);
+  storage.mkdirSync(tmpBase, { recursive: true });
+
+  try {
+    const refArgs = ref ? ['--branch', ref] : [];
+    const args = ['clone', '--depth', '1', ...refArgs, cloneUrl, tmpBase];
+    execSync(`git ${args.map(a => /[\s"]/.test(a) ? `"${a.replace(/"/g, '\\"')}"` : a).join(' ')}`, { stdio: 'pipe' });
+  } catch (err) {
+    // Clean up partial clone before rethrowing
+    try { rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ignore */ }
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new Error(`Failed to clone ${cloneUrl}${ref ? ` (ref ${ref})` : ''}: ${msg}`);
+  }
+
+  const cleanup = () => {
+    try { rmSync(tmpBase, { recursive: true, force: true }); } catch { /* ignore — temp dir, best effort */ }
+  };
+  return { workDir: tmpBase, subPath, cleanup };
+}
+
+/**
+ * Locate the preset directory within a resolved source. Behavior:
+ *  1. If `startDir/preset.json` exists → that IS the preset dir (single-preset source).
+ *     Returns { presetDir: startDir, defaultName: basename(startDir) }.
+ *  2. Else if `startDir/presets/` exists (multi-preset collection):
+ *     - If `nameHint` is provided AND `startDir/presets/<nameHint>` exists → use that.
+ *     - Else throw — caller must pass `--name` to disambiguate.
+ *  3. Else if startDir's basename is `presets` and contains one subdir → use that subdir.
+ *  4. Else throw — startDir doesn't look like a preset or preset collection.
+ */
+function locatePresetWithinSource(startDir: string, nameHint?: string): { presetDir: string; defaultName: string } {
+  // Case 1: startDir IS a preset
+  if (storage.existsSync(path.join(startDir, 'preset.json'))) {
+    return { presetDir: startDir, defaultName: path.basename(startDir) };
+  }
+
+  // Case 2: startDir contains a presets/ collection
+  const presetsSubDir = path.join(startDir, 'presets');
+  if (storage.existsSync(presetsSubDir) && isDirSync(presetsSubDir)) {
+    if (nameHint) {
+      const candidate = path.join(presetsSubDir, nameHint);
+      if (storage.existsSync(path.join(candidate, 'preset.json'))) {
+        return { presetDir: candidate, defaultName: nameHint };
+      }
+      throw new Error(`Preset '${nameHint}' not found in ${presetsSubDir}.`);
+    }
+    // No hint — list available presets and ask user to pick
+    const available = readdirSync(presetsSubDir, { encoding: 'utf-8' })
+      .filter(e => isDirSync(path.join(presetsSubDir, e)))
+      .filter(e => storage.existsSync(path.join(presetsSubDir, e, 'preset.json')));
+    throw new Error(
+      `Source contains multiple presets — specify one with --name <preset-name> or #<preset-name> URL fragment. ` +
+      `Available: ${available.length > 0 ? available.join(', ') : '(none with valid preset.json)'}`,
+    );
+  }
+
+  // Case 3: startDir IS the presets/ dir itself (e.g. user pointed directly at it)
+  if (path.basename(startDir) === 'presets') {
+    if (nameHint) {
+      const candidate = path.join(startDir, nameHint);
+      if (storage.existsSync(path.join(candidate, 'preset.json'))) {
+        return { presetDir: candidate, defaultName: nameHint };
+      }
+      throw new Error(`Preset '${nameHint}' not found in ${startDir}.`);
+    }
+    const available = readdirSync(startDir, { encoding: 'utf-8' })
+      .filter(e => isDirSync(path.join(startDir, e)))
+      .filter(e => storage.existsSync(path.join(startDir, e, 'preset.json')));
+    if (available.length === 1) {
+      const only = available[0]!;
+      return { presetDir: path.join(startDir, only), defaultName: only };
+    }
+    throw new Error(
+      `Source contains multiple presets — specify one with --name <preset-name>. Available: ${available.join(', ')}`,
+    );
+  }
+
+  throw new Error(`No preset found at ${startDir}. Expected either a preset.json or a presets/ directory.`);
 }
 
 // ============================================================================
