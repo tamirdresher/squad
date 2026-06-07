@@ -78,6 +78,13 @@ Data authored 11-auth-mode inventory for Squad.Agents.AI expansion (Decision cle
 - No `.vscode/mcp.json` / `.cursor/mcp.json` auto-load.
 - User-level: `~/.copilot/mcp-config.json`. Plugin-level: bundled with installed plugins.
 
+---
+
+## 2026-06-07 — v0.10.0 Release Preflight (Scribe Notification)
+
+**Research-relevant:** Coordinator dispatched Data, Worf, Troi for full upstream bradygaster/squad v0.10.0 release audit. Key outcomes: Three pre-release blockers (workspace/preview/root package sync), four non-blocking warnings, GO for Phase 2. Prior decision surface: pre-release auth model documented in Worf log; version history & changelog alignment in Data log; messaging/comms pre-flight (Troi blog) ready pending Tamir confirmation. Cross-repo implications: upstream Squad v0.10.0 may surface new memory/research signal for state-backend track. Logs at `.squad/orchestration-log/2026-06-07T053651Z-{data,worf,troi}.md`.
+
+
 **Implication for squad-cli:** Current workaround --additional-mcp-config @./.copilot/mcp-config.json targets a non-standard path. Migration = move file to `./.mcp.json` and drop the flag. Decision written to `.squad/decisions/inbox/seven-mcp-config-paths-verified.md`.
 
 **Caveats:** Verified on 1.0.58 / Windows. Precedence among User/Workspace/Plugin not stated in help; re-verify after CLI upgrades.

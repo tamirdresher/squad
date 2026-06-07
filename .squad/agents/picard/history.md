@@ -64,3 +64,12 @@ Detailed learnings from 2026-06-04 to 2026-06-05 research and execution (PR #120
 - `.squad/agents/picard/history-archive-2026-06-04-to-06-05.md` (2026-06-06T14:08:46Z)
 
 This file was condensed on 2026-06-06 to maintain the 15KB hard gate on history.md.
+
+---
+
+## 2026-06-07 — v0.10.0 Release in Flight (Scribe Notification)
+
+**Context:** Coordinator dispatched preflight agents (Data, Worf, Troi) for full upstream bradygaster/squad v0.10.0 release audit.
+
+**Lead status:** Release cleared for Phase 2 (actual execution). Three pre-release blockers identified; four non-blocking warnings with mitigations attached. Tamir awaiting sign-off and must pre-stage npm/gh auth switches before trigger. Monitor Phase 2 dispatch for real-time coordination. Logs at `.squad/orchestration-log/2026-06-07T053651Z-{data,worf,troi}.md` and `.squad/log/2026-06-07T053651Z-release-preflight.md`.
+

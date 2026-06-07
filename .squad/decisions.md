@@ -1,8 +1,37 @@
 # Squad Decisions
 
-**Last Updated:** 2026-06-06T14:08:46Z
+**Last Updated:** 2026-06-07T08:36:51Z
 
 ## Active Decisions
+
+---
+
+### 2026-06-07T08:36:51Z: Data — v0.10.0 Release Plan (upstream bradygaster/squad)
+
+**Author:** Data  
+**Status:** PLAN ONLY — awaiting Tamir go/no-go  
+**Version:** 0.10.0 (not 0.9.7; 58 changesets request minor bumps for new surface)  
+**Blockers:** 3 (workspace version sync, preview branch missing, root package.json split)  
+**Key findings:** 100 changesets parsed; upstream/main is 3 commits ahead of v0.9.4 tag; dev is 213 ahead (preview cycle, needs internal sync); Tamir's fork stale (0.9.1, must resync). Full plan: `.squad/decisions/inbox/data-v0.9.x-release-plan.md`
+
+---
+
+### 2026-06-07T08:36:51Z: Worf — Release Preflight Audit (security & auth)
+
+**Author:** Worf  
+**Scope:** Full official release of upstream Squad (multi-hour, npm publish)  
+**Hard blockers:** 0 | **Warnings:** 4 (non-blocking, must acknowledge)  
+**Key findings:** tamirdresher auth confirmed on bradygaster/squad; NPM_TOKEN unverifiable (no admin); GITHUB_TOKEN event gap confirmed (manual dispatch needed post-release); npm CLI unauth on workstation. Rollback capability partial (need `npm login` pre-release). Full audit: `.squad/decisions/inbox/worf-release-preflight.md`
+
+---
+
+### 2026-06-07T08:36:51Z: Troi — Release v0.10.0 Blog Draft (announcement)
+
+**Author:** Troi  
+**Mode:** Draft announcement post in Tamir's voice (bradygaster byline)  
+**Status:** Ready for review before publish  
+**Headlines:** Ralph circuit breaker + watch hardening; state backends (orphan/two-layer/external); cross-squad orchestration; persistent Ralph + squad loop; skills/plugins/Rai+fact-checker agents; scar story (coordinator canary, 95.8KB→55KB)  
+**Full post:** `.squad/decisions/inbox/troi-release-blog-draft.md` — version placeholder vX.Y.Z, date 2026-06-07, TODO notes for Tamir verification attached.
 
 ---
 
