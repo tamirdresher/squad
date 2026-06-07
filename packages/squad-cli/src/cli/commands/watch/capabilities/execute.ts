@@ -8,6 +8,8 @@ import path from 'node:path';
 import type { WatchCapability, WatchContext, PreflightResult, CapabilityResult } from '../types.js';
 import type { MachineCapabilities } from '@bradygaster/squad-sdk/ralph/capabilities';
 import { createVerboseLogger } from '../verbose.js';
+import { loadAgentCharter } from '../../../shell/spawn.js';
+import { withAdditionalMcpConfig } from '../../../core/copilot-invocation.js';
 
 /** Normalized work item for execution. */
 export interface ExecutableWorkItem {
@@ -60,7 +62,7 @@ function buildAgentCommand(
   if (context.copilotFlags) {
     args.push(...context.copilotFlags.trim().split(/\s+/));
   }
-  return { cmd: 'copilot', args };
+  return { cmd: 'copilot', args: withAdditionalMcpConfig('copilot', args, context.teamRoot) };
 }
 
 /** Labels that indicate an issue should not be auto-executed. */
@@ -149,7 +151,18 @@ async function executeAll(
   timeoutMs: number,
 ): Promise<{ success: boolean; error?: string }> {
   const prompt = buildAgentPrompt(issues, context.teamRoot);
-  const { cmd, args } = buildAgentCommand(prompt, context);
+
+  // Load Ralph's charter to give the spawned session full specialist context.
+  let charterPrefix = '';
+  try {
+    const charter = await loadAgentCharter('ralph', context.teamRoot);
+    charterPrefix = `You are an AI agent on a software development team.\n\nYOUR CHARTER:\n${charter}\n\nADDITIONAL CONTEXT:\n`;
+  } catch {
+    // Fall back gracefully if no charter exists (e.g., fresh setup)
+  }
+
+  const fullPrompt = charterPrefix + prompt;
+  const { cmd, args } = buildAgentCommand(fullPrompt, context);
 
   return new Promise<{ success: boolean; error?: string }>((resolve) => {
     const cp: ChildProcess = execFile(

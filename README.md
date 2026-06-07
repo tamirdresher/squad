@@ -41,6 +41,8 @@ npm install -g @bradygaster/squad-cli
 squad init
 ```
 
+> **⚡ Want to be up and running in under a second?** Use `squad init --preset default` to start with a fully-configured squad — complete with members, charters, and routing rules — ready to go immediately. The default `squad init` (without the flag) walks you through setup step by step, ideal if you prefer to build and customize your squad deliberately.
+
 **✓ Validate:** Check that `.squad/team.md` was created in your project.
 
 ### 3. Authenticate with GitHub (for Issues, PRs, and Ralph)
@@ -96,13 +98,45 @@ Use `--force` to re-apply updates even when your installed version already match
 
 ---
 
+## Local Development Installation
+
+To install and run Squad from source for development:
+
+```bash
+# Clone the repository
+git clone https://github.com/bradygaster/squad.git
+cd squad
+
+# Install dependencies (npm workspaces)
+npm install
+
+# Build the project (SDK first, then CLI)
+npm run build
+
+# Run the CLI directly
+node ./packages/squad-cli/dist/cli-entry.js init
+
+# Or link it globally for convenience
+npm run dev:link
+```
+
+After `npm run dev:link`, the `squad` command will be available globally and will use your local build. To update after code changes, re-run `npm run build` to recompile.
+
+---
+
+## Quick Commands
+
+Say **"squad commands"** in chat to see a categorized menu of common operations — install & upgrade, team management, issues & PRs, plugins, model settings, and session state. You can also ask naturally: *"how do I switch state backends?"* or *"how do I add a team member?"* — Squad matches your intent and walks you through it. The `squad-commands` skill ships out of the box with every `squad init` and `squad upgrade`.
+
+---
+
 ## All Commands (17 commands)
 
 | Command | What it does |
 |---------|-------------|
 | `squad init` | **Init** — scaffold Squad in the current directory (idempotent — safe to run multiple times); alias: `hire`; use `--global` to init in personal squad directory, `--mode remote <path>` for dual-root mode |
 | `squad upgrade` | Update Squad-owned files to latest; never touches your team state; use `--global` to upgrade personal squad, `--migrate-directory` to rename `.ai-team/` → `.squad/` |
-| `squad upgrade --self` | Update the Squad CLI package itself; add `--insider` for prerelease builds |
+| `squad upgrade --self` | Update the Squad CLI package itself; add `--insider` for dev-channel prerelease builds |
 | `squad status` | Show which squad is active and why |
 | `squad triage` | **Watch mode** — poll for issues and auto-triage to team (aliases: `watch`, `loop`); use `--interval <minutes>` to set polling frequency (default: 10); with `--execute` dispatch Copilot agents; use `--agent-cmd`, `--copilot-flags`, `--auth-user` to customize agent execution; `--health` shows watch status; `--log-file` for diagnostics |
 | `squad copilot` | Add/remove the Copilot coding agent (@copilot); use `--off` to remove, `--auto-assign` to enable auto-assignment |

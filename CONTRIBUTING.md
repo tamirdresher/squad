@@ -187,7 +187,7 @@ External contributors don't have write access, so the review-to-merge flow has a
 
 **Your side (contributor):**
 
-1. ✅ All required CI checks are green (build, test, lint; changeset/CHANGELOG gate only applies when `packages/squad-cli/src/` or `packages/squad-sdk/src/` files change)
+1. ✅ All required CI checks are green (build, test, lint; the changeset/CHANGELOG gate applies when `packages/squad-(sdk|cli)/src/` **or** governed template/scaffolding paths change — `packages/squad-(sdk|cli)/templates/`, `.squad-templates/`, top-level `templates/`, and `.squad/agents/*/charter.md`)
 2. ✅ PR is no longer a draft — mark as **"Ready for review"**
 3. ✅ Copilot reviewer bot posts its review automatically
 4. ✅ Review Copilot's suggestions and manually apply any you agree with in your fork
@@ -214,7 +214,7 @@ An automated readiness check runs on every PR and posts a checklist comment. Add
 | **Not in draft** | Mark your PR as "Ready for review" when it's done |
 | **Branch up to date** | Rebase on latest `dev` (`git fetch upstream && git rebase upstream/dev`) |
 | **Copilot review** | Wait for the Copilot reviewer bot to post its review |
-| **Changeset present** | Run `npx changeset add` if you changed files in `packages/squad-sdk/src/` or `packages/squad-cli/src/` |
+| **Changeset present** | Run `npx changeset add` if you changed `packages/squad-(sdk|cli)/src/` or governed template/scaffolding paths (`packages/squad-(sdk|cli)/templates/`, `.squad-templates/`, top-level `templates/`, `.squad/agents/*/charter.md`) |
 | **No merge conflicts** | Resolve any conflicts with the target branch |
 | **CI passing** | All CI checks (build, test, lint) must be green |
 
@@ -231,6 +231,16 @@ Squad follows strict TypeScript conventions:
 - **Error handling:** Structured errors with `fatal()`, `error()`, `warn()`, `info()`
 - **No hype in docs** — factual, substantiated claims only (tone ceiling)
 
+## Scoped Changes & Diff Hygiene
+
+Keep every change as small and focused as the task requires. Incidental formatting changes make a small edit look like a whole-file rewrite — every line shows as a delta, which makes review hard and can hide the real change.
+
+- **Keep changes scoped:** only touch the lines relevant to your change.
+- **Don't reformat unrelated content:** do not re-indent, reorder, or refactor code or markdown that is unrelated to your change.
+- **Preserve existing line endings:** if a file is committed with CRLF, keep CRLF. On Windows, be aware that `core.autocrlf=true` can silently rewrite a file's line endings on commit — stage such files with `core.autocrlf=false`, or add a `.gitattributes` rule pinning the file's `eol`.
+- **Separate genuine reformats:** if a file genuinely needs reformatting, do it in a dedicated PR so it can be reviewed independently of functional changes.
+- **Sanity-check the diff before pushing:** run `git diff --stat` / `git diff --numstat`. If a small change shows a whole-file delta, investigate (usually whitespace or line endings) before committing.
+
 ## Documentation
 
 - **README.md** — User-facing guide, quick start, architecture overview
@@ -242,7 +252,7 @@ All docs in v1 are **internal only**. No public docs site until v2.
 
 ## Local Development Versioning
 
-When developing Squad locally, set the package version to `{next-version}-preview`. For example, if the last published version is `0.8.5.1`, the local dev version should be `0.8.6-preview`.
+When developing Squad locally, set the package version to `{next-version}-preview` (e.g. `0.8.6-preview`) or a numbered iteration like `0.8.6-preview.N`. The `insider` dist-tag uses `X.Y.Z-insider.N` versions. All three patterns are accepted by the CI Prerelease Version Guard.
 
 This convention makes `squad version` show the preview tag locally, clearly indicating you're running unreleased source code, not the published npm package. The release agent will bump this to the final version at publish time, then immediately back to the next preview version for continued development.
 
@@ -267,7 +277,7 @@ npm unlink -w packages/squad-cli
 
 Squad uses [@changesets/cli](https://github.com/changesets/changesets) for independent package versioning.
 
-**When your PR changes SDK or CLI source files** (`packages/squad-sdk/src/` or `packages/squad-cli/src/`), add a changeset file instead of editing `CHANGELOG.md` directly. Changesets prevent merge conflicts when multiple PRs are open simultaneously and are the preferred workflow.
+**When your PR changes SDK or CLI source files** (`packages/squad-sdk/src/` or `packages/squad-cli/src/`) **or governed template/scaffolding paths** (`packages/squad-(sdk|cli)/templates/`, `.squad-templates/`, top-level `templates/`, or `.squad/agents/*/charter.md`), add a changeset file instead of editing `CHANGELOG.md` directly. Changesets prevent merge conflicts when multiple PRs are open simultaneously and are the preferred workflow.
 
 ### Adding a Changeset
 
@@ -311,7 +321,7 @@ Add streaming support to agent orchestration. Update CLI to display stream progr
 
 ### CI Changelog Gate
 
-The `changelog-gate` CI check enforces that PRs touching SDK/CLI source files include either:
+The `changelog-gate` CI check enforces that PRs touching SDK/CLI source files — or governed template/scaffolding paths (`packages/squad-(sdk|cli)/templates/`, `.squad-templates/`, top-level `templates/`, `.squad/agents/*/charter.md`) — include either:
 - A `.changeset/*.md` file (preferred), **or**
 - A direct `CHANGELOG.md` edit (backward-compatible)
 
@@ -336,9 +346,11 @@ You don't need to manually version — changesets handle it.
 ## Branch Strategy
 
 - **main** — Stable, published releases. All merges include changesets.
-- **insider** — Pre-release features, edge cases. Tag releases as `@insider`.
+- **preview** — Staging branch for release candidates (promote: dev → preview → main).
 - **bradygaster/dev** — Integration branch. **All PRs from forks must target this branch**, not `main`.
 - **user/issue-slug** — Feature branches from users or agents.
+
+> **Note:** The `insider` npm tag (`@bradygaster/squad-cli@insider`) publishes from `dev` via manual workflow dispatch. There is no separate insider branch.
 
 ## Continuous Integration
 
@@ -351,6 +363,39 @@ GitHub Actions runs on every push:
 5. **Diff Size Guard:** Warns when a single-commit PR touches 30+ files (likely branch contamination from staging all files at once on a stale branch). Always use explicit `git add <file>` instead.
 
 All checks must pass before merge.
+
+## Testing Template Changes (End-to-End)
+
+Changes to coordinator and agent templates (`.squad-templates/squad.agent.md`, `scribe-charter.md`, etc.) can't be validated by unit tests alone — they're prompts interpreted by an LLM at runtime. For these changes, run real squad sessions against your locally-built CLI.
+
+### Quick version
+
+```bash
+# 1. Build and link your branch
+npm run build && cd packages/squad-cli && npm link && cd ../..
+
+# 2. Create a disposable test repo
+mkdir /tmp/sq-test && cd /tmp/sq-test
+git init && echo "# Test" > README.md && git add -A && git commit -m "init"
+
+# 3. Init a squad with your modified templates
+squad init
+
+# 4. Run a session and verify behavior
+copilot -p "Picard, decide on a testing framework." 2>&1 | tee session.log
+```
+
+### Full guide
+
+See `.squad-templates/skills/e2e-template-testing/SKILL.md` for the complete workflow: test matrix, evidence collection, verdict format, and anti-patterns.
+
+### When is this needed?
+
+- Any change to `.squad-templates/*.md` files
+- Changes to init scaffolding that writes templates to target repos
+- Changes to conditional template blocks (e.g. state-backend-aware prompts)
+
+Unit tests (`npm test`) still run for logic changes — E2E template testing is an **additional** step, not a replacement.
 
 ## Common Tasks
 

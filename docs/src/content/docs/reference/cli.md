@@ -28,6 +28,7 @@ squad init
 |---------|-------------|:------------------:|
 | `squad` | **Deprecated** — Enter interactive shell (no args). Use `copilot --agent squad` instead. | No |
 | `squad init` | Initialize Squad in the current repo (idempotent — safe to run multiple times) | No |
+| `squad init --state-backend <type>` | Initialize with a specific state backend (`local`, `orphan`, `two-layer`) | No |
 | `squad init --global` | Create a personal squad in your platform-specific directory | No |
 | `squad init --mode remote <path>` | Initialize linked to a remote team root (dual-root mode) | No |
 | `squad link <team-repo-path>` | Link project to a remote team root | Yes |
@@ -38,6 +39,7 @@ squad init
 | `squad status` | Show which squad is active and why | Yes |
 | `squad doctor` | Validate squad setup integrity and diagnose issues (alias: `heartbeat`) | Yes |
 | `squad upgrade` | Upgrade Squad-owned files to latest version | Yes |
+| `squad upgrade --state-backend <type>` | Migrate state backend (`orphan`, `two-layer`); installs git hooks automatically | Yes |
 | `squad upgrade --migrate-directory` | Rename legacy `.ai-team/` directory to `.squad/` | Yes |
 | `squad triage` | Auto-triage issues and assign to team (primary name; `watch` is an alias) | Yes |
 | `squad triage --interval <min>` | Continuous triage (default: every 10 min) | Yes |
@@ -197,6 +199,8 @@ Each cycle, you will:
 
 Keep cycles to 20 minutes max.
 ```
+
+**MCP auto-injection:** When using the default Copilot agent, `squad loop` automatically injects `--yolo --additional-mcp-config @.mcp.json` into every Copilot invocation. See [Copilot CLI MCP Trust Gate](../features/copilot-mcp-trust.md).
 
 For complete documentation and examples, see [Loop — Prompt-driven work loop](../features/loop.md).
 
@@ -402,7 +406,7 @@ The doctor always exits cleanly (no error code) because it's a diagnostic tool, 
 squad --version                              # Check version
 npm install -g @bradygaster/squad-cli@latest # Update
 npm install -g @bradygaster/squad-cli@1.2.3  # Pin version
-npm install -g @bradygaster/squad-cli@insider # Insider builds
+npm install -g @bradygaster/squad-cli@insider # Dev-channel prerelease builds
 ```
 
 ---

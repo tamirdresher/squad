@@ -15,9 +15,89 @@
 import path from 'node:path';
 import os from 'node:os';
 import crypto from 'node:crypto';
+import { execFileSync } from 'node:child_process';
 import { FSStorageProvider } from './storage/fs-storage-provider.js';
+import { resolveStateBackend, StateBackendStorageAdapter, type StateBackend, type StateBackendType } from './state-backend.js';
+import type { StorageProvider } from './storage/storage-provider.js';
 
 const storage = new FSStorageProvider();
+
+// ============================================================================
+// Resolution cache (perf: memoize repeated FS walks)
+// ============================================================================
+//
+// Why caching is needed:
+//   resolveSquad() and findSquadDir() walk from `startDir` toward `/`,
+//   doing 2–3 syscalls per directory level. They are called from many CLI
+//   entry points and from the Ralph daemon's watch loop, often several
+//   times per command — repeating the same walk each time.
+//
+// Why TTL + explicit invalidation:
+//   Results CAN change during a single process: `squad init` creates
+//   `.squad/`, tests scaffold and tear down temp directories, and a
+//   long-running daemon may observe directory changes between ticks.
+//   A short TTL (5 s) makes the cache self-correcting in the worst case;
+//   `clearResolveSquadCache()` provides immediate invalidation for any
+//   command or test that mutates the `.squad/` layout.
+//
+// Escape hatch:
+//   Set `SQUAD_NO_RESOLVE_CACHE=1` to disable both caches. Tests that
+//   exhaustively exercise the walk algorithm should set this so cached
+//   results from a previous test do not contaminate the next.
+//
+// Cache key: absolute path of `startDir` (after `path.resolve()`).
+
+interface CacheEntry<T> {
+  value: T;
+  ts: number;
+}
+
+const RESOLVE_CACHE_TTL_MS = 5_000;
+const resolveSquadCache = new Map<string, CacheEntry<string | null>>();
+type FindSquadDirResult = { dir: string; name: '.squad' | '.ai-team' } | null;
+const findSquadDirCache = new Map<string, CacheEntry<FindSquadDirResult>>();
+
+function isResolveCacheDisabled(): boolean {
+  return process.env['SQUAD_NO_RESOLVE_CACHE'] === '1';
+}
+
+function readCache<T>(cache: Map<string, CacheEntry<T>>, key: string): T | undefined {
+  if (isResolveCacheDisabled()) return undefined;
+  const hit = cache.get(key);
+  if (!hit) return undefined;
+  if (Date.now() - hit.ts > RESOLVE_CACHE_TTL_MS) {
+    cache.delete(key);
+    return undefined;
+  }
+  return hit.value;
+}
+
+function writeCache<T>(cache: Map<string, CacheEntry<T>>, key: string, value: T): void {
+  if (isResolveCacheDisabled()) return;
+  cache.set(key, { value, ts: Date.now() });
+}
+
+/**
+ * Clear all in-process caches used by `resolveSquad()` and `findSquadDir()`.
+ *
+ * Call this from any command or test that creates, moves, or deletes a
+ * `.squad/` (or `.ai-team/`) directory so subsequent resolution calls in
+ * the same process observe the fresh filesystem state immediately,
+ * instead of waiting up to {@link RESOLVE_CACHE_TTL_MS} ms for the TTL
+ * to expire.
+ *
+ * Examples of callers that should invoke this:
+ *   - `squad init` — creates `.squad/` in the project root
+ *   - `squad link` — points an existing checkout at a remote team root
+ *   - `squad upgrade` — may regenerate `.squad/` layout
+ *   - Test fixtures that scaffold or tear down temporary `.squad/` dirs
+ *
+ * Safe to call when the cache is disabled (no-op).
+ */
+export function clearResolveSquadCache(): void {
+  resolveSquadCache.clear();
+  findSquadDirCache.clear();
+}
 
 // ============================================================================
 // Dual-root path resolution types (Issue #311)
@@ -37,7 +117,7 @@ export interface SquadDirConfig {
   extractionDisabled?: boolean;
   /** Where state is stored: 'external' when moved out of the working tree */
   stateLocation?: string;
-  /** State storage backend: worktree | external | git-notes | orphan */
+  /** State storage backend: local | external | git-notes | orphan */
   stateBackend?: string;
 }
 
@@ -109,7 +189,17 @@ function getMainWorktreePath(worktreeDir: string, gitFilePath: string): string |
  * @returns Absolute path to `.squad/` or `null`.
  */
 export function resolveSquad(startDir?: string): string | null {
-  let current = path.resolve(startDir ?? process.cwd());
+  const cacheKey = path.resolve(startDir ?? process.cwd());
+  const cached = readCache(resolveSquadCache, cacheKey);
+  if (cached !== undefined) return cached;
+
+  const result = resolveSquadUncached(cacheKey);
+  writeCache(resolveSquadCache, cacheKey, result);
+  return result;
+}
+
+function resolveSquadUncached(startDir: string): string | null {
+  let current = startDir;
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -165,7 +255,17 @@ const SQUAD_DIR_NAMES = ['.squad', '.ai-team'] as const;
  * Returns the absolute path and the directory name used.
  */
 function findSquadDir(startDir: string): { dir: string; name: '.squad' | '.ai-team' } | null {
-  let current = path.resolve(startDir);
+  const cacheKey = path.resolve(startDir);
+  const cached = readCache(findSquadDirCache, cacheKey);
+  if (cached !== undefined) return cached;
+
+  const result = findSquadDirUncached(cacheKey);
+  writeCache(findSquadDirCache, cacheKey, result);
+  return result;
+}
+
+function findSquadDirUncached(startDir: string): { dir: string; name: '.squad' | '.ai-team' } | null {
+  let current = startDir;
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -598,4 +698,150 @@ export function resolveExternalStateDir(projectKey: string, create: boolean = tr
   }
 
   return projectsDir;
+}
+
+// ============================================================================
+// SQUAD_HOME — roaming squad root (Issue #1038)
+// ============================================================================
+
+/**
+ * Resolve the squad home directory — a roaming squad root for personal agents
+ * and presets that follows the user across machines.
+ *
+ * Resolution order:
+ * 1. `SQUAD_HOME` env var (explicit override, e.g. a synced folder)
+ * 2. `~/.squad/` (conventional default — user's home dir)
+ *
+ * Unlike `resolveGlobalSquadPath()` (which returns platform-specific app config),
+ * squad home is a **squad root** — it can contain `agents/`, `presets/`, etc.
+ *
+ * @param create - Whether to create the directory if missing (default: false).
+ * @returns Absolute path to the squad home directory, or null if it doesn't
+ *          exist and `create` is false.
+ */
+export function resolveSquadHome(create: boolean = false): string | null {
+  const envHome = process.env['SQUAD_HOME'];
+  const homeDir = envHome
+    ? path.resolve(envHome)
+    : path.join(os.homedir(), '.squad');
+
+  if (storage.existsSync(homeDir)) {
+    if (!storage.isDirectorySync(homeDir)) {
+      throw new Error(`SQUAD_HOME path exists but is not a directory: ${homeDir}`);
+    }
+    return homeDir;
+  }
+
+  if (create) {
+    storage.mkdirSync(homeDir, { recursive: true });
+    return homeDir;
+  }
+
+  return null;
+}
+
+/**
+ * Ensure the squad home directory exists with standard structure.
+ * Creates `agents/` and `presets/` subdirectories.
+ *
+ * Idempotent — safe to call multiple times.
+ *
+ * @returns Absolute path to the squad home directory.
+ */
+export function ensureSquadHome(): string {
+  const homeDir = resolveSquadHome(true)!;
+
+  const agentsDir = path.join(homeDir, 'agents');
+  if (!storage.existsSync(agentsDir)) {
+    storage.mkdirSync(agentsDir, { recursive: true });
+  }
+
+  const presetsDir = path.join(homeDir, 'presets');
+  if (!storage.existsSync(presetsDir)) {
+    storage.mkdirSync(presetsDir, { recursive: true });
+  }
+
+  return homeDir;
+}
+
+/**
+ * Resolve the presets directory within squad home.
+ *
+ * @returns Absolute path to `<squad-home>/presets/`, or null if squad home
+ *          doesn't exist.
+ */
+export function resolvePresetsDir(): string | null {
+  const homeDir = resolveSquadHome();
+  if (!homeDir) return null;
+
+  const presetsDir = path.join(homeDir, 'presets');
+  if (!storage.existsSync(presetsDir) || !storage.isDirectorySync(presetsDir)) return null;
+
+  return presetsDir;
+}
+
+// ============================================================================
+// State backend resolution (Issue #1003)
+// ============================================================================
+
+/**
+ * Resolved state context for a squad session.
+ *
+ * Combines the resolved paths with the active state backend. Commands
+ * and SDK functions that need state I/O use this context instead of
+ * directly instantiating an FSStorageProvider.
+ *
+ * **Boundary:** Only mutable squad state flows through the backend.
+ * Bootstrap artifacts (config.json, team.md structure checks) stay on
+ * the local filesystem because they are needed before a backend can be
+ * resolved.
+ */
+export interface SquadStateContext {
+  /** Dual-root resolved paths (projectDir, teamDir, etc.) */
+  paths: ResolvedSquadPaths;
+  /** The active state backend (local, git-notes, or orphan) */
+  backend: StateBackend;
+  /** The repo root directory (for git-native backends) */
+  repoRoot: string;
+  /** StorageProvider backed by the active state backend — pass to SDK modules */
+  storage: StorageProvider;
+}
+
+/**
+ * Resolve the full squad state context: paths + state backend.
+ *
+ * Call once at command entry and thread the context through to SDK functions.
+ * This ensures the configured state backend (local, git-notes, orphan)
+ * applies to all squad operations — not just the watch command.
+ *
+ * @param startDir - Directory to start searching from. Defaults to cwd.
+ * @param cliOverride - CLI flag override for state backend type.
+ * @returns Resolved context, or null if no squad directory is found.
+ */
+export function resolveSquadState(startDir?: string, cliOverride?: StateBackendType): SquadStateContext | null {
+  const paths = resolveSquadPaths(startDir);
+  if (!paths) return null;
+
+  // Resolve actual repo root via git — handles linked worktrees correctly
+  const effectiveStart = startDir ?? process.cwd();
+  let repoRoot: string;
+  try {
+    repoRoot = execFileSync('git', ['rev-parse', '--show-toplevel'], {
+      cwd: effectiveStart, encoding: 'utf-8', stdio: ['pipe', 'pipe', 'pipe'],
+    }).trim();
+  } catch {
+    // Fallback: derive from .squad/ parent if git is unavailable
+    repoRoot = path.resolve(paths.projectDir, '..');
+  }
+
+  // Resolve the backend from config + CLI override
+  const backend = resolveStateBackend(paths.projectDir, repoRoot, cliOverride);
+
+  // For local backend, use FSStorageProvider directly (more capable).
+  // For git-notes/orphan, bridge via StateBackendStorageAdapter.
+  const stateStorage: StorageProvider = backend.name === 'local'
+    ? new FSStorageProvider()
+    : new StateBackendStorageAdapter(backend, paths.projectDir);
+
+  return { paths, backend, repoRoot, storage: stateStorage };
 }

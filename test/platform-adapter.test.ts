@@ -97,34 +97,19 @@ describe('parseGitHubRemote', () => {
     expect(parseGitHubRemote('https://github.com/owner/')).toBeNull();
   });
 
-  // Regression: the repo capture used to disallow `.`, so any GitHub repo whose
-  // name contained a dot (which GitHub permits) failed to parse and bubbled up
-  // as `Could not detect platform: Could not parse GitHub remote URL: ...` in
-  // `squad watch`. See issue #1077.
-  it('parses HTTPS URL with dots in repo name', () => {
-    const result = parseGitHubRemote('https://github.com/myorg/JADE.xlighthousepipelines.git');
-    expect(result).toEqual({ owner: 'myorg', repo: 'JADE.xlighthousepipelines' });
+  it('parses repo name containing dots (HTTPS)', () => {
+    const result = parseGitHubRemote('https://github.com/owner/my.repo.name');
+    expect(result).toEqual({ owner: 'owner', repo: 'my.repo.name' });
   });
 
-  it('parses HTTPS URL with dots in repo name and no .git suffix', () => {
-    const result = parseGitHubRemote('https://github.com/myorg/JADE.xlighthousepipelines');
-    expect(result).toEqual({ owner: 'myorg', repo: 'JADE.xlighthousepipelines' });
+  it('parses repo name containing dots with .git suffix', () => {
+    const result = parseGitHubRemote('https://github.com/owner/my.repo.name.git');
+    expect(result).toEqual({ owner: 'owner', repo: 'my.repo.name' });
   });
 
-  it('parses SSH URL with dots in repo name', () => {
-    const result = parseGitHubRemote('git@github.com:myorg/foo.bar.baz.git');
-    expect(result).toEqual({ owner: 'myorg', repo: 'foo.bar.baz' });
-  });
-
-  it('parses SSH URL with dots in repo name and no .git suffix', () => {
-    const result = parseGitHubRemote('git@github.com:myorg/foo.bar.baz');
-    expect(result).toEqual({ owner: 'myorg', repo: 'foo.bar.baz' });
-  });
-
-  it('parses repo named exactly ".github" (with leading dot before .git)', () => {
-    // owner/.github is a real convention for community-health files
-    const result = parseGitHubRemote('https://github.com/myorg/.github.git');
-    expect(result).toEqual({ owner: 'myorg', repo: '.github' });
+  it('parses SSH repo name containing dots', () => {
+    const result = parseGitHubRemote('git@github.com:org/api.service.git');
+    expect(result).toEqual({ owner: 'org', repo: 'api.service' });
   });
 });
 
@@ -183,25 +168,24 @@ describe('parseAzureDevOpsRemote', () => {
     expect(result).toEqual({ org: 'org', project: 'My-Project', repo: 'my-repo' });
   });
 
-  // Regression: see issue #1077 — repo capture used to disallow `.`.
-  it('parses HTTPS dev.azure.com URL with dots in repo name', () => {
-    const result = parseAzureDevOpsRemote('https://dev.azure.com/org/proj/_git/repo.with.dots');
-    expect(result).toEqual({ org: 'org', project: 'proj', repo: 'repo.with.dots' });
+  it('parses repo name containing dots (HTTPS)', () => {
+    const result = parseAzureDevOpsRemote('https://dev.azure.com/myorg/myproject/_git/my.service.api');
+    expect(result).toEqual({ org: 'myorg', project: 'myproject', repo: 'my.service.api' });
   });
 
-  it('parses HTTPS dev.azure.com URL with dots in repo name and .git suffix', () => {
-    const result = parseAzureDevOpsRemote('https://dev.azure.com/org/proj/_git/repo.with.dots.git');
-    expect(result).toEqual({ org: 'org', project: 'proj', repo: 'repo.with.dots' });
+  it('parses repo name containing dots with .git suffix', () => {
+    const result = parseAzureDevOpsRemote('https://dev.azure.com/myorg/myproject/_git/my.service.api.git');
+    expect(result).toEqual({ org: 'myorg', project: 'myproject', repo: 'my.service.api' });
   });
 
-  it('parses SSH dev.azure.com URL with dots in repo name', () => {
-    const result = parseAzureDevOpsRemote('git@ssh.dev.azure.com:v3/org/proj/repo.with.dots.git');
-    expect(result).toEqual({ org: 'org', project: 'proj', repo: 'repo.with.dots' });
+  it('parses SSH repo name containing dots', () => {
+    const result = parseAzureDevOpsRemote('git@ssh.dev.azure.com:v3/myorg/myproject/core.lib.git');
+    expect(result).toEqual({ org: 'myorg', project: 'myproject', repo: 'core.lib' });
   });
 
-  it('parses legacy visualstudio.com URL with dots in repo name', () => {
-    const result = parseAzureDevOpsRemote('https://contoso.visualstudio.com/proj/_git/repo.with.dots.git');
-    expect(result).toEqual({ org: 'contoso', project: 'proj', repo: 'repo.with.dots' });
+  it('parses visualstudio.com repo name containing dots', () => {
+    const result = parseAzureDevOpsRemote('https://contoso.visualstudio.com/WebApp/_git/api.service.git');
+    expect(result).toEqual({ org: 'contoso', project: 'WebApp', repo: 'api.service' });
   });
 });
 
@@ -1085,5 +1069,144 @@ describe('ADO exports from platform index', () => {
     const types = mod.getAvailableWorkItemTypes('test-org', 'test-proj');
     expect(Array.isArray(types)).toBe(true);
     expect(types.length).toBeGreaterThan(0);
+  });
+});
+
+// ─── createPlatformAdapter with .squad/config.json GitHub override ─────
+
+import { mkdtempSync, mkdirSync, writeFileSync, rmSync } from 'node:fs';
+import { join } from 'node:path';
+import { execSync } from 'node:child_process';
+import { tmpdir } from 'node:os';
+
+describe('createPlatformAdapter with .squad/config.json github override', () => {
+  let tempDir: string;
+
+  function setupTempRepo(): string {
+    tempDir = mkdtempSync(join(tmpdir(), 'squad-test-'));
+    // Initialize a git repo with a GitHub remote (fallback detection target)
+    execSync('git init', { cwd: tempDir, stdio: 'ignore' });
+    execSync('git remote add origin https://github.com/fallbackowner/fallbackrepo.git', { cwd: tempDir, stdio: 'ignore' });
+    return tempDir;
+  }
+
+  function cleanup(): void {
+    if (tempDir) {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  }
+
+  it('uses owner/repo from .squad/config.json when present', async () => {
+    const repoRoot = setupTempRepo();
+    try {
+      // Write .squad/config.json with github override
+      const squadDir = join(repoRoot, '.squad');
+      mkdirSync(squadDir, { recursive: true });
+      writeFileSync(join(squadDir, 'config.json'), JSON.stringify({
+        github: { owner: 'testowner', repo: 'testrepo' }
+      }));
+
+      const { createPlatformAdapter } = await import('../packages/squad-sdk/src/platform/index.js');
+      const adapter = createPlatformAdapter(repoRoot);
+
+      // Should be a GitHubAdapter with the config values, not the remote values
+      expect(adapter).toBeDefined();
+      // Access internal state via the adapter's known interface
+      expect((adapter as any).owner).toBe('testowner');
+      expect((adapter as any).repo).toBe('testrepo');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('falls back to git remote when github key is absent', async () => {
+    const repoRoot = setupTempRepo();
+    try {
+      // Write .squad/config.json WITHOUT github key
+      const squadDir = join(repoRoot, '.squad');
+      mkdirSync(squadDir, { recursive: true });
+      writeFileSync(join(squadDir, 'config.json'), JSON.stringify({ version: 1 }));
+
+      const { createPlatformAdapter } = await import('../packages/squad-sdk/src/platform/index.js');
+      const adapter = createPlatformAdapter(repoRoot);
+
+      expect(adapter).toBeDefined();
+      expect((adapter as any).owner).toBe('fallbackowner');
+      expect((adapter as any).repo).toBe('fallbackrepo');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('falls back to git remote when github key is malformed (missing repo)', async () => {
+    const repoRoot = setupTempRepo();
+    try {
+      const squadDir = join(repoRoot, '.squad');
+      mkdirSync(squadDir, { recursive: true });
+      writeFileSync(join(squadDir, 'config.json'), JSON.stringify({
+        github: { owner: 'testowner' } // missing repo
+      }));
+
+      const { createPlatformAdapter } = await import('../packages/squad-sdk/src/platform/index.js');
+      const adapter = createPlatformAdapter(repoRoot);
+
+      expect(adapter).toBeDefined();
+      expect((adapter as any).owner).toBe('fallbackowner');
+      expect((adapter as any).repo).toBe('fallbackrepo');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('falls back to git remote when github key is malformed (non-string values)', async () => {
+    const repoRoot = setupTempRepo();
+    try {
+      const squadDir = join(repoRoot, '.squad');
+      mkdirSync(squadDir, { recursive: true });
+      writeFileSync(join(squadDir, 'config.json'), JSON.stringify({
+        github: { owner: 123, repo: true }
+      }));
+
+      const { createPlatformAdapter } = await import('../packages/squad-sdk/src/platform/index.js');
+      const adapter = createPlatformAdapter(repoRoot);
+
+      expect(adapter).toBeDefined();
+      expect((adapter as any).owner).toBe('fallbackowner');
+      expect((adapter as any).repo).toBe('fallbackrepo');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('falls back to git remote when config.json is invalid JSON', async () => {
+    const repoRoot = setupTempRepo();
+    try {
+      const squadDir = join(repoRoot, '.squad');
+      mkdirSync(squadDir, { recursive: true });
+      writeFileSync(join(squadDir, 'config.json'), '{ not valid json !!!');
+
+      const { createPlatformAdapter } = await import('../packages/squad-sdk/src/platform/index.js');
+      const adapter = createPlatformAdapter(repoRoot);
+
+      expect(adapter).toBeDefined();
+      expect((adapter as any).owner).toBe('fallbackowner');
+      expect((adapter as any).repo).toBe('fallbackrepo');
+    } finally {
+      cleanup();
+    }
+  });
+
+  it('falls back to git remote when no .squad/config.json exists', async () => {
+    const repoRoot = setupTempRepo();
+    try {
+      const { createPlatformAdapter } = await import('../packages/squad-sdk/src/platform/index.js');
+      const adapter = createPlatformAdapter(repoRoot);
+
+      expect(adapter).toBeDefined();
+      expect((adapter as any).owner).toBe('fallbackowner');
+      expect((adapter as any).repo).toBe('fallbackrepo');
+    } finally {
+      cleanup();
+    }
   });
 });

@@ -5,6 +5,9 @@ dist/
 coverage/
 .vscode/
 *.log
+
+# npm pack output / pre-built tarballs (publish via release artifacts, not git)
+packages/**/*.tgz
 # Squad: ignore runtime state (logs, inbox, sessions)
 .squad/orchestration-log/
 .squad/log/
@@ -24,6 +27,13 @@ docs/tests/screenshots/
 .squad-workstream
 .squad/.first-run
 .squad/.watch-pids
+.squad/.cache/
 
 # Images folder (root only — don't ignore docs/public/images/)
 /images/
+# Squad: ignore runtime state (logs, inbox, sessions)
+.squad/.scratch/
+
+# Squad: PR-1200 picard local artifacts (do not commit)
+.pr-body-new.md
+.followup-issue-body.md
