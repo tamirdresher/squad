@@ -48,3 +48,5 @@ artifacts/
 *.user
 *.userprefs
 
+# NOTE: .squad/casting/* is AUTHORITATIVE IDENTITY and MUST be committed to main.
+# Do not add .squad/casting/ to this ignore list.
