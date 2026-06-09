@@ -445,3 +445,223 @@ PR bradygaster/squad#1207 (Squad.Agents.AI NuGet) fully addressed: (1) rebased f
 - **Auth state:** Currently on tamirdresher_microsoft (EMU)
 - **Backlog:** Iter-7 re-smoke with tighter deterministic prompt; upstream iteration planning
 - **Blockers:** None for Squad.Agents.AI PR #1207 (upstream-ready)
+
+# Data — Agent History
+**Last Updated:** 2026-06-09T08:57:33+03:00
+**Archive:** See `history-summary.md` for consolidated learnings from all prior rounds.
+
+## Round 8 — PR #1207 Round 2: DelegatingAIAgent + MAF ctor (2026-06-09)
+
+**Task:** Address westey-m's 2 MAF-team review comments on Squad.Agents.AI PR #1207. Add .slnx. Build/test/push.
+
+**Learnings:**
+
+- **DelegatingAIAgent base class eliminates ~70 lines of manual override boilerplate.** `CreateSessionCoreAsync`, `RunCoreAsync`, `RunCoreStreamingAsync`, `SerializeSessionCoreAsync`, `DeserializeSessionCoreAsync` — all provided as pass-throughs by `Microsoft.Agents.AI.DelegatingAIAgent`. When wrapping any external `AIAgent` implementation, always extend `DelegatingAIAgent` first.
+- **Chain-ctor constraint: `base()` needs the inner agent before it runs.** Since `DelegatingAIAgent`'s ctor takes `innerAgent` non-null, you cannot build it in the instance body. Solution: private `record struct` state-bag + static factory methods (`BuildState`/`BuildStateInternal`) that run before the `: base(state.Inner)` chain call. This is cleaner than a static field or a `Lazy<T>`.
+- **MAF ctor pattern: required settings on the constructor, optional in options.** `(string requiredParam, OptionsClass? options = null, ILoggerFactory? loggerFactory = null)`. `loggerFactory` is an exception to the "optional in options" rule — it stays on the ctor because it is typically injected via DI. The ctor param overwrites the same-named property in options to give one source of truth.
+- **`protected` members on base types need `typeof(BaseType).GetProperty(...)` in reflection-based tests.** `Type.GetProperty()` with `BindingFlags.NonPublic` does NOT climb the inheritance chain for non-public members — only the declaring type is searched. To access `protected AIAgent InnerAgent { get; }` declared on `DelegatingAIAgent` from a test that holds a `SquadAgent`, use `typeof(DelegatingAIAgent).GetProperty("InnerAgent", BindingFlags.Instance | BindingFlags.NonPublic)`.
+- **`.slnx` (modern XML solution format) is fully supported by dotnet SDK 10.** `dotnet sln <file>.slnx list` and `dotnet build <file>.slnx` work out of the box on SDK 10.0.204. Use `<Solution><Folder Name="/src/"><Project Path="..." /></Folder></Solution>` for the canonical XML structure.
+- **DI factory behavioral change from ActivatorUtilities to explicit ctor call.** Replacing `ActivatorUtilities.CreateInstance<SquadAgent>(sp, options)` with `new SquadAgent(folderPath, options, loggerFactory)` shifts the "missing SquadFolderPath" detection from runtime (null propagation) to ctor time (ArgumentException.ThrowIfNullOrWhiteSpace). Tests that relied on constructing an agent with no SquadFolderPath must be updated to expect `InvalidOperationException` from the DI factory or `ArgumentException` from direct construction.
+
+---
+
+## Round 6 — PR #1195 Review (2026-06-06)
+
+**Task:** Review bradygaster/squad PR #1195 — expand changelog gate to template/scaffolding paths
+
+**Learnings:**
+
+- `templates/` in the Squad repo is **not** a pure mirror of `.squad-templates/`. `sync-templates.mjs` copies FROM `.squad-templates/` TO `templates/` (and two package dirs) but never deletes. As of 2026-06-06, `templates/` has 4 extra files not in `.squad-templates/`: `ghost-protocol.md`, `loop.md`, `personal-charter.md`, `skills/rework-rate/SKILL.md`. The PR's comment calling it a "full canonical mirror" is factually wrong.
+- The `changelog-gate` job in `squad-ci.yml` (pre-PR, line 222) only matched `^packages/squad-(sdk|cli)/src/`. Issue #1156 proved this let multi-thousand-line template PRs through without changesets. PR #1195 widens it to also cover `packages/(sdk|cli)/templates/`, `.squad-templates/`, and `templates/`.
+- PR #1195 does NOT cover `.squad/agents/*/charter.md` — which issue #1156 explicitly called out as a missing path.
+- The `skip-changelog` escape hatch label is wired at policy-gates step line 205 (`steps.labels.outputs.skip_changelog != 'true'`). It remains intact after this PR.
+- `CONTRIBUTING.md` lines 190 and 217 document the gate's scope as only `packages/squad-sdk/src/` / `packages/squad-cli/src/`. After PR #1195 merges, those lines are stale and need updating.
+- The project precedent for CI changelog-gate fixes is to include a `@bradygaster/squad-cli: patch` changeset (see existing `.changeset/fix-changelog-gate.md`). PR #1195 follows this pattern.
+- The test technique of reading the regex directly from the workflow YAML file (`fs.readFileSync` on `squad-ci.yml`) is the correct single-source-of-truth approach for CI gate tests.
+
+---
+
+## Round 7 — Issue #600 Re-evaluation: Two-Layer Backend as Hot/Cold (2026-06-06)
+
+**Task:** Re-evaluate bradygaster/squad #600 ("Tiered agent memory") accounting for Tamir's two-layer backend (PR #1200).
+
+**Learnings:**
+
+- **Two-layer backend = hot/cold at the RETENTION layer, not the LOADING layer.** Git notes (hot) are commit-scoped, ephemeral, volatile — they vanish when a PR is rejected and never appear in diffs. OrphanBranch (cold/permanent) is repo-scoped and durable. `promote_to_permanent: true` = explicit hot→cold promotion. `archive_on_close: true` = relevance-based cold retention. Ralph automates promotion on PR merge. This is a correct and complete hot/cold RETENTION model — exactly what #600 specifies at the state tier.
+- **Critical gap: retention ≠ loading.** Issue #600 requires both retention semantics (done) AND conditional spawn-time context loading (not done). `TwoLayerBackend.read()` (`state-backend.ts:491`) always reads from orphan only — the hot tier (notes) is write-annotate-only, never read back into spawn context. `agent-source.ts:193-194` reads full `history.md` unconditionally via `storage.read()`. Spawn template (`spawn-reference.md:80`) says "Read `agents/{name}/history.md`" with no tier selection.
+- **The SKILL.md spec is complete but runtime is entirely unwired.** `tiered-memory/SKILL.md` defines the 3-tier model, `--include-cold` / `--include-wiki` flags, and spawn template pattern. All implementation checklist items are ☐ unchecked. `.squad/memory/hot/`, `.squad/memory/cold/`, `.squad/memory/wiki/` paths do not exist in the repo. `spawn.ts:buildAgentPrompt()` has no cold/wiki flag processing.
+- **Wiki tier is structurally separate from the two-layer backend.** OrphanBranch can store wiki entries (it's general key-value), but no wiki-specific schema or gating exists. Awaits issue #640 (StorageProvider wiki gating).
+- **Issue-tag retention is partially covered.** `archive_on_close` preserves research notes even on PR rejection. But "keep in hot until issue closes" requires querying the issue tracker API + cross-referencing commits — not implemented.
+- **Seven's error was conflating retention with loading.** The hot/cold metaphor applies to both dimensions independently. Backend solves one; runtime must solve the other.
+- **The correct next PR** for #600 is: wire `spawnAgent()` to read notes (hot) by default and add `--include-cold` flag to pull full history.md (orphan/cold) on demand. This is a spawn.ts + spawn-reference.md change, not a backend change.
+
+---
+
+## Round 8 — Issue #600 Source-Code Grounded Inventory (2026-06-06)
+
+**Task:** Produce a source-code-only inventory for issue #600 ("Tiered agent memory"), distinguishing implemented code from markdown-only spec. Responding to kehansama's 4-tier proposal.
+
+**Verified against:** `upstream/dev` HEAD `3eec7de5` (2026-06-06)
+
+### Source-code inventory — exact citations
+
+#### TwoLayerBackend (`packages/squad-sdk/src/state-backend.ts`)
+
+- **Line 922:** `export class TwoLayerBackend implements StateBackend`
+- **Line 934–937:** `read(key)` reads ONLY from `this.orphan.read(key)` — git notes layer is NOT read back. Hot tier is write/annotate-only from the retention perspective.
+- **Lines 939–950:** `write(key, value)` writes to BOTH `this.orphan` (permanent) AND `this.notes` (commit-scoped), with notes failure swallowed as a warning.
+- **Line 985:** `readNote(ref, commitSha)` — reads a single git-notes JSON payload. Exists. NOT called by any spawn path.
+- **Line 1005:** `promoteNotes(ref)` — walks `refs/notes/squad/*`, reads `promote_to_permanent` and `archive_on_close` flags, copies/moves notes to orphan layer. EXISTS and is IMPLEMENTED.
+- **Lines 1040–1042:** `flags?.promote_to_permanent === true` / `flags?.archive_on_close === true` — flag parsing is live code.
+- **Note:** `archive_on_close` is a DATA FLAG on a note payload, NOT code that queries GitHub issue state. The field name implies intent but no code path reads issue state to decide whether to trigger it.
+
+#### Production callers of `promoteNotes`
+
+1. **`packages/squad-cli/src/cli/commands/notes.ts`** — `squad notes promote` CLI command. `runNotesPromote()` calls `backend.promoteNotes(ref)`. Fully wired.
+2. **`packages/squad-cli/src/cli/commands/watch/capabilities/notes-promote.ts`** — `NotesPromoteCapability.execute()` calls `backend.promoteNotes(ref)` in Ralph's `housekeeping` phase, every N rounds. Fully wired.
+
+#### Spawn prompt construction (`packages/squad-cli/src/cli/shell/spawn.ts`)
+
+- **Line 86:** `buildAgentPrompt(charter, options?)` — concatenates `charter` + optional `systemContext`. **No history.md, no cold/warm/wiki layer, no tier logic whatsoever.**
+- **Line 117:** `spawnAgent()` calls `buildAgentPrompt(charter, { systemContext: options.systemContext })`. History is not part of the system prompt.
+- `spawn-reference.md` template says agents "read their own `history.md`" — this is an agent-side convention (tool call the agent makes), NOT code in `spawn.ts`.
+
+#### agent-source.ts (`packages/squad-sdk/src/config/agent-source.ts`)
+
+- **Lines 191–194:** `LocalAgentSource.getAgent()` reads `history.md` via `storage.read()` into `AgentDefinition.history`. This is metadata/registry use, NOT injected into the spawn-time system prompt.
+
+#### MemoryLoadGuidance (`packages/squad-sdk/src/memory/index.ts`)
+
+- **Line 12:** `type MemoryLoadGuidance = 'ALWAYS' | 'ON-DEMAND' | 'ARCHIVE' | 'NEVER'` — enum exists.
+- **Line 542:** `export class LocalMemoryStore` — governance classifier + storage router exists.
+- **NOT wired into spawn.** `spawn.ts` never imports or calls `LocalMemoryStore`. Load guidance types exist but have no caller that selectively loads memory into a spawn prompt.
+
+#### Wiki tier
+
+- **No source code.** Zero `.ts`/`.js` files reference wiki storage paths (`/.squad/memory/wiki/`, `/.squad/wiki/`). `response-tiers.ts` defines `direct|lightweight|standard|full` response complexity tiers — completely unrelated to memory tiers. The only wiki mentions are in `tiered-memory/SKILL.md` (markdown spec).
+
+#### Issue-tag-based retention
+
+- `archive_on_close` flag IS parsed by `promoteNotes()` at `state-backend.ts:1042`. BUT no source code queries GitHub issue state to decide whether to trigger it. No `gh issue view` / issue-status API calls in any retention code path. The flag is caller-supplied convention, not system-enforced.
+
+#### CLI flags (grep result)
+
+- `--include-cold`, `--include-wiki`, `--tier`, `--cold` — zero occurrences in any `.ts`/`.js` source file. These exist only in `tiered-memory/SKILL.md`.
+
+### Conclusions for future rounds
+
+- **Do NOT cite `--include-cold` as a CLI flag** — it is SKILL.md spec only, zero runtime code.
+- **Do NOT say history.md is unconditionally loaded at spawn** — it is not loaded by spawn.ts at all. Agents read it themselves via tool calls.
+- **Do NOT say `TwoLayerBackend.read()` reads from notes** — it reads orphan only. Notes are write/annotate-only from the read path.
+- **`promoteNotes` HAS two production callers:** `notes.ts` and `notes-promote.ts` (Ralph watch capability). Round 4 audit finding of "zero callers" is now stale.
+- **`MemoryLoadGuidance` types exist** (ALWAYS/ON-DEMAND/ARCHIVE/NEVER) but are not wired into spawn context selection. They're used only within `LocalMemoryStore` governance/classification.
+- **Wiki tier is entirely markdown.** No runtime path for wiki storage exists.
+
+---
+
+## Round 5 — P0 SDK Fixes (2026-06-04)
+
+**Status:** COMPLETE — 3 commits, 142/142 tests pass, ship ready
+
+**Commits:**
+- maxBuffer ENOBUFS fix (B1+B2)
+- CAS compare-and-swap implementation (B4)  
+- args tokenization refactor (P1.2)
+
+**Learnings:**
+- Single choke point: all git invocations route through 2 wrappers in state-backend.ts
+- maxBuffer = 256 MB covers all current and future git invocations
+- CAS via update-ref with 5-retry jittered backoff prevents lost updates under contention
+- Windows PowerShell: use `execFileSync` array form to bypass cmd.exe `^` escape interpretation
+
+
+## Round 10 — v0.10.0 Release Execution — ABORTED at precondition (2026-06-07)
+
+**Task:** Execute Phase 2 of v0.10.0 release (Steps 0–9: auth switch → sync fork → fix broken changeset → consume changesets → bump versions → CHANGELOG → build/test → commit → push fork → open PR). STOP before merge.
+
+**Outcome:** ❌ Aborted before Step 0. Zero mutations.
+
+**Why:** Step 6 has a hard precondition — the Phase 1 plan's §4 CHANGELOG block must be present in `.squad/decisions.md`, with an explicit "ABORT (do not improvise the content)" instruction if missing. The `.squad/decisions.md` entry for Data Round 9 contains **only a 6-line summary** (lines 9–15), not the §4 block. The source file `.squad/decisions/inbox/data-v0.9.x-release-plan.md` does not exist anywhere — empty inbox, empty archive, never committed (`git log --all --diff-filter=A` returns nothing for any `data-v0*` path).
+
+**Decision rationale — abort BEFORE Step 0 vs. AT Step 6:**
+
+- Steps 1–5 all mutate state: force-push `upstream/dev` to fork's `dev`, create+publish `release/0.10.0` to fork, delete a line from `.changeset/squad-commands-review-fixes.md`, run `npx changeset version` (drains `.changeset/` + mutates `packages/*/CHANGELOG.md` + `packages/*/package.json`), run `npm version --workspaces --include-workspace-root` (mutates root + 2 workspace `package.json`).
+- If I ran Steps 1–5 then hit Step 6's missing-content abort, the recovery burden is enormous: revert the fork's `release/0.10.0`, restore the deleted changeset line (`"@bradygaster/squad": patch`), reverse `changeset version` (no supported reverse — would have to git-restore individual files), reverse `npm version`. None of this is the kind of clean rollback Rule 3 ("FAIL-STOP. Do not try to recover, do not skip") allows.
+- Aborting before Step 0 = zero mutations, zero recovery burden, zero auth disruption.
+
+**Reusable learnings:**
+
+- **Phase-handoff antipattern: "summary in decisions.md, body in inbox" is fragile.** The Phase 1 plan's full body (especially the verbatim CHANGELOG block) lived in `.squad/decisions/inbox/data-v0.9.x-release-plan.md` and was apparently deleted after the summary was merged. Phase 2 was authored assuming the body would still be readable. **Fix: any artifact a downstream mission MUST consume verbatim should be inlined into `decisions.md` as a fenced block, not just summarized.** The release skill (`.squad/templates/skills/release-process`) should encode this.
+- **Round 9's deliverable was structurally insufficient.** I wrote a great plan, but only the metadata survived the merge. Next time: when writing a "Phase 1 → Phase 2 handoff" decision, the decisions.md entry must contain every payload the Phase 2 agent needs (CHANGELOG body, exact commands, exact regex replacements) — not just findings and pointers.
+- **The "summary at top, full plan in inbox" pattern works for human readers but not for downstream agent missions.** Agents can't follow pointer links to deleted files. Inline the payload.
+- **Decision to abort early ≠ decision to skip steps.** Read carefully: the mission says "abort on first failure" in sequence, but it also says "STOP IMMEDIATELY. Do not try to recover, do not skip." If a downstream precondition is known to be unmet, blocking on the earliest safe checkpoint (before any mutation) is more faithful to the spirit of Rule 3 than mechanically marching through harmless steps to the literal failure point.
+- **Workstation hygiene preserved:** because Step 0 was never executed, no `gh auth switch` happened. EMU default auth remains intact. The "ALWAYS: restore auth" cleanup is a no-op in this branch.
+
+**Files touched (squad-squad only):**
+
+- ✅ Created `.squad/decisions/inbox/data-v0.10.0-execution.md` (execution report).
+- ✅ Appended this round to `.squad/agents/data/history.md`.
+- ✅ Zero touches to `C:\Users\tamirdresher\source\repos\squad` (the upstream repo — confirmed via `git status` only, never `cd`-ed into).
+
+---
+
+## Round 9 — v0.10.0 Release Plan Recon (2026-06-07)
+
+**Task:** Read-only release plan for cutting v0.10.0 from radygaster/squad main. Output at `.squad/decisions/inbox/data-v0.9.x-release-plan.md`.
+
+**Verdict:** Proposed version is **0.10.0** (not 0.9.7 as coordinator guessed). 27 SDK-minor + 31 CLI-minor changesets force a minor bump per SemVer max-wins.
+
+**Key findings:**
+
+- **Coordinator's recon was reading the wrong remote.** `origin/main` (tamirdresher fork) = 0.9.1 stale; `upstream/main` (bradygaster) = 0.9.4. No version mystery — Tamir's fork just hasn't been synced in 213 commits.
+- **There is NO `preview` branch on bradygaster/squad.** Only `main` and `dev`. `squad-promote.yml` references `origin/preview` (line ~30 `git checkout preview`) and will fail if invoked. The simpler `docs/_internal/release-checklist.md` flow (PR dev → main directly) is the correct path. `release/0.9.4` exists as the only ephemeral release branch from prior cuts.
+- **Workspace version drift on dev:** root=0.9.6-preview.14, sdk=0.9.6-preview.13, cli=0.9.6-preview.15. Indicates prior prerelease bumps were not run with `--include-workspace-root`. v0.9.4 disaster class. Fixed by `npm version 0.10.0 --workspaces --include-workspace-root --no-git-tag-version`.
+- **Broken changeset blocks `changeset version`:** `.changeset/squad-commands-review-fixes.md` declares `"@bradygaster/squad": patch` — root pkg is private + not in workspaces. `npx changeset status` fails with `Error: Found changeset ... for package @bradygaster/squad which is not in the workspace`. Must delete the line before release.
+- **CHANGELOG `[Unreleased]` cruft on dev:** all v0.9.4 entries (#939, #941, #123, Full Work Monitor block, StorageProvider block) sit in `[Unreleased]` even though they shipped in v0.9.4. `changeset version` writes to `packages/*/CHANGELOG.md` only — root CHANGELOG needs manual reconciliation.
+- **`v0.9.6-insider.3` is OFF-TRUNK:** sits only on `feature/coordinator-as-agent`, not reachable from `upstream/dev`. Insider releases should be branched from dev — process bug.
+- **B0 STOP-SHIP:** `tamirdresher_microsoft` cannot push to bradygaster (stored memory). Even after `gh auth switch --user tamirdresher`, this is PR-only unless `tamirdresher` is a maintainer. Step 12 manual `gh workflow run squad-npm-publish.yml` (required by v0.9.4 GITHUB_TOKEN limitation) requires bradygaster-side credentials too.
+
+**Reusable learnings:**
+
+- Always identify which remote a "main is at X" claim is reading — fork drift is a constant confusion source.
+- For Squad changeset parsing, the frontmatter uses DOUBLE quotes (`"@bradygaster/squad-sdk": minor`) not single. My first parser regex matched single quotes and returned empty bumps for every changeset — wasted a round-trip.
+- For SemVer pre-1.0 with mixed minor+patch changesets, the answer is always max-wins (minor). 0.9.4 + minor = 0.10.0, NOT 0.9.10.
+- `squad-release.yml` reads root `package.json` (lines 31-35) — workspace bumps alone are insufficient (PR #1043 / v0.9.4 disaster).
+- Promote workflow assumes preview branch exists; `release-checklist.md` does not. The two docs disagree — release-checklist is closer to reality.
+- `GITHUB_TOKEN` does not trigger downstream workflows — manual `gh workflow run squad-npm-publish.yml --ref main -f version=X.Y.Z` is mandatory until a PAT/App token replaces it in `squad-release.yml`.
+
+
+---
+
+## Round 12 — v0.10.0 E2E validation (2026-06-07T10:00:55.915+03:00)
+
+PR #1218 / commit 79773306 (`release/0.10.0`). Ran `e2e-template-testing` SKILL Steps 1–6 against the actual release commit. **Verdict: ✅ GO.**
+
+### What worked
+- Local build version stamp = `0.10.0` (clean semver, no `-preview` — correct for release commit).
+- Scenario A (fresh init): all expected files scaffolded — `.squad/{config,team,routing,ceremonies,decisions}.md`, agents Rai/ralph/scribe, `.squad/casting/*`, `.squad/memory/*`, `.squad/rai/*`, `.squad/templates/skills/*`, `.github/agents/squad.agent.md` stamped v0.10.0, `.mcp.json` written.
+- Scenario B (upgrade): global `0.9.6-insider.3` → local `0.10.0` upgrade clean — 42 squad-owned files upgraded, 10 skills synced, templates refreshed, team.md preserved byte-for-byte, version stamp bumped.
+- Scenario C (runtime): copilot --agent squad spawned, coordinator printed `Squad v0.10.0` greeting + discovery tip + roster + 7-bullet v0.10.0 changelog summary, no crash.
+
+### Surprises / learnings
+- **`npm link` fails with EPERM on Windows when running inside an active Copilot CLI session** — the `C:\ProgramData\global-npm\squad` shim is locked by the host process. Workaround: invoke `node packages/squad-cli/dist/cli-entry.js` directly. Functionally equivalent for validation. Worth a CONTRIBUTING.md note for Windows contributors.
+- **`team.md` Members table is empty after fresh init** — header + column row only, no agent entries, even though agents/ has 3 charters. By design in v0.10.0 (CHANGELOG: "Sync squad.agent.md roster when agents added to team.md") — the coordinator populates Members upon hire. The SKILL's `3+ agents` check should be re-read as "3+ agent dirs scaffolded", which is true.
+- **`.squad/config.json` after `--no-workflows` init is `{"version": 1}` only** — no project/state-backend/team data. Coordinator handles defaults at runtime. Confirmed OK in Scenario C.
+- **MCP install message reads as a warning even when it's not.** `installed squad_state MCP server to .mcp.json (@bradygaster/squad-cli@insider (@insider fallback))` — the `@insider fallback` parenthetical was added per iter-9 security work but looks alarming. Worth tightening post-0.10.0.
+- **node-pty `AttachConsole failed` stderr in nested PTY** — Copilot CLI 1.0.60 quirk, unrelated to Squad; doesn't affect functionality.
+
+### Releaseable evidence
+Report: `.squad/decisions/inbox/data-v0.10.0-e2e-report.md`. Recommendation: continue Phase B promote dev→main, then manually trigger `squad-npm-publish.yml --ref main -f version=0.10.0` (per prior round's learning that `GITHUB_TOKEN` does not cascade workflows).
+
+## Round 13 — Published v0.10.0 npm E2E (2026-06-07)
+
+**Mission:** Validate the actually-published @bradygaster/squad-cli@0.10.0 and @bradygaster/squad-sdk@0.10.0 on npm (post-release sanity, distinct from Round 12's local-linked build).
+
+**Verdict:** ✅ SHIP-READY. Report at .squad/decisions/inbox/data-v0.10.0-published-e2e.md.
+
+**Scenarios:** A (global install + --version=0.10.0) ✅ · B (squad init scaffolds 96+ files incl. Rai/Ralph/Scribe always-on) ✅ · C (copilot --agent squad boots, banner reads 'Squad v0.10.0', returns 3 features) ✅ · D (SDK 100+ exports via ESM import; CJS require fails by design — ESM-only package) ✅.
+
+**Surprises:** Windows EPERM lock on C:\ProgramData\global-npm\squad shim during npm install -g (other long-lived node/copilot process holds it open). --force did not help. Workaround: install to custom --prefix and invoke shim directly. Recommend documenting in v0.10.0 release notes.
+
+**Delta vs Round 12:** Version string is plain '0.10.0' (no -preview), file count and coordinator output identical, SDK behavior identical. Only delta is the new Windows shim-lock friction on the upgrade path.
+
