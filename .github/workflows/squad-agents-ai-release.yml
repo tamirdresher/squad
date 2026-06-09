@@ -1,4 +1,17 @@
-# Requires repo secret NUGET_API_KEY. Generate at nuget.org → API Keys → Create.
+# Publishes Squad.Agents.AI to NuGet.org via Trusted Publishing (OIDC).
+#
+# ## Authentication
+# No long-lived API key is stored. The job uses GitHub Actions OIDC to obtain a
+# short-lived (1 hour) NuGet API key via the NuGet/login@v1 action. A Trusted
+# Publishing policy must be configured at https://www.nuget.org/account/trusted-publishing
+# under the package owner (Squad organization) with:
+#   Repository Owner: bradygaster
+#   Repository:       squad
+#   Workflow File:    squad-agents-ai-release.yml
+#   Environment:      (leave empty)
+# Set repository variable NUGET_USER to the nuget.org profile name that should
+# perform the token exchange (a member of the Squad org). Use a variable, not a
+# secret — the username is non-sensitive.
 #
 # ## Failure recovery
 # Publishing is branch-driven: dev creates prerelease NuGet packages, main creates stable NuGet
@@ -38,6 +51,9 @@ jobs:
   publish:
     name: Pack and publish NuGet package
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # Required for OIDC token issuance to NuGet/login
     concurrency:
       group: squad-agents-ai-release-${{ github.ref }}
       cancel-in-progress: false
@@ -116,14 +132,14 @@ jobs:
           echo "PACKAGE_VERSION=${package_version}" >> "${GITHUB_OUTPUT}"
           echo "Resolved PACKAGE_VERSION=${package_version} (${version_source})"
 
-      - name: Verify NuGet API key
+      - name: Verify NUGET_USER variable
         shell: bash
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
+          NUGET_USER: ${{ vars.NUGET_USER }}
         run: |
           set -euo pipefail
-          if [[ -z "${NUGET_API_KEY}" ]]; then
-            echo "::error::Missing repo secret NUGET_API_KEY. Generate at nuget.org → API Keys → Create, then add it as a repository secret."
+          if [[ -z "${NUGET_USER}" ]]; then
+            echo "::error::Missing repository variable NUGET_USER. Set it under Settings → Secrets and variables → Actions → Variables to the nuget.org profile name (NOT email) of a Squad org member that will perform the OIDC token exchange. Configure the matching Trusted Publishing policy at https://www.nuget.org/account/trusted-publishing."
             exit 1
           fi
 
@@ -153,8 +169,14 @@ jobs:
           path: nupkgs/*
           if-no-files-found: ignore
 
+      - name: NuGet login (OIDC → temp API key)
+        id: nuget-login
+        uses: NuGet/login@v1
+        with:
+          user: ${{ vars.NUGET_USER }}
+
       - name: Push to NuGet.org
         shell: bash
         env:
-          NUGET_API_KEY: ${{ secrets.NUGET_API_KEY }}
-        run: dotnet nuget push nupkgs/*.nupkg --source https://api.nuget.org/v3/index.json --api-key "${NUGET_API_KEY}" --skip-duplicate
+          NUGET_TEMP_KEY: ${{ steps.nuget-login.outputs.NUGET_API_KEY }}
+        run: dotnet nuget push nupkgs/*.nupkg --source https://api.nuget.org/v3/index.json --api-key "${NUGET_TEMP_KEY}" --skip-duplicate
