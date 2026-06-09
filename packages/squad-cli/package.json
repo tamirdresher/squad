@@ -1,11 +1,12 @@
 {
   "name": "@bradygaster/squad-cli",
-  "version": "0.9.4",
+  "version": "0.10.0",
   "description": "Squad CLI — Command-line interface for the Squad multi-agent runtime",
   "type": "module",
   "bin": {
     "squad": "dist/cli-entry.js",
-    "squad-cli": "dist/cli-entry.js"
+    "squad-cli": "dist/cli-entry.js",
+    "squad-test": "dist/cli-entry.js"
   },
   "exports": {
     ".": {
@@ -148,6 +149,10 @@
       "types": "./dist/cli/commands/copilot.d.ts",
       "import": "./dist/cli/commands/copilot.js"
     },
+    "./commands/memory": {
+      "types": "./dist/cli/commands/memory.d.ts",
+      "import": "./dist/cli/commands/memory.js"
+    },
     "./commands/cost": {
       "types": "./dist/cli/commands/cost.d.ts",
       "import": "./dist/cli/commands/cost.js"
@@ -181,7 +186,8 @@
     "node": ">=22.5.0"
   },
   "dependencies": {
-    "@bradygaster/squad-sdk": "0.9.4",
+    "@bradygaster/squad-sdk": ">=0.10.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "ink": "^6.8.0",
     "react": "^19.2.4",
     "vscode-jsonrpc": "^8.2.1"
@@ -189,7 +195,6 @@
   "devDependencies": {
     "@types/node": "^22.0.0",
     "@types/react": "^19.2.14",
-    "esbuild": "^0.25.0",
     "typescript": "^5.7.0",
     "ink-testing-library": "^4.0.0"
   },

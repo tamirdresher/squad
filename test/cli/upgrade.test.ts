@@ -14,6 +14,7 @@ import { runUpgrade, ensureGitattributes, ensureGitignore, ensureDirectories, en
 import { getPackageVersion } from '@bradygaster/squad-cli/core/version';
 
 const TEST_ROOT = join(tmpdir(), `.test-cli-upgrade-${randomBytes(4).toString('hex')}`);
+const TEST_HOME = join(tmpdir(), `.test-cli-upgrade-home-${randomBytes(4).toString('hex')}`);
 
 describe('CLI: upgrade command', () => {
   beforeEach(async () => {
@@ -21,14 +22,25 @@ describe('CLI: upgrade command', () => {
       await rm(TEST_ROOT, { recursive: true, force: true });
     }
     await mkdir(TEST_ROOT, { recursive: true });
-    
+    if (existsSync(TEST_HOME)) {
+      await rm(TEST_HOME, { recursive: true, force: true });
+    }
+    await mkdir(TEST_HOME, { recursive: true });
+    // iter-7: redirect ~/.copilot/mcp-config.json writes to a temp dir so
+    // tests don't pollute the developer's real HOME.
+    process.env.SQUAD_HOME_DIR_OVERRIDE = TEST_HOME;
+
     // Initialize a squad
     await runInit(TEST_ROOT);
   });
 
   afterEach(async () => {
+    delete process.env.SQUAD_HOME_DIR_OVERRIDE;
     if (existsSync(TEST_ROOT)) {
       await rm(TEST_ROOT, { recursive: true, force: true });
+    }
+    if (existsSync(TEST_HOME)) {
+      await rm(TEST_HOME, { recursive: true, force: true });
     }
   });
 
@@ -135,6 +147,91 @@ describe('CLI: upgrade command', () => {
     // File should still have the correct version stamp
     const after = await readFile(agentPath, 'utf-8');
     expect(after).toContain(`<!-- version: ${currentVersion} -->`);
+  });
+
+  it('preserves agent-frontmatter MCP config on upgrade', async () => {
+    await rm(TEST_ROOT, { recursive: true, force: true });
+    await mkdir(TEST_ROOT, { recursive: true });
+    await runInit(TEST_ROOT, { mcpFrontmatter: true });
+
+    const agentPath = join(TEST_ROOT, '.github', 'agents', 'squad.agent.md');
+    let content = await readFile(agentPath, 'utf-8');
+    expect(content).toContain('mcp-servers:');
+
+    content = content
+      .replace(/<!-- version: [^>]+ -->/m, '<!-- version: 0.1.0 -->')
+      .replace(/mcp-servers:[\s\S]*?\n---/, '---');
+    await writeFile(agentPath, content);
+
+    await runUpgrade(TEST_ROOT);
+
+    const upgraded = await readFile(agentPath, 'utf-8');
+    expect(upgraded).toContain('mcp-servers:');
+    expect(upgraded).toContain('  squad_state:');
+    // After MCP-BRIDGE-BROKEN fix the args MUST pin the CLI version so npx
+    // does not silently resolve to the npm `latest` dist-tag (which lacks the
+    // state-mcp command). Match a regex rather than literal version.
+    expect(upgraded).toMatch(/args: \['-y', '@bradygaster\/squad-cli@[^']+', 'state-mcp'\]/);
+    expect(upgraded).toContain('  EXAMPLE-github:');
+    expect(upgraded).toContain("    args: ['-y', '@anthropic/github-mcp-server']");
+    expect(upgraded).toContain('      GITHUB_TOKEN: ${GITHUB_TOKEN}');
+    expect(upgraded).not.toContain('EXAMPLE-azure-devops');
+    const frontmatterEnd = upgraded.indexOf('\n---', 4);
+    expect(frontmatterEnd).toBeGreaterThan(0);
+    const frontmatter = upgraded.slice(0, frontmatterEnd);
+    expect(frontmatter).not.toContain('SQUAD_TEAM_ROOT');
+    expect(frontmatter).not.toContain(TEST_ROOT);
+  });
+
+  it('infers frontmatter MCP mode during upgrade when config is missing the mode', async () => {
+    await rm(TEST_ROOT, { recursive: true, force: true });
+    await mkdir(TEST_ROOT, { recursive: true });
+    await runInit(TEST_ROOT, { mcpFrontmatter: true });
+
+    const configPath = join(TEST_ROOT, '.squad', 'config.json');
+    await writeFile(configPath, JSON.stringify({ version: 1 }, null, 2) + '\n');
+
+    const agentPath = join(TEST_ROOT, '.github', 'agents', 'squad.agent.md');
+    let content = await readFile(agentPath, 'utf-8');
+    content = content.replace(/<!-- version: [^>]+ -->/m, '<!-- version: 0.1.0 -->');
+    await writeFile(agentPath, content);
+
+    await runUpgrade(TEST_ROOT);
+
+    const upgraded = await readFile(agentPath, 'utf-8');
+    expect(upgraded).toContain('mcp-servers:');
+    expect(upgraded).toContain('  squad_state:');
+    expect(upgraded).toContain('  EXAMPLE-github:');
+  });
+
+  it('preserves Azure DevOps MCP frontmatter on upgrade', async () => {
+    await rm(TEST_ROOT, { recursive: true, force: true });
+    await mkdir(TEST_ROOT, { recursive: true });
+    await runInit(TEST_ROOT, { mcpFrontmatter: true });
+
+    const configPath = join(TEST_ROOT, '.squad', 'config.json');
+    await writeFile(configPath, JSON.stringify({
+      version: 1,
+      platform: 'azure-devops',
+      mcpConfigMode: 'agent-frontmatter',
+    }, null, 2) + '\n');
+
+    const agentPath = join(TEST_ROOT, '.github', 'agents', 'squad.agent.md');
+    let content = await readFile(agentPath, 'utf-8');
+    content = content
+      .replace(/<!-- version: [^>]+ -->/m, '<!-- version: 0.1.0 -->')
+      .replace(/mcp-servers:[\s\S]*?\n---/, '---');
+    await writeFile(agentPath, content);
+
+    await runUpgrade(TEST_ROOT);
+
+    const upgraded = await readFile(agentPath, 'utf-8');
+    expect(upgraded).toContain('mcp-servers:');
+    expect(upgraded).toContain('  EXAMPLE-azure-devops:');
+    expect(upgraded).toContain("    args: ['-y', '@azure/devops-mcp-server']");
+    expect(upgraded).toContain('      AZURE_DEVOPS_ORG: ${AZURE_DEVOPS_ORG}');
+    expect(upgraded).toContain('      AZURE_DEVOPS_PAT: ${AZURE_DEVOPS_PAT}');
+    expect(upgraded).not.toContain('EXAMPLE-github');
   });
 
   it('should preserve version stamp after manifest loop (issue #195)', async () => {
@@ -417,5 +514,104 @@ describe('CLI: upgrade command', () => {
     expect(existsSync(join(castingDir, 'registry.json'))).toBe(true);
     expect(existsSync(join(castingDir, 'policy.json'))).toBe(true);
     expect(existsSync(join(castingDir, 'history.json'))).toBe(true);
+  });
+
+  /* ── warnIfSkillCustomized ──────────────────────────────────── */
+
+  it('warnIfSkillCustomized warns when a skill has been modified', async () => {
+    const agentPath = join(TEST_ROOT, '.github', 'agents', 'squad.agent.md');
+    const skillPath = join(TEST_ROOT, '.copilot', 'skills', 'squad-conventions', 'SKILL.md');
+    expect(existsSync(skillPath)).toBe(true);
+
+    // Simulate old version so upgrade goes through the full manifest path
+    let agentContent = readFileSync(agentPath, 'utf8');
+    agentContent = agentContent.replace(/<!-- version: [^>]+ -->/m, '<!-- version: 0.1.0 -->');
+    writeFileSync(agentPath, agentContent);
+
+    // Modify the skill to simulate user customization
+    const original = readFileSync(skillPath, 'utf8');
+    writeFileSync(skillPath, original + '\n## My Custom Section\nCustom content here.\n');
+
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      await runUpgrade(TEST_ROOT);
+      const calls = spy.mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('has been customized'))).toBe(true);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('warnIfSkillCustomized does NOT warn for CRLF-only differences', async () => {
+    const agentPath = join(TEST_ROOT, '.github', 'agents', 'squad.agent.md');
+    const skillPath = join(TEST_ROOT, '.copilot', 'skills', 'squad-conventions', 'SKILL.md');
+    if (!existsSync(skillPath)) {
+      await runUpgrade(TEST_ROOT);
+    }
+
+    // Simulate old version to go through full manifest path
+    let agentContent = readFileSync(agentPath, 'utf8');
+    agentContent = agentContent.replace(/<!-- version: [^>]+ -->/m, '<!-- version: 0.1.0 -->');
+    writeFileSync(agentPath, agentContent);
+
+    // Re-write content with CRLF line endings (no semantic change)
+    const original = readFileSync(skillPath, 'utf8');
+    const crlf = original.replace(/\r?\n/g, '\r\n');
+    writeFileSync(skillPath, crlf);
+
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      await runUpgrade(TEST_ROOT);
+      const calls = spy.mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('has been customized'))).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('warnIfSkillCustomized does NOT warn for identical content', async () => {
+    const agentPath = join(TEST_ROOT, '.github', 'agents', 'squad.agent.md');
+
+    // Simulate old version to go through full manifest path
+    let agentContent = readFileSync(agentPath, 'utf8');
+    agentContent = agentContent.replace(/<!-- version: [^>]+ -->/m, '<!-- version: 0.1.0 -->');
+    writeFileSync(agentPath, agentContent);
+
+    // After init, skill content should match the template exactly — no customization
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      await runUpgrade(TEST_ROOT);
+      const calls = spy.mock.calls.map(c => String(c[0]));
+      expect(calls.some(c => c.includes('has been customized'))).toBe(false);
+    } finally {
+      spy.mockRestore();
+    }
+  });
+
+  it('warnIfSkillCustomized warns during full version upgrade path', async () => {
+    const agentPath = join(TEST_ROOT, '.github', 'agents', 'squad.agent.md');
+    const skillPath = join(TEST_ROOT, '.copilot', 'skills', 'squad-conventions', 'SKILL.md');
+    if (!existsSync(skillPath)) {
+      await runUpgrade(TEST_ROOT);
+    }
+
+    // Simulate old version to force full upgrade path
+    let content = readFileSync(agentPath, 'utf8');
+    content = content.replace(/<!-- version: [^>]+ -->/m, '<!-- version: 0.1.0 -->');
+    writeFileSync(agentPath, content);
+
+    // Modify skill to simulate customization
+    const original = readFileSync(skillPath, 'utf8');
+    writeFileSync(skillPath, original + '\n## Custom Addition\n');
+
+    const spy = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      await runUpgrade(TEST_ROOT, { force: true });
+      const calls = spy.mock.calls.map(c => String(c[0]));
+      const customizedWarnings = calls.filter(c => c.includes('has been customized'));
+      expect(customizedWarnings.length).toBeGreaterThanOrEqual(1);
+    } finally {
+      spy.mockRestore();
+    }
   });
 });

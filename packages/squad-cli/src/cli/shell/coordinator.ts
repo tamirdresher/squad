@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import { listRoles, searchRoles, FSStorageProvider } from '@bradygaster/squad-sdk';
+import { listRoles, searchRoles, FSStorageProvider, loadDirConfig, resolveExternalStateDir } from '@bradygaster/squad-sdk';
 
 import type { ShellMessage } from './types.js';
 
@@ -84,7 +84,7 @@ Your job: Propose a team of 4-5 AI agents based on what the user wants to do.
    
    You may also choose other film universes (Alien, The Matrix, Heat, Star Wars, Blade Runner, etc.) but the two above are preferred.
 3. Propose 4-5 agents with roles that match the project needs
-4. Scribe and Ralph are always included automatically — do NOT include them in your proposal
+4. Scribe, Ralph, and Rai are always included automatically — do NOT include them in your proposal
 
 ## Response Format — you MUST use this EXACT format:
 
@@ -171,7 +171,7 @@ Your job: Propose a team of 4-5 AI agents based on what the user wants to do.
 1. Analyze the user's message to understand the project (language, stack, scope)
 2. Pick a fictional universe for character names (e.g., Alien, The Usual Suspects, Blade Runner, The Matrix, Heat, Star Wars). Pick ONE universe and use it consistently.
 3. Propose 4-5 agents with roles that match the project needs
-4. Scribe and Ralph are always included automatically — do NOT include them in your proposal
+4. Scribe, Ralph, and Rai are always included automatically — do NOT include them in your proposal
 
 ## Built-in Base Roles (use these as starting points)
 
@@ -233,8 +233,15 @@ export async function buildCoordinatorPrompt(config: CoordinatorConfig): Promise
   const squadRoot = config.teamRoot;
   const storage = new FSStorageProvider();
 
+  // Resolve effective state dir (external when externalized)
+  const localSquadDir = join(squadRoot, '.squad');
+  const dirConfig = loadDirConfig(localSquadDir);
+  const stateDir = (dirConfig?.stateLocation === 'external' && dirConfig.projectKey)
+    ? resolveExternalStateDir(dirConfig.projectKey, false)
+    : localSquadDir;
+
   // Load team.md for roster
-  const teamPath = config.teamPath ?? join(squadRoot, '.squad', 'team.md');
+  const teamPath = config.teamPath ?? join(stateDir, 'team.md');
   let teamContent = '';
   try {
     const raw = await storage.read(teamPath);
@@ -252,7 +259,7 @@ export async function buildCoordinatorPrompt(config: CoordinatorConfig): Promise
   }
 
   // Load routing.md for routing rules
-  const routingPath = config.routingPath ?? join(squadRoot, '.squad', 'routing.md');
+  const routingPath = config.routingPath ?? join(stateDir, 'routing.md');
   let routingContent = '';
   try {
     const raw = await storage.read(routingPath);

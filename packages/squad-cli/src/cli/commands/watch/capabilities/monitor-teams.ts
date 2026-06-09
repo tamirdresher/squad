@@ -4,6 +4,7 @@
 
 import { execFile } from 'node:child_process';
 import type { WatchCapability, WatchContext, PreflightResult, CapabilityResult } from '../types.js';
+import { withAdditionalMcpConfig } from '../../../core/copilot-invocation.js';
 
 /** Build agent command from prompt, respecting --agent-cmd. */
 function buildAgentCommand(prompt: string, context: WatchContext): { cmd: string; args: string[] } {
@@ -13,12 +14,12 @@ function buildAgentCommand(prompt: string, context: WatchContext): { cmd: string
   }
   const args = ['-p', prompt];
   if (context.copilotFlags) args.push(...context.copilotFlags.trim().split(/\s+/));
-  return { cmd: 'copilot', args };
+  return { cmd: 'copilot', args: withAdditionalMcpConfig('copilot', args, context.teamRoot) };
 }
 
 function spawnWithTimeout(cmd: string, args: string[], cwd: string, timeoutMs: number): Promise<void> {
   return new Promise<void>((resolve, reject) => {
-    execFile(cmd, args, { cwd, timeout: timeoutMs, maxBuffer: 50 * 1024 * 1024 }, (err) => {
+    execFile(cmd, args, { cwd, timeout: timeoutMs, maxBuffer: 50 * 1024 * 1024, shell: true }, (err) => {
       if (err) {
         const execErr = err as Error & { killed?: boolean };
         reject(new Error(execErr.killed ? `Timed out after ${Math.round(timeoutMs / 1000)}s` : execErr.message));
@@ -36,9 +37,23 @@ export class MonitorTeamsCapability implements WatchCapability {
   readonly requires = ['gh', 'WorkIQ MCP'];
   readonly phase = 'housekeeping' as const;
 
-  async preflight(_context: WatchContext): Promise<PreflightResult> {
-    // WorkIQ availability can only be checked at runtime; preflight is optimistic
-    return { ok: true };
+  async preflight(context: WatchContext): Promise<PreflightResult> {
+    // If using custom agentCmd, skip copilot check
+    if (context.agentCmd) return { ok: true };
+    return new Promise((resolve) => {
+      execFile('copilot', ['--version'], { shell: true, timeout: 5000 }, (err) => {
+        if (err) {
+          resolve({
+            ok: false,
+            reason:
+              "Copilot CLI ('copilot') not found on PATH. Watch capabilities (monitor-teams, monitor-email, retro, decision-hygiene) require it. " +
+              "If you installed the GitHub CLI extension, ensure 'copilot' is also available on your PATH, or set --agent-cmd to override.",
+          });
+        } else {
+          resolve({ ok: true });
+        }
+      });
+    });
   }
 
   async execute(context: WatchContext): Promise<CapabilityResult> {
