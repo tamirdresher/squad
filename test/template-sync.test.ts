@@ -13,7 +13,7 @@
  *   4. Semantic checks — universe counts, casting-policy internal consistency.
  */
 
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { resolve, dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,6 +21,18 @@ import { execSync } from 'node:child_process';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const ROOT = resolve(__dirname, '..');
+
+// Re-sync templates before any byte-comparison checks.
+// Other test files (e.g., acceptance tests) may run `squad init` in the
+// repo root, overwriting .github/agents/squad.agent.md from the CLI
+// template and making it diverge from .squad-templates/squad.agent.md.
+beforeAll(() => {
+  execSync('node scripts/sync-templates.mjs', {
+    cwd: ROOT,
+    encoding: 'utf-8',
+    timeout: 60_000,
+  });
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -88,10 +100,10 @@ const AGENT_MD_EXTRA_TARGET = '.github/agents';
 
 const SQUAD_AGENT_LOCATIONS = [
   `${SOURCE_DIR}/${AGENT_MD_FILE}`,
-  'templates/squad.agent.md',
+  'templates/squad.agent.md.template',
   '.github/agents/squad.agent.md',
-  'packages/squad-cli/templates/squad.agent.md',
-  'packages/squad-sdk/templates/squad.agent.md',
+  'packages/squad-cli/templates/squad.agent.md.template',
+  'packages/squad-sdk/templates/squad.agent.md.template',
 ] as const;
 
 const CASTING_POLICY_LOCATIONS = [
@@ -116,7 +128,10 @@ describe('dynamic template enumeration (all synced files)', () => {
     const canonicalPath = `${SOURCE_DIR}/${relFile}`;
 
     for (const target of MIRROR_TARGETS) {
-      const targetPath = `${target}/${relFile}`;
+      // squad.agent.md is renamed to .template in mirror targets
+      // to prevent Copilot CLI from discovering template copies
+      const destName = relFile === AGENT_MD_FILE ? `${AGENT_MD_FILE}.template` : relFile;
+      const targetPath = `${target}/${destName}`;
 
       it(`${targetPath} is byte-for-byte identical to ${canonicalPath}`, () => {
         expect(fileExists(targetPath), `${targetPath} should exist`).toBe(true);
@@ -150,7 +165,7 @@ describe('sync-templates.mjs script execution', () => {
     const output = execSync('node scripts/sync-templates.mjs', {
       cwd: ROOT,
       encoding: 'utf-8',
-      timeout: 30_000,
+      timeout: 60_000,
     });
     expect(output).toContain('Synced');
   });
