@@ -73,3 +73,28 @@ This file was condensed on 2026-06-06 to maintain the 15KB hard gate on history.
 
 **Lead status:** Release cleared for Phase 2 (actual execution). Three pre-release blockers identified; four non-blocking warnings with mitigations attached. Tamir awaiting sign-off and must pre-stage npm/gh auth switches before trigger. Monitor Phase 2 dispatch for real-time coordination. Logs at `.squad/orchestration-log/2026-06-07T053651Z-{data,worf,troi}.md` and `.squad/log/2026-06-07T053651Z-release-preflight.md`.
 
+---
+
+## 2026-06-09 — Cross-Agent Alert: PR #1148 Resolver-Not-Wired Anti-Pattern
+
+**From:** Worf (Reliability Review)  
+**PR:** bradygaster/squad#1148 — feat(sdk): thread reasoningEffort through agent spawning pipeline  
+**Verdict:** REQUEST CHANGES (2 blockers)  
+**Alert Level:** ARCHITECTURAL PATTERN RISK
+
+**Pattern Identified:**
+
+The PR introduces a 306-line `resolveReasoningEffort()` function mirroring the 5-layer `resolveModel` shape, complete with 11 unit tests covering all layers. However, the production spawn path in `AgentLifecycleManager.spawnAgent()` never calls it. Instead, lifecycle uses a flat OR-chain:
+```
+const rawEffort = reasoningEffortOverride || agentConfig.resolvedReasoningEffort || undefined;
+```
+This bypasses Layer 0a (per-agent persistent overrides) and Layer 0b (global persistent default) from `.squad/config.json`. Same issue with `clampReasoningEffort()` — never invoked from lifecycle or fan-out default branches.
+
+**Implication:** The advertised persistent-config feature is dead code for users editing `.squad/config.json` directly. Green unit tests prove the resolver is correct; they prove nothing about whether spawn actually calls it.
+
+**Cross-Codebase Risk:** This mirrors a pre-existing pattern — `lifecycle.ts` also uses the older `resolveModel` from `model-selector.ts` rather than the new 5-layer one in `config/models.ts`. Worf's investigation unearthed that BOTH config-layering surfaces (model AND reasoning-effort) have the same lifecycle wiring gap. When reviewing future SDK config-layering PRs, *always* grep production call sites: `git grep -F '<resolver_name>(' packages/squad-sdk/src/` must show hits from spawn pipelines, not just tests and definitions.
+
+**Recommendation to Picard:** Block merge until blockers fixed. File a follow-up infrastructure ticket to audit all config-layer functions (not just new ones) and wire them into both spawn paths (lifecycle + fan-out default branch). This is a systemic architectural gap, not a PR-specific regression — but it is now VISIBLE because of this PR's failures.
+
+**Reference:** `.squad/decisions.md` (Worf PR #1148 review) and `worf-pr1148-review.md` in decisions inbox.
+
