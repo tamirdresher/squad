@@ -17,12 +17,13 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReadmeFile>README.md</PackageReadmeFile>
     <GenerateDocumentationFile>true</GenerateDocumentationFile>
-    <Version>0.2.0</Version>
+    <Version>0.3.0</Version>
   </PropertyGroup>
   <ItemGroup>
     <Compile Remove="samples/**/*.cs" />
   </ItemGroup>
   <ItemGroup>
+    <InternalsVisibleTo Include="Squad.Agents.AI.Tests" />
     <PackageReference Include="Microsoft.Agents.AI.GitHub.Copilot" Version="1.10.0-rc1" />
     <!--
       Direct reference to GitHub.Copilot.SDK so its build/ targets fire during our build.
