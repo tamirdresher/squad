@@ -134,6 +134,36 @@ public sealed class SquadAgent : DelegatingAIAgent, IAsyncDisposable
             ConfigDirectory = squadConfigDir,
             EnableConfigDiscovery = true,
         };
+
+        // ── Default coordinator agent selection ────────────────────────────
+        // SquadAgent wraps a Squad coordinator team. The SDK's SessionConfig.Agent
+        // property is the first-class equivalent of the Copilot CLI's --agent flag —
+        // it selects which discovered agent definition (e.g. .github/agents/squad.agent.md)
+        // to load as the session's system prompt. Without it the CLI uses its built-in
+        // generic agent and the coordinator role-plays responses inline instead of
+        // dispatching real subagents — exactly the inconsistency between
+        // `copilot --agent squad` (CLI) and SquadAgent.RunAsync (SDK) that this
+        // default eliminates.
+        //
+        // We set Agent = AgentFileName (default "squad") unless:
+        //   1. The host explicitly configured a different Agent via ConfigureSession
+        //      (handled implicitly — ConfigureSession runs after us and wins)
+        //   2. AgentFileName is null or whitespace (explicit opt-out)
+        //   3. The agent file does not exist at the conventional path on disk
+        //      (graceful degradation for folders that are not yet Squad-initialized,
+        //      where the CLI would error on `--agent squad`)
+        // ───────────────────────────────────────────────────────────────────
+        if (!string.IsNullOrWhiteSpace(options.AgentFileName) && !string.IsNullOrWhiteSpace(teamRoot))
+        {
+            var agentFilePath = Path.Combine(teamRoot, ".github", "agents", $"{options.AgentFileName}.agent.md");
+            if (File.Exists(agentFilePath))
+            {
+                sessionConfig.Agent = options.AgentFileName;
+            }
+            // If the file is missing we leave SessionConfig.Agent unset; the SDK will
+            // start with its default agent, which is what 0.4.x did anyway.
+        }
+
         if (!string.IsNullOrEmpty(options.Instructions))
         {
             sessionConfig.SystemMessage = new SystemMessageConfig { Content = options.Instructions };
@@ -242,6 +272,7 @@ public sealed class SquadAgent : DelegatingAIAgent, IAsyncDisposable
         {
             combinedCliArgs.Add("--allow-all");
         }
+
         combinedCliArgs.AddRange(options.CliArgs);
 
         // Only override the SDK's default child-process connection when the consumer
