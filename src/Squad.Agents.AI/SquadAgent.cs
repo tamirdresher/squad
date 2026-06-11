@@ -27,6 +27,7 @@ public sealed class SquadAgent : DelegatingAIAgent, IAsyncDisposable
     private readonly ILogger? _logger;
     private readonly bool _ownsClient;
     private readonly SquadAgentOptions _options;
+    private readonly SquadSubagentTraceMapper? _traceMapper;
 
     // State-bag to thread pre-base-ctor state through chain constructors.
     // DelegatingAIAgent requires the inner AIAgent at base() call time, so we
@@ -36,7 +37,8 @@ public sealed class SquadAgent : DelegatingAIAgent, IAsyncDisposable
         CopilotClient CopilotClient,
         ILogger? Logger,
         bool OwnsClient,
-        SquadAgentOptions Options);
+        SquadAgentOptions Options,
+        SquadSubagentTraceMapper? TraceMapper);
 
     /// <summary>
     /// Initializes a new <see cref="SquadAgent"/> with the Squad team root as the primary required parameter.
@@ -76,6 +78,7 @@ public sealed class SquadAgent : DelegatingAIAgent, IAsyncDisposable
         _logger = state.Logger;
         _ownsClient = state.OwnsClient;
         _options = state.Options;
+        _traceMapper = state.TraceMapper;
         _logger?.LogInformation("SquadAgent initialized with name '{AgentName}', team root '{TeamRoot}'",
             state.Options.AgentName, state.Options.SquadFolderPath);
     }
@@ -135,6 +138,18 @@ public sealed class SquadAgent : DelegatingAIAgent, IAsyncDisposable
         {
             sessionConfig.SystemMessage = new SystemMessageConfig { Content = options.Instructions };
         }
+
+        // Wire OnSubagentTrace before ConfigureSession so consumer-supplied ConfigureSession
+        // callbacks can still override or chain behind our defaults (e.g. compose multiple OnEvent
+        // handlers, replace IncludeSubAgentStreamingEvents, etc.).
+        SquadSubagentTraceMapper? traceMapper = null;
+        if (options.OnSubagentTrace is not null)
+        {
+            traceMapper = new SquadSubagentTraceMapper(options.OnSubagentTrace);
+            sessionConfig.IncludeSubAgentStreamingEvents = true;
+            sessionConfig.OnEvent = traceMapper.OnSessionEvent;
+        }
+
         options.ConfigureSession?.Invoke(sessionConfig);
 
         var inner = client.AsAIAgent(
@@ -144,7 +159,7 @@ public sealed class SquadAgent : DelegatingAIAgent, IAsyncDisposable
             name: options.AgentName ?? "Squad",
             description: null);
 
-        return new SquadAgentState(inner, client, lf?.CreateLogger<SquadAgent>(), true, options);
+        return new SquadAgentState(inner, client, lf?.CreateLogger<SquadAgent>(), true, options, traceMapper);
     }
 
     // ── Extensibility seam ──────────────────────────────────────────────
@@ -322,6 +337,10 @@ public sealed class SquadAgent : DelegatingAIAgent, IAsyncDisposable
 
         if (InnerAgent is IAsyncDisposable innerDisposable)
             await innerDisposable.DisposeAsync().ConfigureAwait(false);
+
+        // Drain any subagent activities that never received a matching SubagentCompletedEvent
+        // (e.g. session ended mid-dispatch). Failing to do so leaks Activity instances.
+        _traceMapper?.Dispose();
 
         _logger?.LogDebug("SquadAgent disposed");
     }
