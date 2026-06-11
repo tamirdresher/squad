@@ -150,6 +150,18 @@ squad://localhost?teamRoot=C%3A%5Cteam&cliPath=C%3A%5Ctools%5Ccopilot.exe&cliArg
 
 Parsed URI query keys: `teamRoot`, `cliPath`, `cwd`, `cliArgs` (semicolon-separated), and `env` (`key=value;key2=value2`). Unknown URI host/protocol values are reserved for future use.
 
+## Coordinator agent selection
+
+`SquadAgent` exists to wrap a Squad coordinator team, so it passes `--agent squad` to the underlying `copilot.exe` child process by default. That tells the CLI to load `.github/agents/squad.agent.md` as the agent definition — which is what teaches the coordinator to eager-execute, fan out, and dispatch through the `task` tool. Without it, the CLI uses its built-in generic agent and the coordinator role-plays responses inline instead of spawning real subagents — producing SDK behavior that does NOT match running `copilot --agent squad` interactively against the same team root.
+
+| Scenario | What the SDK does |
+|---|---|
+| Default — `squad.agent.md` exists | Auto-adds `--agent squad` |
+| `squad.agent.md` not found at `.github/agents/` | Silently skips `--agent` (graceful degradation for not-yet-initialized teams; logs a Debug message) |
+| Consumer set `AgentFileName = "data"` (and file exists) | Auto-adds `--agent data` |
+| Consumer set `AgentFileName = null` | Skips `--agent` entirely |
+| Consumer already supplied `--agent X` in `CliArgs` | Respects the explicit value; does not add a second `--agent` |
+
 ## Subagent observability — first-class OpenTelemetry
 
 `Squad.Agents.AI` emits one OpenTelemetry `Activity` per subagent dispatch out of the box. Hosts that subscribe to the activity source see one `squad.subagent {Name}` span per spawn, with the subagent name as a tag and timeline annotations (`squad.subagent.start`, `squad.subagent.message`, `squad.subagent.completed`, `squad.subagent.failed`) marking every state transition.
@@ -196,6 +208,7 @@ builder.Services.AddSquadAgent(o =>
 | `ConfigureCopilotClient` | Advanced delegate for customizing `CopilotClientOptions`. Routing properties are guarded; see BYOK section. |
 | `TraceEvents` | Enables verbose SDK logging and emits a startup warning when enabled. |
 | `AgentName` | Display name for the resulting `AIAgent`; defaults to `Squad`. |
+| `AgentFileName` | Name of the agent definition under `.github/agents/{name}.agent.md` to load via the CLI's `--agent` flag. Defaults to `"squad"`. Set to `null` to skip auto-injection; the file-existence check makes this safe to leave on for not-yet-initialized teams. |
 | `Instructions` | Optional system instructions passed to the inner Copilot agent. |
 | `EmitSubagentActivities` | Whether the SDK opens an OpenTelemetry `Activity` per subagent dispatch and annotates lifecycle events. Defaults to `true`. Set to `false` to handle telemetry from your own `OnSubagentTrace` callback. |
 | `OnSubagentTrace` | Optional callback invoked for every typed `SquadAgentTraceEvent`. Independent of `EmitSubagentActivities` — both can be on simultaneously. |

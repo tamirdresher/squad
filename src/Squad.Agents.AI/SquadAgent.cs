@@ -242,6 +242,45 @@ public sealed class SquadAgent : DelegatingAIAgent, IAsyncDisposable
         {
             combinedCliArgs.Add("--allow-all");
         }
+
+        // ── Default coordinator agent selection ────────────────────────────
+        // SquadAgent wraps a Squad coordinator team. The CLI's `--agent squad`
+        // flag loads `.github/agents/squad.agent.md` as the agent definition,
+        // which is what teaches the coordinator to eager-execute, fan out, and
+        // dispatch via the task tool. Without it the CLI uses its generic
+        // agent and the coordinator role-plays responses inline instead of
+        // spawning subagents — which produces an SDK behaviour that does NOT
+        // match running `copilot --agent squad` interactively against the same
+        // team root.
+        //
+        // We auto-add `--agent {AgentFileName}` (default "squad") unless:
+        //   1. The host already supplied --agent explicitly in CliArgs
+        //   2. AgentFileName is null (explicit opt-out)
+        //   3. The agent file does not exist on disk (graceful degradation
+        //      for folders that are not yet Squad-initialized)
+        // ───────────────────────────────────────────────────────────────────
+        bool hostSuppliedAgent = options.CliArgs.Any(a =>
+            string.Equals(a, "--agent", StringComparison.OrdinalIgnoreCase));
+        if (!hostSuppliedAgent && !string.IsNullOrWhiteSpace(options.AgentFileName))
+        {
+            var teamRoot = options.Cwd ?? options.SquadFolderPath;
+            if (!string.IsNullOrWhiteSpace(teamRoot))
+            {
+                var agentFilePath = Path.Combine(teamRoot, ".github", "agents", $"{options.AgentFileName}.agent.md");
+                if (File.Exists(agentFilePath))
+                {
+                    combinedCliArgs.Add("--agent");
+                    combinedCliArgs.Add(options.AgentFileName);
+                }
+                else
+                {
+                    logger?.LogDebug(
+                        "SquadAgentOptions.AgentFileName is '{AgentFileName}' but the file was not found at '{AgentFilePath}'. Skipping --agent argument; the CLI will fall back to its default agent.",
+                        options.AgentFileName, agentFilePath);
+                }
+            }
+        }
+
         combinedCliArgs.AddRange(options.CliArgs);
 
         // Only override the SDK's default child-process connection when the consumer

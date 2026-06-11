@@ -83,6 +83,35 @@ public sealed class SquadAgentOptions
     public string AgentName { get; set; } = "Squad";
 
     /// <summary>
+    /// Gets or sets the Copilot CLI agent definition file (under <c>.github/agents/</c>) the
+    /// underlying <c>copilot.exe</c> child process should load via the CLI's <c>--agent</c>
+    /// flag. Defaults to <c>"squad"</c>, which selects <c>.github/agents/squad.agent.md</c>
+    /// — the Squad coordinator system prompt that drives eager execution, parallel fan-out,
+    /// and dispatch through the <c>task</c> tool.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// The whole reason <see cref="SquadAgent"/> exists is to wrap a Squad coordinator team,
+    /// so the SDK passes <c>--agent squad</c> by default. Without it the CLI uses its built-in
+    /// generic agent and the coordinator role-plays responses inline instead of dispatching
+    /// real subagents — exactly the inconsistency between <c>copilot --agent squad</c> (CLI)
+    /// and <c>SquadAgent.RunAsync</c> (SDK) that this default eliminates.
+    /// </para>
+    /// <para>
+    /// When the named file does not exist at <c>{team-root}/.github/agents/{AgentFileName}.agent.md</c>
+    /// (e.g. the team root is not Squad-initialized yet), the SDK silently skips the
+    /// <c>--agent</c> argument so the CLI can still start with its default agent.
+    /// </para>
+    /// <para>
+    /// Set to <see langword="null"/> to disable the auto-inject entirely. Set to a different
+    /// name (e.g. <c>"data"</c>) to load a custom agent file. If the consumer already supplied
+    /// <c>--agent</c> in <see cref="CliArgs"/>, that explicit value wins and the default is
+    /// not added.
+    /// </para>
+    /// </remarks>
+    public string? AgentFileName { get; set; } = "squad";
+
+    /// <summary>
     /// Gets or sets optional system instructions passed to the inner Copilot-backed agent.
     /// </summary>
     public string? Instructions { get; set; }
