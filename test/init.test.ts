@@ -157,6 +157,41 @@ describe('Squad Initialization', () => {
       expect(content).toContain('.squad/decisions.md merge=union');
     });
 
+    it('should install the squad-help disambiguation skill (regression: #1297 / supersedes squad name collision)', async () => {
+      // The Squad framework registers a Copilot CLI agent named "Squad" at
+      // .github/agents/squad.agent.md. Coding models sometimes confuse that
+      // with a skill and call skill(Squad), which fails because:
+      //   (a) Copilot CLI's skill loader uses {name, description} — the
+      //       triggers field in our SKILL.md frontmatter is ignored
+      //   (b) A skill named "squad" would collide with the agent name and
+      //       hide the skill from /skills output
+      //
+      // Fix: name the disambiguation skill "squad-help" instead, which
+      // - avoids the agent-name collision (so /skills lists it)
+      // - is discoverable via natural-language match on its description
+      //
+      // Supersedes the original PR #1297 which used the colliding name.
+      const agents: InitAgentSpec[] = [{ name: 'lead', role: 'lead' }];
+      const options: InitOptions = {
+        teamRoot: TEST_ROOT,
+        projectName: 'Test Project',
+        agents
+      };
+
+      await initSquad(options);
+
+      const skillPath = join(TEST_ROOT, '.copilot', 'skills', 'squad-help', 'SKILL.md');
+      expect(existsSync(skillPath)).toBe(true);
+      const content = await readFile(skillPath, 'utf-8');
+      // The skill must NOT be named "squad" (collides with the agent named "Squad")
+      expect(content).toContain('name: "squad-help"');
+      expect(content).not.toMatch(/^name:\s*"?squad"?\s*$/m);
+      // Must explain the agent-vs-skill distinction and route to task tool.
+      expect(content).toContain("agent_type=\"Squad\"");
+      expect(content).toContain('custom agent');
+      expect(content).toContain('squad-commands');
+    });
+
     it('should create initial decisions.md', async () => {
       const agents: InitAgentSpec[] = [{ name: 'lead', role: 'lead' }];
       const options: InitOptions = {
