@@ -14,7 +14,8 @@ import { readdirSync, statSync, lstatSync, rmSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { FSStorageProvider } from '../storage/fs-storage-provider.js';
 import { resolvePresetsDir, ensureSquadHome } from '../resolution.js';
-import type { PresetManifest, PresetApplyResult } from './types.js';
+import type { PresetManifest, PresetApplyResult, PresetAgent } from './types.js';
+import { scaffoldPresetIntoSquad } from './scaffold.js';
 
 export type { PresetManifest, PresetAgent, PresetApplyResult } from './types.js';
 
@@ -135,6 +136,31 @@ export function applyPreset(
       results.push({ agent: agent.name, status: 'installed' });
     } catch (err) {
       results.push({ agent: agent.name, status: 'error', reason: String(err) });
+    }
+  }
+
+  // After copying charters, wire the preset agents into team.md, routing.md,
+  // and the casting state files (registry/history/policy). Without this, the
+  // coordinator's mode-switch check sees an empty ## Members table and
+  // treats every session as Init Mode — see bradygaster/squad#1288. We only
+  // include agents that did not error out (installed + skipped-because-
+  // already-present) so the scaffolded team reflects the user's intent.
+  const wireableAgents: PresetAgent[] = manifest.agents.filter(a =>
+    results.some(r => r.agent === a.name && r.status !== 'error'),
+  );
+  if (wireableAgents.length > 0) {
+    const squadDir = path.dirname(targetDir);
+    try {
+      scaffoldPresetIntoSquad(squadDir, wireableAgents, presetName);
+    } catch (err) {
+      // Scaffolding failed but charters were copied — surface as a single
+      // synthetic error result so the CLI can warn but does not mask the
+      // per-agent install results.
+      results.push({
+        agent: presetName,
+        status: 'error',
+        reason: `Charters copied but failed to wire team.md/routing.md/casting state: ${String(err)}`,
+      });
     }
   }
 
