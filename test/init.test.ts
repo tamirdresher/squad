@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdir, rm, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { initSquad } from '@bradygaster/squad-sdk/config';
+import { initSquad, MANIFEST_SKILL_NAMES } from '@bradygaster/squad-sdk/config';
 import { onboardAgent, addAgentToConfig } from '@bradygaster/squad-sdk/agents';
 import type { InitOptions, InitAgentSpec } from '@bradygaster/squad-sdk/config';
 import type { OnboardOptions } from '@bradygaster/squad-sdk/agents';
@@ -259,6 +259,36 @@ describe('Squad Initialization', () => {
       // Rich Rai charter mentions RAI policy + audit-trail paths.
       expect(charter).toMatch(/\.squad\/rai\/policy\.md/);
       expect(charter).toMatch(/\.squad\/rai\/audit-trail\.md/);
+    });
+
+    it('should install every manifest-curated skill (regression: bradygaster/squad#1289, #1264)', async () => {
+      // Sanity check: every skill listed in MANIFEST_SKILL_NAMES must end up
+      // installed under .copilot/skills/. The prior v0.10.0 install path
+      // silently skipped skills whose source dir was missing from the SDK
+      // templates dir; this test exists to ensure that regression cannot
+      // happen again (the loop now throws on drift, but a missing
+      // SKILL.md after install would still indicate a deeper issue).
+      //
+      // The expected list comes from the same MANIFEST_SKILL_NAMES export
+      // the production install loop reads — so the test cannot fall out
+      // of sync when a new skill is added. Sanity-asserted to be non-empty
+      // so a future accidental empty export doesn't make this test pass
+      // trivially.
+      expect(MANIFEST_SKILL_NAMES.length).toBeGreaterThan(0);
+
+      const agents: InitAgentSpec[] = [{ name: 'lead', role: 'lead' }];
+      const options: InitOptions = {
+        teamRoot: TEST_ROOT,
+        projectName: 'Test Project',
+        agents
+      };
+
+      await initSquad(options);
+
+      for (const skill of MANIFEST_SKILL_NAMES) {
+        const skillPath = join(TEST_ROOT, '.github', 'skills', skill, 'SKILL.md');
+        expect(existsSync(skillPath), `expected ${skill}/SKILL.md to be installed`).toBe(true);
+      }
     });
 
     it('should create .gitattributes for merge drivers', async () => {

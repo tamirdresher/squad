@@ -275,6 +275,30 @@ export const TEMPLATE_MANIFEST: TemplateFile[] = [
     overwriteOnUpgrade: true,
     description: 'Cross-squad delegation — calling another squad as a sub-agent',
   },
+  {
+    source: 'skills/tiered-memory/SKILL.md',
+    destination: '../.github/skills/tiered-memory/SKILL.md',
+    overwriteOnUpgrade: true,
+    description: 'Tiered-memory access patterns (hot/cold/wiki)',
+  },
+  {
+    source: 'skills/iterative-retrieval/SKILL.md',
+    destination: '../.github/skills/iterative-retrieval/SKILL.md',
+    overwriteOnUpgrade: true,
+    description: 'Iterative retrieval for long-running squad work',
+  },
+  {
+    source: 'skills/reflect/SKILL.md',
+    destination: '../.github/skills/reflect/SKILL.md',
+    overwriteOnUpgrade: true,
+    description: 'Reflection skill for capturing session learnings',
+  },
+  {
+    source: 'skills/cross-squad/SKILL.md',
+    destination: '../.github/skills/cross-squad/SKILL.md',
+    overwriteOnUpgrade: true,
+    description: 'Cross-squad discovery — finding peer squads via registry/upstream',
+  },
 
   // Session init reference (squad-owned, coordinator reads at session start)
   {
