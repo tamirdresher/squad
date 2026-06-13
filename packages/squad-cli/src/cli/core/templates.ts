@@ -257,6 +257,12 @@ export const TEMPLATE_MANIFEST: TemplateFile[] = [
     overwriteOnUpgrade: true,
     description: 'Squad CLI internals — version stamping & upgrade mechanics',
   },
+  {
+    source: 'skills/cross-squad-communication/SKILL.md',
+    destination: '../.copilot/skills/cross-squad-communication/SKILL.md',
+    overwriteOnUpgrade: true,
+    description: 'Cross-squad delegation — calling another squad as a sub-agent',
+  },
 
   // Session init reference (squad-owned, coordinator reads at session start)
   {
