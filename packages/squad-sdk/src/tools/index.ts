@@ -122,7 +122,7 @@ export interface StatusQuery {
 }
 
 export interface SkillRequest {
-  /** Skill name (maps to .copilot/skills/{name}/SKILL.md) */
+  /** Skill name (maps to .github/skills/{name}/SKILL.md) */
   skillName: string;
   /** Operation: read the skill or write/update it */
   operation: 'read' | 'write';
@@ -1084,7 +1084,7 @@ export class ToolRegistry {
     // squad_skill: Read/write agent skills
     const squadSkill = defineTool<SkillRequest>({
       name: 'squad_skill',
-      description: 'Read or write agent skill definitions. Skills are stored in .copilot/skills/{name}/SKILL.md.',
+      description: 'Read or write agent skill definitions. Skills are stored in .github/skills/{name}/SKILL.md.',
       parameters: {
         type: 'object',
         properties: {
@@ -1161,7 +1161,7 @@ export class ToolRegistry {
             this.storage.writeSync(skillFile, skillContent);
 
             return {
-              textResultForLlm: `Skill written: ${args.skillName} (.copilot/skills/${args.skillName}/SKILL.md)`,
+              textResultForLlm: `Skill written: ${args.skillName} (.github/skills/${args.skillName}/SKILL.md)`,
               resultType: 'success',
               toolTelemetry: { skillName: args.skillName, operation: 'write', confidence: args.confidence },
             };
