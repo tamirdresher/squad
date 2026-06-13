@@ -27,6 +27,11 @@ import { ensureMemoryGovernanceDefaults } from '../memory/index.js';
 /**
  * The curated built-in skills shipped on init.
  * Only these skills are installed — not the full templates/skills/ directory.
+ *
+ * Drift policy: every entry MUST have a corresponding directory under
+ * packages/squad-sdk/templates/skills/. The install loop (below) throws on
+ * missing source dirs instead of silently skipping — see bradygaster/squad#1289
+ * for the prior silent-skip bug that shipped two missing skills in v0.10.0.
  */
 const MANIFEST_SKILL_NAMES = [
   'squad-conventions',
@@ -41,6 +46,10 @@ const MANIFEST_SKILL_NAMES = [
   'squad-version-check',
   'squad-help',
   'cross-squad-communication',
+  'tiered-memory',
+  'iterative-retrieval',
+  'reflect',
+  'cross-squad',
 ] as const;
 
 // ============================================================================
@@ -1290,13 +1299,30 @@ ${projectDescription ? `- **Description:** ${projectDescription}\n` : ''}- **Cre
     const existingSkills = storage.existsSync(skillsDir) ? storage.listSync(skillsDir) : [];
     if (existingSkills.length === 0) {
       storage.mkdirSync(skillsDir, { recursive: true });
+      const missing: string[] = [];
       for (const skillName of MANIFEST_SKILL_NAMES) {
         const srcSkill = join(skillsSrc, skillName);
         if (storage.existsSync(srcSkill)) {
           copyRecursiveSync(srcSkill, join(skillsDir, skillName), storage);
+        } else {
+          missing.push(skillName);
         }
       }
+      if (missing.length > 0) {
+        // Manifest/templates drift — fail loudly so v0.10.0-style silent-skip
+        // regressions (#1289) cannot reach users. The sync script
+        // scripts/sync-skill-templates.mjs is responsible for keeping
+        // packages/squad-sdk/templates/skills/ in step with .squad/skills/.
+        throw new Error(
+          `Skill template drift: MANIFEST_SKILL_NAMES references ${missing.length} skill(s) ` +
+          `missing from the SDK templates dir (${skillsSrc}): ${missing.join(', ')}. ` +
+          `Run \`node scripts/sync-skill-templates.mjs\` from the squad repo root, ` +
+          `or add the missing skill(s) under .squad/skills/.`
+        );
+      }
       createdFiles.push('.github/skills');
+      createdFiles.push('.copilot/skills');
+>>>>>>> 7d945fea (fix(sdk,cli): bundle missing skills on init + strip fabricated provenance from tiered-memory (#1289, #1264))
     }
   }
 

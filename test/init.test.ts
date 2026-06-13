@@ -261,6 +261,45 @@ describe('Squad Initialization', () => {
       expect(charter).toMatch(/\.squad\/rai\/audit-trail\.md/);
     });
 
+    it('should install every manifest-curated skill (regression: bradygaster/squad#1289, #1264)', async () => {
+      // Sanity check: every skill listed in MANIFEST_SKILL_NAMES must end up
+      // installed under .copilot/skills/. The prior v0.10.0 install path
+      // silently skipped skills whose source dir was missing from the SDK
+      // templates dir; this test exists to ensure that regression cannot
+      // happen again (the loop now throws on drift, but a missing
+      // SKILL.md after install would still indicate a deeper issue).
+      const expectedSkills = [
+        'squad-conventions',
+        'error-recovery',
+        'secret-handling',
+        'git-workflow',
+        'session-recovery',
+        'reviewer-protocol',
+        'test-discipline',
+        'agent-collaboration',
+        'squad-commands',
+        'squad-version-check',
+        'tiered-memory',
+        'iterative-retrieval',
+        'reflect',
+        'cross-squad',
+      ];
+
+      const agents: InitAgentSpec[] = [{ name: 'lead', role: 'lead' }];
+      const options: InitOptions = {
+        teamRoot: TEST_ROOT,
+        projectName: 'Test Project',
+        agents
+      };
+
+      await initSquad(options);
+
+      for (const skill of expectedSkills) {
+        const skillPath = join(TEST_ROOT, '.copilot', 'skills', skill, 'SKILL.md');
+        expect(existsSync(skillPath), `expected ${skill}/SKILL.md to be installed`).toBe(true);
+      }
+    });
+
     it('should create .gitattributes for merge drivers', async () => {
       const agents: InitAgentSpec[] = [{ name: 'lead', role: 'lead' }];
       const options: InitOptions = {
