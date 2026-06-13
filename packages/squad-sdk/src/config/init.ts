@@ -33,7 +33,7 @@ import { ensureMemoryGovernanceDefaults } from '../memory/index.js';
  * missing source dirs instead of silently skipping — see bradygaster/squad#1289
  * for the prior silent-skip bug that shipped two missing skills in v0.10.0.
  */
-const MANIFEST_SKILL_NAMES = [
+export const MANIFEST_SKILL_NAMES = [
   'squad-conventions',
   'error-recovery',
   'secret-handling',
@@ -1298,31 +1298,39 @@ ${projectDescription ? `- **Description:** ${projectDescription}\n` : ''}- **Cre
     const skillsSrc = join(templatesDir, 'skills');
     const existingSkills = storage.existsSync(skillsDir) ? storage.listSync(skillsDir) : [];
     if (existingSkills.length === 0) {
-      storage.mkdirSync(skillsDir, { recursive: true });
+      // Pre-check drift BEFORE writing any skill file so a manifest/template
+      // mismatch fails atomically with no partial install left on disk. The
+      // earlier shape ran the copy loop first and threw at the end — users
+      // saw 8 of 10 skills appear, then an error, with no clean rollback.
       const missing: string[] = [];
       for (const skillName of MANIFEST_SKILL_NAMES) {
-        const srcSkill = join(skillsSrc, skillName);
-        if (storage.existsSync(srcSkill)) {
-          copyRecursiveSync(srcSkill, join(skillsDir, skillName), storage);
-        } else {
+        if (!storage.existsSync(join(skillsSrc, skillName))) {
           missing.push(skillName);
         }
       }
       if (missing.length > 0) {
         // Manifest/templates drift — fail loudly so v0.10.0-style silent-skip
-        // regressions (#1289) cannot reach users. The sync script
-        // scripts/sync-skill-templates.mjs is responsible for keeping
-        // packages/squad-sdk/templates/skills/ in step with .squad/skills/.
+        // regressions (#1289) cannot reach users. End-users see this when an
+        // installed @bradygaster/squad-sdk ships with its templates dir
+        // missing skills the SDK code knows about — almost always a packaging
+        // bug. The fix is to upgrade to a non-broken SDK version
+        // (`squad upgrade`); the dev-facing sync-skill-templates.mjs script
+        // is referenced only as the contributor-side root cause.
         throw new Error(
-          `Skill template drift: MANIFEST_SKILL_NAMES references ${missing.length} skill(s) ` +
+          `Skill template drift in installed @bradygaster/squad-sdk: ` +
+          `MANIFEST_SKILL_NAMES references ${missing.length} skill(s) ` +
           `missing from the SDK templates dir (${skillsSrc}): ${missing.join(', ')}. ` +
-          `Run \`node scripts/sync-skill-templates.mjs\` from the squad repo root, ` +
-          `or add the missing skill(s) under .squad/skills/.`
+          `This is a packaging bug — try \`squad upgrade\` or reinstall the SDK; ` +
+          `if it persists, please report it at https://github.com/bradygaster/squad/issues. ` +
+          `(Contributors: re-run \`node scripts/sync-skill-templates.mjs\` from the repo root before packaging.)`
         );
       }
+      storage.mkdirSync(skillsDir, { recursive: true });
+      for (const skillName of MANIFEST_SKILL_NAMES) {
+        const srcSkill = join(skillsSrc, skillName);
+        copyRecursiveSync(srcSkill, join(skillsDir, skillName), storage);
+      }
       createdFiles.push('.github/skills');
-      createdFiles.push('.copilot/skills');
->>>>>>> 7d945fea (fix(sdk,cli): bundle missing skills on init + strip fabricated provenance from tiered-memory (#1289, #1264))
     }
   }
 
