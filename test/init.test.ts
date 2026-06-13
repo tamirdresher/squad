@@ -280,7 +280,6 @@ describe('Squad Initialization', () => {
     });
 
     it('should install the squad-help disambiguation skill (regression: #1297 / supersedes squad name collision)', async () => {
-      // Disambiguation skill ('squad-help'); not a slash command.
       const agents: InitAgentSpec[] = [{ name: 'lead', role: 'lead' }];
       const options: InitOptions = {
         teamRoot: TEST_ROOT,
@@ -290,7 +289,7 @@ describe('Squad Initialization', () => {
 
       await initSquad(options);
 
-      const skillPath = join(TEST_ROOT, '.copilot', 'skills', 'squad-help', 'SKILL.md');
+      const skillPath = join(TEST_ROOT, '.github', 'skills', 'squad-help', 'SKILL.md');
       expect(existsSync(skillPath)).toBe(true);
       const content = await readFile(skillPath, 'utf-8');
       expect(content).toContain('name: "squad-help"');
@@ -300,7 +299,6 @@ describe('Squad Initialization', () => {
     });
 
     it('should install the squad slash-command skill with user-invocable: true (regression: /squad must appear)', async () => {
-      // Slash-command skill ('squad'); registers /squad in Copilot CLI.
       const agents: InitAgentSpec[] = [{ name: 'lead', role: 'lead' }];
       const options: InitOptions = {
         teamRoot: TEST_ROOT,
@@ -310,12 +308,30 @@ describe('Squad Initialization', () => {
 
       await initSquad(options);
 
-      const skillPath = join(TEST_ROOT, '.copilot', 'skills', 'squad', 'SKILL.md');
+      const skillPath = join(TEST_ROOT, '.github', 'skills', 'squad', 'SKILL.md');
       expect(existsSync(skillPath)).toBe(true);
       const content = await readFile(skillPath, 'utf-8');
       expect(content).toMatch(/^user-invocable:\s*true\s*$/m);
       expect(content).toMatch(/^name:\s*"?squad"?\s*$/m);
       expect(content).toContain('Menu Presentation Rules');
+    });
+
+    it('should install cross-squad-communication skill (companion to cross-squad — #5)', async () => {
+      const agents: InitAgentSpec[] = [{ name: 'lead', role: 'lead' }];
+      const options: InitOptions = {
+        teamRoot: TEST_ROOT,
+        projectName: 'Test Project',
+        agents
+      };
+
+      await initSquad(options);
+
+      const skillPath = join(TEST_ROOT, '.github', 'skills', 'cross-squad-communication', 'SKILL.md');
+      expect(existsSync(skillPath)).toBe(true);
+      const content = await readFile(skillPath, 'utf-8');
+      expect(content).toContain('cross-squad-communication');
+      expect(content).toContain('Pattern 0');
+      expect(content).toContain('Pattern 2');
     });
 
     it('should create initial decisions.md', async () => {
