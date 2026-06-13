@@ -1115,13 +1115,24 @@ All findings logged to \`.squad/fact-checker/audit-trail.md\` (append-only, succ
     const charterPath = join(agentDir, 'charter.md');
     let charterContent: string | null = null;
     if (templatesDir) {
-      // Lookup priority: exact role name first, then capitalized variant
-      // (Rai uses `Rai-charter.md` capitalized; fact-checker uses
-      // `fact-checker-charter.md` lowercase-hyphenated).
-      const candidates = [
-        join(templatesDir, `${agent.role}-charter.md`),
-        join(templatesDir, `${agent.name}-charter.md`),
-      ];
+      // Lookup priority: exact role / name first, then their lowercase
+      // variants. This is needed because rich-charter files in `templates/`
+      // are stored lowercase-hyphenated (`rai-charter.md`,
+      // `fact-checker-charter.md`) while agent specs may use mixed case
+      // (e.g. role/name = "Rai"). On case-sensitive filesystems (Linux CI)
+      // the mixed-case lookup misses without the toLowerCase() fallback,
+      // and the agent silently falls back to the 478-byte generic stub —
+      // exactly the regression #1299 was fixing. Each candidate is only
+      // added if non-empty to avoid `-charter.md` lookups from blank names.
+      const seen = new Set<string>();
+      const candidates: string[] = [];
+      for (const key of [agent.role, agent.name, agent.role?.toLowerCase(), agent.name?.toLowerCase()]) {
+        if (!key) continue;
+        const filename = `${key}-charter.md`;
+        if (seen.has(filename)) continue;
+        seen.add(filename);
+        candidates.push(join(templatesDir, filename));
+      }
       for (const candidate of candidates) {
         if (storage.existsSync(candidate)) {
           charterContent = storage.readSync(candidate) ?? null;
