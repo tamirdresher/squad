@@ -573,6 +573,39 @@ describe('cross-squad-communication/SKILL.md uses real Copilot CLI invocations',
         expect(content).toMatch(/\.copilot\\logs/);
         expect(content).toMatch(/Test-Path/);
       });
+
+      it('every `copilot` spawn into a peer squad includes `--agent squad`', () => {
+        // Squad installs ship .github/agents/squad.agent.md which is only
+        // loaded when --agent squad is passed. Without it the spawned
+        // session runs as a generic Copilot CLI session and does NOT load
+        // the peer's team.md, routing, MCP tools, casting, or coordinator
+        // — defeating the entire point of cross-squad delegation.
+        //
+        // Find every `copilot ...` command line (excluding `copilot --resume`
+        // which preserves the original session's agent, and prose
+        // references to the flag like "`copilot -C <directory>`"). Each
+        // remaining line MUST contain `--agent squad`.
+        const lines = content.split(/\r?\n/);
+        const spawnLines = lines.filter(l =>
+          /\bcopilot\s+(?:-[A-Z]|-p|--(?!resume|version|help))/.test(l)
+          && !/`copilot\s+-C\s+<directory>`/.test(l) // prose flag reference
+        );
+        expect(spawnLines.length, 'expected at least one copilot spawn command').toBeGreaterThan(0);
+        for (const line of spawnLines) {
+          expect(
+            line,
+            `every copilot spawn into a peer squad must pass '--agent squad'. Offender:\n  ${line.trim()}`
+          ).toMatch(/--agent\s+squad\b/);
+        }
+      });
+
+      it('explains WHY --agent squad is required (universal rule paragraph)', () => {
+        // The rationale needs to be visible inline so future edits don't
+        // strip --agent thinking it's redundant. Match the universal-rule
+        // header + the key consequence keyword.
+        expect(content).toMatch(/Universal rule.*--agent squad/i);
+        expect(content).toMatch(/generic Copilot CLI session/i);
+      });
     });
   }
 });
