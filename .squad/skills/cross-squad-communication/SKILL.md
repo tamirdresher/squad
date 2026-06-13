@@ -51,7 +51,7 @@ This is the same technique used by `ralph-watch.ps1`: write the prompt to a temp
 
 **Protocol:**
 1. Write prompt to a temp file (avoids argument-splitting issues, as learned in `ralph-watch.ps1`)
-2. Invoke CLI with `-p` pointing to the prompt file and `--working-directory` set to the target repo
+2. Read the file into a string and invoke `copilot -p <text>` with `-C <directory>` set to the target repo (`-p` takes prompt text, NOT a file path)
 3. Receive response in the same session
 
 **Invocation:**
@@ -70,14 +70,14 @@ Query: What is the current architecture of the platform? What services does it e
 Response Format: Brief structured summary
 "@ | Out-File $promptFile -Encoding utf8
 
-# Option A: ghcs with prompt file
-ghcs -p $promptFile -- --working-directory $targetRepo
+# Option A: copilot with prompt file (read file into string; -p takes text, not a path)
+copilot -C $targetRepo -p (Get-Content $promptFile -Raw) --allow-all-tools
 
 # Option B: Start-Process for non-blocking (ralph-watch.ps1 style)
-Start-Process pwsh -ArgumentList "-NoProfile -Command `"cd '$targetRepo'; ghcs -p '$promptFile'`"" -Wait
+Start-Process pwsh -ArgumentList "-NoProfile -Command `"copilot -C '$targetRepo' -p (Get-Content '$promptFile' -Raw) --allow-all-tools`"" -Wait
 
-# Option C: Pipe directly
-"What is the platform architecture?" | ghcs -- --working-directory $targetRepo
+# Option C: Pipe directly (stdin is the prompt text)
+"What is the platform architecture?" | copilot -C $targetRepo --allow-all-tools
 ```
 
 **When to use synchronous vs async:**
@@ -98,7 +98,7 @@ Start-Process pwsh -ArgumentList "-NoProfile -Command `"cd '$targetRepo'; ghcs -
 4. Is the target squad's Ralph running? → Needed for async processing
 
 **Requirements:**
-- Target repo must be cloned locally (for `--working-directory`)
+- Target repo must be cloned locally (for `copilot -C <directory>`)
 - Prompt file avoids argument-splitting bugs (see `ralph-watch.ps1` lines 2166-2184)
 
 **Response quality:** ⭐⭐⭐⭐⭐ — the CLI session has full context of the target repo, including code, squad metadata, and MCP tools.
@@ -112,9 +112,16 @@ The synchronous CLI session requires monitoring to avoid false timeouts. With 7+
 Instead of a fixed wall-clock timeout, monitor the agency session log directory for activity:
 
 ```powershell
-# The agency CLI creates a session log directory
-# e.g., ~/.agency/logs/session_20260325_071211_57824
-$logDir = Get-ChildItem "$env:USERPROFILE\.agency\logs" -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+# The Copilot CLI creates a session log directory at ~/.copilot/logs/.
+# Older `agency` runtimes wrote to ~/.agency/logs/; fall back to that
+# location if the new path doesn't exist yet on the user's machine.
+# e.g., ~/.copilot/logs/session_20260325_071211_57824
+$copilotLogs = "$env:USERPROFILE\.copilot\logs"
+$agencyLogs = "$env:USERPROFILE\.agency\logs"
+$logRoot = if (Test-Path $copilotLogs) { $copilotLogs } elseif (Test-Path $agencyLogs) { $agencyLogs } else { $null }
+if ($logRoot) {
+    $logDir = Get-ChildItem $logRoot -Directory | Sort-Object LastWriteTime -Descending | Select-Object -First 1
+}
 $lastSize = 0
 $stallCount = 0
 
@@ -153,10 +160,10 @@ while ($proc -and -not $proc.HasExited) {
 
 1. **Check for user input waiting:** Inspect logs for prompts or dialogs (shouldn't happen with `--autopilot`)
 2. **Check MCP server health:** Review `mcp-server-logs/` for connection errors or timeouts
-3. **Retry with `--no-mcp` flag:** For lightweight queries that don't require MCP tools
+3. **Retry with `--disable-builtin-mcps` flag:** For lightweight queries that don't require MCP tools
    ```powershell
    # Retry without MCP servers — faster startup, limited capability
-   ghcs -p $promptFile -- --working-directory $targetRepo --no-mcp
+   copilot -C $targetRepo -p (Get-Content $promptFile -Raw) --disable-builtin-mcps --allow-all-tools
    ```
 4. **Increase timeout threshold:** If MCP server initialization is consistently slow (>90s), raise threshold before declaring stall
 
@@ -342,11 +349,11 @@ status: pending
 ### ⚠️ Know when synchronous CLI is NOT the right choice
 ```powershell
 # WRONG — don't use sync CLI for long-running tasks that need artifacts
-ghcs -p $promptFile -- --working-directory $targetRepo
+copilot -C $targetRepo -p (Get-Content $promptFile -Raw) --allow-all-tools
 # If the task creates files, PRs, or takes multiple cycles → use async (Pattern 2 or 3)
 
 # WRONG — don't use sync CLI when the target repo isn't cloned locally
-ghcs -- --working-directory "C:\not\cloned\yet"
+copilot -C "C:\not\cloned\yet" --allow-all-tools
 # If the repo isn't available locally → use issue-based delegation (Pattern 3)
 ```
 Synchronous CLI sessions (Pattern 0) are valid for quick queries and knowledge lookups. Use async patterns for work that needs to persist or where the target repo isn't available locally.
