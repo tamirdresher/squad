@@ -43,6 +43,14 @@ Is the target repo cloned locally?
 
 ---
 
+## Universal rule: every `copilot` spawn into a peer squad MUST pass `--agent squad`
+
+The `copilot` CLI accepts `--agent <name>` to select a custom agent (see `copilot --help`). Squad installs ship `.github/agents/squad.agent.md`, which is loaded **only when `--agent squad` is specified**. Without it the spawned session runs as a generic Copilot CLI session that does NOT load the peer's `team.md`, routing, MCP tools, casting, or coordinator behaviour — so you get an off-the-shelf model answering, not the peer's Squad. **Every command example in this skill that spawns `copilot` into a peer repo includes `--agent squad`; do not strip it.**
+
+This rule also applies anywhere else you spawn `copilot` into a Squad-initialised repo (not just cross-squad protocols) — e.g., `squad init`'s post-init tip and any automation that invokes the CLI on a squadified folder. The only case where you may omit `--agent` is when resuming an existing session (`copilot --resume <sessionId>`) — the resumed session preserves its original agent context.
+
+---
+
 ### Pattern 0: Synchronous CLI Session (Fastest for Interactive Queries)
 
 For quick knowledge queries, decision lookups, or short analyses — spawn a Copilot CLI session with the working directory set to the target squad's repo. This lets you send a prompt and get a response within the same session, using the target repo's full context.
@@ -51,7 +59,7 @@ This is the same technique used by `ralph-watch.ps1`: write the prompt to a temp
 
 **Protocol:**
 1. Write prompt to a temp file (avoids argument-splitting issues, as learned in `ralph-watch.ps1`)
-2. Read the file into a string and invoke `copilot -p <text>` with `-C <directory>` set to the target repo (`-p` takes prompt text, NOT a file path)
+2. Read the file into a string and invoke `copilot -p <text>` with `-C <directory>` set to the target repo (`-p` takes prompt text, NOT a file path) AND `--agent squad` so the spawned session uses the peer squad's coordinator (without `--agent` you get a generic Copilot CLI session that doesn't load the peer's `team.md`, MCP tools, or skills)
 3. Receive response in the same session
 
 **Invocation:**
@@ -71,13 +79,15 @@ Response Format: Brief structured summary
 "@ | Out-File $promptFile -Encoding utf8
 
 # Option A: copilot with prompt file (read file into string; -p takes text, not a path)
-copilot -C $targetRepo -p (Get-Content $promptFile -Raw) --allow-all-tools
+# --agent squad is REQUIRED: the target is another Squad install, so the spawned
+# session must use that squad's coordinator (not a generic Copilot CLI session).
+copilot -C $targetRepo --agent squad -p (Get-Content $promptFile -Raw) --allow-all-tools
 
 # Option B: Start-Process for non-blocking (ralph-watch.ps1 style)
-Start-Process pwsh -ArgumentList "-NoProfile -Command `"copilot -C '$targetRepo' -p (Get-Content '$promptFile' -Raw) --allow-all-tools`"" -Wait
+Start-Process pwsh -ArgumentList "-NoProfile -Command `"copilot -C '$targetRepo' --agent squad -p (Get-Content '$promptFile' -Raw) --allow-all-tools`"" -Wait
 
 # Option C: Pipe directly (stdin is the prompt text)
-"What is the platform architecture?" | copilot -C $targetRepo --allow-all-tools
+"What is the platform architecture?" | copilot -C $targetRepo --agent squad --allow-all-tools
 ```
 
 **When to use synchronous vs async:**
@@ -99,6 +109,7 @@ Start-Process pwsh -ArgumentList "-NoProfile -Command `"copilot -C '$targetRepo'
 
 **Requirements:**
 - Target repo must be cloned locally (for `copilot -C <directory>`)
+- Target repo must be Squad-initialised (`.squad/config.json` + `.github/agents/squad.agent.md` present), so `--agent squad` resolves to the peer's coordinator
 - Prompt file avoids argument-splitting bugs (see `ralph-watch.ps1` lines 2166-2184)
 
 **Response quality:** ⭐⭐⭐⭐⭐ — the CLI session has full context of the target repo, including code, squad metadata, and MCP tools.
@@ -163,7 +174,7 @@ while ($proc -and -not $proc.HasExited) {
 3. **Retry with `--disable-builtin-mcps` flag:** For lightweight queries that don't require MCP tools
    ```powershell
    # Retry without MCP servers — faster startup, limited capability
-   copilot -C $targetRepo -p (Get-Content $promptFile -Raw) --disable-builtin-mcps --allow-all-tools
+   copilot -C $targetRepo --agent squad -p (Get-Content $promptFile -Raw) --disable-builtin-mcps --allow-all-tools
    ```
 4. **Increase timeout threshold:** If MCP server initialization is consistently slow (>90s), raise threshold before declaring stall
 
@@ -349,11 +360,11 @@ status: pending
 ### ⚠️ Know when synchronous CLI is NOT the right choice
 ```powershell
 # WRONG — don't use sync CLI for long-running tasks that need artifacts
-copilot -C $targetRepo -p (Get-Content $promptFile -Raw) --allow-all-tools
+copilot -C $targetRepo --agent squad -p (Get-Content $promptFile -Raw) --allow-all-tools
 # If the task creates files, PRs, or takes multiple cycles → use async (Pattern 2 or 3)
 
 # WRONG — don't use sync CLI when the target repo isn't cloned locally
-copilot -C "C:\not\cloned\yet" --allow-all-tools
+copilot -C "C:\not\cloned\yet" --agent squad --allow-all-tools
 # If the repo isn't available locally → use issue-based delegation (Pattern 3)
 ```
 Synchronous CLI sessions (Pattern 0) are valid for quick queries and knowledge lookups. Use async patterns for work that needs to persist or where the target repo isn't available locally.
