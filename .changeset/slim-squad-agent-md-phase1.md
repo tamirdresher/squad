@@ -63,8 +63,8 @@ Follow-up issues will tackle these one at a time if/when needed.
 
 ## Wired changes
 
-- New: `.squad/skills/coordinator-{source-of-truth,response-mode,init-mode}/SKILL.md` (canonical sources)
-- Mirrored to `packages/squad-cli/templates/skills/` and `packages/squad-sdk/templates/skills/`
+- New: `.squad/skills/coordinator-{source-of-truth,response-mode,init-mode}/SKILL.md` are the **canonical source files** kept in the squad repo itself (the same convention every other bundled skill follows). At install/upgrade time they are copied to `.github/skills/coordinator-{x}/SKILL.md` in the user's repo — that's the Copilot CLI custom-skills location adopted by #1304 (formerly `.copilot/skills/`).
+- Mirrored at build time to `packages/squad-cli/templates/skills/` and `packages/squad-sdk/templates/skills/` via `scripts/sync-skill-templates.mjs` (same path every other manifest skill takes).
 - `MANIFEST_SKILL_NAMES` in `packages/squad-sdk/src/config/init.ts` grows by 3 entries (now 19)
 - `TEMPLATE_MANIFEST` in `packages/squad-cli/src/cli/core/templates.ts` grows by 3 entries with `../.github/skills/` destinations (matching the post-#1304 install location)
 - `.squad-templates/squad.agent.md` replaces each extracted section with a stub
