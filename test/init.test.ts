@@ -157,6 +157,35 @@ describe('Squad Initialization', () => {
       expect(content).toContain('.squad/decisions.md merge=union');
     });
 
+    it('should install cross-squad-communication skill (companion to cross-squad — #5)', async () => {
+      // Regression for the weekend stabilization item #5: ensure the
+      // cross-squad-communication skill (ported from tamirdresher/squad-skills)
+      // is wired into MANIFEST_SKILL_NAMES and ends up at the install path.
+      // The companion cross-squad skill already shipped in v0.10.0 for
+      // registry discovery; this skill adds the actual communication
+      // protocols (sync CLI, async git, issue-based).
+      //
+      // NOTE: This test only asserts the cross-squad-communication entry.
+      // A broader "every MANIFEST_SKILL_NAMES skill installs" assertion is
+      // tracked separately in bradygaster/squad#1289 (PR #1292), which fixes
+      // the silent-skip bug for squad-commands and squad-version-check.
+      const agents: InitAgentSpec[] = [{ name: 'lead', role: 'lead' }];
+      const options: InitOptions = {
+        teamRoot: TEST_ROOT,
+        projectName: 'Test Project',
+        agents
+      };
+
+      await initSquad(options);
+
+      const skillPath = join(TEST_ROOT, '.copilot', 'skills', 'cross-squad-communication', 'SKILL.md');
+      expect(existsSync(skillPath)).toBe(true);
+      const content = await readFile(skillPath, 'utf-8');
+      expect(content).toContain('cross-squad-communication');
+      expect(content).toContain('Pattern 0');
+      expect(content).toContain('Pattern 2');
+    });
+
     it('should create initial decisions.md', async () => {
       const agents: InitAgentSpec[] = [{ name: 'lead', role: 'lead' }];
       const options: InitOptions = {
