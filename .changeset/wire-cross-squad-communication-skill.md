@@ -13,7 +13,7 @@ This change ports `cross-squad-communication` from [tamirdresher/squad-skills](h
 
 | Pattern | When to use |
 |---|---|
-| Pattern 0: Synchronous CLI session | Quick knowledge queries — spawn `copilot` with `--working-directory` set to target repo |
+| Pattern 0: Synchronous CLI session | Quick knowledge queries — spawn `copilot -C <target-repo>` with the prompt text via `-p (Get-Content $promptFile -Raw)` |
 | Pattern 1: Read-only metadata scan | "What's the architecture of squad X?" — read their `team.md` / `decisions.md` directly |
 | Pattern 2: Async git-based request/response | Long-running work, PR reviews, multi-cycle tasks. Request files in `.squad/cross-squad/requests/`, response files in `.squad/cross-squad/responses/`. |
 | Pattern 3: Issue-based delegation | GitHub-hosted repos — `gh issue create` with `squad:cross-squad` label as the message bus |
