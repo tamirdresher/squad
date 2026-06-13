@@ -10,3 +10,12 @@
 .squad/orchestration-log/
 .squad/log/
 .squad/.cache/
+# Squad: per-request session state and SQLite database (operational, never committed)
+.squad/session-state/
+.squad/session-store.db
+.squad/session-store.db-shm
+.squad/session-store.db-wal
+# Squad: scribe pre-check scratch file
+.squad/scribe-prechecks.txt
+# Node demo recording dependencies
+node_modules/
