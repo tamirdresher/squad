@@ -14,6 +14,9 @@ tools:
 ---
 
 ## Context
+
+> **Read this FIRST any time the user says "squad" as a thing to spawn, delegate to, address, or fan out to** — e.g., *"spawn two squads of designers and devs"*, *"ask the other squad"*, *"delegate to a squad"*. In Squad-PRODUCT vocabulary, "squad" is a **peer** (an independent installation with its own `.squad/`, `team.md`, MCP server, and agents) — NOT a generic English synonym for "team" or "group". Do not fan out raw `task` agents inside your own coordinator context when the user means "another squad". Use the discovery and communication patterns below (and the companion `cross-squad-communication` skill for the actual protocols).
+
 When an organization runs multiple Squad instances (e.g., platform-squad, frontend-squad, data-squad), those squads need to discover each other, share context, and hand off work across repository boundaries. This skill teaches agents how to coordinate across squads without creating tight coupling.
 
 Cross-squad orchestration applies when:

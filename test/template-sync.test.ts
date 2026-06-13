@@ -242,3 +242,61 @@ describe('casting-policy.json content parity', () => {
     }
   });
 });
+
+// ---------------------------------------------------------------------------
+// 5. Squad-spawning routing guard (regression for the "spawn a squad" hole)
+// ---------------------------------------------------------------------------
+
+describe('squad.agent.md squad-spawning guidance', () => {
+  // A coordinator reading squad.agent.md saw the user say "spawn two squads
+  // of designers and devs" and fanned out raw `task` agents inside its own
+  // context instead of treating "squad" as the Squad-PRODUCT concept and
+  // routing through the cross-squad / cross-squad-communication skills.
+  // Two surgical edits to squad.agent.md (a routing-table row + a hard
+  // keyword-to-skill trigger paragraph) close the hole; assert both are
+  // present in every mirrored copy so a future refactor cannot silently
+  // drop either.
+
+  for (const loc of SQUAD_AGENT_LOCATIONS) {
+    describe(loc, () => {
+      const content = readFile(loc);
+
+      it('has a routing-table row for "spawn a squad" / "another squad" / "two squads"', () => {
+        // Match the row independent of exact wording so phrasing tweaks
+        // are allowed; what matters is that ALL three trigger phrases
+        // appear in a single routing-table row (lines starting with `|`).
+        const rowRegex = /^\|.*spawn a squad.*another squad.*two squads.*\|.*$/im;
+        expect(content, 'expected routing row containing all three trigger phrases').toMatch(rowRegex);
+      });
+
+      it('the squad-spawning row references the cross-squad skill(s) as a precondition', () => {
+        // The action cell must instruct the coordinator to load
+        // cross-squad (and ideally cross-squad-communication) BEFORE
+        // any `task` spawn. Match on co-occurrence of "cross-squad"
+        // and "skill" on the same row.
+        const row = content
+          .split(/\r?\n/)
+          .find(l => /^\|.*spawn a squad.*another squad.*two squads/i.test(l));
+        expect(row, 'spawn-a-squad row should exist').toBeDefined();
+        expect(row, 'row should mention cross-squad skill').toMatch(/cross-squad/i);
+        expect(row, 'row should invoke the skill tool').toMatch(/skill/i);
+      });
+
+      it('has a Hard trigger — keyword-to-skill match paragraph in Skill-aware routing', () => {
+        // Both keywords must appear ("Hard trigger" + "keyword-to-skill")
+        // — together they uniquely identify the guard paragraph and rule
+        // out an accidental match against the routing-table row.
+        expect(content).toMatch(/Hard trigger/i);
+        expect(content).toMatch(/keyword.to.skill match/i);
+      });
+
+      it('the hard-trigger paragraph names the cross-squad mapping as a worked example', () => {
+        // Defends against a future edit that keeps the paragraph header
+        // but drops the concrete "squad → cross-squad" example, which
+        // is what makes the rule unambiguous for a coordinator.
+        const tail = content.slice(content.toLowerCase().indexOf('hard trigger'));
+        expect(tail).toMatch(/["']?squad["']?\s*→\s*`?cross-squad/);
+      });
+    });
+  }
+});
