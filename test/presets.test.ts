@@ -459,6 +459,55 @@ describe('applyPreset()', () => {
     expect(policy.max_capacity).toBeGreaterThan(0);
   });
 
+  it('preserves built-in role status labels in team.md (Scribe/Ralph/Rai/Fact Checker) — review on #1293', () => {
+    // A preset that happens to ship one of the always-on built-ins (Scribe,
+    // Ralph, Rai, Fact Checker) must produce the same Status cell that a
+    // fresh `squad init` cast would — '📋 Silent', '🔄 Monitor', '🛡️ RAI',
+    // '🔍 Verifier' respectively — NOT '✅ Active'. Pre-fix, memberRow()
+    // hardcoded '✅ Active' for every preset agent, which made
+    // preset-scaffolded teams visually disagree with cast-scaffolded teams
+    // for the same roster.
+    const homeDir = join(TMP, 'apply-status-roles');
+    process.env['SQUAD_HOME'] = homeDir;
+
+    scaffold(
+      'apply-status-roles/presets/builtins/agents/scribe',
+      'apply-status-roles/presets/builtins/agents/ralph',
+      'apply-status-roles/presets/builtins/agents/rai',
+      'apply-status-roles/presets/builtins/agents/fact-checker',
+      'apply-status-roles/presets/builtins/agents/dev',
+    );
+    writeFile('apply-status-roles/presets/builtins/preset.json', JSON.stringify({
+      name: 'builtins',
+      version: '1.0.0',
+      description: 'Preset that ships built-in roles',
+      agents: [
+        { name: 'scribe', role: 'Session Logger' },
+        { name: 'ralph', role: 'Work Monitor' },
+        { name: 'rai', role: 'RAI Reviewer' },
+        { name: 'fact-checker', role: 'Fact Checker' },
+        { name: 'dev', role: 'developer' },
+      ],
+    }));
+    for (const a of ['scribe', 'ralph', 'rai', 'fact-checker', 'dev']) {
+      writeFile(`apply-status-roles/presets/builtins/agents/${a}/charter.md`, `# ${a}`);
+    }
+
+    const squadDir = join(TMP, 'target-status-roles');
+    const agentsDir = join(squadDir, 'agents');
+    mkdirSync(agentsDir, { recursive: true });
+
+    applyPreset('builtins', agentsDir);
+
+    const teamMd = readFileSync(join(squadDir, 'team.md'), 'utf-8');
+    expect(teamMd).toContain('| scribe | Session Logger | `.squad/agents/scribe/charter.md` | 📋 Silent |');
+    expect(teamMd).toContain('| ralph | Work Monitor | `.squad/agents/ralph/charter.md` | 🔄 Monitor |');
+    expect(teamMd).toContain('| rai | RAI Reviewer | `.squad/agents/rai/charter.md` | 🛡️ RAI |');
+    expect(teamMd).toContain('| fact-checker | Fact Checker | `.squad/agents/fact-checker/charter.md` | 🔍 Verifier |');
+    // Regular agent still gets ✅ Active.
+    expect(teamMd).toContain('| dev | developer | `.squad/agents/dev/charter.md` | ✅ Active |');
+  });
+
   it('appends routing rows for preset agents to routing.md (#1288)', () => {
     const homeDir = join(TMP, 'apply-routing');
     process.env['SQUAD_HOME'] = homeDir;

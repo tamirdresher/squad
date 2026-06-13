@@ -31,11 +31,31 @@ interface ScaffoldOptions {
 }
 
 /**
+ * Map an agent's role to the Members-table Status cell.
+ *
+ * Mirrors the role-to-status mapping in `packages/squad-cli/src/cli/core/cast.ts:652-655`
+ * so a team produced by `preset apply` looks identical to one produced by
+ * a fresh cast — Scribe/Ralph/Rai/Fact-Checker each get their canonical
+ * status label instead of all rows being '✅ Active'. Per-role rather
+ * than per-name because presets may rename the agent but keep the role.
+ */
+function statusForRole(role: string): string {
+  // Case-insensitive comparison so presets that lowercase "session logger"
+  // still get the silent status.
+  const r = role.toLowerCase();
+  if (r === 'session logger' || r === 'scribe') return '📋 Silent';
+  if (r === 'work monitor' || r === 'ralph') return '🔄 Monitor';
+  if (r === 'rai reviewer' || r === 'rai') return '🛡️ RAI';
+  if (r === 'fact checker' || r === 'fact-checker') return '🔍 Verifier';
+  return '✅ Active';
+}
+
+/**
  * Build a single Members table row for a preset agent.
  */
 function memberRow(agent: PresetAgent): string {
   const nameLower = agent.name.toLowerCase();
-  return `| ${agent.name} | ${agent.role} | \`.squad/agents/${nameLower}/charter.md\` | ✅ Active |`;
+  return `| ${agent.name} | ${agent.role} | \`.squad/agents/${nameLower}/charter.md\` | ${statusForRole(agent.role)} |`;
 }
 
 /**

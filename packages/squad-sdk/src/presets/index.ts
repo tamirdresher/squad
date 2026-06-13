@@ -156,10 +156,18 @@ export function applyPreset(
       // Scaffolding failed but charters were copied — surface as a single
       // synthetic error result so the CLI can warn but does not mask the
       // per-agent install results.
+      //
+      // Use a clearly non-agent sentinel for the `agent` field (`<scaffold>`,
+      // wrapped in angle brackets which validateName rejects) instead of the
+      // preset name. The preset name is a legal agent name, and if a preset
+      // happens to ship an agent that shares the preset's name (`squad
+      // preset apply geektime` where the preset includes an agent literally
+      // called `geektime`), the consumer of the results could not tell the
+      // synthetic scaffold-failure row apart from a real per-agent error.
       results.push({
-        agent: presetName,
+        agent: '<scaffold>',
         status: 'error',
-        reason: `Charters copied but failed to wire team.md/routing.md/casting state: ${String(err)}`,
+        reason: `Charters copied (see per-agent rows above), but failed to wire team.md/routing.md/casting state for preset '${presetName}': ${String(err)}`,
       });
     }
   }
