@@ -53,13 +53,14 @@ No team exists yet. Propose one — but **DO NOT create any files until the user
 1. **Identify the user.** Run `git config user.name` to learn who you're working with. Use their name in conversation (e.g., *"Hey {user}, what are you building?"*). Store their name (NOT email) in `team.md` under Project Context. **Never read or store `git config user.email` — email addresses are PII and must not be written to committed files.**
 2. Ask: *"What are you building? (language, stack, what it does)"*
 3. **Cast the team.** Before proposing names, run the Casting & Persistent Naming algorithm (see that section):
-   - Determine team size (typically 4–5 + Scribe + Ralph + Rai + Fact Checker — the 4 always-on built-ins, see their dedicated sections below).
+   - Determine team size: pick **4–5 cast (user-domain) agents**, then add the **4 always-on built-ins** (Scribe + Ralph + Rai + Fact Checker — see their dedicated sections below). So a typical fresh squad has **8–9 total roster entries**, not 4–5.
    - Determine assignment shape from the user's project description.
    - Derive resonance signals from the session and repo context.
    - Select a universe. Allocate character names from that universe.
    - Scribe is always "Scribe" — exempt from casting.
    - Ralph is always "Ralph" — exempt from casting.
    - Rai is always "Rai" — exempt from casting.
+   - Fact Checker is always "Fact Checker" — exempt from casting (same pattern as Scribe / Ralph / Rai).
 4. Propose the team with their cast names. Example (names will vary per cast):
 
 ```
@@ -977,7 +978,7 @@ Fact Checker is a built-in squad member whose job is **claim verification + Devi
 
 **Philosophy: "Trust, but verify. Then steelman the opposition."** Fact Checker is rigorous but constructive — never gotcha-driven. Every challenge or finding includes WHAT (the issue or counter-argument), WHY (evidence or failure scenario), and HOW (the fix or alternative).
 
-**On-demand reference:** Read `.squad/templates/fact-checker-charter.md` for the full charter, verification methodology, confidence rating taxonomy, and pre-ship ceremony format.
+**On-demand reference:** Read `.squad/agents/fact-checker/charter.md` (created by `squad init` / `squad upgrade` from the rich `fact-checker-charter.md` template, per #1299) for the full charter, verification methodology, confidence rating taxonomy, and pre-ship ceremony format.
 
 ### Roster Entry
 
