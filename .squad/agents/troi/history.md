@@ -119,3 +119,48 @@ Seed sources:
 **Output location:** `.squad/decisions/inbox/troi-release-blog-draft.md`. Includes the full draft above plus a "Note for Tamir" section listing modeled posts, picked themes, omitted themes, and every factual claim with its citation.
 
 **Length target verified:** Roughly the same scale as v0.9.0 (~260 lines including the reviewer note). Headline body alone is ~150 lines, which is comparable to v0.9.0's body length.
+
+## 2026-06-09 — Substantive Code Review Comment on PR #1148 (@ahhlun, reasoningEffort pipeline)
+
+**Task:** Draft a PR review comment for ahhlun's `feat(sdk): thread reasoningEffort through agent spawning pipeline` — 18 files, +983/-6, 5-layer hierarchy + clamping. Based on a review by Data + Worf.
+
+**What worked:**
+- Opening acknowledgment is specific and evidence-backed: "~30 unit tests across 3 test files", "live test confirmed 8 reasoning delta events at xhigh", "charter parsing handles missing field, casing, whitespace, auto sentinel cleanly" — all concrete, none generic. Matches the #1195 pattern of "Good use of X with a specific referent."
+- "Two asks before I approve:" as a transition is confident and non-hedged. Labels the comment's structure upfront so the author knows exactly what they're looking at.
+- **Net effect:** translation after the technical description — "defaultReasoningEffort: 'high' in .squad/config.json today does nothing" — is the signature move. Technical detail + plain-English consequence in the same breath.
+- **The "fair caveat" pattern (new pattern):** When a gap is inherited from existing broken code rather than introduced by this PR, acknowledge it explicitly and briefly: "the same gap exists for `model` in `lifecycle.ts` already — this follows the existing broken pattern." This signals precision about blame, not hedging. Tamir does this to maintain credibility with the author without excusing the issue.
+- Consolidated both blockers into one ask (wire the resolver OR scope the description + file follow-up), followed by one integration test ask. Two asks, not four — makes the "before I approve" threshold clear.
+- Smaller stuff downgraded explicitly ("not blockers") and listed without elaboration. Signals Tamir noticed them, they don't block merge, but the author should know.
+- Kicker closes on the *resolver*, not a social sign-off: "The resolver logic is tight — the missing piece is plugging it into the path that actually runs." Restates what's good, frames what's missing, done.
+
+**What to avoid:**
+- Don't explain the PR's architecture back to the author (no "this PR introduces a 5-layer hierarchy…"). They wrote it.
+- Don't list every good thing — pick the 3-4 most specific. "The plumbing is solid" as a one-liner is enough after enumerating specifics.
+- No "I would suggest" or "it might be worth" — "either wire X or scope the description" is the instruction.
+
+**New pattern extracted — "Net effect" sentence:**
+After walking through why something doesn't fire (resolver not called → dep optional → no caller injects it → fallback replicates OR-chain), terminate with a single short declarative: "Net effect: [thing user configured today does nothing]." Compresses 4 technical bullets into 1 actionable fact. Use whenever a chain of conditions leads to silent failure.
+
+**New pattern extracted — "Fair caveat" paragraph:**
+When a gap exists in the PR's code but the root cause is inherited from an existing broken pattern (not introduced by this PR), add one short parenthetical: "(Fair caveat: the same gap exists for X already — this follows the existing broken pattern rather than introducing a new regression.)" Keeps the review honest without letting the author feel they're being blamed for someone else's debt. One sentence, parenthetical, no softening of the actual ask.
+
+**Length target:** ~390 words. On the high end of code review comments (vs. #1195's shorter shape) because of two parallel technical gaps that each need explaining. Still comfortably under 450.
+
+## 2026-06-09 — REVISION: PR #1148 comment revised from "request changes" → "approve with nits"
+
+**Task:** Revise the earlier "request changes" draft for ahhlun's `reasoningEffort` PR after Tamir pushed back. On closer reading, the integrator-wiring gaps Worf flagged are intentional SDK design (same pattern as `resolveModel` — SDK exposes hooks, integrators like squad-cli wire them). The earlier draft was unfair.
+
+**Key learning — verify "approve vs. request changes" framing before posting under Tamir's name:**
+- An overcall on "request changes" when the gap is by design is worse than a false positive nit: it signals the reviewer didn't understand the PR's design intent, and it blocks a PR that shouldn't be blocked.
+- Before framing any gap as a blocker, check whether the existing SDK follows the same pattern. If `resolveModel` is optional on `FanOutDependencies` and nobody fires on that, the same shape on `resolveReasoningEffort` is not a bug — it's consistency.
+- The right move when catching this before posting: reframe as APPROVE, surface the design pattern explicitly ("same shape as `resolveModel`") so the author knows you read it correctly, then route remaining substance to nits + one testing question.
+- Posting a "request changes" review under Tamir's name when the correct verdict is "approve" is a voice fidelity failure with real consequences (blocks a PR, signals distrust, puts Tamir's reputation behind a wrong call). Always double-check the verdict label last, after drafting substance.
+
+**What changed structurally in the revision:**
+- Verdict: request changes → approve
+- Design-intent paragraph added: explicitly names the `resolveModel` parallel so the author knows the gap was considered, not missed
+- Both "blockers" demoted to nits — not blockers
+- Testing question kept (Layer 2 charter path not live-verified the same way as Layer 1) but reframed as "worth one more pass" rather than "required before merge"
+- Sign-off changes from "two things before I approve" to "approving — address nits your call"
+
+**Length target:** ~430 words (slightly above #1148 draft-1 because the design-intent paragraph is new).
