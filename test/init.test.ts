@@ -157,6 +157,41 @@ describe('Squad Initialization', () => {
       expect(content).toContain('.squad/decisions.md merge=union');
     });
 
+    it('should install the squad slash-command skill with user-invocable: true (regression: /squad must appear)', async () => {
+      // Users want to type /squad in Copilot CLI to see Squad's command
+      // catalog. Copilot CLI auto-registers any skill with frontmatter
+      // user-invocable: true as a slash command using the skill's name.
+      // (Verified against Copilot CLI 1.0.62-2 sdk/index.js, function Y_n:
+      //   getLoadedSkills().filter(e => e.userInvocable).map(...
+      //     ({name: `/${eF(e)}`, isSkill: true, skill: e}))
+      //
+      // The previous skill named 'squad-commands' had no user-invocable
+      // field (Copilot CLI defaults to false), so /squad-commands did not
+      // appear. Renamed to 'squad' + set user-invocable: true so /squad
+      // shows the command catalog.
+      const agents: InitAgentSpec[] = [{ name: 'lead', role: 'lead' }];
+      const options: InitOptions = {
+        teamRoot: TEST_ROOT,
+        projectName: 'Test Project',
+        agents
+      };
+
+      await initSquad(options);
+
+      const skillPath = join(TEST_ROOT, '.copilot', 'skills', 'squad', 'SKILL.md');
+      expect(existsSync(skillPath)).toBe(true);
+      const content = await readFile(skillPath, 'utf-8');
+      // The skill must declare itself user-invocable so Copilot CLI
+      // registers /squad as a slash command. This is the load-bearing
+      // assertion for the whole feature.
+      expect(content).toMatch(/^user-invocable:\s*true\s*$/m);
+      // Skill name must be 'squad' for the slash command to be /squad.
+      expect(content).toMatch(/^name:\s*"?squad"?\s*$/m);
+      // Body must still contain the menu-presentation rules so the
+      // coordinator knows what to show on /squad invocation.
+      expect(content).toContain('Menu Presentation Rules');
+    });
+
     it('should create initial decisions.md', async () => {
       const agents: InitAgentSpec[] = [{ name: 'lead', role: 'lead' }];
       const options: InitOptions = {
