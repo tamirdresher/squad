@@ -257,6 +257,30 @@ export const TEMPLATE_MANIFEST: TemplateFile[] = [
     overwriteOnUpgrade: true,
     description: 'Squad CLI internals — version stamping & upgrade mechanics',
   },
+  {
+    source: 'skills/tiered-memory/SKILL.md',
+    destination: '../.copilot/skills/tiered-memory/SKILL.md',
+    overwriteOnUpgrade: true,
+    description: 'Tiered-memory access patterns (hot/cold/wiki)',
+  },
+  {
+    source: 'skills/iterative-retrieval/SKILL.md',
+    destination: '../.copilot/skills/iterative-retrieval/SKILL.md',
+    overwriteOnUpgrade: true,
+    description: 'Iterative retrieval for long-running squad work',
+  },
+  {
+    source: 'skills/reflect/SKILL.md',
+    destination: '../.copilot/skills/reflect/SKILL.md',
+    overwriteOnUpgrade: true,
+    description: 'Reflection skill for capturing session learnings',
+  },
+  {
+    source: 'skills/cross-squad/SKILL.md',
+    destination: '../.copilot/skills/cross-squad/SKILL.md',
+    overwriteOnUpgrade: true,
+    description: 'Cross-squad discovery — finding peer squads via registry/upstream',
+  },
 
   // Session init reference (squad-owned, coordinator reads at session start)
   {

@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { mkdir, rm, readFile, writeFile } from 'fs/promises';
 import { join } from 'path';
 import { existsSync } from 'fs';
-import { initSquad } from '@bradygaster/squad-sdk/config';
+import { initSquad, MANIFEST_SKILL_NAMES } from '@bradygaster/squad-sdk/config';
 import { onboardAgent, addAgentToConfig } from '@bradygaster/squad-sdk/agents';
 import type { InitOptions, InitAgentSpec } from '@bradygaster/squad-sdk/config';
 import type { OnboardOptions } from '@bradygaster/squad-sdk/agents';
@@ -146,22 +146,13 @@ describe('Squad Initialization', () => {
       // templates dir; this test exists to ensure that regression cannot
       // happen again (the loop now throws on drift, but a missing
       // SKILL.md after install would still indicate a deeper issue).
-      const expectedSkills = [
-        'squad-conventions',
-        'error-recovery',
-        'secret-handling',
-        'git-workflow',
-        'session-recovery',
-        'reviewer-protocol',
-        'test-discipline',
-        'agent-collaboration',
-        'squad-commands',
-        'squad-version-check',
-        'tiered-memory',
-        'iterative-retrieval',
-        'reflect',
-        'cross-squad',
-      ];
+      //
+      // The expected list comes from the same MANIFEST_SKILL_NAMES export
+      // the production install loop reads — so the test cannot fall out
+      // of sync when a new skill is added. Sanity-asserted to be non-empty
+      // so a future accidental empty export doesn't make this test pass
+      // trivially.
+      expect(MANIFEST_SKILL_NAMES.length).toBeGreaterThan(0);
 
       const agents: InitAgentSpec[] = [{ name: 'lead', role: 'lead' }];
       const options: InitOptions = {
@@ -172,7 +163,7 @@ describe('Squad Initialization', () => {
 
       await initSquad(options);
 
-      for (const skill of expectedSkills) {
+      for (const skill of MANIFEST_SKILL_NAMES) {
         const skillPath = join(TEST_ROOT, '.copilot', 'skills', skill, 'SKILL.md');
         expect(existsSync(skillPath), `expected ${skill}/SKILL.md to be installed`).toBe(true);
       }
