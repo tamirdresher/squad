@@ -297,6 +297,89 @@ describe('squad.agent.md squad-spawning guidance', () => {
         const tail = content.slice(content.toLowerCase().indexOf('hard trigger'));
         expect(tail).toMatch(/["']?squad["']?\s*→\s*`?cross-squad/);
       });
+
+      it('the routing row instructs the coordinator to ask_user when the request is ambiguous', () => {
+        // Real-world failure mode (2026-06-13): even AFTER the row +
+        // hard-trigger were in place, a coordinator silently picked
+        // ad-hoc `task` fan-out instead of bootstrapping real squads
+        // because "two squads of engineers for a 30-line app felt
+        // disproportionate". The fix is an explicit "you MUST ask_user
+        // when ambiguous" clause with no escape hatch — and a callout
+        // that calling task agents "squad-alpha" doesn't make them
+        // squads. Both must be present on the squad-spawning row.
+        const row = content
+          .split(/\r?\n/)
+          .find(l => /^\|.*spawn a squad.*another squad.*two squads/i.test(l));
+        expect(row, 'spawn-a-squad row should exist').toBeDefined();
+        expect(row, 'row should reference ask_user for ambiguous requests').toMatch(/ask_user/i);
+        expect(row, 'row should call out the "naming != being" anti-pattern').toMatch(/anti-pattern/i);
+      });
+    });
+  }
+});
+
+// ---------------------------------------------------------------------------
+// 6. cross-squad/SKILL.md must have the Disambiguation section
+// ---------------------------------------------------------------------------
+
+const CROSS_SQUAD_SKILL_LOCATIONS = [
+  '.squad/skills/cross-squad/SKILL.md',
+  'packages/squad-cli/templates/skills/cross-squad/SKILL.md',
+  'packages/squad-sdk/templates/skills/cross-squad/SKILL.md',
+] as const;
+
+describe('cross-squad/SKILL.md disambiguation rule', () => {
+  // Folded into PR #1307 after a real-world failure (2026-06-13): the routing
+  // row alone wasn't enough — once the coordinator loaded the skill, its
+  // generic eager-execution / parallel-fan-out doctrine pulled it back to
+  // `task` fan-out anyway. The dedicated Disambiguation section makes the
+  // squad-vs-ad-hoc rule unmistakable inside the skill itself, with explicit
+  // default-behavior table, ask_user protocol, and anti-patterns.
+
+  for (const loc of CROSS_SQUAD_SKILL_LOCATIONS) {
+    describe(loc, () => {
+      const content = readFile(loc);
+
+      it('has a "Disambiguation" section', () => {
+        expect(content).toMatch(/##\s+Disambiguation/i);
+      });
+
+      it('declares the default-behaviour rule (literal Squad install when user says "squad")', () => {
+        // The default must be the literal interpretation. Any future
+        // edit that flips the default to ad-hoc fan-out would be a
+        // regression — that's exactly the failure mode this section
+        // exists to prevent.
+        const tail = content.slice(content.toLowerCase().indexOf('disambiguation'));
+        expect(tail).toMatch(/default behaviour|default behavior/i);
+        expect(tail).toMatch(/real.*Squad install|literal reference to a Squad install/i);
+      });
+
+      it('requires ask_user on ambiguous requests (no silent downgrade)', () => {
+        const tail = content.slice(content.toLowerCase().indexOf('disambiguation'));
+        expect(tail).toMatch(/ask_user/);
+        // Must explicitly forbid silent downgrades — the failure mode
+        // was "coordinator silently picked the cheaper option".
+        expect(tail).toMatch(/never silently/i);
+      });
+
+      it('lists the "calling task agents squad-alpha doesn\'t make them squads" anti-pattern', () => {
+        const tail = content.slice(content.toLowerCase().indexOf('disambiguation'));
+        // The anti-pattern is the strongest defense against the
+        // "name it a squad to look compliant" failure mode.
+        expect(tail).toMatch(/anti-pattern/i);
+        expect(tail).toMatch(/squad-alpha|squad-beta|naming.*does(n't| not)/i);
+      });
+
+      it('frontmatter declares squad-spawning trigger phrases', () => {
+        // Copilot CLI itself ignores triggers: at the loader level
+        // (verified via sdk/index.js decompile), but the squad
+        // skill-aware-routing system uses natural-language matching
+        // against frontmatter + content. Documenting the trigger
+        // phrases here helps that matcher fire on the right prompts.
+        expect(content).toMatch(/^triggers:/m);
+        expect(content).toMatch(/spawn a squad|spawn N squads/);
+        expect(content).toMatch(/another squad|two squads of/);
+      });
     });
   }
 });
