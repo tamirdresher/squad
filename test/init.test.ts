@@ -270,7 +270,7 @@ describe('Squad Initialization', () => {
       const content = await readFile(skillPath, 'utf-8');
       expect(content).toContain('name: "squad-help"');
       expect(content).not.toMatch(/^name:\s*"?squad"?\s*$/m);
-      expect(content).toContain("agent_type="Squad"");
+      expect(content).toContain('agent_type="Squad"');
       expect(content).toContain('custom agent');
     });
 
