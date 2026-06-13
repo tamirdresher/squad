@@ -71,8 +71,14 @@ describe('squad.agent.md.template — state-backend handshake (#1305)', () => {
         expect(content).toMatch(/\.squad\/decisions\/inbox/);
         expect(content).toMatch(/\.squad\/agents\/\*\/history\.md/);
         // And must call out the create/edit/write_file tools by name so the
-        // model maps the rule to its actual function inventory.
-        expect(content).toMatch(/create.*edit.*write_file|create\s*\/\s*edit/i);
+        // model maps the rule to its actual function inventory. Match each
+        // tool name with separate assertions so dropping any one of them
+        // (e.g. forgetting `write_file`) fails the test — the previous
+        // single-regex form had | precedence so the shorter alternative
+        // `create\s*/\s*edit` could pass without `write_file`.
+        expect(content).toMatch(/\bcreate\b/);
+        expect(content).toMatch(/\bedit\b/);
+        expect(content).toMatch(/\bwrite_file\b/);
       });
 
       it('keeps the local/worktree carve-out explicit (file ops valid for local backends)', () => {
