@@ -930,6 +930,74 @@ export async function initSquad(options: InitOptions, storage: StorageProvider =
   }
 
   // -------------------------------------------------------------------------
+  // Seed .squad/fact-checker/ files (policy and audit trail)
+  //
+  // Mirrors the Rai pattern above. Fact Checker is an always-on built-in
+  // (per bradygaster/squad#789 + #1254 — single agent, dual operating mode:
+  // Verification + Devil's Advocate) and gets its own state dir so its
+  // policy + audit trail are first-class artifacts the coordinator can
+  // reference, not embedded inside the agent's charter file.
+  //
+  // See bradygaster/squad#1299 for the design rationale.
+  // -------------------------------------------------------------------------
+
+  const factCheckerDir = join(squadDir, 'fact-checker');
+  const factCheckerPolicyPath = join(factCheckerDir, 'policy.md');
+  if (!storage.existsSync(factCheckerPolicyPath)) {
+    const templateSrc = templatesDir ? join(templatesDir, 'fact-checker-policy.md') : null;
+    if (templateSrc && storage.existsSync(templateSrc)) {
+      storage.copySync(templateSrc, factCheckerPolicyPath);
+    } else {
+      // Minimal fallback if the template was stripped from the install (e.g.,
+      // pre-1299 squad-sdk). The full template at
+      // .squad-templates/fact-checker-policy.md is the canonical source.
+      const factCheckerPolicyFallback = `# Fact Checker Policy
+
+> Verification & devil's-advocate methodology for this project.
+
+## Verification Mode
+
+Check claims about URLs, package names, API endpoints, file paths, function signatures, quoted text, and cross-references to team decisions. Issue one of:
+
+- ✅ Verified — confirmed via source
+- ⚠️ Unverified — plausible but could not confirm (flag, do not block)
+- ❌ Contradicted — evidence contradicts the claim (**blocking** at Pre-Ship)
+- 🔍 Needs Investigation — beyond current scope
+
+## Devil's Advocate Mode
+
+Produce briefs that include: steelman of the opposition, load-bearing assumptions, pre-mortem in 30 days, alternative approach, risk acceptance.
+
+## Hard Rules
+
+- Never cite a URL/package/API without verifying it exists
+- Never invent measurement data or "production results"
+- Never fabricate a counter-hypothesis
+- Never block on opinion — only on ❌ Contradicted findings
+
+## Audit Trail
+
+All findings logged to \`.squad/fact-checker/audit-trail.md\` (append-only, succinct — verdict + citation, never raw source).
+`;
+      await storage.write(factCheckerPolicyPath, factCheckerPolicyFallback);
+    }
+    createdFiles.push(toRelativePath(factCheckerPolicyPath));
+  } else {
+    skippedFiles.push(toRelativePath(factCheckerPolicyPath));
+  }
+
+  const factCheckerAuditTrailPath = join(factCheckerDir, 'audit-trail.md');
+  if (!storage.existsSync(factCheckerAuditTrailPath)) {
+    await storage.write(
+      factCheckerAuditTrailPath,
+      '# Fact Checker Audit Trail\n\n> Append-only evidence log. Entries are succinct — verdict + citation, never raw source material.\n\n<!-- Fact Checker appends findings below -->\n',
+    );
+    createdFiles.push(toRelativePath(factCheckerAuditTrailPath));
+  } else {
+    skippedFiles.push(toRelativePath(factCheckerAuditTrailPath));
+  }
+
+  // -------------------------------------------------------------------------
   // Create .squad/config.json for squad settings
   // -------------------------------------------------------------------------
 
@@ -1036,8 +1104,36 @@ export async function initSquad(options: InitOptions, storage: StorageProvider =
     agentDirs.push(agentDir);
 
     // Create charter.md
+    //
+    // Built-in always-on agents (Rai, fact-checker) ship with rich
+    // charter templates at `templates/{role}-charter.md`. If a template
+    // exists for this agent's role, use that instead of the generic
+    // role-based stub — this gives the agent its full operating manual
+    // (verdict protocol, audit-trail rules, dual-mode declarations) from
+    // day one of `squad init`, matching the behavior of `squad upgrade`'s
+    // `ensureBuiltinAgents` path. See bradygaster/squad#1299.
     const charterPath = join(agentDir, 'charter.md');
-    const charterContent = generateCharter(agent, projectName, projectDescription);
+    let charterContent: string | null = null;
+    if (templatesDir) {
+      // Lookup priority: exact role name first, then capitalized variant
+      // (Rai uses `Rai-charter.md` capitalized; fact-checker uses
+      // `fact-checker-charter.md` lowercase-hyphenated).
+      const candidates = [
+        join(templatesDir, `${agent.role}-charter.md`),
+        join(templatesDir, `${agent.name}-charter.md`),
+      ];
+      for (const candidate of candidates) {
+        if (storage.existsSync(candidate)) {
+          charterContent = storage.readSync(candidate) ?? null;
+          if (charterContent) break;
+        }
+      }
+    }
+    if (charterContent === null) {
+      // Fall back to the generic role-based charter for user-defined agents
+      // that don't have a rich template (everyone except Rai + fact-checker).
+      charterContent = generateCharter(agent, projectName, projectDescription);
+    }
     await writeIfNotExists(charterPath, charterContent);
 
     // Create history.md
@@ -1192,6 +1288,7 @@ ${projectDescription ? `- **Description:** ${projectDescription}\n` : ''}- **Cre
     '.squad/log/** merge=union',
     '.squad/orchestration-log/** merge=union',
     '.squad/rai/audit-trail.md merge=union',
+    '.squad/fact-checker/audit-trail.md merge=union',
   ];
 
   let existingAttrs = '';
