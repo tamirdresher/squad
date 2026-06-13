@@ -81,7 +81,18 @@ export async function runPreset(cwd: string, subcommand: string, args: string[])
       }
       const force = args.includes('--force');
       const nameIdx = args.indexOf('--name');
-      const nameOverride = nameIdx >= 0 ? args[nameIdx + 1] : undefined;
+      let nameOverride: string | undefined;
+      if (nameIdx >= 0) {
+        // Defend against `squad preset install <src> --name` (no value) and
+        // `--name --force` (value is another flag) — both currently produce
+        // confusing downstream errors. Fail fast with a clear usage hint
+        // per review on bradygaster/squad#1225.
+        const candidate = args[nameIdx + 1];
+        if (!candidate || candidate.startsWith('-')) {
+          fatal('`--name` requires a value. Usage: squad preset install <source> --name <override>');
+        }
+        nameOverride = candidate;
+      }
       await presetInstall(source!, nameOverride, force);
       break;
     }
