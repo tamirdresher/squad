@@ -263,6 +263,12 @@ export const TEMPLATE_MANIFEST: TemplateFile[] = [
     overwriteOnUpgrade: true,
     description: 'Squad CLI internals — version stamping & upgrade mechanics',
   },
+  {
+    source: 'skills/squad-help/SKILL.md',
+    destination: '../.copilot/skills/squad-help/SKILL.md',
+    overwriteOnUpgrade: true,
+    description: 'How to actually use Squad — agent vs skill vs slash command (#1297 redirect)',
+  },
 
   // Session init reference (squad-owned, coordinator reads at session start)
   {
