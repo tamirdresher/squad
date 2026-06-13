@@ -96,6 +96,44 @@ describe('CLI: init command', () => {
     expect(wisdomContent).toContain('Team Wisdom');
   });
 
+  it('should NOT write any squad_state entries to ~/.copilot/mcp-config.json (regression: #1296)', async () => {
+    // iter-8 design: init writes squad_state to repo-root .mcp.json ONLY.
+    // The unconditional ensureSquadStateMcpInUserConfig call at init.ts:408
+    // (and upgrade.ts:738) used to write squad_state_<hash> to HOME on every
+    // init, accumulating one entry per project with no GC and contradicting
+    // the iter-8 docstring's stated "No HOME modifications" intent.
+    //
+    // This test isolates the developer's real HOME by setting USERPROFILE
+    // (Windows) and HOME (POSIX) to a temp dir before init, then asserting
+    // no squad_state* entries appear under that temp HOME.
+    const fakeHome = join(tmpdir(), `.test-fake-home-${randomBytes(4).toString('hex')}`);
+    await mkdir(fakeHome, { recursive: true });
+    const originalUserprofile = process.env.USERPROFILE;
+    const originalHome = process.env.HOME;
+    process.env.USERPROFILE = fakeHome;
+    process.env.HOME = fakeHome;
+    try {
+      await runInit(TEST_ROOT);
+
+      const fakeHomeMcp = join(fakeHome, '.copilot', 'mcp-config.json');
+      if (existsSync(fakeHomeMcp)) {
+        const content = await readFile(fakeHomeMcp, 'utf-8');
+        const config = JSON.parse(content);
+        const servers = (config.mcpServers as Record<string, unknown> | undefined) ?? {};
+        const offending = Object.keys(servers).filter(k => k.startsWith('squad_state'));
+        expect(offending, `init must not write squad_state entries to HOME; found: ${offending.join(', ')}`).toEqual([]);
+      }
+      // (If the file doesn't exist at all, that's also a pass — init touched
+      // nothing under HOME, which is the iter-8 ideal.)
+    } finally {
+      if (originalUserprofile === undefined) { delete process.env.USERPROFILE; } else { process.env.USERPROFILE = originalUserprofile; }
+      if (originalHome === undefined) { delete process.env.HOME; } else { process.env.HOME = originalHome; }
+      if (existsSync(fakeHome)) {
+        await rm(fakeHome, { recursive: true, force: true });
+      }
+    }
+  });
+
   it('should create .copilot/mcp-config.json without squad_state (iter-7: lives in ~/.copilot)', async () => {
     await runInit(TEST_ROOT);
 

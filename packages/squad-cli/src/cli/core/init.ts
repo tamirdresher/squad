@@ -16,7 +16,7 @@ import { installGitHooks } from '../commands/install-hooks.js';
 import { liftInitMutableStateOntoOrphan } from '../commands/migrate-backend.js';
 import { resolveSquadStateMcpSpec } from './mcp-spec.js';
 import { describeMcpSpec } from './upgrade.js';
-import { ensureSquadStateMcpInRoot, ensureSquadStateMcpInUserConfig, tombstoneStaleSquadStateInProjectMcp } from './mcp-root.js';
+import { ensureSquadStateMcpInRoot, tombstoneStaleSquadStateInProjectMcp } from './mcp-root.js';
 import {
   readTeamMd,
   writeTeamMd,
@@ -399,11 +399,13 @@ export async function runInit(dest: string, options: RunInitOptions = {}): Promi
     if (rootResult.written) {
       success(`installed squad_state MCP server to .mcp.json (${describeMcpSpec(mcpSpec)}) — Copilot CLI will auto-load on next invocation`);
     }
-    // Also pin to user-level config for external `copilot -p` compatibility
-    const userResult = ensureSquadStateMcpInUserConfig(dest, mcpSpec);
-    if (userResult.written) {
-      success(`pinned squad_state to ~/.copilot/mcp-config.json for \`copilot -p\` mode compatibility`);
-    }
+    // iter-8: do NOT write to ~/.copilot/mcp-config.json. The repo-root
+    // .mcp.json write above is sufficient for Copilot CLI 5.3+ (which
+    // auto-loads .mcp.json walking up from cwd to git root) AND for
+    // `copilot -p` invocations launched from the project root. Users who
+    // launch `copilot -p` from outside the project root should use
+    // `--additional-mcp-config @.mcp.json` (already documented at the end
+    // of this command). See bradygaster/squad#1296.
     const tomb = tombstoneStaleSquadStateInProjectMcp(dest);
     if (tomb.removed) {
       success(`removed stale squad_state from ${tomb.path} (now lives in .mcp.json)`);

@@ -16,7 +16,7 @@ import { scrubEmails } from './email-scrub.js';
 import { getPackageVersion, stampVersion, readInstalledVersion } from './version.js';
 import { resolveSquadStateMcpSpec, type SquadStateMcpSpec } from './mcp-spec.js';
 export { resolveSquadStateMcpSpec } from './mcp-spec.js';
-import { ensureSquadStateMcpInRoot, ensureSquadStateMcpInUserConfig, tombstoneStaleSquadStateInProjectMcp } from './mcp-root.js';
+import { ensureSquadStateMcpInRoot, tombstoneStaleSquadStateInProjectMcp } from './mcp-root.js';
 
 const storage = new FSStorageProvider();
 
@@ -733,15 +733,11 @@ async function runEnsureChecks(dest: string, templatesDir: string, filesUpdated:
   } catch (err) {
     warn(`Could not write .mcp.json: ${err instanceof Error ? err.message : err}`);
   }
-  // Also pin to user-level config for external `copilot -p` compatibility
-  try {
-    const userResult = ensureSquadStateMcpInUserConfig(dest, pinnedSpec);
-    if (userResult.written) {
-      success(`pinned squad_state to ~/.copilot/mcp-config.json for \`copilot -p\` mode compatibility`);
-    }
-  } catch {
-    // best-effort: user-level config write failure does not block upgrade
-  }
+  // iter-8: do NOT write to ~/.copilot/mcp-config.json on upgrade. The
+  // repo-root .mcp.json write above is sufficient for Copilot CLI 5.3+
+  // (auto-loads .mcp.json from cwd up) AND for `copilot -p` from the
+  // project root. Out-of-tree `copilot -p` should use
+  // `--additional-mcp-config @.mcp.json`. See bradygaster/squad#1296.
   const tomb = tombstoneStaleSquadStateInProjectMcp(dest);
   if (tomb.removed) {
     success(`removed stale squad_state from ${tomb.path} (now lives in .mcp.json)`);
