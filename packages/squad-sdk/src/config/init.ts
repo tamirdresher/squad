@@ -1336,6 +1336,9 @@ ${projectDescription ? `- **Description:** ${projectDescription}\n` : ''}- **Cre
 
   // -------------------------------------------------------------------------
   // Create .gitattributes for merge drivers
+  // Append-only mutable state files use union merge to handle concurrent appends.
+  // Note: .squad/casting/* files are identity (not mutable) so they don't need
+  // union merge and are NOT listed here.
   // -------------------------------------------------------------------------
 
   const gitattributesPath = join(teamRoot, '.gitattributes');
@@ -1366,6 +1369,10 @@ ${projectDescription ? `- **Description:** ${projectDescription}\n` : ''}- **Cre
   // Create .gitignore entries for runtime state (logs, inbox, sessions)
   // These paths are written during normal squad operation but should not be
   // committed to version control (they are runtime state).
+  //
+  // Note: .squad/casting/* is AUTHORITATIVE IDENTITY (team-defined agent
+  // universe, persistent name registry, history). It belongs on 'main', not
+  // on the squad-state orphan branch. Do NOT add casting/* to ignoreEntries.
   // -------------------------------------------------------------------------
 
   const gitignorePath = join(teamRoot, '.gitignore');
@@ -1387,6 +1394,7 @@ ${projectDescription ? `- **Description:** ${projectDescription}\n` : ''}- **Cre
   if (missingIgnore.length > 0) {
     const block = (existingIgnore && !existingIgnore.endsWith('\n') ? '\n' : '')
       + '# Squad: ignore runtime state (logs, inbox, sessions)\n'
+      + '# Note: .squad/casting/* is identity and MUST be committed to main, not ignored\n'
       + missingIgnore.join('\n') + '\n';
     await storage.append(gitignorePath, block);
     createdFiles.push(toRelativePath(gitignorePath));
