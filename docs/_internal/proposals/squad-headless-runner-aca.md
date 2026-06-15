@@ -123,13 +123,35 @@ This phase answers exactly one question: *"does the CLI run cleanly in a contain
 | Build | Size | Run time (single prompt) | Notes |
 |---|---|---|---|
 | Initial Phase 1 (node:22-alpine, no prune) | 1.28 GB | 55.9 s | Required `--entrypoint node /app/.../app.js` workaround for Copilot's Node-24 requirement |
-| Phase 1 lean (node:24-alpine + `npm prune --omit=dev` + strip darwin/win32 prebuilds) | **973 MB** | **36.2 s** | Clean `copilot` entrypoint. -307 MB / -24% size, -19.7 s / -35% wall time |
+| Lean Alpine (node:24-alpine + `npm prune --omit=dev` + strip darwin/win32 prebuilds) | 973 MB | 36.2 s | Clean `copilot` entrypoint. -24% size, -35% wall time |
+| **Distroless** (gcr.io/distroless/nodejs24-debian12:nonroot + glibc builder + strip musl + linuxmusl prebuilds) | **914 MB** | **22.7 s** | **-29% size, -59% wall time** vs initial. No shell in runtime. |
 
 **Optimization log** (this image, what was done):
 - ✅ Base bumped to `node:24-alpine` → matches `@github/copilot`'s Node 24 requirement; removes workaround
 - ✅ `npm prune --omit=dev` after build → drops typescript, eslint, vitest, playwright-core, @cspell, @esbuild, @shikijs, @babel
-- ✅ Strip cross-platform prebuilds from `@github/copilot` (delete `darwin-*` + `win32-*`, keep all 4 Linux variants for portability)
-- ⏭️ Not done (Phase 2): tree-shake `@opentelemetry` (~256 MB, real SDK runtime dep), distroless runtime base (~70-100 MB), esbuild bundle (could reach ~300-400 MB)
+- ✅ Strip cross-platform prebuilds (delete `darwin-*` + `win32-*`, then `linuxmusl-*` once we switched off Alpine — keeps `linux-{x64,arm64}` only)
+- ✅ Runtime: `gcr.io/distroless/nodejs24-debian12:nonroot` (drops shell, busybox, apk)
+- ✅ Builder: `node:24-bookworm-slim` (debian/glibc) so native modules match distroless's glibc runtime
+- ⏭️ Not done (Phase 2): tree-shake `@opentelemetry` (~256 MB, real SDK runtime dep), esbuild bundle (could reach ~300-400 MB total)
+
+### Distroless invocation pattern
+
+Distroless lacks `/usr/bin/env`, so the `copilot` shebang (`#!/usr/bin/env node`) doesn't resolve. Invoke node directly with the script path:
+
+```bash
+# Squad CLI (default — uses ENTRYPOINT)
+docker run --rm squad:phase1 --version
+docker run --rm squad:phase1 doctor
+
+# Copilot one-shot prompt with the squad agent
+docker run --rm \
+  -e GITHUB_TOKEN=$TOKEN \
+  -v $PWD:/workspace \
+  --entrypoint /nodejs/bin/node \
+  squad:phase1 \
+  /app/node_modules/@github/copilot/app.js \
+  -p "show me the team" --agent squad --allow-all-tools
+```
 
 ## References
 
