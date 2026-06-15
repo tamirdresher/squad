@@ -1,0 +1,45 @@
+# Build artifacts (regenerated inside the image)
+**/node_modules
+**/dist
+**/coverage
+**/*.tsbuildinfo
+
+# VCS
+.git
+.gitignore
+.gitattributes
+
+# IDE / editor
+.vscode
+.idea
+*.swp
+.DS_Store
+
+# Logs & temp
+*.log
+.npm
+.cache
+tmp
+.tmp
+
+# Tests & fixtures (not needed at runtime)
+test
+test-fixtures
+
+# Docs site (not needed at runtime)
+docs
+
+# Samples (each has its own Dockerfile)
+samples
+
+# Local agent state (would leak project-specific data into images)
+.squad
+.ai-team
+.copilot
+.github/agents
+
+# Misc
+*.tgz
+.changeset
+playwright-report
+test-results
