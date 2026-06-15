@@ -134,16 +134,24 @@ This phase answers exactly one question: *"does the CLI run cleanly in a contain
 - ✅ Builder: `node:24-bookworm-slim` (debian/glibc) so native modules match distroless's glibc runtime
 - ⏭️ Not done (Phase 2): tree-shake `@opentelemetry` (~256 MB, real SDK runtime dep), esbuild bundle (could reach ~300-400 MB total)
 
-### Distroless invocation pattern
+### Distroless invocation
 
-Distroless lacks `/usr/bin/env`, so the `copilot` shebang (`#!/usr/bin/env node`) doesn't resolve. Invoke node directly with the script path:
+We copy `/usr/bin/env` (~48 KB, glibc-only) from the builder into the distroless runtime so `#!/usr/bin/env node` shebangs (e.g. in `node_modules/.bin/copilot`) resolve normally. Both ergonomic patterns work:
 
 ```bash
 # Squad CLI (default — uses ENTRYPOINT)
 docker run --rm squad:phase1 --version
 docker run --rm squad:phase1 doctor
 
-# Copilot one-shot prompt with the squad agent
+# Copilot one-shot prompt with the squad agent — clean form (shebang works)
+docker run --rm \
+  -e GITHUB_TOKEN=$TOKEN \
+  -v $PWD:/workspace \
+  --entrypoint /app/node_modules/.bin/copilot \
+  squad:phase1 \
+  -p "show me the team" --agent squad --allow-all-tools
+
+# Fallback if shebangs don't resolve in your environment:
 docker run --rm \
   -e GITHUB_TOKEN=$TOKEN \
   -v $PWD:/workspace \

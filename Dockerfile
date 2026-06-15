@@ -95,6 +95,11 @@ COPY --from=builder --chown=65532:65532 /build/packages/squad-cli/templates pack
 COPY --from=builder --chown=65532:65532 /build/packages/squad-cli/scripts packages/squad-cli/scripts
 COPY --from=builder --chown=65532:65532 /workspace /workspace
 
+# Copy /usr/bin/env from the builder so shebangs like #!/usr/bin/env node
+# (in node_modules/.bin/* symlinks, including @github/copilot's npm-loader)
+# resolve. Only ~48 KB; depends on libc + ld-linux which distroless has.
+COPY --from=builder /usr/bin/env /usr/bin/env
+
 # `copilot` resolvable from PATH. Distroless puts node at /nodejs/bin/node.
 ENV PATH="/app/node_modules/.bin:/nodejs/bin:/usr/local/bin:/usr/bin:/bin"
 ENV SQUAD_STORAGE=fs
