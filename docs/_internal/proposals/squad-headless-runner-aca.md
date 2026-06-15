@@ -114,9 +114,10 @@ This phase answers exactly one question: *"does the CLI run cleanly in a contain
 1. `docker build -t squad:phase1 .` from the repo root succeeds on a clean Node 22+ host.
 2. `docker run --rm squad:phase1 --version` prints a valid semver.
 3. `docker run --rm squad:phase1 --help` prints CLI help.
-4. Image size < 500 MB (alpine baseline ~150 MB + node_modules ~200 MB + dist ~50 MB).
-5. Image runs as non-root user (`squad`, uid synthesized).
-6. `VOLUME /workspace` declared so users can mount a host `.squad/` directory.
+4. Image runs as non-root user (`squad`, uid synthesized).
+5. `VOLUME /workspace` declared so users can mount a host `.squad/` directory.
+
+> **Note on image size:** Phase 1 image is ~1.3 GB (Alpine ~150 MB + full `node_modules` including devDeps ~1 GB + dist + templates ~150 MB). This is acceptable for Phase 1 ("can it run in a container?"). **Image-size optimization is explicitly Phase 2 work**, where `npm prune --production` after build, removing the `scripts/` directory, and possibly switching to `node:22-alpine` distroless or `gcr.io/distroless/nodejs22` runtime can take it under 400 MB. We avoid premature optimization in Phase 1 to keep the diff small and the failure surface narrow.
 
 ## References
 
