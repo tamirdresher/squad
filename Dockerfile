@@ -38,9 +38,17 @@ RUN node packages/squad-cli/scripts/patch-esm-imports.mjs
 # Copy the rest of the source tree. CI=1 suppresses the build-bump script
 # (scripts/bump-build.mjs respects CI=true / SKIP_BUILD_BUMP=1) so the
 # image version matches the committed package.json — no .dirty bumps.
+#
+# We invoke the workspace package builds DIRECTLY rather than `npm run build`
+# at the root. The root build runs a `prebuild` that calls
+# scripts/sync-skill-templates.mjs, which hard-fails when `.squad/skills/`
+# is absent — it always is in a clean image (we .dockerignore .squad/ to
+# avoid baking project-specific state into the image). The package
+# template dirs (packages/*/templates/skills/) are already committed in
+# the repo, so the sync is redundant here.
 COPY . .
 ENV CI=true
-RUN npm run build
+RUN npm run build -w packages/squad-sdk && npm run build -w packages/squad-cli
 
 # ─── Runtime stage ────────────────────────────────────────────
 FROM node:22-alpine
