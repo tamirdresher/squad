@@ -1,16 +1,66 @@
 # Squad Decisions
 
-**Last Updated:** 2026-06-15T18:24:50Z
+**Last Updated:** 2026-06-24T13:33:13Z
 
 ## Active Decisions
 
 ---
 
-# Squad Decisions
+### 2026-06-24T13:33:13Z: Data — PR Review: bradygaster/squad#1383
 
-**Last Updated:** 2026-06-09T10:03:36Z
+**Author:** Data  
+**Date:** 2026-06-24T13:33:13+03:00  
+**PR:** https://github.com/bradygaster/squad/pull/1383  
+**Title:** fix: CLI and upgrade bug fixes (#1050, #1048, #1047, #1052, #1029, #1353)  
+**Verdict:** REQUEST CHANGES — 2 blockers (CI failure + routing logic bug)
 
-## Active Decisions
+**Summary:** Batches six CLI and upgrade bug fixes. All issues addressed in code, but logical error in routing mention guard (`||` should be `&&`) and CI test failure block merge.
+
+**BLOCKER 1 — CI `test` step FAILED:** Two tests fail directly from PR changes. Need confirmation these aren't pre-existing or fixes required.
+
+**BLOCKER 2 — Routing mention guard uses `||` instead of `&&`:** In `routing.ts`, the @mention fast-path condition `allKnownAgents.includes(agentName) || agentName !== 'coordinator'` is logically inverted. Should be `&&`. As written, ANY `@word` (except `@coordinator`) bypasses normal routing, creating a live routing regression.
+
+**Non-blocking:** Upgrade backup overwrites silently (no rotation). Onboarding regex fragile with bracket characters in role strings.
+
+---
+
+### 2026-06-24T13:33:13Z: Worf — Security & Reliability Review: bradygaster/squad#1383
+
+**Author:** Worf  
+**PR:** https://github.com/bradygaster/squad/pull/1383  
+**Verdict:** ⚠️ CONCERNS — Do not merge until issues below resolved
+
+**CI Status:** `test` job FAILING (2 tests introduced by PR). All others pass.
+
+**FINDING S-1 (HIGH):** `routing.ts` boolean logic flaw in @mention guard — same `||` vs `&&` bug as Data's review. Any `@arbitrary-name` routes to that agent at high confidence, bypassing routing rules.
+
+**FINDING S-2 (LOW):** `onboarding.ts` unescaped user input in RegExp constructor. `agentName` directly concatenated into RegExp without escaping; `a+(b` causes `SyntaxError`.
+
+**FINDING S-3 (LOW):** `upgrade.ts` no backup rotation. Hardcoded backup path silently overwrites on each upgrade.
+
+**FINDING R-1 (BLOCKER):** Both failing tests introduced by PR. `addAgentToConfig` regression is correctness issue in production code.
+
+**FINDING R-2 (MEDIUM):** `state-mcp.ts` permanent error caching. If initialization fails once, `initError` is cached forever and every subsequent ListTools/CallTool request throws. No retry or reset path.
+
+**FINDING R-3 (LOW):** `state-mcp.ts` tool map rebuilt on every CallTool invocation, not just once.
+
+**FINDING R-4 (LOW):** `build.ts` dead variable `baseDir` — code smell suggesting copy-paste error.
+
+**FINDING R-5 (LOW / THEORETICAL):** `build.ts` unvalidated `relPath` path traversal — `.squad/../../sensitive-file` passes prefix check. Theoretical under current code paths but worth hardening.
+
+---
+
+### 2026-06-18T15:44:01Z: Geordi — Aspire 13.5-preview MessagePack CVE override
+
+**Author:** Geordi  
+**Date:** 2026-06-18T15:44:01+03:00 (proposed) · 2026-06-18T15:53+03:00 (applied)  
+**Status:** APPLIED — Option B selected by coordinator; restore + build verified clean on `experimental/with-terminal-13.5`
+
+**Decision:** When pinning CVE-vulnerable transitive packages under CPM, use **Option B — direct PackageReference promotion** (preferred for narrow CVE fixes). Add `<PackageReference>` entries to consuming projects' `.csproj` files; central `<PackageVersion>` drives version for those projects only.
+
+**For MessagePack CVE GHSA-hv8m-jj95-wg3x:** Pin to 2.5.301 (patch within same minor line as StreamJsonRpc 2.22.x requirement). Applied to both `examples/squad/CommunityToolkit.Aspire.Hosting.Squad.AppHost.csproj` and `src/CommunityToolkit.Aspire.Hosting.Squad.csproj`.
+
+**Outcome:** Verified clean restore and build; `project.assets.json` confirms MessagePack/2.5.301 resolution.
 
 ---
 

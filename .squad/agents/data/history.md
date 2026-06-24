@@ -1,37 +1,53 @@
-# Data — Agent History
+# Data — Agent Summary (Consolidated Learnings)
 
-**Last Updated:** 2026-06-09 06:16:01Z
+**Last Updated:** 2026-06-24T13:33:13Z
 
-**Archive:** See \history-archive.md\ for all prior rounds. See \history-summary.md\ for consolidated learnings.
+## Areas of Expertise
 
----
+### TypeScript & Monorepo Tooling
+- TypeScript 6 breaking changes: Node globals now require explicit `"types": ["node"]` in tsconfig (no auto-injection)
+- Dependabot monorepo lockfile drift: always use `npm install` (not `npm ci`) to fix mismatches; Dependabot updates workspace package.json but fails to regenerate root lock
+- `@typescript-eslint` v8 latest already supports TypeScript 6; v9 doesn't exist as of 2026-06-16
+- Coordinating multiple related Dependabot PRs into one consolidated PR reduces friction and ensures lockfile regeneration catches all transitive changes simultaneously
 
+### NPM Ecosystem & Dependency Management
+- Pre-existing test failures on base branch can mask PR-induced failures; always check if failures appear across multiple unrelated Dependabot PRs before attributing to the PR itself
+- Major version bumps (or large minor jumps) will surface API incompatibility in CI; test suite is effective at discovering integration issues when real version jumps occur
+- OpenTelemetry 0.57.2 → 0.219.0 is a massive bump with breaking API changes (e.g., Resource constructor); respect intermediate compatibility bands when upgrading transitive deps
+- Dev-dependency patches (e.g., typedoc-plugin-markdown) are low-risk; lockfile sync alone unblocks the PR if CI gates pass
 
-## Round - 2026-06-15T18:22:41+03:00 - CI Investigation: bradygaster/squad Repo [ws:squad-agents-ai]
+### Astro & Static Site Generation
+- Astro 5→6: config location change (`src/content/config.ts` → `src/content.config.ts`); this is fatal and surfaces as LegacyContentConfigError
+- Astro 6 replaced `ViewTransitions` from `astro:transitions` with `ClientRouter`; audit all `astro:*` imports when bumping major versions
+- Two independent breaking changes can surface from single major-version bump; both must be fixed for build to succeed
 
-### Investigation Scope
-Analyzed CI health of upstream bradygaster/squad repo following 4 consecutive workflow failures on dependabot PRs (all same-root-cause).
+### Code Review & Framework Correctness
+- Squad `resolveModel` pattern (5-layer resolver in config/models.ts) is canonical; new config-resolution code should mirror this shape for consistency
+- Two `resolveModel` functions exist (one in config/models.ts, one in agents/model-selector.ts); callers matter — lifecycle spawn path uses the older one and misses persistent config layers
+- Type duplication (same union in 3+ places) is a code smell; should consolidate on future enum additions
+- Stale-session impact: routing logic errors (like `||` vs `&&` in mention guards) take effect immediately on next session, making live regressions a serious concern for all users
 
-### Learnings
+### Documentation & CI Gates
+- Markdown validation is strict: fence count must be even, code blocks non-empty; single-fence errors cascade to all dependent PRs
+- Fence regex must be anchored to line start (`^```/gm` not `/```/g`) to avoid false positives in table cells and inline code spans
+- Documentation files can become CI bottleneck; validate .md files before committing to investigation
 
-- **Dependabot PRs as regression detectors**: Dependabot dependency-update PRs are excellent natural test harnesses for detecting silent base-branch (dev/main) regressions. They run full CI/CD without introducing any new code, so any failure is inherited from the base branch. The 4 consecutive identical failures (all in docs-build.test.ts) were NOT caused by the dependency changes themselves — they revealed a pre-existing broken docs file on dev.
-- **Documentation as CI bottleneck**: In bradygaster/squad, the docs validation layer (`test/docs-build.test.ts`) is the primary failure vector for currently-blocked merges, not SDK tests or build failures. Two specific checks fail: (1) markdown fence count parity validation (must be even; skill-security-scanner.md has 1 unclosed fence), (2) code block content validation (requires >1 line; skill-security-scanner.md has empty blocks). Fixing one malformed docs file unblocks all 4 dependent PRs.
-- **Markdown validation as gates**: Squad's docs validation is strict: every .md file in the repo must have properly paired code fences (``` counts) and non-empty code blocks. This is enforced at test-suite level before any dependency updates can merge. When reviewing docs file changes or skills documentation, always verify fence count is even and code blocks are populated. Single-fence errors silently propagate to all dependent PRs.
-- **Deterministic vs. flaky failures**: The 4 failures show 100% replication (no timeout, no intermittent passes on rerun). This is not a flaky environmental issue. Flaky CI typically shows 60–90% failure rate on rerun; deterministic failures are always-fail. For future bradygaster/squad investigations, prioritize deterministic failures (fix immediately; blocks merges) over sporadic ones (usually environmental/infrastructure).
-- **Policy gates as safeguards**: Even when test suite fails, the separate Policy Gates job (changelog validation, prerelease version checks, npm publish scope enforcement) continues to pass. These gates are effective at catching non-code violations and don't cascade into false positives from unrelated test failures — good pattern to preserve.
-- **CI inheritance chain**: Dependabot PR tests inherit all base-branch files (including .md docs), so a single broken skill documentation file on dev blocks all downstream PRs. When unblocking a stalled PR queue, always check if root cause is base-branch-only (not PR-specific). This reduces time-to-fix significantly (trivial file edit vs. debugging PR logic).
+### State Backend Expertise
+- Node.js `execFileSync` default `maxBuffer` = 1 MB is silent killer for large git outputs (30k commits exceeds limit)
+- Fix: `maxBuffer: 256 * 1024 * 1024` in all git wrapper functions
+- Git CAS pattern: `git update-ref <ref> <new-sha> <expected-old-sha>` with jittered backoff prevents silent data loss
+- ESM gotchas: Both SDK and CLI use `type: module`; CLI bin = `dist/cli-entry.js`; export paths critical for bundling
+- Windows PowerShell: `^` is cmd.exe escape; use `execFileSync` array form to bypass shell
 
----
+## Known Patterns & Risk Factors
 
-## Round - 2026-06-09T10:03:36+03:00 - PR #1148 Review (reasoningEffort threading)
+1. **Path verification**: Always double-check file paths before reporting findings; use `find` or `ls -r` to verify existence
+2. **Backwards-compat in SDKs**: Making resolver functions optional with inline fallbacks is established pattern for adding new resolution layers without breaking existing callers
+3. **Template propagation**: Squad agent templates are duplicated across 5+ copies; any convention change requires multi-file edits
+4. **Capability clamping edge case**: When requested effort is below model's minimum, clamping UP (not undefined) can silently raise cost
+5. **Windows-only test failures**: Confirmed pre-existing failures in storage and scheduler tests; Linux CI is authoritative
+6. **Single choke point principle**: All git invocations route through 2 wrapper functions; patch at layer not callsites
 
-### Learnings
+## Recent Cross-Agent Coordination
 
-- **Squad resolveModel pattern (config/models.ts:1057)** has 5 explicit layers: 0a per-agent persistent -> 0b global persistent -> 1 session directive -> 2 charter -> 3 task-aware -> 4 default. New `resolveReasoningEffort` mirrors this with 4 active layers (no task-aware) + undefined default. When reviewing new config-resolution code, always diff against this canonical shape.
-- **Two `resolveModel` functions exist**: one in `config/models.ts` (the new 5-layer resolver) and one in `agents/model-selector.ts` (the older one). `AgentLifecycleManager` uses the model-selector version and therefore does NOT consult `.squad/config.json` model layers in the lifecycle spawn path. Reasoning-effort wiring inherits the same gap — Layer 0a/0b only apply when callers explicitly call the new resolver. When auditing config-layer claims, trace from the resolver back to actual call sites; do not assume documented layers reach production.
-- **Charter `## Model` section parsing** uses regex `\*\*Reasoning Effort:\*\*\s*(.+)` with `.toLowerCase()` and a Set lookup against `VALID_REASONING_EFFORTS`. `auto` is a sentinel meaning "not set" — handled in 3 places (parser, compileCharterFull override gate, resolveReasoningEffort isValid). Future field additions should follow the same trio of normalization sites.
-- **Type duplication smell**: same string union (`low|medium|high|xhigh`) now lives in three places — `SquadReasoningEffort` (adapter/types.ts:751), `ValidReasoningEffort` (config/models.ts), and inlined in `builders/types.ts`. The PR didn't consolidate. Watch for this on future enum additions.
-- **clampReasoningEffort edge case**: when requested effort is BELOW model's supported minimum, it clamps UP, not returning undefined. This can silently raise cost when a user picks `low` on a model that only supports `high`. Useful to remember when reviewing other capability-clamping code.
-- **`FanOutDependencies` backwards-compat pattern**: making the new resolver function optional and falling back to a simpler inline `override || charter.field` is the established way to add new resolution layers without breaking existing fan-out callers.
-- **Template propagation**: same 27-line block lives in 5 squad.agent.md.template copies. This duplication is pre-existing, not introduced by this PR — but it means any agent-charter convention change is a 5-file edit. Worth a future cleanup.
-**CROSS-AGENT NOTE (2026-06-15, Scribe):** File-path error in CI investigation — initially claimed docs/skills/skill-security-scanner.md; actual path is docs/src/content/docs/features/skill-security-scanner.md (verified by coordinator). LESSON: Double-check file paths before reporting findings; use ind or ls -r to verify existence before committing to investigation.
+- **2026-06-24 — PR #1383 Review:** Coordinated with Worf on security & framework review. Converged on critical blocker: `routing.ts` @mention guard uses `||` instead of `&&`, creating live routing regression. Both verdicts: REQUEST CHANGES. Merged to decisions.md.
