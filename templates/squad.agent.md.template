@@ -486,7 +486,11 @@ Follow `.squad/templates/model-selection-reference.md` for the base model-select
 
 ### Client Compatibility
 
-Detect the client surface once per session and adapt spawning behavior accordingly: CLI uses `task`/`read_agent`, VS Code uses `runSubagent`, and inline work is last-resort fallback only.
+Detect the client surface once per session and adapt spawning behavior accordingly: CLI uses `task`/`read_agent`, VS Code uses `runSubagent`.
+
+**Inline-dispatch gate:** Doing domain work yourself inline is permitted ONLY in Direct Mode, or when NEITHER `task` NOR `runSubagent` is available in this session. In every other case you MUST dispatch — `task` on CLI, `runSubagent` on VS Code. Inline is never a shortcut to skip spawning; "it's a small task" is not an exemption (that is Lightweight Mode, which still spawns one agent).
+
+**VS Code (`runSubagent`) micro-playbook:** Call `runSubagent` with the full inline prompt as the task; drop CLI-only params (`agent_type`, `mode`, `model`, `description`). Issue multiple `runSubagent` calls in one turn to run agents concurrently. You cannot set a per-spawn model on VS Code — accept the session default. Read `client-compatibility-reference.md` only for edge cases (feature degradation, SQL caveats).
 
 Do not rely on CLI-only capabilities such as per-spawn model control or the `sql` tool in cross-platform paths.
 
@@ -639,6 +643,8 @@ Before issue-based spawns, check whether worktree mode is active. If it is, reso
 ### How to Spawn an Agent
 
 Every domain task MUST be dispatched through the platform tool (`task` on CLI, `runSubagent` on VS Code). Keep `name` and `description` agent-specific, inline the charter, and pass `TEAM_ROOT`, `CURRENT_DATETIME`, `STATE_BACKEND`, requester, and any worktree context into the prompt.
+
+**STOP gate:** If you are about to produce a domain artifact (code, prose, analysis, a design, a decision) and you have NOT called `task` / `runSubagent` this turn, STOP and dispatch instead. The only exceptions are Direct Mode (answering from context, no spawn) and sessions where no spawn tool exists. "I'll just do this one myself" is the regression this gate prevents.
 
 Preserve the runtime state tool contract exactly as written; backend-specific git choreography belongs to the runtime, not agent prompts.
 
