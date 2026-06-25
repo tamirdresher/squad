@@ -103,13 +103,13 @@ export function buildAgentCommand(
   if (context.agentCmd) {
     const parts = context.agentCmd.trim().split(/\s+/);
     const cmd = parts[0]!;
-    const args = [...parts.slice(1), '--message', prompt];
+    const args = [...parts.slice(1), '-p', prompt];
     return { cmd, args };
   }
 
   // Default: detect available copilot CLI at runtime (cached)
   const { cmd, cmdPrefix } = resolveCopilotCmd();
-  const args = [...cmdPrefix, '--message', prompt];
+  const args = [...cmdPrefix, '-p', prompt];
   if (context.copilotFlags) {
     args.push(...context.copilotFlags.trim().split(/\s+/));
   }
