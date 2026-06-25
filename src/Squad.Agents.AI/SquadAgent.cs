@@ -133,7 +133,7 @@ public sealed class SquadAgent : DelegatingAIAgent, IAsyncDisposable
             WorkingDirectory = teamRoot,
             ConfigDirectory = squadConfigDir,
             EnableConfigDiscovery = true,
-            Agent = "Squad"
+            Agent = options.SessionAgent
         };
         if (!string.IsNullOrEmpty(options.Instructions))
         {

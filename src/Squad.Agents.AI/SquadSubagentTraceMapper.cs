@@ -57,13 +57,6 @@ internal sealed class SquadSubagentTraceMapper : IDisposable
     // subagent's reply streams in.
     private readonly ConcurrentDictionary<string, string> _toolCallIdBySdkAgentId = new(StringComparer.Ordinal);
 
-    // Stash of LLM-supplied persona arguments parsed from the task tool dispatch, keyed by
-    // ToolCallId. Lets later events (SubagentStarted/Completed) enrich their typed envelope
-    // with the persona identity that lives only on the dispatch event's Arguments JSON.
-    private readonly ConcurrentDictionary<string, DispatchedPersona> _personasByToolCallId = new(StringComparer.Ordinal);
-
-    private sealed record DispatchedPersona(string? Name, string? Description, string? AgentType, string? Prompt);
-
     public SquadSubagentTraceMapper(Action<SquadAgentTraceEvent>? onTrace, bool emitActivities = true)
     {
         _onTrace = onTrace;
@@ -132,7 +125,15 @@ internal sealed class SquadSubagentTraceMapper : IDisposable
                         ActivityKind.Internal);
                     if (activity is not null)
                     {
-                        _activitiesByToolCallId[toolCallId] = activity;
+                        if (!_activitiesByToolCallId.TryAdd(toolCallId, activity))
+                        {
+                            // Another path (typically a racing OnTaskDispatch with the same
+                            // ToolCallId) already registered an Activity for this dispatch.
+                            // Dispose our duplicate and adopt the winner so the rest of the
+                            // lifecycle stays anchored to a single span.
+                            activity.Dispose();
+                            _activitiesByToolCallId.TryGetValue(toolCallId, out activity);
+                        }
                     }
                 }
 
@@ -225,7 +226,6 @@ internal sealed class SquadSubagentTraceMapper : IDisposable
                 if (!string.IsNullOrEmpty(toolCallId) &&
                     _activitiesByToolCallId.TryRemove(toolCallId!, out var completedActivity))
                 {
-                    _personasByToolCallId.TryRemove(toolCallId!, out _);
                     if (!string.IsNullOrEmpty(envelope.SdkAgentId))
                     {
                         _toolCallIdBySdkAgentId.TryRemove(envelope.SdkAgentId!, out _);
@@ -282,8 +282,6 @@ internal sealed class SquadSubagentTraceMapper : IDisposable
                 prompt = p.GetString();
         }
 
-        _personasByToolCallId[toolCallId!] = new DispatchedPersona(personaName, personaDesc, agentType, prompt);
-
         if (_emitActivities)
         {
             // Open the activity as early as possible so the dashboard timeline shows the dispatch
@@ -318,7 +316,14 @@ internal sealed class SquadSubagentTraceMapper : IDisposable
                         ["squad.subagent.agent_type"] = agentType,
                         ["squad.subagent.tool_call_id"] = toolCallId,
                     }));
-                _activitiesByToolCallId[toolCallId!] = activity;
+                if (!_activitiesByToolCallId.TryAdd(toolCallId!, activity))
+                {
+                    // A racing event handler (e.g. SubagentStartedEvent arriving before this
+                    // dispatch handler completes) already registered the canonical span for
+                    // this ToolCallId. Dispose our duplicate; the existing span keeps the
+                    // lifecycle invariants and downstream events will close it normally.
+                    activity.Dispose();
+                }
             }
         }
 
@@ -420,6 +425,5 @@ internal sealed class SquadSubagentTraceMapper : IDisposable
         }
         _activitiesByToolCallId.Clear();
         _toolCallIdBySdkAgentId.Clear();
-        _personasByToolCallId.Clear();
     }
 }

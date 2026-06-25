@@ -51,7 +51,7 @@ if (RunFlow(1))
     host1.Logging.SetMinimumLevel(LogLevel.Warning); // keep sample output clean
     host1.Services.AddSquadAgent(o =>
     {
-        o.SquadFolderPath = @"C:\Users\tamirdresher\source\repos\squad-squad";
+        o.SquadFolderPath = teamRoot;
         o.AgentName = "SampleSquad";
         o.EmitSubagentActivities = true;
         o.Instructions = "You are a helpful assistant. Respond concisely. and ask each subagent for their input before providing a final answer.";

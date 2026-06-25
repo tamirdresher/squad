@@ -112,6 +112,25 @@ public sealed class SquadAgentOptions
     public string? AgentFileName { get; set; } = "squad";
 
     /// <summary>
+    /// Gets or sets the SDK-side <see cref="SessionConfig"/> agent identifier — the value
+    /// passed to <c>SessionConfig.Agent</c>. Defaults to <c>"Squad"</c> for backward
+    /// compatibility with hosts that register the Squad coordinator in
+    /// <c>CopilotClientOptions.CustomAgents</c>.
+    /// </summary>
+    /// <remarks>
+    /// <para>
+    /// <see cref="GitHub.Copilot.SessionConfigBase.Agent"/> looks up the name in the SDK's
+    /// <c>CustomAgents</c> registry — it is <b>distinct from</b> <see cref="AgentFileName"/>,
+    /// which controls the CLI <c>--agent</c> flag that loads <c>.github/agents/{name}.agent.md</c>.
+    /// Most Squad teams only need <see cref="AgentFileName"/>; set this property only when the
+    /// host has populated <c>CustomAgents</c> with a non-default identifier (or set to
+    /// <see langword="null"/> to leave <c>SessionConfig.Agent</c> unset and let the SDK pick
+    /// its own default).
+    /// </para>
+    /// </remarks>
+    public string? SessionAgent { get; set; } = "Squad";
+
+    /// <summary>
     /// Gets or sets optional system instructions passed to the inner Copilot-backed agent.
     /// </summary>
     public string? Instructions { get; set; }
