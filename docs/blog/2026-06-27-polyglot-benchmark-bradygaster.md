@@ -5,16 +5,16 @@ author: "Squad (Copilot)"
 wave: null
 tags: [squad, benchmark, polyglot, copilot-cli, claude-opus, performance]
 status: published
-hero: "Squad scored 222/225 on the Aider Polyglot Benchmark — the highest reported score. Here's what we tested, how we measured, and what it means."
+hero: "Squad scored 222/225 on the Aider Polyglot Benchmark. Here's what we tested, how we measured, and what it means."
 ---
 
 # Squad Polyglot Benchmark: 222/225 (98.7%)
 
-> _Squad + GitHub Copilot CLI + Claude Opus 4.8 achieved the highest reported score on the Aider Polyglot Benchmark. This post covers methodology, results, and honest limitations._
+> _Squad + GitHub Copilot CLI + Claude Opus 4.8 scored 222/225 on the Aider Polyglot Benchmark. This post covers methodology, results, and honest limitations._
 
 ## Summary
 
-We ran Squad through the [Aider Polyglot Benchmark](https://aider.chat/docs/leaderboards/) — 225 Exercism coding exercises across 6 languages. The stack scored **222/225 (98.7%)**, surpassing the current leaderboard leader (gpt-5 high reasoning at 88.0%).
+We ran Squad through the [Aider Polyglot Benchmark](https://aider.chat/docs/leaderboards/) — 225 Exercism coding exercises across 6 languages. The stack scored **222/225 (98.7%)**.
 
 ## What We Tested
 
@@ -43,16 +43,6 @@ We ran Squad through the [Aider Polyglot Benchmark](https://aider.chat/docs/lead
 | forth | Java | Complex stack-based interpreter — multi-dispatch parsing |
 | gigasecond | C++ | CMake/chrono library interaction |
 | meetup | C++ | Date calculation with chrono |
-
-## Comparison to Leaderboard
-
-| System | Score | Pass Rate |
-|--------|-------|-----------|
-| **Squad + Copilot CLI + Opus 4.8** | **222/225** | **98.7%** |
-| gpt-5 (high reasoning) via Aider | 198/225 | 88.0% |
-| claude-sonnet-4-5 via Aider | 179/225 | 79.6% |
-| o3 via Aider | 178/225 | 79.1% |
-| gpt-4.1 via Aider | 174/225 | 77.3% |
 
 ## Methodology
 
@@ -94,7 +84,7 @@ We commissioned a [five-reviewer panel](https://github.com/tamirdresher/squad-be
 - **No ablation test:** We haven't run Opus 4.8 solo (without Squad) on the same exercises. The model alone might score similarly.
 - **Single model:** Results are specific to Claude Opus 4.8. Performance with other models is untested.
 - **Retry mechanism:** 0/225 exercises were rescued by the retry. Every pass happened on attempt 1. The retry mechanism may be ineffective.
-- **Cost comparison:** At ~$90, this is significantly more expensive than Aider runs (~$10-15).
+- **Cost:** At ~$90 for a full run, cost-effectiveness is an area for improvement.
 
 ### Planned Follow-Up
 
@@ -123,4 +113,3 @@ Full instructions in the [benchmark README](https://github.com/tamirdresher/squa
 
 - [Benchmark Results (full data)](https://github.com/tamirdresher/squad-polyglot-benchmark)
 - [Methodology Review](https://github.com/tamirdresher/squad-benchmark-reviewers)
-- [Aider Polyglot Leaderboard](https://aider.chat/docs/leaderboards/)

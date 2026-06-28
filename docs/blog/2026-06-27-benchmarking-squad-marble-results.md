@@ -33,8 +33,6 @@ So I pointed Squad at it: `copilot --yolo --agent squad` backed by Claude Opus 4
 
 222 out of 225. Three failures: a Forth interpreter in Java (fair — that's hard), and two C++ date/time exercises where CMake decided to have opinions.
 
-For comparison, the Aider leaderboard's current #1 is gpt-5 with high reasoning at 88.0%.
-
 ## The Part Where I Hired Five Critics
 
 Here's where it gets interesting. I didn't just run the benchmark and post a screenshot. I hired a review panel.
@@ -126,7 +124,6 @@ Any of these outcomes is a good outcome. Science doesn't care which answer you w
 
 - [Benchmark repo](https://github.com/tamirdresher/squad-polyglot-benchmark) — full runner, results, logs
 - [Review methodology](https://github.com/tamirdresher/squad-benchmark-reviewers) — the five-reviewer panel and their assessment
-- [Aider Polyglot Leaderboard](https://aider.chat/docs/leaderboards/) — the benchmark we ran against
 - [Squad](https://github.com/bradygaster/squad) — the multi-agent orchestration system
 
 ## The Takeaway
