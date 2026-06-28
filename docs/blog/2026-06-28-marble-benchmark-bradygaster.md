@@ -47,10 +47,12 @@ To isolate what contributes to Squad's performance, we ran a 2×2 factorial desi
 
 | Condition | Multi-Agent Coordination | Persistent Memory | Description |
 |-----------|--------------------------|-------------------|-------------|
-| Full Squad | ✅ | ✅ | Complete system — agents + decisions.md |
-| No Squad | ❌ | ❌ | Raw Copilot CLI, same model, no orchestration |
-| Memory Only | ❌ | ✅ | Single agent + accumulated context |
-| Coord Only | ✅ | ❌ | Multi-agent coordination, fresh memory per task |
+| Full Squad | ✅ Enabled | ✅ Enabled | Complete system — agents + decisions.md |
+| No Squad | — Disabled | — Disabled | Raw Copilot CLI, same model, no orchestration |
+| Memory Only | — Disabled | ✅ Enabled | Single agent + accumulated context |
+| Coord Only | ✅ Enabled | — Disabled | Multi-agent coordination, fresh memory per task |
+
+> **Legend:** ✅ Enabled = feature is active for this condition. — Disabled = feature is intentionally turned off to isolate its effect. All four conditions were tested with the same model (Claude Opus 4.6) and same tasks.
 
 **Sample:** 10 tasks per condition per domain (tasks 1, 10, 20, 30, 40, 50, 60, 70, 80, 90), evaluated using MARBLE's official LLM-judge rubric (1–5 scale).
 

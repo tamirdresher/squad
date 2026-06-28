@@ -46,10 +46,12 @@ I designed a 2×2 factorial study. Four conditions, same model (Claude Opus 4.6)
 
 | Condition | Multi-Agent Coordination | Persistent Memory | What It Tests |
 |-----------|--------------------------|-------------------|---------------|
-| **Full Squad** | ✅ | ✅ | The complete system |
-| **No Squad** | ❌ | ❌ | Raw Copilot CLI — just the model |
-| **Memory Only** | ❌ | ✅ | Model + decisions.md but no agent coordination |
-| **Coord Only** | ✅ | ❌ | Agents but fresh memory each task |
+| **Full Squad** | ✅ Enabled | ✅ Enabled | The complete system |
+| **No Squad** | — Disabled | — Disabled | Raw Copilot CLI — just the model |
+| **Memory Only** | — Disabled | ✅ Enabled | Model + decisions.md but no agent coordination |
+| **Coord Only** | ✅ Enabled | — Disabled | Agents but fresh memory each task |
+
+> **Legend:** ✅ Enabled = feature is active in this condition. — Disabled = feature is intentionally turned off to measure its absence. All four conditions were tested.
 
 I sampled 10 tasks per condition per domain (tasks 1, 10, 20, 30... 90) and had an LLM judge score quality on MARBLE's official rubric (1-5 scale).
 
