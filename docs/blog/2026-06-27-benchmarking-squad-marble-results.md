@@ -44,14 +44,12 @@ But here's the thing — I learned from last time. A big completion number witho
 
 I designed a 2×2 factorial study. Four conditions, same model (Claude Opus 4.6), same tasks:
 
-| Condition | Multi-Agent Coordination | Persistent Memory | What It Tests |
-|-----------|--------------------------|-------------------|---------------|
-| **Full Squad** | ✅ Enabled | ✅ Enabled | The complete system |
-| **No Squad** | — Disabled | — Disabled | Raw Copilot CLI — just the model |
-| **Memory Only** | — Disabled | ✅ Enabled | Model + decisions.md but no agent coordination |
-| **Coord Only** | ✅ Enabled | — Disabled | Agents but fresh memory each task |
-
-> **Legend:** ✅ Enabled = feature is active in this condition. — Disabled = feature is intentionally turned off to measure its absence. All four conditions were tested.
+| Condition | What We Actually Ran |
+|-----------|---------------------|
+| **Full Squad** | The complete system — coordinator routes to specialist agents, decisions persist between tasks |
+| **Coord Only** | Agents coordinate, but each task starts with a blank slate (no memory of past work) |
+| **Memory Only** | One single agent (no team), but it keeps a running log of past decisions |
+| **No Squad** | Raw Copilot CLI — same model, one agent, no memory, no coordination. The baseline. |
 
 I sampled 10 tasks per condition per domain (tasks 1, 10, 20, 30... 90) and had an LLM judge score quality on MARBLE's official rubric (1-5 scale).
 
