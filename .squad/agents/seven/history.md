@@ -159,3 +159,21 @@ The pattern in bradygaster/squad: spec/skill ships first (low-friction PR), runt
 - **Permission contract** — #1191 (jonlester) covers the breaking bug; the two follow-up suggestions (protocolVersion warning, approveAll re-export) were not filed separately.
 
 **Pattern worth noting:** External/community contributors (idangutman, ischrei, ralarcon, mfrieman, sytone) are filing issues faster than the core team is triaging them. Several issues lack labels and have no core-team response. This suggests a triage backlog is forming around memory and extensibility topics.
+
+## 2026-07-03 — JavaScript Extensions Windows CI Failure: Cross-repo Research & Prior Context Inventory
+
+**Dispatch:** Coordinator assigned Seven to research prior Aspire Squad resource context and catalog relevant PRs, test projects, and shared TypeScript AppHost harness for the JS Extensions Windows CI failure investigation.
+
+**Key findings:**
+- Identified bradygaster/squad local repository with three PRs relevant to CI failure: #1383 (CLI fixes), #1384 (OTel tracing), #1148 (reasoningEffort threading)
+- Located 82 existing tests across net8.0/net9.0/net10.0 targets with clean passing baseline
+- Discovered shared `CommunityToolkit.Aspire.Hosting.Squad.AppHost` harness used across sample projects
+- Confirmed cross-repo pattern: Squad CLI depends on Aspire SDK + platform context; environment drift (Node.js, corepack, package managers) is platform-specific (Windows CI failure, not macOS/Linux)
+
+**Integration:** Seven's prior-context research enabled Geordi to rapidly diagnose CI surface and Worf to confirm external tooling drift (not code regression). All three agents converged on same root cause.
+
+**Decision log:** Cross-referenced in `.squad/decisions.md` entry 2026-07-03T09:20:04.467+03:00 (JS Extensions Windows CI failure analysis).
+
+---
+
+**Last Updated:** 2026-07-03T09:20:04.467+03:00

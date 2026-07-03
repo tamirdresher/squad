@@ -1,8 +1,61 @@
 # Squad Decisions
 
-**Last Updated:** 2026-06-24T13:33:13Z
+**Last Updated:** 2026-07-03T09:20:04.467+03:00
 
 ## Active Decisions
+
+---
+
+### 2026-06-24T15:34:17Z: Data & Worf — PR Review: bradygaster/squad#1384
+**Reviewers:** Data (Framework Lead), Worf (Reliability)  
+**Date:** 2026-06-24T15:34:17+03:00  
+**PR:** https://github.com/bradygaster/squad/pull/1384  
+**Title:** feat(tracing): capture task-tool dispatch + tool requests for subagent OTel  
+**Verdict:** REQUEST CHANGES — 4 issues (2 blockers + 2 reliability concerns)
+
+**Cross-agent findings (consolidated):**
+
+**BLOCKER 1 (Data/Worf agreed):** Hardcoded developer path in sample `Program.cs`:
+```csharp
+o.SquadFolderPath = @"C:\Users\tamirdresher\source\repos\squad-squad";
+```
+Blocks all non-author clones. Restore to `teamRoot` or `Directory.GetCurrentDirectory()`.
+
+**BLOCKER 2 (Worf emphasis):** Untruncated span attribute `squad.subagent.prompt` leaks user PII. Truncate to 1024 chars (matches typed event) or make optional via `SquadAgentOptions.IncludeDispatchedPromptInTraces` (default false).
+
+**RELIABILITY R-1 (Worf):** Missing try/catch guard in `OnTaskDispatch`. If `JsonElement` access or `Activity` operations throw, exception propagates into SDK's event dispatcher. Wrap `OnTaskDispatch` body in defensive try/catch.
+
+**RELIABILITY R-2 (Worf):** Parallel dispatch span parenting incorrect. Multiple `ToolExecutionStartEvent[task]` fire on same thread → second span parents to first (should both parent to coordinator). Capture and restore `Activity.Current` before opening subagent span.
+
+**Positive:** CI all green on net8.0/net9.0/net10.0. 82 tests pass. 11 new dispatch-path tests added. `InvokeConsumer` protected. Concurrent state correct.
+
+**Recommendation:** REQUEST CHANGES. Fix blockers before merge. R-1 and R-2 mitigate failure modes in production telemetry.
+
+---
+
+### 2026-07-03T09:20:04Z: Worf — Reliability Review: JavaScript Extensions Windows CI Failure
+**Author:** Worf  
+**Date:** 2026-07-03T09:20:04.467+03:00  
+**Status:** COMPLETED  
+**Finding:** External tooling drift (not code regression)
+
+**Root Cause:** Windows CI flakes driven by environment, not Squad code changes:
+- Node.js version floating (no major pin; auto-upgrade on `windows-latest`)
+- Corepack enabled; bun/pnpm versions floating without lock
+- Package lock disabled (npm ci bypassed; regenerated lock on each run)
+- nx/turbo shim behavior differs Node LTS ↔ latest; cache invalidation patterns changed
+- `windows-latest` image updates introduce filesystem/symlink interaction differences
+
+**Risk Level:** MEDIUM — CI reliability, not code correctness. Intermittent Windows-only flakes; no codebase regression.
+
+**Recommendations:**
+1. Pin Node LTS version in workflows (e.g., `node-version: "20.x"`)
+2. Lock corepack behavior explicitly
+3. Restore `npm ci` (disable package lock regeneration)
+4. Verify nx/turbo cache on pinned Node + stable Windows image
+5. Document Windows CI expectations in contribution guide
+
+**Decision:** ANALYZED — External drift confirmed. No code fix required. Recommend environment stabilization in upstream CI (bradygaster/squad) workflows. **Not a blocker for Squad.Agents.AI SDK or Squad CLI release.**
 
 ---
 

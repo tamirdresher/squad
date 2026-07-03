@@ -73,3 +73,40 @@
 **Verdict:** CONCERNS — Do not merge until blockers + high-priority fixes resolved. Coordinated with Data agent on identical @mention guard blocker finding.
 
 **CROSS-AGENT NOTE (2026-06-24, Scribe — PR #1383 review):** Coordinated with Data. Converged on critical blocker: `routing.ts` @mention guard uses `||` instead of `&&`, creating live routing regression. Worf's complete findings: 5 issues (1 blocker + 4 required fixes), including permanent error caching in `state-mcp.ts` (medium priority) and unescaped regex input in `onboarding.ts` (low). Verdict: CONCERNS / Do not merge. Decision merged to .squad/decisions.md.
+
+## 2026-07-03 — JavaScript Extensions Windows CI Failure: Reliability Review & External Drift Analysis
+
+**Dispatch:** Coordinator assigned Worf to perform reliability review of bradygaster/squad#1384 (OTel tracing) AND analyze JavaScript Extensions Windows CI failure surface.
+
+### PR #1384 Review Summary
+**Status:** CI all green (14 checks pass, net8.0/net9.0/net10.0). 82 tests pass. 11 new dispatch-path tests added.
+
+**Blockers (REQUEST CHANGES):**
+- **S-1 HIGH:** Untruncated `DispatchedPrompt` on typed event leaks LLM prompts containing PII/secrets to observability backends. Fix: apply 1024-char truncation (matches span tag behavior).
+- **Reliability C-1:** Hardcoded developer path in sample Program.cs breaks all non-author clones. Fix: restore to `teamRoot` or computed runtime path.
+
+**Medium-Priority Issues:**
+- **R-1 MEDIUM:** `OnTaskDispatch` lacks exception guard. If JsonElement access/Activity operations throw, exception propagates into SDK dispatcher. Fix: wrap in try/catch.
+- **R-2 MEDIUM:** Parallel dispatch span parenting incorrect. Multiple `ToolExecutionStartEvent[task]` fire on same thread → second span parents to first (should both parent to coordinator). Fix: capture/restore `Activity.Current`.
+
+**Non-blocking:** reply_preview capped ✓, activity null-guards ✓, Dispose drains live activities ✓, concurrent state correct ✓.
+
+### JS Extensions Windows CI Failure Analysis
+**Root Cause:** External tooling drift (not code regression)
+
+**Root Causes Ranked:**
+1. Node.js version floating (no major pin; auto-upgrade on windows-latest)
+2. Corepack enabled; bun/pnpm versions floating without lock
+3. Package lock disabled (npm ci bypassed; regenerated on each run)
+4. nx/turbo cache invalidation differs on latest Node vs. LTS
+5. Windows-latest image updates affect filesystem symlink/case-sensitivity
+
+**Reliability Assessment:** MEDIUM — CI intermittent on Windows; no codebase regression. Recommend environment stabilization (pin Node LTS, restore npm ci, lock corepack).
+
+**Vertical Learning:** Environment drift vs. code defects: diagnostics approach differs. For code defects, look for PR-introduced compile errors or test failures in CI. For environment drift, look for platform-specific intermittency (Windows-only failures), symptom consistency across unrelated code paths, and alignment with transitive dependency or toolchain updates. When three agents converge on same root cause independently, confidence is HIGH.
+
+**Decision log:** Both PR #1384 review and JS Extensions Windows CI analysis merged to `.squad/decisions.md` (entries 2026-07-03T09:20:04.467+03:00).
+
+---
+
+**Last Updated:** 2026-07-03T09:20:04.467+03:00
