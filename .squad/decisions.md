@@ -1,8 +1,27 @@
 # Squad Decisions
 
-**Last Updated:** 2026-07-03T09:20:04.467+03:00
+**Last Updated:** 2026-07-05T15:34:48.648+03:00
 
 ## Active Decisions
+
+---
+
+### 2026-07-05T15:34:48Z: Data & Worf — Squad Org Demo Workstream & Real Copilot Proof
+
+**Authors:** Data (Squad Framework Expert), Worf (Security & Reliability)  
+**Date:** 2026-07-04 (Data workstream setup), 2026-07-05T15:33+03:00 (Worf verdict)  
+**Status:** APPROVED (with relabel requirement on MP4)  
+**Workstream:** `squad-org-demo`
+
+**Data's decision:** Upgraded Squad CLI from `0.10.0-insider.1` to `0.11.0` on this machine (installed to `C:\.tools\.npm-global` to avoid admin requirement). Created new active workstream `squad-org-demo` with template structure to hold presentation-prep covering upstream, sub squads, workstreams, peer squads, squad communication, and presets. Workstream files created: `README.md`, `now.md`, `decisions.md`, `decisions/inbox/.gitkeep`. Updated `.squad/workstreams/README.md` with the new workstream entry.
+
+**Worf's verdict (on Data's proof artifact `real-copilot-squad-run-proof.md`):**
+- ✅ **APPROVED** — Real Copilot session with live Squad CLI 0.11.0 execution proven via session id, NTFS mtimes, and in-file timestamps.
+- **Mandatory relabel:** MP4 is a Playwright/ffmpeg-encoded replay of a real transcript, NOT a live terminal/Copilot recording. Must be labeled: "Reproducible replay of a real Squad org-demo run" (or similar honest variant). Unacceptable labels: "Live Copilot session recording."
+- All six verification criteria passed: session timing, direct CLI usage, demo beats covered, upstream directives consumed, security/PII scrubbed (except local paths — fine for internal use; scrub before external publication).
+- **Non-blocking follow-up:** If genuinely live recording needed, capture Copilot PTY while agent loop runs; do not re-render transcript.
+
+**Recommendation:** Proceed with workstream and demo prep. Ensure MP4 labeling reflects Worf's approved wording before any external use.
 
 ---
 
