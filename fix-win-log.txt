@@ -1,0 +1,758 @@
+﻿2026-07-03T08:06:12.9894501Z Current runner version: '2.335.1'
+2026-07-03T08:06:12.9921504Z ##[group]Runner Image Provisioner
+2026-07-03T08:06:12.9922444Z Hosted Compute Agent
+2026-07-03T08:06:12.9922941Z Version: 20260624.560
+2026-07-03T08:06:12.9923540Z Commit: 925d229a51159bc391ae97e54a2dd1fe20af789d
+2026-07-03T08:06:12.9924203Z Build Date: 2026-06-24T18:26:47Z
+2026-07-03T08:06:12.9924827Z Worker ID: {9b0092ea-02be-4a65-a2ec-e31ac3d48481}
+2026-07-03T08:06:12.9925516Z Azure Region: westus
+2026-07-03T08:06:12.9926011Z ##[endgroup]
+2026-07-03T08:06:12.9927431Z ##[group]Operating System
+2026-07-03T08:06:12.9928067Z Microsoft Windows Server 2025
+2026-07-03T08:06:12.9928620Z 10.0.26100
+2026-07-03T08:06:12.9929117Z Datacenter
+2026-07-03T08:06:12.9929582Z ##[endgroup]
+2026-07-03T08:06:12.9930047Z ##[group]Runner Image
+2026-07-03T08:06:12.9930589Z Image: windows-2025-vs2026
+2026-07-03T08:06:12.9931723Z Version: 20260628.158.1
+2026-07-03T08:06:12.9933175Z Included Software: https://github.com/actions/runner-images/blob/win25-vs2026/20260628.158/images/windows/Windows2025-VS2026-Readme.md
+2026-07-03T08:06:12.9934727Z Image Release: https://github.com/actions/runner-images/releases/tag/win25-vs2026%2F20260628.158
+2026-07-03T08:06:12.9935665Z ##[endgroup]
+2026-07-03T08:06:12.9936717Z ##[group]GITHUB_TOKEN Permissions
+2026-07-03T08:06:12.9938762Z Contents: read
+2026-07-03T08:06:12.9939299Z Metadata: read
+2026-07-03T08:06:12.9939799Z ##[endgroup]
+2026-07-03T08:06:12.9941920Z Secret source: Actions
+2026-07-03T08:06:12.9942607Z Prepare workflow directory
+2026-07-03T08:06:13.0586179Z Prepare all required actions
+2026-07-03T08:06:13.0630387Z Getting action download info
+2026-07-03T08:06:13.4059672Z Download action repository 'actions/checkout@v6' (SHA:df4cb1c069e1874edd31b4311f1884172cec0e10)
+2026-07-03T08:06:13.5398296Z Download action repository 'actions/upload-artifact@v7' (SHA:043fb46d1a93c77aae656e7c1c64a875d1fc6a0a)
+2026-07-03T08:06:13.7719415Z Uses: tamirdresher/Aspire-1/.github/workflows/tests.yaml@refs/heads/geordi/ci-experiment-fix (a30242da149199bea64dd9fbc776f16866867965)
+2026-07-03T08:06:13.7724588Z ##[group] Inputs
+2026-07-03T08:06:13.7725123Z   selected-tests: 
+2026-07-03T08:06:13.7725575Z ##[endgroup]
+2026-07-03T08:06:13.7726237Z Complete job name: run / Hosting.JavaScript.Extensions.Tests-windows-latest
+2026-07-03T08:06:13.9031135Z ##[group]Run actions/checkout@v6
+2026-07-03T08:06:13.9032284Z with:
+2026-07-03T08:06:13.9032732Z   repository: tamirdresher/Aspire-1
+2026-07-03T08:06:13.9037086Z   token: ***
+2026-07-03T08:06:13.9037521Z   ssh-strict: true
+2026-07-03T08:06:13.9037958Z   ssh-user: git
+2026-07-03T08:06:13.9038415Z   persist-credentials: true
+2026-07-03T08:06:13.9038912Z   clean: true
+2026-07-03T08:06:13.9039385Z   sparse-checkout-cone-mode: true
+2026-07-03T08:06:13.9039923Z   fetch-depth: 1
+2026-07-03T08:06:13.9040340Z   fetch-tags: false
+2026-07-03T08:06:13.9040779Z   show-progress: true
+2026-07-03T08:06:13.9041226Z   lfs: false
+2026-07-03T08:06:13.9041642Z   submodules: false
+2026-07-03T08:06:13.9042126Z   set-safe-directory: true
+2026-07-03T08:06:13.9042836Z env:
+2026-07-03T08:06:13.9043279Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:06:13.9043808Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:06:13.9045167Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:06:13.9046564Z   CI: true
+2026-07-03T08:06:13.9046983Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:06:13.9047973Z ##[endgroup]
+2026-07-03T08:06:14.0924985Z Syncing repository: tamirdresher/Aspire-1
+2026-07-03T08:06:14.0929260Z ##[group]Getting Git version info
+2026-07-03T08:06:14.0931276Z Working directory is 'D:\a\Aspire-1\Aspire-1'
+2026-07-03T08:06:14.1767954Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-07-03T08:06:14.3558450Z git version 2.54.0.windows.1
+2026-07-03T08:06:14.3612500Z ##[endgroup]
+2026-07-03T08:06:14.3632799Z Temporarily overriding HOME='D:\a\_temp\08121419-3e00-4344-a9c6-d12fd555ec34' before making global git config changes
+2026-07-03T08:06:14.3637705Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-03T08:06:14.3644631Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\Aspire-1\Aspire-1
+2026-07-03T08:06:14.3965933Z Deleting the contents of 'D:\a\Aspire-1\Aspire-1'
+2026-07-03T08:06:14.3972503Z ##[group]Determining repository object format
+2026-07-03T08:06:14.3976410Z ##[endgroup]
+2026-07-03T08:06:14.3978565Z ##[group]Initializing the repository
+2026-07-03T08:06:14.3986762Z [command]"C:\Program Files\Git\bin\git.exe" init D:\a\Aspire-1\Aspire-1
+2026-07-03T08:06:14.4424552Z Initialized empty Git repository in D:/a/Aspire-1/Aspire-1/.git/
+2026-07-03T08:06:14.4475024Z [command]"C:\Program Files\Git\bin\git.exe" remote add origin https://github.com/tamirdresher/Aspire-1
+2026-07-03T08:06:14.4819795Z ##[endgroup]
+2026-07-03T08:06:14.4820750Z ##[group]Disabling automatic garbage collection
+2026-07-03T08:06:14.4830006Z [command]"C:\Program Files\Git\bin\git.exe" config --local gc.auto 0
+2026-07-03T08:06:14.5156313Z ##[endgroup]
+2026-07-03T08:06:14.5158223Z ##[group]Setting up auth
+2026-07-03T08:06:14.5159076Z Removing SSH command configuration
+2026-07-03T08:06:14.5169200Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-07-03T08:06:14.5514951Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-07-03T08:06:15.5011232Z Removing HTTP extra header
+2026-07-03T08:06:15.5021621Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-03T08:06:15.5347338Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-07-03T08:06:16.1298584Z Removing includeIf entries pointing to credentials config files
+2026-07-03T08:06:16.1313374Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-03T08:06:16.1649460Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-07-03T08:06:16.7411941Z [command]"C:\Program Files\Git\bin\git.exe" config --file D:\a\_temp\git-credentials-850ce5d5-13a9-4528-9462-d3ecbb9276d3.config http.https://github.com/.extraheader "AUTHORIZATION: basic ***"
+2026-07-03T08:06:16.7779318Z [command]"C:\Program Files\Git\bin\git.exe" config --local includeIf.gitdir:D:/a/Aspire-1/Aspire-1/.git.path D:\a\_temp\git-credentials-850ce5d5-13a9-4528-9462-d3ecbb9276d3.config
+2026-07-03T08:06:16.8110380Z [command]"C:\Program Files\Git\bin\git.exe" config --local includeIf.gitdir:D:/a/Aspire-1/Aspire-1/.git/worktrees/*.path D:\a\_temp\git-credentials-850ce5d5-13a9-4528-9462-d3ecbb9276d3.config
+2026-07-03T08:06:16.8443121Z [command]"C:\Program Files\Git\bin\git.exe" config --local includeIf.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-850ce5d5-13a9-4528-9462-d3ecbb9276d3.config
+2026-07-03T08:06:16.8777147Z [command]"C:\Program Files\Git\bin\git.exe" config --local includeIf.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-850ce5d5-13a9-4528-9462-d3ecbb9276d3.config
+2026-07-03T08:06:16.9115923Z ##[endgroup]
+2026-07-03T08:06:16.9116691Z ##[group]Fetching the repository
+2026-07-03T08:06:16.9133013Z [command]"C:\Program Files\Git\bin\git.exe" -c protocol.version=2 fetch --no-tags --prune --no-recurse-submodules --depth=1 origin +a30242da149199bea64dd9fbc776f16866867965:refs/remotes/origin/geordi/ci-experiment-fix
+2026-07-03T08:06:18.3380643Z From https://github.com/tamirdresher/Aspire-1
+2026-07-03T08:06:18.3382885Z  * [new ref]         a30242da149199bea64dd9fbc776f16866867965 -> origin/geordi/ci-experiment-fix
+2026-07-03T08:06:18.3630014Z [command]"C:\Program Files\Git\bin\git.exe" branch --list --remote origin/geordi/ci-experiment-fix
+2026-07-03T08:06:18.3923960Z   origin/geordi/ci-experiment-fix
+2026-07-03T08:06:18.3974518Z [command]"C:\Program Files\Git\bin\git.exe" rev-parse refs/remotes/origin/geordi/ci-experiment-fix
+2026-07-03T08:06:18.4259641Z a30242da149199bea64dd9fbc776f16866867965
+2026-07-03T08:06:18.4298903Z ##[endgroup]
+2026-07-03T08:06:18.4299376Z ##[group]Determining the checkout info
+2026-07-03T08:06:18.4301092Z ##[endgroup]
+2026-07-03T08:06:18.4310617Z [command]"C:\Program Files\Git\bin\git.exe" sparse-checkout disable
+2026-07-03T08:06:18.4688314Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset-all extensions.worktreeConfig
+2026-07-03T08:06:18.5008640Z ##[group]Checking out the ref
+2026-07-03T08:06:18.5018441Z [command]"C:\Program Files\Git\bin\git.exe" checkout --progress --force -B geordi/ci-experiment-fix refs/remotes/origin/geordi/ci-experiment-fix
+2026-07-03T08:06:19.3542527Z Switched to a new branch 'geordi/ci-experiment-fix'
+2026-07-03T08:06:19.3558964Z branch 'geordi/ci-experiment-fix' set up to track 'origin/geordi/ci-experiment-fix'.
+2026-07-03T08:06:19.3660348Z ##[endgroup]
+2026-07-03T08:06:19.4039394Z [command]"C:\Program Files\Git\bin\git.exe" log -1 --format=%H
+2026-07-03T08:06:19.4337247Z a30242da149199bea64dd9fbc776f16866867965
+2026-07-03T08:06:19.5033258Z Prepare all required actions
+2026-07-03T08:06:19.5033963Z Getting action download info
+2026-07-03T08:06:19.7376725Z Download action repository 'actions/setup-dotnet@v4' (SHA:67a3573c9a986a3f9c594539f4ab511d57bb3ce9)
+2026-07-03T08:06:20.2642047Z Download action repository 'timheuer/setup-aspire@v0.1.0' (SHA:fec3fa825218461aa07fed28fa97a600d5d88b14)
+2026-07-03T08:06:20.5515422Z Download action repository 'actions/setup-python@v5' (SHA:a26af69be951a213d495a4c3e4e4022e16d87065)
+2026-07-03T08:06:20.7002336Z Download action repository 'astral-sh/setup-uv@v5' (SHA:d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86)
+2026-07-03T08:06:21.0995796Z Download action repository 'actions/setup-go@v6' (SHA:924ae3a1cded613372ab5595356fb5720e22ba16)
+2026-07-03T08:06:21.5115452Z Download action repository 'actions/setup-java@v4' (SHA:c1e323688fd81a25caa38c78aa6df2d33d3e20d9)
+2026-07-03T08:06:22.0346459Z Download action repository 'actions/setup-node@v4' (SHA:49933ea5288caeca8642d1e84afbd3f7d6820020)
+2026-07-03T08:06:22.1882939Z Download action repository 'denoland/setup-deno@v2' (SHA:667a34cdef165d8d2b2e98dde39547c9daac7282)
+2026-07-03T08:06:22.5192478Z Download action repository 'pnpm/action-setup@v5' (SHA:fc06bc1257f339d1d5d8b3a19a8cae5388b55320)
+2026-07-03T08:06:22.9352886Z Download action repository 'oven-sh/setup-bun@v2' (SHA:0c5077e51419868618aeaa5fe8019c62421857d6)
+2026-07-03T08:06:23.2721796Z Download action repository 'actions/cache@v4' (SHA:0057852bfaa89a56745cba8c7296529d2fc39830)
+2026-07-03T08:06:23.4054953Z Download action repository 'Swatinem/rust-cache@v2' (SHA:e18b497796c12c097a38f9edb9d0641fb99eee32)
+2026-07-03T08:06:23.8229848Z Download action repository 'docker/login-action@v3' (SHA:c94ce9fb468520275223c153574b00df6fe4bcc9)
+2026-07-03T08:06:24.2415743Z Download action repository 'dapr/setup-dapr@v2' (SHA:8d980918fd43a2765c143ce7f687665b2d46a6b9)
+2026-07-03T08:06:24.5493397Z Download action repository 'ai-action/setup-ollama@v1' (SHA:bfc77222729bdd88f91b95ef1142d247773e486d)
+2026-07-03T08:06:24.9243599Z ##[group]Run ./.github/actions/setup-runtimes-caching
+2026-07-03T08:06:24.9243976Z with:
+2026-07-03T08:06:24.9244197Z   name: Hosting.JavaScript.Extensions.Tests
+2026-07-03T08:06:24.9244467Z env:
+2026-07-03T08:06:24.9244642Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:06:24.9244875Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:06:24.9245569Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:06:24.9246530Z   CI: true
+2026-07-03T08:06:24.9246710Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:06:24.9246938Z ##[endgroup]
+2026-07-03T08:06:24.9497861Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-03T08:06:24.9499664Z ##[group]Run actions/setup-dotnet@v4
+2026-07-03T08:06:24.9499910Z with:
+2026-07-03T08:06:24.9500101Z   dotnet-version: 8.0.x
+9.0.x
+10.0.x
+
+2026-07-03T08:06:24.9500346Z   cache: false
+2026-07-03T08:06:24.9500520Z env:
+2026-07-03T08:06:24.9500690Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:06:24.9500990Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:06:24.9501674Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:06:24.9502922Z   CI: true
+2026-07-03T08:06:24.9503103Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:06:24.9503328Z ##[endgroup]
+2026-07-03T08:06:25.1362415Z (node:3260) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-03T08:06:25.1363599Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-03T08:06:25.2555323Z [command]"C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -Sta -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command & 'D:\a\_actions\actions\setup-dotnet\v4\externals\install-dotnet.ps1' -SkipNonVersionedFiles -Runtime dotnet -Channel LTS
+2026-07-03T08:06:31.7557466Z dotnet-install: .NET Core Runtime with version '10.0.9' is already installed.
+2026-07-03T08:06:31.9287684Z [command]"C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -Sta -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command & 'D:\a\_actions\actions\setup-dotnet\v4\externals\install-dotnet.ps1' -SkipNonVersionedFiles -Channel 8.0
+2026-07-03T08:06:32.7699101Z dotnet-install: .NET Core SDK with version '8.0.422' is already installed.
+2026-07-03T08:06:32.9203106Z [command]"C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -Sta -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command & 'D:\a\_actions\actions\setup-dotnet\v4\externals\install-dotnet.ps1' -SkipNonVersionedFiles -Runtime dotnet -Channel LTS
+2026-07-03T08:06:33.6486981Z dotnet-install: .NET Core Runtime with version '10.0.9' is already installed.
+2026-07-03T08:06:33.8021353Z [command]"C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -Sta -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command & 'D:\a\_actions\actions\setup-dotnet\v4\externals\install-dotnet.ps1' -SkipNonVersionedFiles -Channel 9.0
+2026-07-03T08:06:34.5996468Z dotnet-install: .NET Core SDK with version '9.0.315' is already installed.
+2026-07-03T08:06:34.7573210Z [command]"C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -Sta -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command & 'D:\a\_actions\actions\setup-dotnet\v4\externals\install-dotnet.ps1' -SkipNonVersionedFiles -Runtime dotnet -Channel LTS
+2026-07-03T08:06:35.4786664Z dotnet-install: .NET Core Runtime with version '10.0.9' is already installed.
+2026-07-03T08:06:35.6332189Z [command]"C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -Sta -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command & 'D:\a\_actions\actions\setup-dotnet\v4\externals\install-dotnet.ps1' -SkipNonVersionedFiles -Channel 10.0
+2026-07-03T08:06:36.3712989Z dotnet-install: .NET Core SDK with version '10.0.301' is already installed.
+2026-07-03T08:06:36.4802098Z ##[group]Run ASPIRE_VERSION="$(dotnet msbuild Directory.Build.props -nologo -v:q -getProperty:AspireVersion)"
+2026-07-03T08:06:36.4802969Z [36;1mASPIRE_VERSION="$(dotnet msbuild Directory.Build.props -nologo -v:q -getProperty:AspireVersion)"[0m
+2026-07-03T08:06:36.4803565Z [36;1mecho "version=${ASPIRE_VERSION}" >> "$GITHUB_OUTPUT"[0m
+2026-07-03T08:06:36.4804260Z [36;1mecho "cli-version=${ASPIRE_VERSION%%-*}" >> "$GITHUB_OUTPUT"[0m
+2026-07-03T08:06:36.4822595Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-07-03T08:06:36.4823000Z env:
+2026-07-03T08:06:36.4823188Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:06:36.4823429Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:06:36.4824136Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:06:36.4824864Z   CI: true
+2026-07-03T08:06:36.4825043Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:06:36.4825293Z   DOTNET_ROOT: C:\Program Files\dotnet
+2026-07-03T08:06:36.4825535Z ##[endgroup]
+2026-07-03T08:06:39.8306510Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-03T08:06:39.8307854Z ##[group]Run timheuer/setup-aspire@v0.1.0
+2026-07-03T08:06:39.8308118Z with:
+2026-07-03T08:06:39.8308283Z   version: 13.4.3
+2026-07-03T08:06:39.8308483Z   dotnet-prereq-check: true
+2026-07-03T08:06:39.8308695Z   cache: true
+2026-07-03T08:06:39.8308861Z env:
+2026-07-03T08:06:39.8309029Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:06:39.8310104Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:06:39.8310830Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:06:39.8311563Z   CI: true
+2026-07-03T08:06:39.8311745Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:06:39.8311995Z   DOTNET_ROOT: C:\Program Files\dotnet
+2026-07-03T08:06:39.8312239Z ##[endgroup]
+2026-07-03T08:06:40.1791799Z Detected .NET SDK 10.0.301
+2026-07-03T08:06:40.1820166Z Downloading Aspire installer from https://aspire.dev/install.ps1
+2026-07-03T08:06:40.7806310Z Running Aspire installer to C:\Users\runneradmin\.aspire\bin
+2026-07-03T08:06:40.8596368Z [command]"C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -NoProfile -ExecutionPolicy Bypass -File D:\a\_temp\e0d2b210-498b-439a-a34a-374f2d1a02fe.ps1 -InstallPath C:\Users\runneradmin\.aspire\bin -Version 13.4.3
+2026-07-03T08:06:41.5271977Z Downloading aspire-cli-win-x64-13.4.3.zip
+2026-07-03T08:06:44.3648330Z Aspire CLI successfully installed to: C:\Users\runneradmin\.aspire\bin\aspire.exe
+2026-07-03T08:06:44.4012592Z Added C:\Users\runneradmin\.aspire\bin to PATH for current session
+2026-07-03T08:06:44.4292318Z Added C:\Users\runneradmin\.aspire\bin to user PATH environment variable
+2026-07-03T08:06:44.4299498Z 
+2026-07-03T08:06:44.4307387Z The aspire cli is now available for use in this and new sessions.
+2026-07-03T08:06:44.4488568Z Added C:\Users\runneradmin\.aspire\bin to GITHUB_PATH for GitHub Actions
+2026-07-03T08:06:44.5820077Z Cached Aspire CLI to C:\hostedtoolcache\windows\aspire\13.4.3\x64
+2026-07-03T08:06:45.4773941Z Aspire CLI version: 13.4.3+4f218933552e18ff2874d1b6d5dc3fe671e3b6d9
+2026-07-03T08:06:45.5042062Z ##[group]Run INSTALLED_ASPIRE_CLI_VERSION="$(aspire --version)"
+2026-07-03T08:06:45.5042516Z [36;1mINSTALLED_ASPIRE_CLI_VERSION="$(aspire --version)"[0m
+2026-07-03T08:06:45.5042892Z [36;1mcase "${INSTALLED_ASPIRE_CLI_VERSION}" in[0m
+2026-07-03T08:06:45.5043325Z [36;1m  "${EXPECTED_ASPIRE_CLI_VERSION}"|"${EXPECTED_ASPIRE_CLI_VERSION}"+*) ;;[0m
+2026-07-03T08:06:45.5043700Z [36;1m  *)[0m
+2026-07-03T08:06:45.5044149Z [36;1m    echo "Expected Aspire CLI version ${EXPECTED_ASPIRE_CLI_VERSION}, but found ${INSTALLED_ASPIRE_CLI_VERSION}."[0m
+2026-07-03T08:06:45.5045198Z [36;1m    exit 1[0m
+2026-07-03T08:06:45.5045390Z [36;1m    ;;[0m
+2026-07-03T08:06:45.5045558Z [36;1mesac[0m
+2026-07-03T08:06:45.5058767Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-07-03T08:06:45.5059161Z env:
+2026-07-03T08:06:45.5060209Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:06:45.5060450Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:06:45.5061133Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:06:45.5061852Z   CI: true
+2026-07-03T08:06:45.5062037Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:06:45.5062964Z   DOTNET_ROOT: C:\Program Files\dotnet
+2026-07-03T08:06:45.5063284Z   EXPECTED_ASPIRE_CLI_VERSION: 13.4.3
+2026-07-03T08:06:45.5063532Z ##[endgroup]
+2026-07-03T08:06:45.7086203Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-03T08:06:45.7087484Z ##[group]Run actions/setup-python@v5
+2026-07-03T08:06:45.7087746Z with:
+2026-07-03T08:06:45.7087928Z   python-version: 3.11
+2026-07-03T08:06:45.7088131Z   check-latest: false
+2026-07-03T08:06:45.7090624Z   token: ***
+2026-07-03T08:06:45.7090819Z   update-environment: true
+2026-07-03T08:06:45.7091055Z   allow-prereleases: false
+2026-07-03T08:06:45.7091271Z   freethreaded: false
+2026-07-03T08:06:45.7091459Z env:
+2026-07-03T08:06:45.7091639Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:06:45.7091865Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:06:45.7092735Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:06:45.7093460Z   CI: true
+2026-07-03T08:06:45.7093642Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:06:45.7094372Z   DOTNET_ROOT: C:\Program Files\dotnet
+2026-07-03T08:06:45.7094627Z ##[endgroup]
+2026-07-03T08:06:45.8793239Z ##[group]Installed versions
+2026-07-03T08:06:45.8892968Z (node:7184) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-03T08:06:45.8894390Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-03T08:06:45.8895265Z Successfully set up CPython (3.11.9)
+2026-07-03T08:06:45.8896178Z ##[endgroup]
+2026-07-03T08:06:45.9172698Z ##[group]Run python -m pip install --upgrade pip
+2026-07-03T08:06:45.9173067Z [36;1mpython -m pip install --upgrade pip[0m
+2026-07-03T08:06:45.9173354Z [36;1mpip install uvicorn[0m
+2026-07-03T08:06:45.9187737Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-07-03T08:06:45.9188127Z env:
+2026-07-03T08:06:45.9188308Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:06:45.9188543Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:06:45.9189217Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:06:45.9190373Z   CI: true
+2026-07-03T08:06:45.9190555Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:06:45.9190815Z   DOTNET_ROOT: C:\Program Files\dotnet
+2026-07-03T08:06:45.9191206Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:06:45.9191925Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.11.9\x64/lib/pkgconfig
+2026-07-03T08:06:45.9192398Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:06:45.9192799Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:06:45.9193198Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:06:45.9193506Z ##[endgroup]
+2026-07-03T08:06:49.7358749Z Requirement already satisfied: pip in C:\hostedtoolcache\windows\Python\3.11.9\x64\Lib\site-packages (26.1.2)
+2026-07-03T08:06:52.0179091Z Collecting uvicorn
+2026-07-03T08:06:52.2374231Z   Downloading uvicorn-0.49.0-py3-none-any.whl.metadata (6.7 kB)
+2026-07-03T08:06:52.2834321Z Collecting click>=7.0 (from uvicorn)
+2026-07-03T08:06:52.2886976Z   Downloading click-8.4.2-py3-none-any.whl.metadata (2.6 kB)
+2026-07-03T08:06:52.3382782Z Collecting h11>=0.8 (from uvicorn)
+2026-07-03T08:06:52.3432352Z   Downloading h11-0.16.0-py3-none-any.whl.metadata (8.3 kB)
+2026-07-03T08:06:52.3864503Z Collecting colorama (from click>=7.0->uvicorn)
+2026-07-03T08:06:52.3917043Z   Downloading colorama-0.4.6-py2.py3-none-any.whl.metadata (17 kB)
+2026-07-03T08:06:52.4172628Z Downloading uvicorn-0.49.0-py3-none-any.whl (71 kB)
+2026-07-03T08:06:52.5085577Z Downloading click-8.4.2-py3-none-any.whl (119 kB)
+2026-07-03T08:06:52.5447593Z Downloading h11-0.16.0-py3-none-any.whl (37 kB)
+2026-07-03T08:06:52.5653530Z Downloading colorama-0.4.6-py2.py3-none-any.whl (25 kB)
+2026-07-03T08:06:52.6247746Z Installing collected packages: h11, colorama, click, uvicorn
+2026-07-03T08:06:53.0458147Z 
+2026-07-03T08:06:53.0471183Z Successfully installed click-8.4.2 colorama-0.4.6 h11-0.16.0 uvicorn-0.49.0
+2026-07-03T08:06:53.1400338Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-03T08:06:53.1401661Z ##[group]Run astral-sh/setup-uv@v5
+2026-07-03T08:06:53.1401902Z with:
+2026-07-03T08:06:53.1402085Z   enable-cache: false
+2026-07-03T08:06:53.1404756Z   github-token: ***
+2026-07-03T08:06:53.1405251Z   cache-dependency-glob: **/uv.lock
+**/requirements*.txt
+
+2026-07-03T08:06:53.1405585Z   prune-cache: true
+2026-07-03T08:06:53.1405796Z   ignore-nothing-to-cache: false
+2026-07-03T08:06:53.1406048Z   ignore-empty-workdir: false
+2026-07-03T08:06:53.1406258Z env:
+2026-07-03T08:06:53.1406426Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:06:53.1406651Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:06:53.1407328Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:06:53.1408053Z   CI: true
+2026-07-03T08:06:53.1408234Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:06:53.1408479Z   DOTNET_ROOT: C:\Program Files\dotnet
+2026-07-03T08:06:53.1408822Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:06:53.1409275Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.11.9\x64/lib/pkgconfig
+2026-07-03T08:06:53.1409717Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:06:53.1410114Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:06:53.1410509Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:06:53.1410816Z ##[endgroup]
+2026-07-03T08:06:53.3659331Z (node:7228) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-03T08:06:53.3660900Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-03T08:06:53.7276856Z Downloading uv from "https://github.com/astral-sh/uv/releases/download/0.11.26/uv-x86_64-pc-windows-msvc.zip" ...
+2026-07-03T08:06:54.2159305Z [command]"C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command "$ErrorActionPreference = 'Stop' ; try { Add-Type -AssemblyName System.IO.Compression.ZipFile } catch { } ; try { [System.IO.Compression.ZipFile]::ExtractToDirectory('D:\a\_temp\9cca90ca-8552-463d-9377-b145021a3954.zip', 'D:\a\_temp\161bc991-9e77-4808-8745-2d8bebef9f29', $true) } catch { if (($_.Exception.GetType().FullName -eq 'System.Management.Automation.MethodException') -or ($_.Exception.GetType().FullName -eq 'System.Management.Automation.RuntimeException') ){ Expand-Archive -LiteralPath 'D:\a\_temp\9cca90ca-8552-463d-9377-b145021a3954.zip' -DestinationPath 'D:\a\_temp\161bc991-9e77-4808-8745-2d8bebef9f29' -Force } else { throw $_ } } ;"
+2026-07-03T08:06:54.8185888Z Set UV_TOOL_BIN_DIR to D:\a\_temp\uv-tool-bin-dir
+2026-07-03T08:06:54.8189447Z Added D:\a\_temp\uv-tool-bin-dir to the path
+2026-07-03T08:06:54.8200273Z Added C:\hostedtoolcache\windows\uv\0.11.26\x86_64 to the path
+2026-07-03T08:06:54.8203023Z Set UV_TOOL_DIR to D:\a\_temp\uv-tool-dir
+2026-07-03T08:06:54.8219588Z Set UV_CACHE_DIR to D:\a\_temp\setup-uv-cache
+2026-07-03T08:06:54.8220667Z Successfully installed uv version 0.11.26
+2026-07-03T08:06:54.8520659Z ##[group]Run actions/setup-go@v6
+2026-07-03T08:06:54.8520894Z with:
+2026-07-03T08:06:54.8521070Z   go-version: ^1.25.4
+2026-07-03T08:06:54.8521359Z   cache-dependency-path: ./examples/golang/gin-api/go.sum
+
+2026-07-03T08:06:54.8521684Z   check-latest: false
+2026-07-03T08:06:54.8524173Z   token: ***
+2026-07-03T08:06:54.8524352Z   cache: true
+2026-07-03T08:06:54.8524522Z env:
+2026-07-03T08:06:54.8524698Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:06:54.8524926Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:06:54.8525602Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:06:54.8526356Z   CI: true
+2026-07-03T08:06:54.8526538Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:06:54.8526788Z   DOTNET_ROOT: C:\Program Files\dotnet
+2026-07-03T08:06:54.8527112Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:06:54.8528151Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.11.9\x64/lib/pkgconfig
+2026-07-03T08:06:54.8528708Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:06:54.8530046Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:06:54.8530494Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:06:54.8530853Z   UV_TOOL_BIN_DIR: D:\a\_temp\uv-tool-bin-dir
+2026-07-03T08:06:54.8531140Z   UV_TOOL_DIR: D:\a\_temp\uv-tool-dir
+2026-07-03T08:06:54.8531403Z   UV_CACHE_DIR: D:\a\_temp\setup-uv-cache
+2026-07-03T08:06:54.8531652Z ##[endgroup]
+2026-07-03T08:06:55.0154292Z Setup go version spec ^1.25.4
+2026-07-03T08:06:55.0214382Z Found in cache @ C:\hostedtoolcache\windows\go\1.26.4\x64
+2026-07-03T08:06:55.0219190Z Added go to the path
+2026-07-03T08:06:55.0223729Z Successfully set up Go version ^1.25.4
+2026-07-03T08:06:56.7326109Z [command]C:\hostedtoolcache\windows\go\1.26.4\x64\bin\go.exe env GOMODCACHE
+2026-07-03T08:06:56.7385057Z [command]C:\hostedtoolcache\windows\go\1.26.4\x64\bin\go.exe env GOCACHE
+2026-07-03T08:06:56.7657006Z C:\Users\runneradmin\AppData\Local\go-build
+2026-07-03T08:06:56.7677397Z C:\Users\runneradmin\go\pkg\mod
+2026-07-03T08:06:56.7766124Z ##[warning]Restore cache failed: Some specified paths were not resolved, unable to cache dependencies.
+2026-07-03T08:06:56.7776169Z go version go1.26.4 windows/amd64
+2026-07-03T08:06:56.7776508Z 
+2026-07-03T08:06:56.7776915Z ##[group]go env
+2026-07-03T08:06:59.2689139Z set AR=ar
+2026-07-03T08:06:59.2689564Z set CC=gcc
+2026-07-03T08:06:59.2689932Z set CGO_CFLAGS=-O2 -g
+2026-07-03T08:06:59.2690517Z set CGO_CPPFLAGS=
+2026-07-03T08:06:59.2690766Z set CGO_CXXFLAGS=-O2 -g
+2026-07-03T08:06:59.2691036Z set CGO_ENABLED=1
+2026-07-03T08:06:59.2691261Z set CGO_FFLAGS=-O2 -g
+2026-07-03T08:06:59.2691494Z set CGO_LDFLAGS=-O2 -g
+2026-07-03T08:06:59.2691709Z set CXX=g++
+2026-07-03T08:06:59.2691896Z set GCCGO=gccgo
+2026-07-03T08:06:59.2692094Z set GO111MODULE=
+2026-07-03T08:06:59.2692288Z set GOAMD64=v1
+2026-07-03T08:06:59.2692477Z set GOARCH=amd64
+2026-07-03T08:06:59.2692667Z set GOAUTH=netrc
+2026-07-03T08:06:59.2692853Z set GOBIN=
+2026-07-03T08:06:59.2693160Z set GOCACHE=C:\Users\runneradmin\AppData\Local\go-build
+2026-07-03T08:06:59.2693494Z set GOCACHEPROG=
+2026-07-03T08:06:59.2693691Z set GODEBUG=
+2026-07-03T08:06:59.2693967Z set GOENV=C:\Users\runneradmin\AppData\Roaming\go\env
+2026-07-03T08:06:59.2694278Z set GOEXE=.exe
+2026-07-03T08:06:59.2694472Z set GOEXPERIMENT=
+2026-07-03T08:06:59.2694678Z set GOFIPS140=off
+2026-07-03T08:06:59.2694873Z set GOFLAGS=
+2026-07-03T08:06:59.2695757Z set GOGCCFLAGS=-m64 -mthreads -Wl,--no-gc-sections -fmessage-length=0 -ffile-prefix-map=C:\Users\RUNNER~1\AppData\Local\Temp\go-build3475614178=/tmp/go-build -gno-record-gcc-switches
+2026-07-03T08:06:59.2697167Z set GOHOSTARCH=amd64
+2026-07-03T08:06:59.2697399Z set GOHOSTOS=windows
+2026-07-03T08:06:59.2697611Z set GOINSECURE=
+2026-07-03T08:06:59.2697802Z set GOMOD=NUL
+2026-07-03T08:06:59.2698062Z set GOMODCACHE=C:\Users\runneradmin\go\pkg\mod
+2026-07-03T08:06:59.2698361Z set GONOPROXY=
+2026-07-03T08:06:59.2698556Z set GONOSUMDB=
+2026-07-03T08:06:59.2698756Z set GOOS=windows
+2026-07-03T08:06:59.2698996Z set GOPATH=C:\Users\runneradmin\go
+2026-07-03T08:06:59.2699337Z set GOPRIVATE=
+2026-07-03T08:06:59.2699638Z set GOPROXY=https://proxy.golang.org,direct
+2026-07-03T08:06:59.2700012Z set GOROOT=C:\hostedtoolcache\windows\go\1.26.4\x64
+2026-07-03T08:06:59.2700340Z set GOSUMDB=sum.golang.org
+2026-07-03T08:06:59.2700578Z set GOTELEMETRY=local
+2026-07-03T08:06:59.2700932Z set GOTELEMETRYDIR=C:\Users\runneradmin\AppData\Roaming\go\telemetry
+2026-07-03T08:06:59.2701306Z set GOTMPDIR=
+2026-07-03T08:06:59.2701508Z set GOTOOLCHAIN=local
+2026-07-03T08:06:59.2701893Z set GOTOOLDIR=C:\hostedtoolcache\windows\go\1.26.4\x64\pkg\tool\windows_amd64
+2026-07-03T08:06:59.2702273Z set GOVCS=
+2026-07-03T08:06:59.2702465Z set GOVERSION=go1.26.4
+2026-07-03T08:06:59.2702665Z set GOWORK=
+2026-07-03T08:06:59.2702862Z set PKG_CONFIG=pkg-config
+2026-07-03T08:06:59.2703012Z 
+2026-07-03T08:06:59.2703347Z ##[endgroup]
+2026-07-03T08:06:59.2988827Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-03T08:06:59.2990096Z ##[group]Run actions/setup-java@v4
+2026-07-03T08:06:59.2990337Z with:
+2026-07-03T08:06:59.2990515Z   distribution: microsoft
+2026-07-03T08:06:59.2990721Z   java-version: 21
+2026-07-03T08:06:59.2990930Z   java-package: jdk
+2026-07-03T08:06:59.2991123Z   check-latest: false
+2026-07-03T08:06:59.2991308Z   server-id: github
+2026-07-03T08:06:59.2991498Z   server-username: GITHUB_ACTOR
+2026-07-03T08:06:59.2991732Z   server-password: GITHUB_TOKEN
+2026-07-03T08:06:59.2991956Z   overwrite-settings: true
+2026-07-03T08:06:59.2992168Z   job-status: success
+2026-07-03T08:06:59.2994697Z   token: ***
+2026-07-03T08:06:59.2994869Z env:
+2026-07-03T08:06:59.2995042Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:06:59.2995269Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:06:59.2995955Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:06:59.2996682Z   CI: true
+2026-07-03T08:06:59.2996859Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:06:59.2997107Z   DOTNET_ROOT: C:\Program Files\dotnet
+2026-07-03T08:06:59.2997434Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:06:59.2997892Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.11.9\x64/lib/pkgconfig
+2026-07-03T08:06:59.2998340Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:06:59.2998737Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:06:59.2999136Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:06:59.2999478Z   UV_TOOL_BIN_DIR: D:\a\_temp\uv-tool-bin-dir
+2026-07-03T08:06:59.2999765Z   UV_TOOL_DIR: D:\a\_temp\uv-tool-dir
+2026-07-03T08:06:59.3000016Z   UV_CACHE_DIR: D:\a\_temp\setup-uv-cache
+2026-07-03T08:06:59.3000271Z   GOTOOLCHAIN: local
+2026-07-03T08:06:59.3000458Z ##[endgroup]
+2026-07-03T08:06:59.5016862Z ##[group]Installed distributions
+2026-07-03T08:06:59.5046460Z Trying to resolve the latest version from remote
+2026-07-03T08:06:59.5259610Z (node:5040) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-03T08:06:59.5260920Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-03T08:06:59.7553525Z Resolved latest version as 21.0.2
+2026-07-03T08:06:59.7553967Z Trying to download...
+2026-07-03T08:06:59.7554940Z Downloading Java 21.0.2 (Microsoft) from https://aka.ms/download-jdk/microsoft-jdk-21.0.2-windows-x64.zip ...
+2026-07-03T08:07:01.9709069Z Extracting Java archive...
+2026-07-03T08:07:02.0676622Z [command]"C:\Program Files\PowerShell\7\pwsh.exe" -NoLogo -NoProfile -NonInteractive -ExecutionPolicy Unrestricted -Command "$ErrorActionPreference = 'Stop' ; try { Add-Type -AssemblyName System.IO.Compression.ZipFile } catch { } ; try { [System.IO.Compression.ZipFile]::ExtractToDirectory('D:\a\_temp\eaa9620a-1452-41a8-a21e-561f7cc1c3cb.zip', 'D:\a\_temp\ea97c92d-dc0c-4306-88d7-a8b972f206b1', $true) } catch { if (($_.Exception.GetType().FullName -eq 'System.Management.Automation.MethodException') -or ($_.Exception.GetType().FullName -eq 'System.Management.Automation.RuntimeException') ){ Expand-Archive -LiteralPath 'D:\a\_temp\eaa9620a-1452-41a8-a21e-561f7cc1c3cb.zip' -DestinationPath 'D:\a\_temp\ea97c92d-dc0c-4306-88d7-a8b972f206b1' -Force } else { throw $_ } } ;"
+2026-07-03T08:07:04.7047888Z Java 21.0.2 was downloaded
+2026-07-03T08:07:04.7048431Z Setting Java 21.0.2 as the default
+2026-07-03T08:07:04.7074380Z Creating toolchains.xml for JDK version 21 from microsoft
+2026-07-03T08:07:04.7161357Z Writing to C:\Users\runneradmin\.m2\toolchains.xml
+2026-07-03T08:07:04.7166268Z 
+2026-07-03T08:07:04.7166994Z Java configuration:
+2026-07-03T08:07:04.7167356Z   Distribution: microsoft
+2026-07-03T08:07:04.7167749Z   Version: 21.0.2
+2026-07-03T08:07:04.7168323Z   Path: C:\hostedtoolcache\windows\Java_Microsoft_jdk\21.0.2\x64
+2026-07-03T08:07:04.7168774Z 
+2026-07-03T08:07:04.7169778Z ##[endgroup]
+2026-07-03T08:07:04.7175399Z Creating settings.xml with server-id: github
+2026-07-03T08:07:04.7188881Z Writing to C:\Users\runneradmin\.m2\settings.xml
+2026-07-03T08:07:04.7532648Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-03T08:07:04.7533951Z ##[group]Run actions/setup-node@v4
+2026-07-03T08:07:04.7534190Z with:
+2026-07-03T08:07:04.7534360Z   node-version: 22.22.2
+2026-07-03T08:07:04.7534556Z   always-auth: false
+2026-07-03T08:07:04.7534765Z   check-latest: false
+2026-07-03T08:07:04.7537291Z   token: ***
+2026-07-03T08:07:04.7537459Z env:
+2026-07-03T08:07:04.7537629Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:07:04.7537857Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:07:04.7538523Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:07:04.7539260Z   CI: true
+2026-07-03T08:07:04.7539444Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:07:04.7539699Z   DOTNET_ROOT: C:\Program Files\dotnet
+2026-07-03T08:07:04.7540033Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:04.7540540Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.11.9\x64/lib/pkgconfig
+2026-07-03T08:07:04.7541023Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:04.7541421Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:04.7541820Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:04.7542160Z   UV_TOOL_BIN_DIR: D:\a\_temp\uv-tool-bin-dir
+2026-07-03T08:07:04.7542434Z   UV_TOOL_DIR: D:\a\_temp\uv-tool-dir
+2026-07-03T08:07:04.7542694Z   UV_CACHE_DIR: D:\a\_temp\setup-uv-cache
+2026-07-03T08:07:04.7542943Z   GOTOOLCHAIN: local
+2026-07-03T08:07:04.7543225Z   JAVA_HOME: C:\hostedtoolcache\windows\Java_Microsoft_jdk\21.0.2\x64
+2026-07-03T08:07:04.7543666Z   JAVA_HOME_21_X64: C:\hostedtoolcache\windows\Java_Microsoft_jdk\21.0.2\x64
+2026-07-03T08:07:04.7544272Z ##[endgroup]
+2026-07-03T08:07:04.9361610Z Attempting to download 22.22.2...
+2026-07-03T08:07:04.9545059Z (node:6580) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-03T08:07:04.9546429Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-03T08:07:05.6315903Z Acquiring 22.22.2 - x64 from https://github.com/actions/node-versions/releases/download/22.22.2-23521889093/node-22.22.2-win32-x64.7z
+2026-07-03T08:07:05.9951292Z Extracting ...
+2026-07-03T08:07:08.3987746Z Adding to the cache ...
+2026-07-03T08:07:11.9819463Z ##[group]Environment details
+2026-07-03T08:07:13.4216548Z node: v22.22.2
+2026-07-03T08:07:13.4216921Z npm: 10.9.7
+2026-07-03T08:07:13.4217123Z yarn: 1.22.22
+2026-07-03T08:07:13.4217827Z ##[endgroup]
+2026-07-03T08:07:13.4505315Z ##[group]Run npm i -g corepack@latest
+2026-07-03T08:07:13.4505679Z [36;1mnpm i -g corepack@latest[0m
+2026-07-03T08:07:13.4505935Z [36;1mcorepack --version[0m
+2026-07-03T08:07:13.4524416Z shell: C:\Program Files\Git\bin\bash.EXE --noprofile --norc -e -o pipefail {0}
+2026-07-03T08:07:13.4524817Z env:
+2026-07-03T08:07:13.4525001Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:07:13.4525247Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:07:13.4525947Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:07:13.4526866Z   CI: true
+2026-07-03T08:07:13.4527065Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:07:13.4527320Z   DOTNET_ROOT: C:\Program Files\dotnet
+2026-07-03T08:07:13.4527648Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:13.4528090Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.11.9\x64/lib/pkgconfig
+2026-07-03T08:07:13.4528532Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:13.4528921Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:13.4529321Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:13.4538727Z   UV_TOOL_BIN_DIR: D:\a\_temp\uv-tool-bin-dir
+2026-07-03T08:07:13.4539280Z   UV_TOOL_DIR: D:\a\_temp\uv-tool-dir
+2026-07-03T08:07:13.4539568Z   UV_CACHE_DIR: D:\a\_temp\setup-uv-cache
+2026-07-03T08:07:13.4539837Z   GOTOOLCHAIN: local
+2026-07-03T08:07:13.4540136Z   JAVA_HOME: C:\hostedtoolcache\windows\Java_Microsoft_jdk\21.0.2\x64
+2026-07-03T08:07:13.4540594Z   JAVA_HOME_21_X64: C:\hostedtoolcache\windows\Java_Microsoft_jdk\21.0.2\x64
+2026-07-03T08:07:13.4540955Z ##[endgroup]
+2026-07-03T08:07:14.6547668Z npm error code EEXIST
+2026-07-03T08:07:14.6548609Z npm error path C:\npm\prefix\yarn.cmd
+2026-07-03T08:07:14.6549092Z npm error EEXIST: file already exists
+2026-07-03T08:07:14.6549569Z npm error File exists: C:\npm\prefix\yarn.cmd
+2026-07-03T08:07:14.6550150Z npm error Remove the existing file and try again, or run npm
+2026-07-03T08:07:14.6550752Z npm error with --force to overwrite files recklessly.
+2026-07-03T08:07:14.6560537Z npm error A complete log of this run can be found in: C:\npm\cache\_logs\2026-07-03T08_07_13_973Z-debug-0.log
+2026-07-03T08:07:15.6918821Z ##[error]Process completed with exit code 1.
+2026-07-03T08:07:15.7171878Z ##[group]Run actions/upload-artifact@v7
+2026-07-03T08:07:15.7172224Z with:
+2026-07-03T08:07:15.7172521Z   name: binlog-Hosting.JavaScript.Extensions.Tests-windows-latest
+2026-07-03T08:07:15.7172886Z   path: **/*.binlog
+2026-07-03T08:07:15.7173084Z   if-no-files-found: warn
+2026-07-03T08:07:15.7173301Z   compression-level: 6
+2026-07-03T08:07:15.7173496Z   overwrite: false
+2026-07-03T08:07:15.7173687Z   include-hidden-files: false
+2026-07-03T08:07:15.7173901Z   archive: true
+2026-07-03T08:07:15.7174083Z env:
+2026-07-03T08:07:15.7174279Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:07:15.7174497Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:07:15.7175172Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:07:15.7176106Z   CI: true
+2026-07-03T08:07:15.7176292Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:07:15.7176535Z   DOTNET_ROOT: C:\Program Files\dotnet
+2026-07-03T08:07:15.7176891Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:15.7177358Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.11.9\x64/lib/pkgconfig
+2026-07-03T08:07:15.7177808Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:15.7178199Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:15.7178587Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:15.7178926Z   UV_TOOL_BIN_DIR: D:\a\_temp\uv-tool-bin-dir
+2026-07-03T08:07:15.7179201Z   UV_TOOL_DIR: D:\a\_temp\uv-tool-dir
+2026-07-03T08:07:15.7179451Z   UV_CACHE_DIR: D:\a\_temp\setup-uv-cache
+2026-07-03T08:07:15.7179697Z   GOTOOLCHAIN: local
+2026-07-03T08:07:15.7179981Z   JAVA_HOME: C:\hostedtoolcache\windows\Java_Microsoft_jdk\21.0.2\x64
+2026-07-03T08:07:15.7180415Z   JAVA_HOME_21_X64: C:\hostedtoolcache\windows\Java_Microsoft_jdk\21.0.2\x64
+2026-07-03T08:07:15.7180766Z ##[endgroup]
+2026-07-03T08:07:16.4257548Z ##[warning]No files were found with the provided path: **/*.binlog. No artifacts will be uploaded.
+2026-07-03T08:07:16.4584783Z ##[group]Run actions/upload-artifact@v7
+2026-07-03T08:07:16.4585148Z with:
+2026-07-03T08:07:16.4585478Z   name: testresults-Hosting.JavaScript.Extensions.Tests-windows-latest
+2026-07-03T08:07:16.4585885Z   path: testresults/**
+2026-07-03T08:07:16.4586103Z   if-no-files-found: warn
+2026-07-03T08:07:16.4586582Z   compression-level: 6
+2026-07-03T08:07:16.4586786Z   overwrite: false
+2026-07-03T08:07:16.4586987Z   include-hidden-files: false
+2026-07-03T08:07:16.4587395Z   archive: true
+2026-07-03T08:07:16.4587596Z env:
+2026-07-03T08:07:16.4587808Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:07:16.4588051Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:07:16.4588779Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:07:16.4589514Z   CI: true
+2026-07-03T08:07:16.4589698Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:07:16.4589984Z   DOTNET_ROOT: C:\Program Files\dotnet
+2026-07-03T08:07:16.4590312Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:16.4590760Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.11.9\x64/lib/pkgconfig
+2026-07-03T08:07:16.4591199Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:16.4591598Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:16.4591995Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:16.4592337Z   UV_TOOL_BIN_DIR: D:\a\_temp\uv-tool-bin-dir
+2026-07-03T08:07:16.4592613Z   UV_TOOL_DIR: D:\a\_temp\uv-tool-dir
+2026-07-03T08:07:16.4592872Z   UV_CACHE_DIR: D:\a\_temp\setup-uv-cache
+2026-07-03T08:07:16.4593129Z   GOTOOLCHAIN: local
+2026-07-03T08:07:16.4593408Z   JAVA_HOME: C:\hostedtoolcache\windows\Java_Microsoft_jdk\21.0.2\x64
+2026-07-03T08:07:16.4593857Z   JAVA_HOME_21_X64: C:\hostedtoolcache\windows\Java_Microsoft_jdk\21.0.2\x64
+2026-07-03T08:07:16.4594205Z ##[endgroup]
+2026-07-03T08:07:16.6442962Z ##[warning]No files were found with the provided path: testresults/**. No artifacts will be uploaded.
+2026-07-03T08:07:16.6733980Z ##[group]Run actions/upload-artifact@v7
+2026-07-03T08:07:16.6734535Z with:
+2026-07-03T08:07:16.6734856Z   name: npm-logs-Hosting.JavaScript.Extensions.Tests-windows-latest
+2026-07-03T08:07:16.6735257Z   path: C:\\npm\\cache\\_logs\\**
+2026-07-03T08:07:16.6735508Z   if-no-files-found: warn
+2026-07-03T08:07:16.6735738Z   compression-level: 6
+2026-07-03T08:07:16.6735946Z   overwrite: false
+2026-07-03T08:07:16.6736152Z   include-hidden-files: false
+2026-07-03T08:07:16.6736382Z   archive: true
+2026-07-03T08:07:16.6736814Z env:
+2026-07-03T08:07:16.6736995Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:07:16.6737234Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:07:16.6737932Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:07:16.6738658Z   CI: true
+2026-07-03T08:07:16.6738847Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:07:16.6739142Z   DOTNET_ROOT: C:\Program Files\dotnet
+2026-07-03T08:07:16.6739483Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:16.6739932Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.11.9\x64/lib/pkgconfig
+2026-07-03T08:07:16.6740376Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:16.6740771Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:16.6741175Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:16.6741551Z   UV_TOOL_BIN_DIR: D:\a\_temp\uv-tool-bin-dir
+2026-07-03T08:07:16.6741851Z   UV_TOOL_DIR: D:\a\_temp\uv-tool-dir
+2026-07-03T08:07:16.6742116Z   UV_CACHE_DIR: D:\a\_temp\setup-uv-cache
+2026-07-03T08:07:16.6742377Z   GOTOOLCHAIN: local
+2026-07-03T08:07:16.6742667Z   JAVA_HOME: C:\hostedtoolcache\windows\Java_Microsoft_jdk\21.0.2\x64
+2026-07-03T08:07:16.6743113Z   JAVA_HOME_21_X64: C:\hostedtoolcache\windows\Java_Microsoft_jdk\21.0.2\x64
+2026-07-03T08:07:16.6743466Z ##[endgroup]
+2026-07-03T08:07:16.8725300Z With the provided path, there will be 9 files uploaded
+2026-07-03T08:07:16.8730721Z Artifact name is valid!
+2026-07-03T08:07:16.8732026Z Root directory input is valid!
+2026-07-03T08:07:17.2142891Z Uploading artifact: npm-logs-Hosting.JavaScript.Extensions.Tests-windows-latest.zip
+2026-07-03T08:07:17.2189581Z Beginning upload of artifact content to blob storage
+2026-07-03T08:07:17.8671866Z Uploaded bytes 99011
+2026-07-03T08:07:17.9405246Z Finished uploading artifact content to blob storage!
+2026-07-03T08:07:17.9406967Z SHA256 digest of uploaded artifact is 0eba8b7ecdd97861835f271e9b3391f1ed155aa300238516d2c679e72ed4ab8e
+2026-07-03T08:07:17.9407804Z Finalizing artifact upload
+2026-07-03T08:07:18.3141710Z Artifact npm-logs-Hosting.JavaScript.Extensions.Tests-windows-latest successfully finalized. Artifact ID 8061186359
+2026-07-03T08:07:18.3144454Z Artifact npm-logs-Hosting.JavaScript.Extensions.Tests-windows-latest has been successfully uploaded! Final size is 99011 bytes. Artifact ID is 8061186359
+2026-07-03T08:07:18.3152589Z Artifact download URL: https://github.com/tamirdresher/Aspire-1/actions/runs/28645855369/artifacts/8061186359
+2026-07-03T08:07:18.3476324Z ##[group]Run actions/upload-artifact@v7
+2026-07-03T08:07:18.3476669Z with:
+2026-07-03T08:07:18.3477022Z   name: ts-app-host-logs-Hosting.JavaScript.Extensions.Tests-windows-latest
+2026-07-03T08:07:18.3477483Z   path: C:\\Users\\runneradmin\\.aspire\\logs\\**
+2026-07-03T08:07:18.3477781Z   if-no-files-found: warn
+2026-07-03T08:07:18.3478003Z   compression-level: 6
+2026-07-03T08:07:18.3478228Z   overwrite: false
+2026-07-03T08:07:18.3478435Z   include-hidden-files: false
+2026-07-03T08:07:18.3478662Z   archive: true
+2026-07-03T08:07:18.3478843Z env:
+2026-07-03T08:07:18.3479018Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:07:18.3479245Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:07:18.3479927Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:07:18.3480654Z   CI: true
+2026-07-03T08:07:18.3480847Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:07:18.3481150Z   DOTNET_ROOT: C:\Program Files\dotnet
+2026-07-03T08:07:18.3481503Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:18.3481976Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.11.9\x64/lib/pkgconfig
+2026-07-03T08:07:18.3482439Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:18.3482846Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:18.3483496Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:18.3483851Z   UV_TOOL_BIN_DIR: D:\a\_temp\uv-tool-bin-dir
+2026-07-03T08:07:18.3484134Z   UV_TOOL_DIR: D:\a\_temp\uv-tool-dir
+2026-07-03T08:07:18.3484396Z   UV_CACHE_DIR: D:\a\_temp\setup-uv-cache
+2026-07-03T08:07:18.3484790Z   GOTOOLCHAIN: local
+2026-07-03T08:07:18.3485175Z   JAVA_HOME: C:\hostedtoolcache\windows\Java_Microsoft_jdk\21.0.2\x64
+2026-07-03T08:07:18.3485623Z   JAVA_HOME_21_X64: C:\hostedtoolcache\windows\Java_Microsoft_jdk\21.0.2\x64
+2026-07-03T08:07:18.3485996Z ##[endgroup]
+2026-07-03T08:07:18.5351601Z ##[warning]No files were found with the provided path: C:\\Users\\runneradmin\\.aspire\\logs\\**. No artifacts will be uploaded.
+2026-07-03T08:07:18.5625986Z ##[group]Run aspire doctor
+2026-07-03T08:07:18.5626319Z [36;1maspire doctor[0m
+2026-07-03T08:07:18.5754813Z shell: C:\Program Files\PowerShell\7\pwsh.EXE -command ". '{0}'"
+2026-07-03T08:07:18.5755214Z env:
+2026-07-03T08:07:18.5755707Z   DOTNET_CONFIGURATION: Release
+2026-07-03T08:07:18.5755964Z   DAPR_VERSION: 1.15.0
+2026-07-03T08:07:18.5756712Z   TEST_PROJECT_PATH: tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests/CommunityToolkit.Aspire.Hosting.JavaScript.Extensions.Tests.csproj
+2026-07-03T08:07:18.5757499Z   CI: true
+2026-07-03T08:07:18.5757696Z   NPM_CONFIG_PACKAGE_LOCK: false
+2026-07-03T08:07:18.5757961Z   DOTNET_ROOT: C:\Program Files\dotnet
+2026-07-03T08:07:18.5758312Z   pythonLocation: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:18.5758783Z   PKG_CONFIG_PATH: C:\hostedtoolcache\windows\Python\3.11.9\x64/lib/pkgconfig
+2026-07-03T08:07:18.5759255Z   Python_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:18.5759723Z   Python2_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:18.5760148Z   Python3_ROOT_DIR: C:\hostedtoolcache\windows\Python\3.11.9\x64
+2026-07-03T08:07:18.5760513Z   UV_TOOL_BIN_DIR: D:\a\_temp\uv-tool-bin-dir
+2026-07-03T08:07:18.5760820Z   UV_TOOL_DIR: D:\a\_temp\uv-tool-dir
+2026-07-03T08:07:18.5761092Z   UV_CACHE_DIR: D:\a\_temp\setup-uv-cache
+2026-07-03T08:07:18.5761368Z   GOTOOLCHAIN: local
+2026-07-03T08:07:18.5761675Z   JAVA_HOME: C:\hostedtoolcache\windows\Java_Microsoft_jdk\21.0.2\x64
+2026-07-03T08:07:18.5762123Z   JAVA_HOME_21_X64: C:\hostedtoolcache\windows\Java_Microsoft_jdk\21.0.2\x64
+2026-07-03T08:07:18.5762479Z ##[endgroup]
+2026-07-03T08:07:18.9572749Z 
+2026-07-03T08:07:18.9583826Z Telemetry
+2026-07-03T08:07:18.9584171Z ---------
+2026-07-03T08:07:18.9584331Z 
+2026-07-03T08:07:18.9585160Z The Aspire CLI collects usage data. It is collected by Microsoft and is used to help us improve your experience. You can opt out of telemetry by setting the 
+2026-07-03T08:07:18.9586273Z ASPIRE_CLI_TELEMETRY_OPTOUT environment variable to '1' or 'true' using your preferred shell.
+2026-07-03T08:07:18.9586689Z 
+2026-07-03T08:07:18.9587048Z Read more about Aspire CLI telemetry: https://aka.ms/aspire/cli-telemetry
+2026-07-03T08:07:18.9587390Z 
+2026-07-03T08:07:18.9990927Z [2mChecking Aspire environment...[0m
+2026-07-03T08:07:27.3182204Z 
+2026-07-03T08:07:27.3183575Z [1mAspire Environment Check[0m
+2026-07-03T08:07:27.3185504Z ========================
+2026-07-03T08:07:27.3186447Z 
+2026-07-03T08:07:27.3186924Z [1mAspire[0m
+2026-07-03T08:07:27.3197726Z   ⚠️ Aspire CLI version 13.4.3 (channel: stable) is out of date. Latest version is 13.4.6 (channel: stable)  
+2026-07-03T08:07:27.3199777Z        Run 'aspire update' to update Aspire CLI.       
+2026-07-03T08:07:27.3200143Z 
+2026-07-03T08:07:27.3200424Z [1m.NET SDK[0m
+2026-07-03T08:07:27.3202279Z   ✅ .NET 10.0.301 installed (x64)  
+2026-07-03T08:07:27.3202998Z 
+2026-07-03T08:07:27.3203559Z [1mContainer Runtime[0m
+2026-07-03T08:07:27.3207297Z   ❌ Docker is running in Windows container mode ← active  
+2026-07-03T08:07:27.3219997Z        Switch Docker Desktop to Linux containers mode (right-click Docker tray icon → 'Switch to Linux containers...')       
+2026-07-03T08:07:27.3221630Z        See: https://aka.ms/aspire/containers                                                                                 
+2026-07-03T08:07:27.3223137Z        [2mDetails:[0m                                                                                                              
+2026-07-03T08:07:27.3225024Z        [2mAspire requires Linux containers. Windows containers are not supported.[0m                                               
+2026-07-03T08:07:27.3225943Z 
+2026-07-03T08:07:27.3226202Z [1mEnvironment[0m
+2026-07-03T08:07:27.3226909Z   ⚠️ HTTPS development certificate is not trusted  
+2026-07-03T08:07:27.3238647Z        Run 'aspire certs trust' to trust the HTTPS development certificate.                                                                 
+2026-07-03T08:07:27.3240187Z        See: https://aka.ms/aspire-prerequisites#dev-certs                                                                                   
+2026-07-03T08:07:27.3241321Z        [2mDetails:[0m                                                                                                                             
+2026-07-03T08:07:27.3242480Z        [2mCertificate B287197CBAEC288C6DF6150603464024EDED6604 exists in the personal store but was not found in the trusted root store.[0m       
+2026-07-03T08:07:27.3243270Z 
+2026-07-03T08:07:27.3243711Z [1mSummary: 1 passed, 2 warnings, 1 failed[0m
+2026-07-03T08:07:27.3244270Z For detailed prerequisites: https://aka.ms/aspire-prerequisites
+2026-07-03T08:07:27.3244563Z 
+2026-07-03T08:07:27.3244786Z [1mAspire CLI Installations[0m
+2026-07-03T08:07:27.3245068Z ========================
+2026-07-03T08:07:27.3245211Z 
+2026-07-03T08:07:27.3246049Z ╭───────────────────────────────────────────────────────────────────┬─────────────────────────────────────────────────┬─────────┬────────┬─────────────╮
+2026-07-03T08:07:27.3247273Z │ Path                                                              │ Version                                         │ Channel │ Route  │ PATH status │
+2026-07-03T08:07:27.3248783Z ├───────────────────────────────────────────────────────────────────┼─────────────────────────────────────────────────┼─────────┼────────┼─────────────┤
+2026-07-03T08:07:27.3249985Z │ C:\hostedtoolcache\windows\aspire\13.4.3\x64\aspire.exe (current) │ 13.4.3+4f218933552e18ff2874d1b6d5dc3fe671e3b6d9 │ stable  │ script │ active      │
+2026-07-03T08:07:27.3251662Z │ C:\Users\runneradmin\.aspire\bin\aspire.EXE                       │ 13.4.3+4f218933552e18ff2874d1b6d5dc3fe671e3b6d9 │ stable  │ script │ shadowed    │
+2026-07-03T08:07:27.3252868Z ╰───────────────────────────────────────────────────────────────────┴─────────────────────────────────────────────────┴─────────┴────────┴─────────────╯
+2026-07-03T08:07:27.3253818Z 📄 See logs at C:\hostedtoolcache\windows\aspire\13.4.3\logs\cli_20260703T080718_63e64d6b.log
+2026-07-03T08:07:27.4653019Z ##[error]Process completed with exit code 1.
+2026-07-03T08:07:27.4958040Z Post job cleanup.
+2026-07-03T08:07:27.5134283Z Node 20 is being deprecated. This workflow is running with Node 24 by default. If you need to temporarily use Node 20, you can set the ACTIONS_ALLOW_USE_UNSECURE_NODE_VERSION=true environment variable. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/
+2026-07-03T08:07:27.5135552Z Post job cleanup.
+2026-07-03T08:07:27.6824351Z (node:1368) [DEP0040] DeprecationWarning: The `punycode` module is deprecated. Please use a userland alternative instead.
+2026-07-03T08:07:27.6825890Z (Use `node --trace-deprecation ...` to show where the warning was created)
+2026-07-03T08:07:27.7235910Z Post job cleanup.
+2026-07-03T08:07:27.9336596Z [command]"C:\Program Files\Git\bin\git.exe" version
+2026-07-03T08:07:27.9625339Z git version 2.54.0.windows.1
+2026-07-03T08:07:27.9697239Z Temporarily overriding HOME='D:\a\_temp\9a74eb59-4660-4fda-8ce3-a21129a34a85' before making global git config changes
+2026-07-03T08:07:27.9699327Z Adding repository directory to the temporary git global config as a safe directory
+2026-07-03T08:07:27.9709171Z [command]"C:\Program Files\Git\bin\git.exe" config --global --add safe.directory D:\a\Aspire-1\Aspire-1
+2026-07-03T08:07:28.0036227Z Removing SSH command configuration
+2026-07-03T08:07:28.0048510Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp core\.sshCommand
+2026-07-03T08:07:28.0391436Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'core\.sshCommand' && git config --local --unset-all 'core.sshCommand' || :\""
+2026-07-03T08:07:28.6810712Z Removing HTTP extra header
+2026-07-03T08:07:28.6821988Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp http\.https\:\/\/github\.com\/\.extraheader
+2026-07-03T08:07:28.7176370Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "sh -c \"git config --local --name-only --get-regexp 'http\.https\:\/\/github\.com\/\.extraheader' && git config --local --unset-all 'http.https://github.com/.extraheader' || :\""
+2026-07-03T08:07:29.2918694Z Removing includeIf entries pointing to credentials config files
+2026-07-03T08:07:29.2932342Z [command]"C:\Program Files\Git\bin\git.exe" config --local --name-only --get-regexp ^includeIf\.gitdir:
+2026-07-03T08:07:29.3224610Z includeif.gitdir:D:/a/Aspire-1/Aspire-1/.git.path
+2026-07-03T08:07:29.3225599Z includeif.gitdir:D:/a/Aspire-1/Aspire-1/.git/worktrees/*.path
+2026-07-03T08:07:29.3226335Z includeif.gitdir:/github/workspace/.git.path
+2026-07-03T08:07:29.3227101Z includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-07-03T08:07:29.3275650Z [command]"C:\Program Files\Git\bin\git.exe" config --local --get-all includeif.gitdir:D:/a/Aspire-1/Aspire-1/.git.path
+2026-07-03T08:07:29.3560932Z D:\a\_temp\git-credentials-850ce5d5-13a9-4528-9462-d3ecbb9276d3.config
+2026-07-03T08:07:29.3614915Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset includeif.gitdir:D:/a/Aspire-1/Aspire-1/.git.path D:\a\_temp\git-credentials-850ce5d5-13a9-4528-9462-d3ecbb9276d3.config
+2026-07-03T08:07:29.3963071Z [command]"C:\Program Files\Git\bin\git.exe" config --local --get-all includeif.gitdir:D:/a/Aspire-1/Aspire-1/.git/worktrees/*.path
+2026-07-03T08:07:29.4253283Z D:\a\_temp\git-credentials-850ce5d5-13a9-4528-9462-d3ecbb9276d3.config
+2026-07-03T08:07:29.4303745Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset includeif.gitdir:D:/a/Aspire-1/Aspire-1/.git/worktrees/*.path D:\a\_temp\git-credentials-850ce5d5-13a9-4528-9462-d3ecbb9276d3.config
+2026-07-03T08:07:29.4639800Z [command]"C:\Program Files\Git\bin\git.exe" config --local --get-all includeif.gitdir:/github/workspace/.git.path
+2026-07-03T08:07:29.4924925Z /github/runner_temp/git-credentials-850ce5d5-13a9-4528-9462-d3ecbb9276d3.config
+2026-07-03T08:07:29.4973287Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset includeif.gitdir:/github/workspace/.git.path /github/runner_temp/git-credentials-850ce5d5-13a9-4528-9462-d3ecbb9276d3.config
+2026-07-03T08:07:29.5311323Z [command]"C:\Program Files\Git\bin\git.exe" config --local --get-all includeif.gitdir:/github/workspace/.git/worktrees/*.path
+2026-07-03T08:07:29.5597246Z /github/runner_temp/git-credentials-850ce5d5-13a9-4528-9462-d3ecbb9276d3.config
+2026-07-03T08:07:29.5644396Z [command]"C:\Program Files\Git\bin\git.exe" config --local --unset includeif.gitdir:/github/workspace/.git/worktrees/*.path /github/runner_temp/git-credentials-850ce5d5-13a9-4528-9462-d3ecbb9276d3.config
+2026-07-03T08:07:29.6047957Z [command]"C:\Program Files\Git\bin\git.exe" submodule foreach --recursive "git config --local --show-origin --name-only --get-regexp remote.origin.url"
+2026-07-03T08:07:30.1805341Z Removing credentials config 'D:\a\_temp\git-credentials-850ce5d5-13a9-4528-9462-d3ecbb9276d3.config'
+2026-07-03T08:07:30.2034431Z Cleaning up orphan processes
+2026-07-03T08:07:30.2268378Z ##[warning]Node.js 20 is deprecated. The following actions target Node.js 20 but are being forced to run on Node.js 24: actions/setup-dotnet@v4, actions/setup-java@v4, actions/setup-node@v4, actions/setup-python@v5, astral-sh/setup-uv@v5, timheuer/setup-aspire@v0.1.0. For more information see: https://github.blog/changelog/2025-09-19-deprecation-of-node-20-on-github-actions-runners/

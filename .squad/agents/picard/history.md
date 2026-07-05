@@ -98,3 +98,44 @@ This bypasses Layer 0a (per-agent persistent overrides) and Layer 0b (global per
 
 **Reference:** `.squad/decisions.md` (Worf PR #1148 review) and `worf-pr1148-review.md` in decisions inbox.
 
+
+
+---
+
+## 2026-06-16 — Learnings: @types/node Major Bumps + @ts-expect-error Cleanup
+
+### Context
+Handled coordinated bump of @types/node 22 → 25 across two packages (squad-cli, squad-sdk), combining Dependabot PRs #1321 and #1326 into a single PR (#1349).
+
+### @types/node Major Bump Pattern
+When a @types/node major version is bumped (e.g., 22 → 25), the type definitions become more complete. APIs that were previously ny or untyped get proper type signatures. This means:
+1. **@ts-expect-error directives may become invalid (TS2578)** — if the underlying expression is now well-typed, TypeScript flags the directive as unused. Decision: remove the directive; the code is now correctly typed.
+2. **Lockfile drift** is the other common Dependabot failure. Fix: run 
+pm install (not 
+pm ci) to regenerate, then commit the updated package-lock.json.
+3. **Runtime version vs. type version are independent** — project targets Node 22 LTS runtime (ngines.node >=22.5.0), but accepting @types/node 25 typings for dev is fine and expected.
+
+### @ts-expect-error Cleanup Rule
+Before removing a @ts-expect-error:
+- Identify what the directive was suppressing and WHY it was added.
+- Verify the new types actually handle that case (do NOT remove if a new TS error appears without it).
+- If the directive guarded optional/dynamic patterns that are still unsafe (e.g., optional dependencies like qrcode-terminal), leave them — they're different from @types/node-driven ones.
+- Only remove when 	sc --noEmit succeeds cleanly without the directive.
+
+### Combining Dependabot PRs
+When multiple Dependabot PRs touch the same @types package across different sub-packages, combine them into one PR:
+- One 
+pm install regenerates all lockfiles at once.
+- One CI run validates both packages simultaneously.
+- Reference both Dependabot PR numbers with Closes #XXXX for clean auto-close.
+
+### Windows-Known Flake Reference
+For this repo, these test files fail on Windows but pass on Ubuntu CI (treat as preexisting):
+- 	est/storage-provider.test.ts (NTFS unicode)
+- 	est/cli/doctor.test.ts (sqlite binding)
+- 	est/acceptance/acceptance.test.ts > Init in existing project (ANSI dim codes)
+- 	est/cli/state-mcp.test.ts (timing/worker timeout)
+- 	est/cli/team-root-resolution.test.ts (8.3 path resolution)
+- 	est/cli/upgrade.test.ts
+
+Additional pre-existing Windows flakes confirmed on 2026-06-16: 	est/cli-packaging-smoke.test.ts, 	est/docs-build.test.ts, 	est/init-leak-mutable-state.test.ts, 	est/remote-control.test.ts, 	est/repl-ux.test.ts, 	est/scheduler.test.ts, 	est/state-backend.test.ts.

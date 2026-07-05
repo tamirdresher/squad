@@ -164,3 +164,53 @@ When a gap exists in the PR's code but the root cause is inherited from an exist
 - Sign-off changes from "two things before I approve" to "approving — address nits your call"
 
 **Length target:** ~430 words (slightly above #1148 draft-1 because the design-intent paragraph is new).
+
+---
+
+# Troi History Summary
+**Archive Date:** 2026-06-15T18:55:00Z  
+**Original Size:** 16916 bytes  
+**Reason:** Threshold ≥15360 bytes hit; summarization triggered.
+
+## Core Purpose
+Troi drafts blogs, posts, and content in Tamir's voice. Emphasis on technical specificity, evidence-backed claims, zero generic LLM-tells, pragmatic verdicts.
+
+## Key Voice Patterns Extracted
+
+### Code Review Comments
+- Open with *specific* praise ("~30 unit tests", not generic warmup)
+- Use bold section headers to separate distinct issues
+- Name actual files/line numbers as evidence
+- Quote + correct errors with suggested fixes
+- End with explicit verdict, no hedging
+
+### Conversational Thread Replies
+- Answer in sentence one; no preamble
+- 5 short paragraphs (~120 words)
+- Light callback if carries substance
+- Close with specific action-forward offer
+- No sign-off
+
+### Design-Discussion Replies
+- Open with specific gap acknowledgment backed by code
+- Use file:line cites freely
+- Honest "what IS/ISN'T shipped" structure
+- Reusable lesson in closing, not specific advice
+- 5-7 paragraphs, ~250-350 words
+
+### Net Effect Pattern (new)
+After technical chain explaining why something doesn't fire, terminate with one declarative: "Net effect: [plain-English consequence]"
+
+### Fair Caveat Pattern (new)
+When gap is inherited from existing broken code: "(same pattern as X already — existing debt, not new regression)"
+
+## Major Deliverables
+- **2026-06-07:** v0.10.0 release announcement draft (~150 lines body; 5 themes max, scar story, verified metrics)
+- **2026-06-09:** PR #1148 review (reasoningEffort pipeline; first draft request-changes → revision approve after design-pattern check)
+
+## Learnings
+- Match commenter's substance in design discussions or reads dismissive
+- 30% compression in design-reply structure possible via thematic merging
+- Always verify "approve vs. request-changes" verdict against SDK precedent before posting
+- Overcall on "request-changes" when gap is by design blocks PR + signals misread
+- Release: metrics only from changelog, scar-story lesson reusable, breaking-changes inline

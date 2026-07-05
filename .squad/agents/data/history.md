@@ -51,3 +51,39 @@
 ## Recent Cross-Agent Coordination
 
 - **2026-06-24 — PR #1383 Review:** Coordinated with Worf on security & framework review. Converged on critical blocker: `routing.ts` @mention guard uses `||` instead of `&&`, creating live routing regression. Both verdicts: REQUEST CHANGES. Merged to decisions.md.
+
+## Learnings (from PR #1383 review — 2026-06-24)
+
+### CLI Upgrade Pattern
+- `writeAgentTemplate()` diff pattern: strip the version-stamp comment (`<!-- squad-cli vX.Y.Z -->`) before comparing existing vs. template to avoid false "customized" detection on every upgrade. Useful pattern for any template-overwrite scenario where a version header is injected.
+- Single `.local-backup` slot is risky for repeated upgrade runs; timestamp suffixes (`file.local-backup-YYYYMMDD`) prevent silent clobber.
+- `--dry-run` in upgrade.ts: runs the detection logic early and returns before any writes; the preview block is cleanly separated from the write path via early return.
+
+### Lazy MCP Init Pattern
+- Deferring `createStateMcpToolRegistry()` to first tool call via a closure with error-memoization is the correct pattern for any MCP server that performs I/O at startup. Allows the transport connection to complete before state resolution. Use `initError` memoization to avoid re-throwing unhelpful errors on every subsequent call after a one-time failure.
+- Rebuilding Maps (runtimeTools, toolMap) per request from a memoized registry adds minor overhead; the `toolMap` should also be memoized alongside the registry.
+
+### Routing Guard Anti-Pattern
+- `||` vs `&&` in agent-mention guards is a recurring risk. `allKnownAgents.includes(name) || name !== 'coordinator'` is almost always true (the second clause is true for any name that isn't the literal string 'coordinator'). The safe form is `&&`. Always verify boolean guard logic when the second clause is a negative equality check.
+
+### addAgentToConfig Regex Approach
+- Two regex patterns needed for squad.config.ts: `agents: [...]` object-literal style AND `.agents([...])` builder-method style. Using a non-greedy `[\s\S]*?` with a lookahead `(?=\s*[,}\)])` is the correct approach for multi-line TypeScript array matching.
+- Existing test suite has a strict 80-char line-length assertion for generated code output; always validate generated template strings against this constraint before merging onboarding changes.
+
+## Learnings (from PR #1384 review — 2026-06-24)
+
+### OTel span attribute PII pattern
+- Prompt content and long descriptions placed as OTel span attributes are a PII risk in multi-tenant backends. Use opt-in flags (`IncludeX InTraces`) or omit from spans by default; typed envelopes (in-process callbacks) are the safe surface for full content.
+- `Truncate()` guards applied to prompt but not to persona.description — inconsistency to flag.
+
+### Sample file hygiene
+- Hardcoded developer machine paths in committed sample files are a common regression: always verify `SquadFolderPath` / working directory is resolved at runtime (env var, `GetCurrentDirectory()`, relative path), never a machine-local absolute.
+- Dead/debug commented-out code (`//return await agent1.RunAsync(...)`) should be removed before merging samples.
+
+## Learnings — 2026-07-04
+
+- **npm global installs on Windows with admin-owned prefix:** When 
+pm config get prefix points to an admin-writable dir like C:\ProgramData\global-npm and the session is unelevated, 
+pm install -g fails with EPERM unlink. Workaround: install with NPM_CONFIG_PREFIX pointing to a user-writable dir that already sits earlier on `PATH` (here: C:\.tools\.npm-global). No admin, no PATH mutation, no downgrade of side-by-side tools.
+- **Squad `workstreams` CLI vs filesystem workstreams:** `squad subsquads list` (alias `workstreams`) reads `.squad/streams.json` — it does NOT enumerate the file-based `.squad/workstreams/active/{slug}/` directories. This repo uses the filesystem convention (per `.squad/workstreams/README.md`), so new workstreams are created by copying `_template/` and updating the active-workstreams table by hand.
+- **Squad CLI 0.11.0 install footprint:** 247 npm packages, ~35s on this machine. Ships `squad`, `squad-cli`, and `squad-test` shims.

@@ -1,0 +1,131 @@
+{
+  "completedAt": "2026-07-03T08:07:32Z",
+  "conclusion": "failure",
+  "databaseId": 84952584346,
+  "name": "run / Hosting.JavaScript.Extensions.Tests-windows-latest",
+  "startedAt": "2026-07-03T08:06:11Z",
+  "status": "completed",
+  "steps": [
+    {
+      "completedAt": "2026-07-03T08:06:13Z",
+      "conclusion": "success",
+      "name": "Set up job",
+      "number": 1,
+      "startedAt": "2026-07-03T08:06:12Z",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-07-03T08:06:19Z",
+      "conclusion": "success",
+      "name": "Checkout code",
+      "number": 2,
+      "startedAt": "2026-07-03T08:06:13Z",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-07-03T08:07:15Z",
+      "conclusion": "failure",
+      "name": "Setup Runtimes, Caching, and Tools",
+      "number": 3,
+      "startedAt": "2026-07-03T08:06:19Z",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-07-03T08:07:15Z",
+      "conclusion": "skipped",
+      "name": "Verify Docker is running",
+      "number": 4,
+      "startedAt": "2026-07-03T08:07:15Z",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-07-03T08:07:15Z",
+      "conclusion": "skipped",
+      "name": "Build test project",
+      "number": 5,
+      "startedAt": "2026-07-03T08:07:15Z",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-07-03T08:07:15Z",
+      "conclusion": "skipped",
+      "name": "Run tests",
+      "number": 6,
+      "startedAt": "2026-07-03T08:07:15Z",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-07-03T08:07:15Z",
+      "conclusion": "skipped",
+      "name": "Dump docker info",
+      "number": 7,
+      "startedAt": "2026-07-03T08:07:15Z",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-07-03T08:07:16Z",
+      "conclusion": "success",
+      "name": "Upload bin log artifact",
+      "number": 8,
+      "startedAt": "2026-07-03T08:07:15Z",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-07-03T08:07:16Z",
+      "conclusion": "success",
+      "name": "Upload test results artifact",
+      "number": 9,
+      "startedAt": "2026-07-03T08:07:16Z",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-07-03T08:07:18Z",
+      "conclusion": "success",
+      "name": "Upload npm logs if failed",
+      "number": 10,
+      "startedAt": "2026-07-03T08:07:16Z",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-07-03T08:07:18Z",
+      "conclusion": "success",
+      "name": "Upload TypeScript app host logs if failed",
+      "number": 11,
+      "startedAt": "2026-07-03T08:07:18Z",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-07-03T08:07:27Z",
+      "conclusion": "failure",
+      "name": "Aspire doctor",
+      "number": 12,
+      "startedAt": "2026-07-03T08:07:18Z",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-07-03T08:07:27Z",
+      "conclusion": "success",
+      "name": "Post Setup Runtimes, Caching, and Tools",
+      "number": 23,
+      "startedAt": "2026-07-03T08:07:27Z",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-07-03T08:07:30Z",
+      "conclusion": "success",
+      "name": "Post Checkout code",
+      "number": 24,
+      "startedAt": "2026-07-03T08:07:27Z",
+      "status": "completed"
+    },
+    {
+      "completedAt": "2026-07-03T08:07:30Z",
+      "conclusion": "success",
+      "name": "Complete job",
+      "number": 25,
+      "startedAt": "2026-07-03T08:07:30Z",
+      "status": "completed"
+    }
+  ],
+  "url": "https://github.com/tamirdresher/Aspire-1/actions/runs/28645855369/job/84952584346"
+}

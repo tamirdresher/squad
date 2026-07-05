@@ -21,6 +21,7 @@ workstreams/
 | Slug | Name | Status |
 |------|------|--------|
 | `squad-agents-ai` | Squad.Agents.AI NuGet | active |
+| `squad-org-demo` | Squad Org Demo — Presentation Prep | active |
 
 ## Workstream Binding
 
