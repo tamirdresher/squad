@@ -1,8 +1,109 @@
 # Squad Decisions
 
-**Last Updated:** 2026-07-05T15:34:48.648+03:00
+**Last Updated:** 2026-07-07T10:30:00Z
 
 ## Active Decisions
+
+---
+
+### 2026-07-07T10:30:00Z: Worf — PR Review Batch: #1435, #1449, #1450 (Infra/Dependencies)
+
+**Author:** Worf (Security & Reliability)  
+**Date:** 2026-07-07T10:30:00Z  
+**PRs:** bradygaster/squad#1435, #1449, #1450  
+**Overall Status:** 2 CHANGES_REQUESTED (blockers), 1 COMMENT (conditional pass)
+
+**Summary:** Batch review of three infra/dependency PRs.
+
+**PR #1435 — ci: bump checkout v4 → v7 (54 templates):**
+- **Verdict:** 💬 Comment (conditional pass on CI stability)
+- Supply-chain hardening present (v7 blocks unsafe fork PR checkout). Change itself safe; recommend follow-up to pin checkout to commit SHAs instead of floating v7 tag.
+- **Blocker:** None from code. Blocked pending `test` CI re-run (pre-existing flake, orthogonal to this PR).
+
+**PR #1449 — deps: GitHub.Copilot.SDK 1.0.3 → 1.0.5:**
+- **Verdict:** ⛔ REQUEST CHANGES — HARD BUILD BREAK
+- Between 1.0.3 and 1.0.5, SDK repackaged `CopilotClient` into separate assembly not transitively referenced. C# build fails across net8.0/net9.0/net10.0 on both ubuntu-latest and windows-latest.
+- Additional API surface change: `getBearerToken` callback renamed in MCP OAuth host token handlers (#1796).
+- **Action:** Do not merge. Either add explicit `PackageReference` in csproj or refactor to new API.
+
+**PR #1450 — deps: bump OTel 0.219 → 0.220 (3 packages):**
+- **Verdict:** ⛔ REQUEST CHANGES — BLOCKER (lockfile + breaking API changes)
+- **BLOCKER 1:** `package-lock.json` NOT regenerated; `npm ci` refuses. Must run `npm install` and commit lockfile.
+- **BLOCKER 2:** Marked `:boom:` breaking API changes in 0.220 — `BatchLogRecordProcessor` and `SimpleLogRecordProcessor` constructors now require options-object signature instead of positional args. If Squad's OTel wiring constructs these directly, runtime breakage will occur.
+- **Action:** Do not merge. Regenerate lockfile, audit/migrate processor construction sites, confirm CI green.
+
+**Consolidated:** #1435 safe once `test` passes (separate follow-up for SHA hardening). #1449 and #1450 blocked on hard structural issues.
+
+---
+
+### 2026-07-07T10:30:00Z: Data — PR Review: bradygaster/squad#1444 (Model Catalog Refresh)
+
+**Author:** Data (Framework Expert)  
+**Date:** 2026-07-07T10:30:00Z  
+**PR:** https://github.com/bradygaster/squad/pull/1444  
+**Title:** Refresh model catalog to CLI-reachable IDs and prune dead fallback chains  
+**Verdict:** ✅ **APPROVE**
+
+**Summary:** Refactors `MODEL_CATALOG` from 18 → 13 CLI-reachable model IDs. Prunes dead IDs from all three fallback sources. Adds optional `githubCategory` cost-ceiling field. Includes new `test/catalog-refresh.test.ts` with invariant: all chain IDs exist in catalog, no dead IDs.
+
+**Key Decisions:**
+- `defaultModel` moves `claude-sonnet-4` → `claude-sonnet-4.6` (real behavior change, correctly marked minor bump in SDK).
+- Out-of-catalog IDs still pass through selector (by design, carves out users pinning `--model claude-opus-4.5` etc.).
+- All fallback tiers (Premium/Standard/Fast) non-empty, no dead IDs in chains.
+
+**Non-blocking observation:** Coordinator prompt template `squad.agent.md` on `dev` still lists old valid-models catalog and old fallback chains. Not a blocker (runtime resolver is now correct internally); however, flag for follow-up "docs sync" PR to update all four template copies in `.squad-templates/`, `packages/squad-cli/templates/`, `packages/squad-sdk/templates/`, `templates/`.
+
+**CI:** Pre-existing failure in `docs/` (Astro dep drift: `@astrojs/markdown-remark`). Unrelated to this diff; separate micro-PR should fix.
+
+**Recommendation:** Merge as-is. Two follow-ups: (1) confirm docs sync PR, (2) fix Astro deps.
+
+---
+
+### 2026-07-07T10:30:00Z: Troi — PR Review: bradygaster/squad#1453 (Docs: Squad Overview & Install Guide)
+
+**Author:** Troi (Blogger & Voice)  
+**Date:** 2026-07-07T10:30:00Z  
+**PR:** https://github.com/bradygaster/squad/pull/1453  
+**Title:** docs: Add Squad overview and comprehensive installation guide  
+**Contributor:** @ElazarK (external)  
+**Verdict:** 💬 COMMENT — Ship after accuracy fixes
+
+**Summary:** Two new Astro docs pages: `concepts/what-is-squad.md` (129 LOC) and `get-started/install-comprehensive.md` (207 LOC). Writing is clean, beginner-friendly. Package names, core commands, `.squad/` layout all match reality. CI green on 7 checks.
+
+**Accuracy Findings (fix before merge):**
+1. **BLOCKING for link quality:** `what-is-squad.md` links to `/docs/get-started/installation/`, but new file is `install-comprehensive.md`. Either rename file to `installation.md` (preferred) or fix link target.
+2. **Deprecated npm command:** `$(npm bin -g)` removed in npm 9+. Replace with `$(npm prefix -g)/bin` (macOS/Linux) and `"$(npm prefix -g)"` (Windows). Users on modern npm will hit empty PATH.
+3. **GitLab claim overreaches:** "Ralph watches your GitHub or GitLab issues." Squad's triage uses `gh` CLI (GitHub-only). Drop GitLab claim or scope to "GitHub" until GitLab support ships.
+4. **Governance enforcement overstated:** File-write guards, PII scrubbing, reviewer lockout described as framework-level enforcement; in practice these are charter-driven conventions + opt-in checks. Soften wording (e.g., "patterns and templates for") or escalate to Worf for security-language review.
+
+**Voice & clarity (non-blocking):**
+5. H1 and first H2 identical ("What is Squad?"). Drop H2 or rename.
+6. Voice is competent but corporate (not Tamir's warm, jokes-and-scars style). Acceptable tradeoff for external contribution. Highest-leverage places for personality pass: "Responsible AI" and "How Squad works" sections.
+
+**Completeness (nice-to-have):** Workstreams, decisions/inbox, skills, `.squad/config.json` (from `--mode remote`) not yet covered. Fine for v1.
+
+**Recommendation:** Leave friendly review with four accuracy fixes (link, npm, GitLab, governance). Approve after author addresses. Escalate #4 to Worf before public publication.
+
+---
+
+### 2026-07-05T19:22:53Z: Scribe — Squad Org Demo Narrated Draft Video Production
+
+**Authors:** Troi (Production/Narration), Data (Assembly & Validation)  
+**Date:** 2026-07-05T19:22:53+03:00  
+**Status:** DRAFT PRODUCED — Re-record Required Before Shipping  
+**Workstream:** `squad-org-demo`
+
+**Summary:** Troi produced narration script, captions, and production plan for the squad-org-demo presentation video. Data assembled the final MP4 (`squad-org-demo-talk-narrated.mp4`) from the previously approved real CLI recording and local SAPI narration. Video verified with ffprobe: H.264 video 1920x1080 @ 30 fps, AAC audio, 424.24s duration.
+
+**Deliverable Location:** `C:\Users\tamirdresher\.copilot\session-state\9aceebaf-58ed-4b03-b681-ab889154eb93\files\squad-org-demo-talk-narrated.mp4`
+
+**Critical Finding:** SAPI narration is system-generated and does not reflect Tamir's voice. This is a draft cut for review and rehearsal purposes only. **Before shipping to external audiences, re-record the narration with Tamir's actual voice or prepare for live delivery rehearsal.**
+
+**Recommendation:** 
+1. Use current draft for internal timing review and slide deck alignment
+2. Schedule Tamir narration re-recording session OR prepare for live delivery (if presentation will be live)
+3. Verify final audio quality and lip-sync before external publication
+4. Update video label/description to note current state (e.g., "Draft with placeholder narration")
 
 ---
 
