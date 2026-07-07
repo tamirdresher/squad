@@ -87,3 +87,17 @@ pm config get prefix points to an admin-writable dir like C:\ProgramData\global-
 pm install -g fails with EPERM unlink. Workaround: install with NPM_CONFIG_PREFIX pointing to a user-writable dir that already sits earlier on `PATH` (here: C:\.tools\.npm-global). No admin, no PATH mutation, no downgrade of side-by-side tools.
 - **Squad `workstreams` CLI vs filesystem workstreams:** `squad subsquads list` (alias `workstreams`) reads `.squad/streams.json` — it does NOT enumerate the file-based `.squad/workstreams/active/{slug}/` directories. This repo uses the filesystem convention (per `.squad/workstreams/README.md`), so new workstreams are created by copying `_template/` and updating the active-workstreams table by hand.
 - **Squad CLI 0.11.0 install footprint:** 247 npm packages, ~35s on this machine. Ships `squad`, `squad-cli`, and `squad-test` shims.
+
+## 2026-07-07 — CommunityToolkit/Aspire PR #1456 Review: `.squad/.cache/` Convention Verification
+
+- **Framework Finding (M2 — MEDIUM):** Verified that `InternalsVisibleTo` declarations exist (or must exist) for all cross-assembly internal API usage when `TreatWarningsAsErrors` is enabled in production build policy. Missing declarations will fail compile under strict build settings. This applies to PR's internal API surface in Aspire SDK.
+
+- **Framework Convention:** `.squad/.cache/` is sanctioned directory per Squad framework convention. Already gitignored (`.gitignore`:12). PR's use of `.squad/.cache/` for launcher state is correct and follows established pattern.
+
+- **Verified API surfaces:** `--agent squad` CLI routing: correct behavior for agent-selection wiring. Public Aspire API surface: no breaking changes in this PR. SDK interop with CLI: compatible.
+
+- **Framework Learning:** Build policy strictness (`TreatWarningsAsErrors`) surfaces framework assumptions that are often implicit. When porting code between contexts (here, Aspire SDK consuming Squad patterns), always verify that visibility/access declarations match the target build policy. Saves CI loops.
+
+- **Cross-Agent Sync:** Worf agent (Security & Reliability) reviewed same PR, flagged `wt.exe` re-parsing vulnerability. Test brittleness finding converged (both agents flagged `Assert.DoesNotContain(";",script)` fragility). Decisions merged to shared log; both reviewers approved with suggestions.
+
+**Last Updated:** 2026-07-07T14:01:12Z

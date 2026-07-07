@@ -109,4 +109,18 @@
 
 ---
 
-**Last Updated:** 2026-07-03T09:20:04.467+03:00
+## 2026-07-07 — CommunityToolkit/Aspire PR #1456 Review: `wt.exe` `;`-Reparse Vulnerability
+
+**PR Context:** Cross-platform Copilot CLI launch fix addressing PowerShell `;`-injection. PR correctly escapes `;` in PowerShell `-File` parameter.
+
+**Standout Finding (F1 — HIGH):** Windows Terminal (`wt.exe`) itself re-parses `;` in its own `-d`/`--title`/`-File` arguments — same bug class and severity as the vulnerability the PR fixes. When Copilot CLI invokes `wt.exe -File "script.ps1; other-cmd"`, the escaped PowerShell call succeeds, but if `script.ps1` itself launches another `wt.exe` with a user-controlled argument, re-injection occurs at the second hop.
+
+**Recommendation:** Escape `;` to `\;` in PR's `wt.exe` command construction in addition to PowerShell `-File` handling. Add test case verifying `;` is escaped in final `wt.exe` invocation (not just PowerShell layer).
+
+**Framework Learning:** Multi-layer escaping requirements. When subprocess handles arguments AND that subprocess internally shells to another tool, escaping must apply at both layers. Single-layer fixes create false negatives (no error in immediate subprocess, but injection succeeds in cascading subprocess).
+
+**Cross-Agent Sync:** Data agent (Framework Expert) reviewed same PR, flagged framework-level build concerns. Test brittleness finding converged (both agents): `Assert.DoesNotContain(";",script)` is too broad for intent; recommend assertion that specifically validates escaping of user-controlled command separators in final invocation strings.
+
+---
+
+**Last Updated:** 2026-07-07T14:01:12Z
