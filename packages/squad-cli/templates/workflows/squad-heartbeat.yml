@@ -13,8 +13,18 @@ on:
   pull_request:
     types: [closed]
 
+  # Periodic safety-net sweep so new squad work still gets triaged.
+  schedule:
+    - cron: "*/15 * * * *"
+
   # Manual trigger
   workflow_dispatch:
+
+# Collapse overlapping runs: only one heartbeat runs at a time, and any
+# queued/in-progress duplicate is cancelled instead of piling onto runners.
+concurrency:
+  group: squad-heartbeat
+  cancel-in-progress: true
 
 permissions:
   issues: write
@@ -24,6 +34,7 @@ permissions:
 jobs:
   heartbeat:
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
 
