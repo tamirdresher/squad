@@ -4,6 +4,9 @@ All notable changes to this project will be documented in this file.
 
 ## [Unreleased]
 
+### Fixed
+- (ci) Sync concurrency group, schedule trigger, and timeout-minutes guard to all 4 heartbeat template locations (`templates/workflows/`, `packages/squad-cli/templates/`, `packages/squad-sdk/templates/`, `.squad-templates/`) so `squad upgrade` carries them forward — fixes #4702. Without these, every upgrade silently dropped the concurrency guard added on 2026-05-24, causing 13 concurrent CI failures (#4699).
+
 ## [0.10.0] — 2026-06-07
 
 First stable release since v0.9.4 (April 25). Consumes 97 changesets (sdk: 50, cli: 71).
