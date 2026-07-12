@@ -184,8 +184,8 @@ function countOmissions(
   chunks: RetrievalChunk[],
   selected: RetrievalChunk[],
 ): { decisions: number; history: number } {
-  const selectedIds = new Set(selected.map(chunk => chunk.id));
-  const omitted = chunks.filter(chunk => !selectedIds.has(chunk.id));
+  const selectedChunks = new Set(selected);
+  const omitted = chunks.filter(chunk => !selectedChunks.has(chunk));
   return {
     decisions: omitted.filter(chunk => chunk.source === 'decisions').length,
     history: omitted.filter(chunk => chunk.source === 'history').length,

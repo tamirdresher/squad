@@ -75,8 +75,8 @@
         "command": "experiment-focused suite --no-file-parallelism",
         "exitCode": 0,
         "tests": {
-          "total": 73,
-          "passed": 73,
+          "total": 74,
+          "passed": 74,
           "failed": 0
         }
       },

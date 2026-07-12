@@ -122,4 +122,21 @@ describe('selective spawn-time retrieval experiment', () => {
 
     expect(result.metrics.maxInjectedBytes).toBe(4096);
   });
+
+  it('counts duplicate-content chunks as separate omitted matches', () => {
+    const duplicate = '## Duplicate\n\nAuthentication token rotation.';
+    const result = retrieveSpawnContext({
+      agentName: 'eecom',
+      query: 'authentication token rotation',
+      decisions: `${duplicate}\n\n${duplicate}`,
+      history: '',
+      maxItems: 1,
+      maxInjectedBytes: 1024,
+    });
+
+    expect(result.metrics.matchCount).toBe(2);
+    expect(result.metrics.selectedIds).toHaveLength(1);
+    expect(result.metrics.omittedMatches).toBe(1);
+    expect(result.context).toContain('[+1 more matches — read decisions.md]');
+  });
 });
