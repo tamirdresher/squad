@@ -355,6 +355,19 @@ describe('compileCharterFull', () => {
     expect(result.prompt).toContain('Fenster, Verbal, Hockney');
   });
 
+  it('keeps experiment retrieval context in a distinct prompt section', () => {
+    const result = compileCharterFull({
+      agentName: 'verbal',
+      charterPath: '/test/charter.md',
+      charterContent: FULL_CHARTER,
+      retrievedContext: '> Provenance: bounded-lexical-v1\n\nSelected history.',
+    });
+
+    expect(result.prompt).toContain('## Retrieved Context');
+    expect(result.prompt).toContain('Provenance: bounded-lexical-v1');
+    expect(result.prompt).toContain('Selected history.');
+  });
+
   it('handles empty charter content gracefully', () => {
     const result = compileCharterFull({
       agentName: 'empty',

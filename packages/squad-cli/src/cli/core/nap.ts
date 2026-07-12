@@ -348,7 +348,12 @@ function archiveDecisions(squadDir: string, dryRun: boolean): NapAction | null {
   const lines = content.split('\n');
 
   // Find entry boundaries (### headings)
-  const entries: { start: number; end: number; daysAgo: number | null }[] = [];
+  const entries: {
+    start: number;
+    end: number;
+    daysAgo: number | null;
+    protected: boolean;
+  }[] = [];
   for (let i = 0; i < lines.length; i++) {
     if (lines[i]!.match(/^###\s/)) {
       const entryStart = i;
@@ -357,7 +362,16 @@ function archiveDecisions(squadDir: string, dryRun: boolean): NapAction | null {
         if (lines[j]!.match(/^###\s/)) { entryEnd = j; break; }
       }
       const age = daysAgoFromLine(lines[i]!);
-      entries.push({ start: entryStart, end: entryEnd, daysAgo: age });
+      const entryContent = lines.slice(entryStart, entryEnd).join('\n');
+      const protectedEntry =
+        /\bclass:\s*\[?POLICY\]?/i.test(entryContent)
+        || /\bloadGuidance:\s*\[?ALWAYS\]?/i.test(entryContent);
+      entries.push({
+        start: entryStart,
+        end: entryEnd,
+        daysAgo: age,
+        protected: protectedEntry,
+      });
       i = entryEnd - 1;
     }
   }
@@ -366,7 +380,7 @@ function archiveDecisions(squadDir: string, dryRun: boolean): NapAction | null {
   const recent: typeof entries = [];
   const old: typeof entries = [];
   for (const e of entries) {
-    if (e.daysAgo !== null && e.daysAgo > DECISION_MAX_AGE_DAYS) {
+    if (!e.protected && e.daysAgo !== null && e.daysAgo > DECISION_MAX_AGE_DAYS) {
       old.push(e);
     } else {
       recent.push(e);
@@ -377,8 +391,9 @@ function archiveDecisions(squadDir: string, dryRun: boolean): NapAction | null {
   // archive the oldest dated recent entries to get under the size limit.
   // Undated entries are preserved — they are often foundational directives.
   if (old.length === 0) {
-    const dated = recent.filter(e => e.daysAgo !== null);
+    const dated = recent.filter(e => e.daysAgo !== null && !e.protected);
     const undated = recent.filter(e => e.daysAgo === null);
+    const protectedEntries = recent.filter(e => e.protected);
 
     if (dated.length === 0) return null; // only undated entries, nothing to archive
 
@@ -394,7 +409,9 @@ function archiveDecisions(squadDir: string, dryRun: boolean): NapAction | null {
     const headerEnd = entries.length > 0 ? entries[0]!.start : lines.length;
     const headerSize = Buffer.byteLength(lines.slice(0, headerEnd).join('\n'), 'utf8');
     const reassemblyOverhead = 2; // '\n' after header + trailing '\n'
-    const undatedSize = undated.reduce(
+    const protectedAndUndated = [...undated, ...protectedEntries]
+      .sort((a, b) => a.start - b.start);
+    const undatedSize = protectedAndUndated.reduce(
       (sum, e) => sum + Buffer.byteLength(lines.slice(e.start, e.end).join('\n'), 'utf8') + 1, 0,
     );
     let budget = DECISION_THRESHOLD - headerSize - reassemblyOverhead - undatedSize;
@@ -414,7 +431,7 @@ function archiveDecisions(squadDir: string, dryRun: boolean): NapAction | null {
 
     // Rebuild recent: undated + kept dated, in original document order
     recent.length = 0;
-    recent.push(...undated, ...keptDated);
+    recent.push(...protectedAndUndated, ...keptDated);
     recent.sort((a, b) => a.start - b.start);
   }
 

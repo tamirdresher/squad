@@ -19,6 +19,11 @@ import type { StorageProvider } from '../storage/storage-provider.js';
 import { buildActivePluginContext } from '../marketplace/plugin-state.js';
 import { trace, SpanStatusCode } from '../runtime/otel-api.js';
 import { recordAgentSpawn, recordAgentDestroy, recordAgentError } from '../runtime/otel-metrics.js';
+import {
+  appendContextInjectionRecord,
+  retrieveSpawnContext,
+  type SelectiveRetrievalOptions,
+} from './selective-retrieval.js';
 
 const tracer = trace.getTracer('squad-sdk');
 
@@ -85,6 +90,9 @@ export interface SpawnAgentOptions {
   
   /** Relevant decision records */
   decisions?: string;
+
+  /** Off-by-default selective retrieval experiment. */
+  selectiveRetrieval?: SelectiveRetrievalOptions;
   
   /** Idle timeout in milliseconds (default: 5 minutes) */
   idleTimeout?: number;
@@ -158,6 +166,7 @@ export class AgentLifecycleManager {
       teamContext,
       routingRules,
       decisions,
+      selectiveRetrieval,
       idleTimeout = this.defaultIdleTimeout,
     } = options;
     
@@ -184,6 +193,37 @@ export class AgentLifecycleManager {
         );
       }
       
+      let retrievedContext: string | undefined;
+      let retrievalMetrics: ReturnType<typeof retrieveSpawnContext>['metrics'] | undefined;
+      let recordPath: string | undefined;
+      if (selectiveRetrieval?.enabled === true) {
+        const decisionsPath = path.join(this.teamRoot, '.squad', 'decisions.md');
+        const historyPath = path.join(
+          this.teamRoot,
+          '.squad',
+          'agents',
+          agentName,
+          'history.md',
+        );
+        const decisionInput = decisions ?? await this.storage.read(decisionsPath) ?? '';
+        const historyInput = await this.storage.read(historyPath) ?? '';
+        const retrieval = retrieveSpawnContext({
+          agentName,
+          query: task,
+          decisions: decisionInput,
+          history: historyInput,
+          maxItems: selectiveRetrieval.maxItems,
+          maxInjectedBytes: selectiveRetrieval.maxInjectedBytes,
+        });
+        retrievedContext = retrieval.context;
+        retrievalMetrics = retrieval.metrics;
+        const configuredRecordPath = selectiveRetrieval.recordPath
+          ?? path.join('.squad', 'measurements', 'context-injection.jsonl');
+        recordPath = path.isAbsolute(configuredRecordPath)
+          ? configuredRecordPath
+          : path.join(this.teamRoot, configuredRecordPath);
+      }
+
       // Step 2: Compile charter
       const compileOptions: CharterCompileOptions = {
         agentName,
@@ -191,7 +231,8 @@ export class AgentLifecycleManager {
         charterContent,
         teamContext,
         routingRules,
-        decisions,
+        decisions: selectiveRetrieval?.enabled === true ? undefined : decisions,
+        retrievedContext,
         pluginContext: await buildActivePluginContext(this.storage, path.join(this.teamRoot, '.squad')),
       };
       
@@ -225,6 +266,13 @@ export class AgentLifecycleManager {
         },
         ...(validEffort ? { reasoningEffort: validEffort } : {}),
       };
+
+      if (retrievalMetrics && recordPath) {
+        await appendContextInjectionRecord(this.storage, recordPath, {
+          ...retrievalMetrics,
+          systemPromptBytes: Buffer.byteLength(agentConfig.prompt, 'utf8'),
+        });
+      }
       
       const session = await this.client.createSession(sessionConfig);
       

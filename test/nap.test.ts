@@ -484,6 +484,28 @@ describe('Nap — Decision archival', () => {
     }
   });
 
+  it('protects POLICY and loadGuidance ALWAYS entries from age and size archival', async () => {
+    let decisions = '# Decisions\n\n';
+    decisions += '### 2024-01-01: Security policy\n';
+    decisions += 'class: POLICY\nloadGuidance: [ALWAYS]\n';
+    decisions += 'Policy content must remain active.\n\n';
+    for (let i = 0; i < 30; i++) {
+      decisions += `### 2024-01-${String(i + 1).padStart(2, '0')}: Routine ${i + 1}\n`;
+      decisions += 'r'.repeat(1000) + '\n\n';
+    }
+    const squadDir = createTestSquadDir({ 'decisions.md': decisions });
+
+    const result = await runNap({ squadDir });
+    const remaining = readFileSync(join(squadDir, 'decisions.md'), 'utf8');
+    const archived = readFileSync(join(squadDir, 'decisions-archive.md'), 'utf8');
+
+    expect(result.actions.some(action => action.type === 'archive')).toBe(true);
+    expect(remaining).toContain('Security policy');
+    expect(remaining).toContain('class: POLICY');
+    expect(remaining).toContain('loadGuidance: [ALWAYS]');
+    expect(archived).not.toContain('Security policy');
+  });
+
   it('count-based fallback: exactly at threshold does NOT archive (boundary case)', async () => {
     // Build content that is exactly at or just under 20KB with all-recent entries
     const today = new Date().toISOString().slice(0, 10);

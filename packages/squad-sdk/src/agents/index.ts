@@ -65,6 +65,14 @@ export {
   type SpawnAgentOptions,
   type LifecycleManagerConfig,
 } from './lifecycle.js';
+export {
+  retrieveSpawnContext,
+  appendContextInjectionRecord,
+  type SelectiveRetrievalOptions,
+  type SelectiveRetrievalInput,
+  type SelectiveRetrievalResult,
+  type ContextInjectionRecord,
+} from './selective-retrieval.js';
 
 // --- M1-11 History Shadows ---
 export {

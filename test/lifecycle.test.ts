@@ -178,6 +178,81 @@ Test collaboration patterns.
     
     await lifecycleManager.destroyAgent(handle);
   });
+
+  it('preserves full decision injection when selective retrieval is disabled', async () => {
+    await lifecycleManager.shutdown();
+    let systemPrompt = '';
+    mockClient = createMockClient(config => {
+      systemPrompt = config.systemMessage?.content ?? '';
+    });
+    lifecycleManager = new AgentLifecycleManager({
+      client: mockClient,
+      teamRoot,
+      defaultIdleTimeout: 60_000,
+    });
+
+    await lifecycleManager.spawnAgent({
+      agentName: 'test-agent',
+      task: 'Test task',
+      decisions: 'Full baseline decision context.',
+    });
+
+    expect(systemPrompt).toContain('## Relevant Decisions');
+    expect(systemPrompt).toContain('Full baseline decision context.');
+    expect(systemPrompt).not.toContain('## Retrieved Context');
+  });
+
+  it('injects selected decisions and history and writes content-free JSONL when enabled', async () => {
+    const squadAgentDir = path.join(teamRoot, '.squad', 'agents', 'test-agent');
+    await fs.mkdir(squadAgentDir, { recursive: true });
+    await fs.writeFile(
+      path.join(teamRoot, '.squad', 'decisions.md'),
+      '## Authentication\nRotate refresh tokens.\n\n## Database\nUse PostgreSQL.\n',
+      'utf8',
+    );
+    await fs.writeFile(
+      path.join(squadAgentDir, 'history.md'),
+      '## Replay fix\nToken rotation stopped replay attacks.\n\n## UI\nReduced spacing.\n',
+      'utf8',
+    );
+
+    await lifecycleManager.shutdown();
+    let systemPrompt = '';
+    mockClient = createMockClient(config => {
+      systemPrompt = config.systemMessage?.content ?? '';
+    });
+    lifecycleManager = new AgentLifecycleManager({
+      client: mockClient,
+      teamRoot,
+      defaultIdleTimeout: 60_000,
+    });
+    const recordPath = path.join(teamRoot, 'measurements', 'context.jsonl');
+
+    await lifecycleManager.spawnAgent({
+      agentName: 'test-agent',
+      task: 'Fix refresh token replay',
+      selectiveRetrieval: {
+        enabled: true,
+        maxItems: 2,
+        maxInjectedBytes: 1024,
+        recordPath,
+      },
+    });
+
+    expect(systemPrompt).toContain('## Retrieved Context');
+    expect(systemPrompt).toContain('Rotate refresh tokens');
+    expect(systemPrompt).toContain('Token rotation stopped replay attacks');
+    expect(systemPrompt).not.toContain('Use PostgreSQL');
+    expect(systemPrompt).not.toContain('Reduced spacing');
+
+    const record = JSON.parse((await fs.readFile(recordPath, 'utf8')).trim()) as {
+      systemPromptBytes: number;
+      selectedIds: string[];
+    };
+    expect(record.systemPromptBytes).toBe(Buffer.byteLength(systemPrompt, 'utf8'));
+    expect(record.selectedIds).toHaveLength(2);
+    expect(JSON.stringify(record)).not.toContain('replay attacks');
+  });
   
   it('should shutdown all agents', async () => {
     // Spawn multiple agents
@@ -338,7 +413,9 @@ describe('History Shadows', () => {
 
 // --- Mock Client ---
 
-function createMockClient(): SquadClientWithPool {
+function createMockClient(
+  onCreate?: (config: { systemMessage?: { content?: string } }) => void,
+): SquadClientWithPool {
   let sessionCounter = 0;
   const sessions = new Map<string, any>();
   
@@ -350,6 +427,7 @@ function createMockClient(): SquadClientWithPool {
     isConnected() { return true; },
     
     async createSession(config: any) {
+      onCreate?.(config);
       const sessionId = `test-session-${++sessionCounter}`;
       const session = {
         sessionId,
