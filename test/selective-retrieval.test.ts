@@ -90,4 +90,18 @@ describe('selective spawn-time retrieval experiment', () => {
       maxInjectedBytes: 255,
     })).toThrow(/maxInjectedBytes must be an integer >= 256/);
   });
+
+  it('matches deterministic Unicode word and bigram tokens', () => {
+    const result = retrieveSpawnContext({
+      agentName: 'network',
+      query: '修复身份验证令牌',
+      decisions: '## 身份验证\n令牌必须定期轮换。\n\n## 数据库\n使用 PostgreSQL。\n',
+      history: '',
+      maxInjectedBytes: 1024,
+    });
+
+    expect(result.context).toContain('令牌必须定期轮换');
+    expect(result.context).not.toContain('PostgreSQL');
+    expect(result.metrics.selectedIds).toHaveLength(1);
+  });
 });

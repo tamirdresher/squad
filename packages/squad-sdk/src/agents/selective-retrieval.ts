@@ -146,10 +146,22 @@ function formatContext(querySha256: string, chunks: RetrievalChunk[]): string {
 }
 
 function tokenize(value: string): string[] {
-  return value
+  const runs = value
     .toLowerCase()
-    .split(/[^a-z0-9]+/)
-    .filter(token => token.length >= 3);
+    .match(/[\p{L}\p{N}]+/gu) ?? [];
+  const tokens: string[] = [];
+  for (const run of runs) {
+    const characters = [...run];
+    if (characters.some(character => character.codePointAt(0)! > 0x7f)) {
+      if (characters.length >= 2) tokens.push(run);
+      for (let index = 0; index < characters.length - 1; index++) {
+        tokens.push(`${characters[index]}${characters[index + 1]}`);
+      }
+    } else if (characters.length >= 3) {
+      tokens.push(run);
+    }
+  }
+  return tokens;
 }
 
 function overlapScore(queryTokens: Set<string>, content: string): number {

@@ -192,15 +192,17 @@ export class AgentLifecycleManager {
           }
         );
       }
+      const activeStateDir = charterPath === legacyCharterPath
+        ? path.join(this.teamRoot, '.ai-team')
+        : path.join(this.teamRoot, '.squad');
       
       let retrievedContext: string | undefined;
       let retrievalMetrics: ReturnType<typeof retrieveSpawnContext>['metrics'] | undefined;
       let recordPath: string | undefined;
       if (selectiveRetrieval?.enabled === true) {
-        const decisionsPath = path.join(this.teamRoot, '.squad', 'decisions.md');
+        const decisionsPath = path.join(activeStateDir, 'decisions.md');
         const historyPath = path.join(
-          this.teamRoot,
-          '.squad',
+          activeStateDir,
           'agents',
           agentName,
           'history.md',

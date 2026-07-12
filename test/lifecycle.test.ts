@@ -203,10 +203,10 @@ Test collaboration patterns.
   });
 
   it('injects selected decisions and history and writes content-free JSONL when enabled', async () => {
-    const squadAgentDir = path.join(teamRoot, '.squad', 'agents', 'test-agent');
+    const squadAgentDir = path.join(teamRoot, '.ai-team', 'agents', 'test-agent');
     await fs.mkdir(squadAgentDir, { recursive: true });
     await fs.writeFile(
-      path.join(teamRoot, '.squad', 'decisions.md'),
+      path.join(teamRoot, '.ai-team', 'decisions.md'),
       '## Authentication\nRotate refresh tokens.\n\n## Database\nUse PostgreSQL.\n',
       'utf8',
     );
@@ -252,6 +252,43 @@ Test collaboration patterns.
     expect(record.systemPromptBytes).toBe(Buffer.byteLength(systemPrompt, 'utf8'));
     expect(record.selectedIds).toHaveLength(2);
     expect(JSON.stringify(record)).not.toContain('replay attacks');
+  });
+
+  it('retrieves context from the legacy state directory selected by charter fallback', async () => {
+    const legacyAgentDir = path.join(teamRoot, '.ai-team', 'agents', 'test-agent');
+    await fs.writeFile(
+      path.join(teamRoot, '.ai-team', 'decisions.md'),
+      '## Legacy authentication\nRotate legacy refresh tokens.\n',
+      'utf8',
+    );
+    await fs.writeFile(
+      path.join(legacyAgentDir, 'history.md'),
+      '## Legacy replay\nThe legacy token replay fix held.\n',
+      'utf8',
+    );
+
+    await lifecycleManager.shutdown();
+    let systemPrompt = '';
+    mockClient = createMockClient(config => {
+      systemPrompt = config.systemMessage?.content ?? '';
+    });
+    lifecycleManager = new AgentLifecycleManager({
+      client: mockClient,
+      teamRoot,
+      defaultIdleTimeout: 60_000,
+    });
+
+    await lifecycleManager.spawnAgent({
+      agentName: 'test-agent',
+      task: 'legacy refresh token replay',
+      selectiveRetrieval: {
+        enabled: true,
+        recordPath: path.join(teamRoot, 'measurements', 'legacy.jsonl'),
+      },
+    });
+
+    expect(systemPrompt).toContain('Rotate legacy refresh tokens');
+    expect(systemPrompt).toContain('legacy token replay fix held');
   });
   
   it('should shutdown all agents', async () => {
