@@ -6,9 +6,9 @@
     "forkMainObserved": "ffcd439980c99cdec038b72b1cca964deeddda46",
     "forkBehindByCommits": 2
   },
-  "sourceCommit": "c20dc04d2a36d7fef38548cb3fe49231e0d1ccb7",
-  "sourceDirty": false,
-  "measurementSourceSha256": "42b7c941d2a390f7cf7d926148f9da5c2a21af8dd5ca769c22022ad0746565c5",
+  "sourceCommit": "361b4e3a189f377cfd1bbe3901c154b503f32d8e",
+  "sourceDirty": true,
+  "measurementSourceSha256": "7f6d238bcecba9b8596ea683557d51d7bbe847ec6a8f240ab9dd22953573f985",
   "packageVersion": "0.11.0",
   "inputs": {
     "coordinatorTemplate": {
@@ -40,9 +40,12 @@
         "meanRecall": 0.8571,
         "meanPrecision": 0.6667,
         "handLabeledCoverageDecrease": 0.1429,
+        "policyOmissionCount": 5,
+        "policyOmissionInvariantPass": false,
         "gate": {
           "reductionThresholdPercent": 20,
-          "maximumCoverageDecrease": 0.05,
+          "maximumCoverageDecrease": 0,
+          "policyOmissionInvariantRequired": true,
           "pass": false
         },
         "taskResults": [
@@ -63,7 +66,10 @@
             "systemPromptBytes": 1013,
             "systemPromptReductionPercent": 99.4,
             "recall": 1,
-            "precision": 0.6666666666666666
+            "precision": 0.6666666666666666,
+            "policyOmittedIds": [
+              "decisions:8368d4ad3690b9ca"
+            ]
           },
           {
             "taskId": "coordinator-split",
@@ -81,26 +87,30 @@
             "systemPromptBytes": 783,
             "systemPromptReductionPercent": 99.54,
             "recall": 1,
-            "precision": 1
+            "precision": 1,
+            "policyOmittedIds": [
+              "decisions:8368d4ad3690b9ca"
+            ]
           },
           {
             "taskId": "policy-nap",
             "expectedIds": [
-              "decisions:0c679ee3ed3350a6",
+              "decisions:8368d4ad3690b9ca",
               "history:89eb19a908adc8c9"
             ],
             "selectedIds": [
-              "decisions:0c679ee3ed3350a6",
+              "decisions:8368d4ad3690b9ca",
               "history:89eb19a908adc8c9",
               "decisions:5a7ba24ba1991295"
             ],
             "matchCount": 3,
             "omittedMatches": 0,
-            "injectedBytes": 653,
-            "systemPromptBytes": 932,
-            "systemPromptReductionPercent": 99.45,
+            "injectedBytes": 628,
+            "systemPromptBytes": 907,
+            "systemPromptReductionPercent": 99.46,
             "recall": 1,
-            "precision": 0.6666666666666666
+            "precision": 0.6666666666666666,
+            "policyOmittedIds": []
           },
           {
             "taskId": "package-skew",
@@ -118,7 +128,10 @@
             "systemPromptBytes": 770,
             "systemPromptReductionPercent": 99.54,
             "recall": 1,
-            "precision": 1
+            "precision": 1,
+            "policyOmittedIds": [
+              "decisions:8368d4ad3690b9ca"
+            ]
           },
           {
             "taskId": "skills-manifest",
@@ -127,16 +140,17 @@
             ],
             "selectedIds": [
               "decisions:7cfd6918dac3674d",
-              "decisions:0c679ee3ed3350a6",
+              "decisions:8368d4ad3690b9ca",
               "history:89eb19a908adc8c9"
             ],
             "matchCount": 3,
             "omittedMatches": 0,
-            "injectedBytes": 652,
-            "systemPromptBytes": 931,
-            "systemPromptReductionPercent": 99.45,
+            "injectedBytes": 627,
+            "systemPromptBytes": 906,
+            "systemPromptReductionPercent": 99.46,
             "recall": 1,
-            "precision": 0.3333333333333333
+            "precision": 0.3333333333333333,
+            "policyOmittedIds": []
           },
           {
             "taskId": "large-migration",
@@ -152,7 +166,10 @@
             "systemPromptBytes": 631,
             "systemPromptReductionPercent": 99.63,
             "recall": 0,
-            "precision": 0
+            "precision": 0,
+            "policyOmittedIds": [
+              "decisions:8368d4ad3690b9ca"
+            ]
           },
           {
             "taskId": "negative-no-match",
@@ -164,7 +181,10 @@
             "systemPromptBytes": 405,
             "systemPromptReductionPercent": 99.76,
             "recall": 1,
-            "precision": 1
+            "precision": 1,
+            "policyOmittedIds": [
+              "decisions:8368d4ad3690b9ca"
+            ]
           }
         ]
       },
@@ -172,14 +192,17 @@
         "id": "4k-top6",
         "maxInjectedBytes": 4096,
         "maxItems": 6,
-        "p50SystemPromptReductionPercent": 99.45,
+        "p50SystemPromptReductionPercent": 99.46,
         "meanRecall": 1,
         "meanPrecision": 0.6905,
         "handLabeledCoverageDecrease": 0,
+        "policyOmissionCount": 4,
+        "policyOmissionInvariantPass": false,
         "gate": {
           "reductionThresholdPercent": 20,
-          "maximumCoverageDecrease": 0.05,
-          "pass": true
+          "maximumCoverageDecrease": 0,
+          "policyOmissionInvariantRequired": true,
+          "pass": false
         },
         "taskResults": [
           {
@@ -192,17 +215,18 @@
               "history:30f8a0ede275de2f",
               "decisions:5a7ba24ba1991295",
               "decisions:a181ab088936f867",
-              "decisions:0c679ee3ed3350a6",
+              "decisions:8368d4ad3690b9ca",
               "decisions:7cfd6918dac3674d",
               "decisions:5a50e1dabedc9a67"
             ],
             "matchCount": 9,
             "omittedMatches": 3,
-            "injectedBytes": 1283,
-            "systemPromptBytes": 1562,
-            "systemPromptReductionPercent": 99.07,
+            "injectedBytes": 1258,
+            "systemPromptBytes": 1537,
+            "systemPromptReductionPercent": 99.09,
             "recall": 1,
-            "precision": 0.3333333333333333
+            "precision": 0.3333333333333333,
+            "policyOmittedIds": []
           },
           {
             "taskId": "coordinator-split",
@@ -220,26 +244,30 @@
             "systemPromptBytes": 783,
             "systemPromptReductionPercent": 99.54,
             "recall": 1,
-            "precision": 1
+            "precision": 1,
+            "policyOmittedIds": [
+              "decisions:8368d4ad3690b9ca"
+            ]
           },
           {
             "taskId": "policy-nap",
             "expectedIds": [
-              "decisions:0c679ee3ed3350a6",
+              "decisions:8368d4ad3690b9ca",
               "history:89eb19a908adc8c9"
             ],
             "selectedIds": [
-              "decisions:0c679ee3ed3350a6",
+              "decisions:8368d4ad3690b9ca",
               "history:89eb19a908adc8c9",
               "decisions:5a7ba24ba1991295"
             ],
             "matchCount": 3,
             "omittedMatches": 0,
-            "injectedBytes": 653,
-            "systemPromptBytes": 932,
-            "systemPromptReductionPercent": 99.45,
+            "injectedBytes": 628,
+            "systemPromptBytes": 907,
+            "systemPromptReductionPercent": 99.46,
             "recall": 1,
-            "precision": 0.6666666666666666
+            "precision": 0.6666666666666666,
+            "policyOmittedIds": []
           },
           {
             "taskId": "package-skew",
@@ -257,7 +285,10 @@
             "systemPromptBytes": 770,
             "systemPromptReductionPercent": 99.54,
             "recall": 1,
-            "precision": 1
+            "precision": 1,
+            "policyOmittedIds": [
+              "decisions:8368d4ad3690b9ca"
+            ]
           },
           {
             "taskId": "skills-manifest",
@@ -266,16 +297,17 @@
             ],
             "selectedIds": [
               "decisions:7cfd6918dac3674d",
-              "decisions:0c679ee3ed3350a6",
+              "decisions:8368d4ad3690b9ca",
               "history:89eb19a908adc8c9"
             ],
             "matchCount": 3,
             "omittedMatches": 0,
-            "injectedBytes": 652,
-            "systemPromptBytes": 931,
-            "systemPromptReductionPercent": 99.45,
+            "injectedBytes": 627,
+            "systemPromptBytes": 906,
+            "systemPromptReductionPercent": 99.46,
             "recall": 1,
-            "precision": 0.3333333333333333
+            "precision": 0.3333333333333333,
+            "policyOmittedIds": []
           },
           {
             "taskId": "large-migration",
@@ -292,7 +324,10 @@
             "systemPromptBytes": 4108,
             "systemPromptReductionPercent": 97.57,
             "recall": 1,
-            "precision": 0.5
+            "precision": 0.5,
+            "policyOmittedIds": [
+              "decisions:8368d4ad3690b9ca"
+            ]
           },
           {
             "taskId": "negative-no-match",
@@ -304,7 +339,10 @@
             "systemPromptBytes": 405,
             "systemPromptReductionPercent": 99.76,
             "recall": 1,
-            "precision": 1
+            "precision": 1,
+            "policyOmittedIds": [
+              "decisions:8368d4ad3690b9ca"
+            ]
           }
         ]
       },
@@ -312,14 +350,17 @@
         "id": "8k-top8",
         "maxInjectedBytes": 8192,
         "maxItems": 8,
-        "p50SystemPromptReductionPercent": 99.45,
+        "p50SystemPromptReductionPercent": 99.46,
         "meanRecall": 1,
         "meanPrecision": 0.6786,
         "handLabeledCoverageDecrease": 0,
+        "policyOmissionCount": 4,
+        "policyOmissionInvariantPass": false,
         "gate": {
           "reductionThresholdPercent": 20,
-          "maximumCoverageDecrease": 0.05,
-          "pass": true
+          "maximumCoverageDecrease": 0,
+          "policyOmissionInvariantRequired": true,
+          "pass": false
         },
         "taskResults": [
           {
@@ -332,7 +373,7 @@
               "history:30f8a0ede275de2f",
               "decisions:5a7ba24ba1991295",
               "decisions:a181ab088936f867",
-              "decisions:0c679ee3ed3350a6",
+              "decisions:8368d4ad3690b9ca",
               "decisions:7cfd6918dac3674d",
               "decisions:5a50e1dabedc9a67",
               "decisions:f9ec16bc827fad52",
@@ -340,11 +381,12 @@
             ],
             "matchCount": 9,
             "omittedMatches": 1,
-            "injectedBytes": 4956,
-            "systemPromptBytes": 5235,
-            "systemPromptReductionPercent": 96.9,
+            "injectedBytes": 4931,
+            "systemPromptBytes": 5210,
+            "systemPromptReductionPercent": 96.91,
             "recall": 1,
-            "precision": 0.25
+            "precision": 0.25,
+            "policyOmittedIds": []
           },
           {
             "taskId": "coordinator-split",
@@ -362,26 +404,30 @@
             "systemPromptBytes": 783,
             "systemPromptReductionPercent": 99.54,
             "recall": 1,
-            "precision": 1
+            "precision": 1,
+            "policyOmittedIds": [
+              "decisions:8368d4ad3690b9ca"
+            ]
           },
           {
             "taskId": "policy-nap",
             "expectedIds": [
-              "decisions:0c679ee3ed3350a6",
+              "decisions:8368d4ad3690b9ca",
               "history:89eb19a908adc8c9"
             ],
             "selectedIds": [
-              "decisions:0c679ee3ed3350a6",
+              "decisions:8368d4ad3690b9ca",
               "history:89eb19a908adc8c9",
               "decisions:5a7ba24ba1991295"
             ],
             "matchCount": 3,
             "omittedMatches": 0,
-            "injectedBytes": 653,
-            "systemPromptBytes": 932,
-            "systemPromptReductionPercent": 99.45,
+            "injectedBytes": 628,
+            "systemPromptBytes": 907,
+            "systemPromptReductionPercent": 99.46,
             "recall": 1,
-            "precision": 0.6666666666666666
+            "precision": 0.6666666666666666,
+            "policyOmittedIds": []
           },
           {
             "taskId": "package-skew",
@@ -399,7 +445,10 @@
             "systemPromptBytes": 770,
             "systemPromptReductionPercent": 99.54,
             "recall": 1,
-            "precision": 1
+            "precision": 1,
+            "policyOmittedIds": [
+              "decisions:8368d4ad3690b9ca"
+            ]
           },
           {
             "taskId": "skills-manifest",
@@ -408,16 +457,17 @@
             ],
             "selectedIds": [
               "decisions:7cfd6918dac3674d",
-              "decisions:0c679ee3ed3350a6",
+              "decisions:8368d4ad3690b9ca",
               "history:89eb19a908adc8c9"
             ],
             "matchCount": 3,
             "omittedMatches": 0,
-            "injectedBytes": 652,
-            "systemPromptBytes": 931,
-            "systemPromptReductionPercent": 99.45,
+            "injectedBytes": 627,
+            "systemPromptBytes": 906,
+            "systemPromptReductionPercent": 99.46,
             "recall": 1,
-            "precision": 0.3333333333333333
+            "precision": 0.3333333333333333,
+            "policyOmittedIds": []
           },
           {
             "taskId": "large-migration",
@@ -434,7 +484,10 @@
             "systemPromptBytes": 4108,
             "systemPromptReductionPercent": 97.57,
             "recall": 1,
-            "precision": 0.5
+            "precision": 0.5,
+            "policyOmittedIds": [
+              "decisions:8368d4ad3690b9ca"
+            ]
           },
           {
             "taskId": "negative-no-match",
@@ -446,13 +499,16 @@
             "systemPromptBytes": 405,
             "systemPromptReductionPercent": 99.76,
             "recall": 1,
-            "precision": 1
+            "precision": 1,
+            "policyOmittedIds": [
+              "decisions:8368d4ad3690b9ca"
+            ]
           }
         ]
       }
     ],
     "proposedConfigurationId": "4k-top6",
-    "proposedConfigurationGatePass": true,
+    "proposedConfigurationGatePass": false,
     "defaultRecords": [
       {
         "schemaVersion": 1,
@@ -462,12 +518,12 @@
         "querySha256": "2bd2a90a167a181f87a92be2e27648b75439972ad2660285380c950e6f607e16",
         "decisionInputBytes": 168550,
         "historyInputBytes": 32768,
-        "injectedBytes": 1283,
+        "injectedBytes": 1258,
         "selectedIds": [
           "history:30f8a0ede275de2f",
           "decisions:5a7ba24ba1991295",
           "decisions:a181ab088936f867",
-          "decisions:0c679ee3ed3350a6",
+          "decisions:8368d4ad3690b9ca",
           "decisions:7cfd6918dac3674d",
           "decisions:5a50e1dabedc9a67"
         ],
@@ -481,7 +537,7 @@
         "taskSha256": "2bd2a90a167a181f87a92be2e27648b75439972ad2660285380c950e6f607e16",
         "model": "synthetic-measurement",
         "sessionId": "synthetic-auth-replay",
-        "systemPromptBytes": 1562
+        "systemPromptBytes": 1537
       },
       {
         "schemaVersion": 1,
@@ -516,9 +572,9 @@
         "querySha256": "628e17c63c422474d9b3a681a3bf3586fee1166be369a49fa77ffa9a6e1a2dca",
         "decisionInputBytes": 168550,
         "historyInputBytes": 32768,
-        "injectedBytes": 653,
+        "injectedBytes": 628,
         "selectedIds": [
-          "decisions:0c679ee3ed3350a6",
+          "decisions:8368d4ad3690b9ca",
           "history:89eb19a908adc8c9",
           "decisions:5a7ba24ba1991295"
         ],
@@ -532,7 +588,7 @@
         "taskSha256": "628e17c63c422474d9b3a681a3bf3586fee1166be369a49fa77ffa9a6e1a2dca",
         "model": "synthetic-measurement",
         "sessionId": "synthetic-policy-nap",
-        "systemPromptBytes": 932
+        "systemPromptBytes": 907
       },
       {
         "schemaVersion": 1,
@@ -567,10 +623,10 @@
         "querySha256": "081d2012d9f1f4181bb4339276fe309ae26d80d1b70021b301b36adc4802606d",
         "decisionInputBytes": 168550,
         "historyInputBytes": 32768,
-        "injectedBytes": 652,
+        "injectedBytes": 627,
         "selectedIds": [
           "decisions:7cfd6918dac3674d",
-          "decisions:0c679ee3ed3350a6",
+          "decisions:8368d4ad3690b9ca",
           "history:89eb19a908adc8c9"
         ],
         "matchCount": 3,
@@ -583,7 +639,7 @@
         "taskSha256": "081d2012d9f1f4181bb4339276fe309ae26d80d1b70021b301b36adc4802606d",
         "model": "synthetic-measurement",
         "sessionId": "synthetic-skills-manifest",
-        "systemPromptBytes": 931
+        "systemPromptBytes": 906
       },
       {
         "schemaVersion": 1,
@@ -633,6 +689,14 @@
         "systemPromptBytes": 405
       }
     ]
+  },
+  "securityProbe": {
+    "matcherId": "FORBIDDEN credential-like assignment",
+    "payloadSha256": "64326de06700730a3f9702114c707d326585d466f5313d2bb44e626f490e6211",
+    "forbiddenPatternMatched": true,
+    "injectedIntoSystemContext": true,
+    "metricsRecordContainsPayload": false,
+    "payloadPersisted": false
   },
   "coordinatorExternalization": {
     "baselineBytes": 75883,
