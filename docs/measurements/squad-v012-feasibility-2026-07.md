@@ -17,8 +17,8 @@
 | Selective spawn-time retrieval + provenance | **REJECTED by the frozen confidence gate** | The 4 KiB point estimate passes byte/coverage, but POLICY omissions, secret-shaped system-context leakage, and a pre-existing test regression trigger SC-3, SC-4, and SC-6. |
 | Coordinator prompt externalisation | **INSUFFICIENT EVIDENCE; byte gate fails** | The exact-base template split reduces 75,883 B to 47,560 B (37.32%), below the 40% gate. No documented-mode behavior suite was run. |
 | Class-aware `nap` phase 1 | **INSUFFICIENT EVIDENCE for the 0.5-day scope** | Current `nap` never reads `.squad/memory/index.json` and does not archive governed memory entries. POLICY/load-guidance metadata has no flow into its decision-markdown parser. The earlier regex prototype was removed. |
-| GitHub-native governance baseline | **REJECTED by the frozen gate** | SC-4 affects PR-4, no A-Bypass cases were run, and S = 0.30 crosses the rejection boundary. Existing controls remain factual but do not confirm the proposed PR. |
-| `AGENTS.md` / `SKILL.md` integrity and provenance lint | **REJECTED by the frozen gate** | SC-4 affects PR-5, no E4 corpus or reviewer agreement exists, and S = 0.30 crosses the rejection boundary. |
+| GitHub-native governance baseline | **REJECTED by the frozen gate** | SC-4 affects PR-4, no A-Bypass cases were run, and S = 0.00 crosses the rejection boundary. Existing controls remain factual but do not confirm the proposed PR. |
+| `AGENTS.md` / `SKILL.md` integrity and provenance lint | **REJECTED by the frozen gate** | SC-4 affects PR-5, no E4 corpus or reviewer agreement exists, and S = 0.00 crosses the rejection boundary. |
 | Memory API unification | **Keep in v0.13** | Scribe still operates through `squad_state_*`, while governed `memory.*` has separate tools and CLI callers. |
 | Runtime tiered memory | **Wait for evidence** | No `contextTier` or `context_tier` runtime symbol exists at the exact base. |
 
