@@ -50,6 +50,28 @@
         "modelBehavior": "NOT_RUN_INDEPENDENTLY"
       },
       "implementationEstimatesAffected": false
+    },
+    "benchmarkProvenanceAudit": {
+      "repository": "tamirdresher_microsoft/squad-benchmark-reviewers",
+      "pr1CurrentHead": "b22bba02c0e6f9070859f2c9e369572909586499",
+      "claimedCommit": "65b3aeac99f8ed5620c581f676f751aafc3569d8",
+      "identityResolved": true,
+      "deterministicFixtureArithmeticVerified": true,
+      "nativeModelCallsReproduced": false,
+      "freshBlindDispatch": "0/12",
+      "committedStructuredOutcomes": "24/60",
+      "fixtureManifestGitObjectMatches": "1/10",
+      "fixtureManifestCheckoutCRLFMatches": "9/10",
+      "evidenceDisposition": "Headline retrieval and coordinator numbers are properties of committed synthetic fixtures/structured outcomes, not independently reproduced native-model behavior."
+    },
+    "replacementExperimentAuthorization": {
+      "addendumPath": "C:\\Users\\tamirdresher\\.copilot\\session-state\\d0e720d5-817c-45be-9102-4ee8a1fedcad\\files\\squad-confidence-gate-addendum-01.md",
+      "suppliedSelfAttestingSha256": "86cad230acd068cce0c68c79bcbfcfd9c3ac874e75268810fa40f958d5b7fc8c",
+      "rawFileSha256": "3936f95d4c34e0fc6a50f898ffca3246d691a4d054904615e6b84a4215a29c6d",
+      "documentedPlaceholderCanonicalSha256": "322878d24bd704321bd02e4826794dfc33a3360bfb04b312f703728eddc65742",
+      "selfAttestationMatches": false,
+      "status": "BLOCKED",
+      "authorizedReplacementResultsInspected": false
     }
   },
   "overall": {

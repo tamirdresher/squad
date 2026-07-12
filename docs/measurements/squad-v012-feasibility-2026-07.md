@@ -65,6 +65,33 @@ Concrete prerequisites before a new release-readiness pass:
 
 These results strengthen the pause recommendation. They do not alter implementation-time estimates, which remain code/diff/test based.
 
+## Benchmark provenance correction
+
+The benchmark exists in `tamirdresher_microsoft/squad-benchmark-reviewers`; the earlier absence finding was valid only for the separate `squad-squad` repository.
+
+The correct-repo audit verifies:
+
+- PR #1 exists at current head `b22bba02c0e6f9070859f2c9e369572909586499`;
+- commit `65b3aeac99f8ed5620c581f676f751aafc3569d8` exists and introduced hardened fixtures plus 60 structured outcomes;
+- deterministic fixture re-scoring reproduces 24/60 coordinator exact matches and the committed retrieval arithmetic;
+- the published command replays committed structured outcomes; it does not invoke the native model;
+- native call transcripts, provider call IDs, model version, seed, and timestamps are absent;
+- PR #2's current fresh blind dispatch is 0/12, not 24/60;
+- only 1/10 fixture manifest hashes matches Git LF objects; 9/10 match Windows CRLF checkout bytes instead.
+
+Therefore the benchmark numbers are valid properties of committed synthetic fixtures and structured outputs. They are **not independently reproduced native-model behavior or causal production evidence**. The release pause remains, but model-behavior claims must carry this provenance qualification.
+
+## Addendum-01 authorization integrity
+
+No replacement experiment was run. The supplied Addendum-01 self-attesting hash does not verify:
+
+- supplied: `86cad230acd068cce0c68c79bcbfcfd9c3ac874e75268810fa40f958d5b7fc8c`;
+- raw file SHA-256: `3936f95d4c34e0fc6a50f898ffca3246d691a4d054904615e6b84a4215a29c6d`;
+- documented full-file placeholder canonicalization: `322878d24bd704321bd02e4826794dfc33a3360bfb04b312f703728eddc65742`;
+- tested pre-hash/prefix canonicalizations also do not match.
+
+Because the addendum requires immutable preregistration before result inspection, E2b-prime, E2/E3-v2, and shadow-mode confirmatory results are blocked until a verifiable frozen artifact is supplied. No replacement outcome is claimed here.
+
 ## Frozen confidence-gate outcome
 
 The preregistered protocol was applied without changing thresholds:
