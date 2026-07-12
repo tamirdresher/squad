@@ -57,22 +57,22 @@
     "commands": [
       {
         "command": "npm test -- --reporter=json",
-        "durationMs": 437254,
+        "durationMs": 442763,
         "exitCode": 1,
         "tests": {
-          "total": 7053,
-          "passed": 6844,
-          "failed": 101,
+          "total": 7055,
+          "passed": 6843,
+          "failed": 104,
           "pending": 61,
-          "failedFiles": 12
+          "failedFiles": 16
         }
       },
       {
         "command": "focused treatment suite --no-file-parallelism",
         "exitCode": 0,
         "tests": {
-          "total": 397,
-          "passed": 397,
+          "total": 399,
+          "passed": 399,
           "failed": 0
         }
       },
@@ -86,16 +86,19 @@
       }
     ],
     "failureComparison": {
-      "sharedFailedFiles": 11,
+      "sharedFailedFiles": 12,
       "newFailedFiles": [
-        "test/cli/consult.test.ts"
+        "test/init-leak-mutable-state.test.ts",
+        "test/init-sdk.test.ts",
+        "test/speed-gates.test.ts",
+        "test/cli/init.test.ts"
       ],
       "resolvedFailedFiles": [
-        "test/init.test.ts",
+        "test/init-scaffolding.test.ts",
         "test/platform-adapter.test.ts",
         "test/repl-ux-e2e.test.ts",
         "test/template-sync.test.ts",
-        "test/cli/upgrade.test.ts"
+        "test/cli/doctor.test.ts"
       ],
       "interpretation": "The changing failure set indicates baseline Windows concurrency/environment instability. No new experiment test failed, and the focused treatment suite passed."
     }

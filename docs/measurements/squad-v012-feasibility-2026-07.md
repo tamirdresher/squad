@@ -168,12 +168,12 @@ A governance PR is feasible only as a gap audit and targeted hardening PR. Dupli
 | Baseline | `npm run lint:eslint` | pass, 2,028 existing warnings |
 | Baseline | focused serial suite | 386/386 pass |
 | Baseline | full `npm test` | 6,818/7,042 pass; 116 failures |
-| Treatment | focused serial suite + new tests | 397/397 pass |
-| Treatment | full `npm test` | 6,844/7,053 pass; 101 failures |
+| Treatment | focused serial suite + new tests | 399/399 pass |
+| Treatment | full `npm test` | 6,843/7,055 pass; 104 failures |
 | Treatment | `npm run lint` | pass |
 | Treatment | `npm run lint:eslint -- --quiet` | pass |
 
-The full Windows suite is not a clean release signal in this checkout. Eleven failing files were shared between runs; six baseline failing files passed in treatment; one unrelated consult file newly failed. No new experiment test failed. The dominant repeated failures include Windows storage/symlink behavior and concurrent filesystem tests. Focused source, lifecycle, memory, `nap`, template, and `state-mcp` tests pass serially. No stable treatment regression was localized.
+The full Windows suite is not a clean release signal in this checkout. Twelve failing files were shared between runs; five baseline failing files passed in treatment; four unrelated init/speed files newly failed. No new experiment test failed. The dominant repeated failures include Windows storage/symlink behavior and concurrent filesystem tests. Focused source, lifecycle, memory, `nap`, template, and `state-mcp` tests pass serially. No stable treatment regression was localized.
 
 ## Proposed PR slices and effort
 
