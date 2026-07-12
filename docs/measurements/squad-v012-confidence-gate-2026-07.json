@@ -6,6 +6,21 @@
     "frozenAt": "2026-07-12T08:31:00+03:00",
     "thresholdsModified": false
   },
+  "evidenceScope": {
+    "implementationEstimateInputs": [
+      "pinned source at the exact base SHA",
+      "experiment branch diff and implementation paths",
+      "locally reproduced measurements",
+      "locally executed tests and build/lint results"
+    ],
+    "publicationEvidenceInfluencedEstimates": false,
+    "excludedInheritedClaims": [
+      "DeltaMem performance percentage",
+      "LongMemEval-V2 performance percentage",
+      "LongMemEval-V2 venue classification",
+      "OpenViking performance percentage"
+    ]
+  },
   "overall": {
     "status": "HALT",
     "requiredItemCount": 19,

@@ -10,6 +10,8 @@
 
 **Experiment:** off by default; no default branch changed; no upstream issue or PR filed
 
+**Evidence scope:** implementation conclusions and estimates use only code at the pinned SHA, this branch's diff, reproduced measurements, and executed tests. Inherited DeltaMem, LongMemEval-V2, and OpenViking performance/venue claims are excluded and do not influence estimates or verdicts.
+
 ## Executive verdict
 
 | Recommendation | Verdict | Evidence / required change |
