@@ -14,13 +14,45 @@
 
 | Recommendation | Verdict | Evidence / required change |
 |---|---|---|
-| Selective spawn-time retrieval + provenance | **Feasible, but larger than 2–3 days** | The 4 KiB/top-6 synthetic treatment passes the proposed reduction/coverage gate. The 2 KiB/top-3 treatment fails coverage, which demonstrates that the budget matters. Current spawn paths are split across SDK lifecycle, fan-out, and CLI shell code; the prototype only wires SDK lifecycle. |
-| Coordinator prompt externalisation | **Does not meet the stated v0.12 gate** | The exact-base template split reduces 75,883 B to 47,560 B (37.32%), below the 40% gate. No documented-mode behavior suite was run, so the overall gate also fails. |
-| Class-aware `nap` phase 1 | **Not implementable as stated in 0.5 day** | Current `nap` never reads `.squad/memory/index.json` and does not archive governed memory entries. POLICY/load-guidance metadata has no flow into its decision-markdown parser. The earlier regex prototype was removed. |
-| GitHub-native governance baseline | **Mostly already present; narrow the PR** | The repository already has 20 workflows, `CODEOWNERS`, PR requirements, policy gates, readiness, scope checks, label governance, and PR nudges. |
-| `AGENTS.md` / `SKILL.md` integrity and provenance lint | **Split the recommendation** | No `AGENTS.md` exists. Skill install coverage exists, but sync/provenance remains spread across two template roots. Ship SKILL provenance only after defining the canonical source map. |
+| Selective spawn-time retrieval + provenance | **REJECTED by the frozen confidence gate** | The 4 KiB point estimate passes byte/coverage, but POLICY omissions, secret-shaped system-context leakage, and a pre-existing test regression trigger SC-3, SC-4, and SC-6. |
+| Coordinator prompt externalisation | **INSUFFICIENT EVIDENCE; byte gate fails** | The exact-base template split reduces 75,883 B to 47,560 B (37.32%), below the 40% gate. No documented-mode behavior suite was run. |
+| Class-aware `nap` phase 1 | **INSUFFICIENT EVIDENCE for the 0.5-day scope** | Current `nap` never reads `.squad/memory/index.json` and does not archive governed memory entries. POLICY/load-guidance metadata has no flow into its decision-markdown parser. The earlier regex prototype was removed. |
+| GitHub-native governance baseline | **REJECTED by the frozen gate** | SC-4 affects PR-4, no A-Bypass cases were run, and S = 0.30 crosses the rejection boundary. Existing controls remain factual but do not confirm the proposed PR. |
+| `AGENTS.md` / `SKILL.md` integrity and provenance lint | **REJECTED by the frozen gate** | SC-4 affects PR-5, no E4 corpus or reviewer agreement exists, and S = 0.30 crosses the rejection boundary. |
 | Memory API unification | **Keep in v0.13** | Scribe still operates through `squad_state_*`, while governed `memory.*` has separate tools and CLI callers. |
 | Runtime tiered memory | **Wait for evidence** | No `contextTier` or `context_tier` runtime symbol exists at the exact base. |
+
+## Frozen confidence-gate outcome
+
+The preregistered protocol was applied without changing thresholds:
+
+- protocol SHA-256: `54ea9e2de839e1d70297ccf1f76d4a89b7ea36c5feafdd2f198c0dc5dccc18ff`;
+- frozen at `2026-07-12T08:31:00+03:00`;
+- exact evidence: `docs/measurements/squad-v012-confidence-gate-2026-07.json`.
+
+**Overall status: HALT / ESCALATE.** The uncapped required-item mean is 0.2421, already below the 0.30 stop cap. The five-PR train is rejected.
+
+| Stop | Result | Exact evidence |
+|---|---|---|
+| SC-2 documented-mode regression | Not evaluated | No end-to-end Ralph, GitHub-Issues, PRD, MCP, or model-table mode run exists. |
+| SC-3 POLICY omission | **Triggered** | 4 KiB/top-6 omitted the synthetic `class: POLICY` / `loadGuidance: ALWAYS` section on four of seven tasks. |
+| SC-4 secret leakage | **Triggered** | An ephemeral secret-shaped assignment was selected into system context. The JSON metrics remained content-free and the value was not persisted. |
+| SC-5 governance bypass | Not applicable | PR-4 was not implemented; no default branch was changed. |
+| SC-6 prototype test regression | **Triggered** | Baseline focused `state-mcp` passed at 5 seconds; treatment focused timed out at the same frozen limit. A 15-second diagnostic pass does not clear the stop. |
+| SC-7 injection log gap | Insufficient evidence | Seven synthetic records exist, but no runtime measurement window was run and eight required provenance fields are absent. |
+| SC-10 native-only violation | Not triggered | The prototype uses only Node.js built-ins, Markdown, git, and existing Squad/Copilot primitives. |
+
+### Six-axis record
+
+| Item | V | F | E | S | O | G | Verdict |
+|---|---:|---:|---:|---:|---:|---:|---|
+| PR-1 retrieval + provenance | 0.90 | 0.50 | 0.00 | 0.00 | 0.50 | 0.00 | **REJECTED** |
+| PR-2 coordinator externalisation | 0.90 | 0.50 | 0.00 | 0.50 | 0.50 | 0.00 | **INSUFFICIENT EVIDENCE** |
+| PR-3 class-aware compaction | 0.90 | 0.50 | 0.00 | 0.50 | 0.50 | 0.00 | **INSUFFICIENT EVIDENCE** |
+| PR-4 governance baseline | 0.90 | 0.50 | 0.00 | 0.00 | 0.50 | 0.00 | **REJECTED** |
+| PR-5 integrity lint | 0.90 | 0.50 | 0.00 | 0.00 | 0.50 | 0.00 | **REJECTED** |
+
+Generalizability is zero because all new retrieval outcomes are synthetic. E2 also misses the frozen minimum of 20 tasks per agent across at least three agents, three model repetitions, and a 95% CI. These are evidence deficits, not thresholds to relax. The complete 19-item matrix and uncapped arithmetic mean are in the confidence-gate JSON.
 
 ## Claim-by-claim reconciliation
 
@@ -64,16 +96,17 @@ Seven hand-labeled synthetic tasks were run at three budgets. One task is an int
 | Configuration | Injected range | p50 system-byte reduction | Mean recall | Mean precision | Gate |
 |---|---:|---:|---:|---:|---|
 | 2 KiB / top 3 | 126–734 B | 99.54% | 85.71% | 66.67% | **FAIL** — 14.29% coverage decrease |
-| 4 KiB / top 6 | 126–3,829 B | 99.45% | 100% | 69.05% | **PASS** |
-| 8 KiB / top 8 | 126–4,956 B | 99.45% | 100% | 67.86% | **PASS** |
+| 4 KiB / top 6 | 126–3,829 B | 99.46% | 100% | 69.05% | Byte/aggregate-coverage point estimate passes; **frozen E2 gate fails SC-3** |
+| 8 KiB / top 8 | 126–4,931 B | 99.46% | 100% | 67.86% | Byte/aggregate-coverage point estimate passes; **frozen E2 gate fails SC-3** |
 
-The large percentage is a property of the reported 168,550-byte consumer scale; it must not be generalized to ordinary repositories. Precision is materially below 100%, so lexical retrieval still injects irrelevant matches even when recall is preserved. That negative result should remain visible.
+The large percentage is a property of the reported 168,550-byte consumer scale; it must not be generalized to ordinary repositories. Precision is materially below 100%, so lexical retrieval still injects irrelevant matches even when recall is preserved. More importantly, the retriever does not always-load POLICY context: the frozen security invariant fails even where aggregate recall is 100%.
 
 Machine-readable artifacts:
 
 - `docs/measurements/squad-v012-feasibility-2026-07.json`
 - `docs/measurements/squad-v012-context-injection-2026-07.jsonl`
 - `docs/measurements/squad-v012-validation-2026-07.json`
+- `docs/measurements/squad-v012-confidence-gate-2026-07.json`
 
 ### 4. Coordinator externalisation
 
@@ -194,11 +227,10 @@ Rollback is direct: omit `selectiveRetrieval` or set `enabled: false`. Coordinat
 
 ## Final recommendation changes
 
-1. Keep selective retrieval as a v0.12 candidate, but budget 4–6 days and cover every spawn surface before shipping.
-2. Use 4 KiB/top 6 as the current evidence-backed default. Preserve the failed 2 KiB result.
-3. Do not claim the 75,883-byte custom-agent template is the default CLI shell system body.
-4. Do not ship coordinator externalisation under the stated gate; it currently reaches only 37.32% and has no mode-regression evidence.
-5. Drop the half-day `nap` guard recommendation until the target and metadata flow are defined.
-6. Correct the manifest claim: the three skills are present and installed in v0.11 source.
-7. Correct the promotion claim: production callers exist, while Scribe still bypasses classification.
-8. Keep memory API unification in v0.13 and runtime tiering evidence-gated.
+1. **Do not confirm PR-1 or the five-PR v0.12 train.** SC-3, SC-4, and SC-6 require rejection and owner escalation.
+2. Treat 4 KiB/top 6 only as a promising point estimate, not an evidence-backed ship default.
+3. Add unconditional POLICY/ALWAYS retrieval, secret filtering before prompt injection, and complete provenance fields before a new preregistered pass.
+4. Do not claim the 75,883-byte custom-agent template is the default CLI shell system body.
+5. Do not ship coordinator externalisation under the stated gate; it reaches only 37.32% and has no mode-regression evidence.
+6. Return the half-day `nap` guard to design/evidence gathering until the target and metadata flow are defined; do not approve or reject it on this pass.
+7. Keep memory API unification in v0.13 and runtime tiering evidence-gated.

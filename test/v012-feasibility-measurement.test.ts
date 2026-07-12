@@ -24,10 +24,18 @@ describe('v0.12 coordinator externalization simulation', () => {
       configurations: Array<{
         id: string;
         meanRecall: number;
+        policyOmissionInvariantPass: boolean;
         gate: { pass: boolean };
         taskResults: Array<{ taskId: string; selectedIds: string[] }>;
       }>;
       proposedConfigurationGatePass: boolean;
+    };
+    securityProbe: {
+      forbiddenPatternMatched: boolean;
+      injectedIntoSystemContext: boolean;
+      metricsRecordContainsPayload: boolean;
+      payloadPersisted: boolean;
+      payloadSha256: string;
     };
     coordinatorExternalization: {
       baselineBytes: number;
@@ -67,10 +75,20 @@ describe('v0.12 coordinator externalization simulation', () => {
 
     expect(twoKiB?.gate.pass).toBe(false);
     expect(twoKiB?.meanRecall).toBeLessThan(1);
-    expect(fourKiB?.gate.pass).toBe(true);
+    expect(fourKiB?.gate.pass).toBe(false);
     expect(fourKiB?.meanRecall).toBe(1);
+    expect(fourKiB?.policyOmissionInvariantPass).toBe(false);
     expect(negativeTask?.selectedIds).toEqual([]);
-    expect(measurement.selectiveRetrieval.proposedConfigurationGatePass).toBe(true);
+    expect(measurement.selectiveRetrieval.proposedConfigurationGatePass).toBe(false);
+  });
+
+  it('records reproducible non-secret evidence for the frozen leakage stop', () => {
+    expect(measurement.securityProbe.forbiddenPatternMatched).toBe(true);
+    expect(measurement.securityProbe.injectedIntoSystemContext).toBe(true);
+    expect(measurement.securityProbe.metricsRecordContainsPayload).toBe(false);
+    expect(measurement.securityProbe.payloadPersisted).toBe(false);
+    expect(measurement.securityProbe.payloadSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(JSON.stringify(measurement.securityProbe)).not.toContain('synthetic1234567890');
   });
 
   it('externalizes substantial on-demand guidance while preserving core contracts', () => {

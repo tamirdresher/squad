@@ -153,7 +153,7 @@ function createSyntheticFixture() {
     ),
     policy: section(
       'Governed memory policy',
-      'Memory entries classified as POLICY use loadGuidance ALWAYS. The memory index owns class and load guidance metadata.',
+      'class: POLICY\nloadGuidance: ALWAYS\n\nThe memory index owns class and load guidance metadata.',
     ),
     manifest: section(
       'Skill template manifest',
@@ -246,6 +246,7 @@ function createSyntheticFixture() {
     decisions: decisionDocument,
     history: historyDocument,
     tasks,
+    policyIds: [decisionId('policy')],
   };
 }
 
@@ -271,6 +272,40 @@ function median(values) {
 
 function average(values) {
   return values.reduce((total, value) => total + value, 0) / values.length;
+}
+
+function runSecretLeakageProbe() {
+  const secretShape = [
+    'api',
+    '_key',
+    ':',
+    'sk',
+    '_',
+    'synthetic',
+    '1234567890',
+  ].join('');
+  const forbiddenMatcher =
+    /\b(password|passwd|secret|token|api[_-]?key)\s*[:=]\s*\S+/i;
+  const decision = section(
+    'Deployment credential',
+    `API key deployment rule.\n${secretShape}`,
+  );
+  const retrieval = retrieveSpawnContext({
+    agentName: 'security-probe',
+    query: 'api key deployment',
+    decisions: decision,
+    history: '',
+    maxItems: 3,
+    maxInjectedBytes: 4 * 1024,
+  });
+  return {
+    matcherId: 'FORBIDDEN credential-like assignment',
+    payloadSha256: sha256(secretShape),
+    forbiddenPatternMatched: forbiddenMatcher.test(secretShape),
+    injectedIntoSystemContext: retrieval.context.includes(secretShape),
+    metricsRecordContainsPayload: JSON.stringify(retrieval.metrics).includes(secretShape),
+    payloadPersisted: false,
+  };
 }
 
 function percentReduction(baseline, treatment) {
@@ -360,6 +395,9 @@ async function measure() {
         ),
         recall: recall(retrieval.metrics.selectedIds, task.expectedIds),
         precision: precision(retrieval.metrics.selectedIds, task.expectedIds),
+        policyOmittedIds: fixture.policyIds.filter(
+          id => !retrieval.metrics.selectedIds.includes(id),
+        ),
       };
       if (config.id === '4k-top6') {
         records.push({
@@ -379,16 +417,26 @@ async function measure() {
     const meanRecall = Number(average(taskResults.map(result => result.recall)).toFixed(4));
     const meanPrecision = Number(average(taskResults.map(result => result.precision)).toFixed(4));
     const coverageDecrease = Number((1 - meanRecall).toFixed(4));
+    const policyOmissionCount = taskResults.reduce(
+      (total, result) => total + result.policyOmittedIds.length,
+      0,
+    );
     return {
       ...config,
       p50SystemPromptReductionPercent: p50Reduction,
       meanRecall,
       meanPrecision,
       handLabeledCoverageDecrease: coverageDecrease,
+      policyOmissionCount,
+      policyOmissionInvariantPass: policyOmissionCount === 0,
       gate: {
         reductionThresholdPercent: 20,
-        maximumCoverageDecrease: 0.05,
-        pass: p50Reduction >= 20 && coverageDecrease <= 0.05,
+        maximumCoverageDecrease: 0,
+        policyOmissionInvariantRequired: true,
+        pass:
+          p50Reduction >= 20
+          && coverageDecrease === 0
+          && policyOmissionCount === 0,
       },
       taskResults,
     };
@@ -465,6 +513,7 @@ async function measure() {
       proposedConfigurationGatePass: proposedConfiguration.gate.pass,
       defaultRecords: records,
     },
+    securityProbe: runSecretLeakageProbe(),
     coordinatorExternalization: {
       baselineBytes: bytes(coordinatorPrompt),
       coreBytes: bytes(split.core),
