@@ -29,6 +29,27 @@
       "numericTraceabilityGate": "FAILED",
       "D1InheritedEvidenceVerdict": "INSUFFICIENT_EVIDENCE",
       "implementationEstimatesAffected": false
+    },
+    "independentValidation": {
+      "reference": "tamirdresher_microsoft/squad-benchmark-reviewers PR #2 at 5179d47",
+      "report": "reports/independent-validation-squad-v012-2026-07.md",
+      "deterministicRunReproducedExactly": true,
+      "releaseReadiness": "PAUSED",
+      "findings": {
+        "hardRetrievalCoverage": 0.846,
+        "hardRetrievalDeltaVsPilotPercentagePoints": -15.4,
+        "supersededDecisionsInjected": "9/13",
+        "independentBlindLabels": false,
+        "integrityRealCorpusFalsePositiveRate": 0.12,
+        "integrityCanonicalRecall": 1,
+        "integrityObfuscatedBypassRecall": 0.269,
+        "reviewerKappaMet": false,
+        "governanceNonExecutableBypassCases": "5/7",
+        "governanceTestableControlsBypassed": "2/2",
+        "memoryShapeWorseThanBestInjectedBytes": 0.379,
+        "modelBehavior": "NOT_RUN_INDEPENDENTLY"
+      },
+      "implementationEstimatesAffected": false
     }
   },
   "overall": {
@@ -165,7 +186,7 @@
       "O": 0.5,
       "G": 0,
       "verdict": "REJECTED",
-      "evidence": "Direct source evidence; split spawn surfaces; frozen E2/POLICY invariant fails; secret reaches system context; operational burden unmeasured; synthetic-only generalizability."
+      "evidence": "Direct source evidence; split spawn surfaces; frozen E2/POLICY invariant fails; secret reaches system context. Independent validation reports 84.6% hard coverage, a 15.4-point pilot drop, 9/13 superseded decisions injected, and no blind labels."
     },
     {
       "item": "PR-2 coordinator externalisation",
@@ -198,7 +219,7 @@
       "O": 0.5,
       "G": 0,
       "verdict": "REJECTED",
-      "evidence": "SC-4 affects PR-4; proposed ruleset delta and A-Bypass-1..5 cases were not implemented or tested."
+      "evidence": "SC-4 affects PR-4. Independent validation found 5/7 bypass cases non-executable because controls were absent and both testable controls bypassed."
     },
     {
       "item": "PR-5 integrity lint + honest skills manifest",
@@ -209,7 +230,7 @@
       "O": 0.5,
       "G": 0,
       "verdict": "REJECTED",
-      "evidence": "SC-4 affects PR-5; no E4 payload families, clean corpora, reviewer agreement, or bypass tests ran. v0.11 already ships the three disputed skills, so remaining scope is integrity, provenance, and manifest consistency only."
+      "evidence": "SC-4 affects PR-5. Independent validation found 12% real-corpus FP, 100% canonical recall, 26.9% obfuscated-bypass recall, and no qualifying reviewer kappa. v0.11 already ships the three disputed skills."
     },
     {
       "item": "D-1 ship v0.12 as five-PR train",
@@ -342,7 +363,7 @@
       "O": 0.5,
       "G": 0,
       "verdict": "REJECTED",
-      "evidence": "No three-family payload corpus, clean corpus, false-positive score, or reviewer agreement exists; S = 0.30 crosses the frozen rejection boundary."
+      "evidence": "Independent validation fails the <=5% FP requirement at 12%, reports only 26.9% obfuscated-bypass recall, and lacks qualifying reviewer kappa; S = 0.30 also crosses the rejection boundary."
     },
     {
       "item": "E2b coordinator externalisation",
@@ -365,6 +386,18 @@
       "G": 0,
       "verdict": "INSUFFICIENT_EVIDENCE",
       "evidence": "No runtime measurement spawns; eight required fields are absent from synthetic records."
+    }
+  ],
+  "deferredItemEvidence": [
+    {
+      "item": "D-5a per-agent + shared memory shape",
+      "verdict": "WEAKENED",
+      "evidence": "Independent validation measured the recommendation 37.9% worse than the best injected-byte shape; constants are hardcoded."
+    },
+    {
+      "item": "independent model behavior",
+      "verdict": "INSUFFICIENT_EVIDENCE",
+      "evidence": "Not run because independence could not be established."
     }
   ]
 }

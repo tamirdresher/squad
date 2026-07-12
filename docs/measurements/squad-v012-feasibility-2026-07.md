@@ -12,6 +12,8 @@
 
 **Evidence scope:** implementation conclusions and estimates use only code at the pinned SHA, this branch's diff, reproduced measurements, and executed tests. Inherited DeltaMem, LongMemEval-V2, and OpenViking performance/venue claims are excluded and do not influence estimates or verdicts.
 
+**Release readiness:** **PAUSE v0.12.** No production package in the proposed train is confirmed.
+
 ## Executive verdict
 
 | Recommendation | Verdict | Evidence / required change |
@@ -38,6 +40,30 @@ Scope consequences:
 - MCP memory remains optional, runtime tiering remains deferred, and memory API convergence has stronger direction but no proven schedule.
 
 The source audit does not alter implementation estimates, which remain based only on pinned code, reproduced measurements, diff scope, and executed validation.
+
+## Independent validation reconciliation
+
+`tamirdresher_microsoft/squad-benchmark-reviewers` PR #2 at `5179d47` reproduced the deterministic frozen run exactly and then evaluated separate evidence.
+
+| Area | Independent result | Feasibility implication |
+|---|---|---|
+| Retrieval | 84.6% hard coverage, 15.4 percentage points below pilot; 9/13 superseded decisions injected; no independent blind labels | PR-1 remains blocked. Prototype mechanics are feasible, but release readiness and generalizability are not. |
+| Integrity lint | 12% FP on a real corpus; 100% canonical recall; 26.9% obfuscated-bypass recall; reviewer kappa unmet | PR-5/E4 remains rejected. Canonical recall alone is not sufficient. |
+| Governance | 5/7 bypass cases non-executable because controls were absent; both testable controls bypassed | PR-4 remains rejected. Existing policy documents are not enforceable evidence. |
+| Memory shape | Recommended shape 37.9% worse than the best injected-byte alternative; constants hardcoded | D-5a is weakened. Convergence direction may remain, but the default shape and schedule are unproven. |
+| Model behavior | Not run independently because independence could not be established | No model-behavior claim is upgraded. |
+
+Concrete prerequisites before a new release-readiness pass:
+
+- Unicode normalization and wider code-point coverage in integrity scanning;
+- secret patterns covering `sk_live`, `gho`, `AKIA`, and encoded/base64 families;
+- a real clean corpus of at least 10 files with FP at or below 5%;
+- two independent reviewers with Cohen's kappa at or above 0.70;
+- executable governance controls before scoring bypass resistance;
+- supersession/conflict handling before retrieval is live;
+- non-hardcoded memory-shape configuration and a joint byte/recall comparison.
+
+These results strengthen the pause recommendation. They do not alter implementation-time estimates, which remain code/diff/test based.
 
 ## Frozen confidence-gate outcome
 
@@ -246,10 +272,11 @@ Rollback is direct: omit `selectiveRetrieval` or set `enabled: false`. Coordinat
 
 ## Final recommendation changes
 
-1. **Do not confirm PR-1 or the five-PR v0.12 train.** SC-3, SC-4, and SC-6 require rejection and owner escalation.
-2. Treat 4 KiB/top 6 only as a promising point estimate, not an evidence-backed ship default.
-3. Add unconditional POLICY/ALWAYS retrieval, secret filtering before prompt injection, and complete provenance fields before a new preregistered pass.
-4. Do not claim the 75,883-byte custom-agent template is the default CLI shell system body.
-5. Do not ship coordinator externalisation under the stated gate; it reaches only 37.32% and has no mode-regression evidence.
-6. Return the half-day `nap` guard to design/evidence gathering until the target and metadata flow are defined; do not approve or reject it on this pass.
-7. Keep MCP memory optional and runtime tiering deferred; pursue memory API convergence as a direction without committing to an unproven release schedule.
+1. **Pause v0.12. Do not confirm PR-1 or the original five-PR train.**
+2. Restrict current work to shadow instrumentation, repository hygiene, control implementation, and honest manifest/provenance maintenance; make no release-readiness claim.
+3. Treat 4 KiB/top 6 only as a synthetic point estimate, not a ship default.
+4. Add unconditional POLICY/ALWAYS retrieval, secret filtering, supersession/conflict handling, and complete provenance before a new preregistered pass.
+5. Build and adversarially test governance and integrity controls before proposing them for release.
+6. Do not ship coordinator pointer externalisation; deterministic route-to-section alternatives remain exploratory until Addendum-01 and independent measurement.
+7. Return the half-day `nap` guard to design/evidence gathering; keep MCP memory optional and runtime tiering deferred.
+8. Pursue memory API convergence as a direction without committing to an unproven default shape or release schedule.
