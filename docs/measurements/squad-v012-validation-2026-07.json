@@ -1,0 +1,117 @@
+{
+  "schemaVersion": 1,
+  "baselineCommit": "25eae44b53bb2842f15bb2cd71c97a0ad7d6e598",
+  "environment": {
+    "os": "Windows_NT",
+    "node": "v24.14.0",
+    "npm": "11.9.0"
+  },
+  "baseline": {
+    "commands": [
+      {
+        "command": "npm ci --no-audit --no-fund",
+        "durationMs": 40860,
+        "exitCode": 0
+      },
+      {
+        "command": "npm run build",
+        "durationMs": 22047,
+        "exitCode": 0
+      },
+      {
+        "command": "npm run lint",
+        "durationMs": 6482,
+        "exitCode": 0
+      },
+      {
+        "command": "npm run lint:eslint",
+        "durationMs": 29814,
+        "exitCode": 0,
+        "warnings": 2028,
+        "errors": 0
+      },
+      {
+        "command": "npm test -- --reporter=json",
+        "durationMs": 416491,
+        "exitCode": 1,
+        "tests": {
+          "total": 7042,
+          "passed": 6818,
+          "failed": 116,
+          "pending": 61,
+          "failedFiles": 17
+        }
+      },
+      {
+        "command": "focused baseline suite --no-file-parallelism",
+        "exitCode": 0,
+        "tests": {
+          "total": 386,
+          "passed": 386,
+          "failed": 0
+        }
+      }
+    ]
+  },
+  "treatment": {
+    "commands": [
+      {
+        "command": "npm test -- --reporter=json",
+        "durationMs": 437254,
+        "exitCode": 1,
+        "tests": {
+          "total": 7053,
+          "passed": 6844,
+          "failed": 101,
+          "pending": 61,
+          "failedFiles": 12
+        }
+      },
+      {
+        "command": "focused treatment suite --no-file-parallelism",
+        "exitCode": 0,
+        "tests": {
+          "total": 397,
+          "passed": 397,
+          "failed": 0
+        }
+      },
+      {
+        "command": "npm run lint",
+        "exitCode": 0
+      },
+      {
+        "command": "npm run lint:eslint -- --quiet",
+        "exitCode": 0
+      }
+    ],
+    "failureComparison": {
+      "sharedFailedFiles": 11,
+      "newFailedFiles": [
+        "test/cli/consult.test.ts"
+      ],
+      "resolvedFailedFiles": [
+        "test/init.test.ts",
+        "test/platform-adapter.test.ts",
+        "test/repl-ux-e2e.test.ts",
+        "test/template-sync.test.ts",
+        "test/cli/upgrade.test.ts"
+      ],
+      "interpretation": "The changing failure set indicates baseline Windows concurrency/environment instability. No new experiment test failed, and the focused treatment suite passed."
+    }
+  },
+  "publishedPackageReproduction": {
+    "compatible": {
+      "cli": "0.11.0",
+      "sdk": "0.11.0",
+      "stateMcpExitCode": 0,
+      "sdkExportsAddSquadStateGitignoreBlock": true
+    },
+    "mismatched": {
+      "cli": "0.11.0",
+      "sdk": "0.10.0",
+      "stateMcpExitCode": 1,
+      "error": "The requested module '@bradygaster/squad-sdk' does not provide an export named 'addSquadStateGitignoreBlock'"
+    }
+  }
+}

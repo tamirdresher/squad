@@ -1,11 +1,14 @@
 {
   "schemaVersion": 1,
   "experiment": "squad-v0.12-feasibility",
-  "sourceCommit": "25eae44b53bb2842f15bb2cd71c97a0ad7d6e598",
+  "sourceCommit": "d524fd350b5d420838a064139c316db7c8892873",
+  "sourceDirty": true,
+  "measurementSourceSha256": "0843179fa1d73e5e09fdfe160d260b4681b24f24fe79632aeaa930b9a0554924",
   "packageVersion": "0.11.0",
   "querySha256": "22efa8396d0216f524a2f23cf268bf28abe43b204eb40495166440a5a9256c45",
   "inputs": {
-    "coordinatorPromptBytes": 76930,
+    "templateCoordinatorPromptBytes": 76930,
+    "shellCoordinatorPromptBytes": 8886,
     "decisionBytes": 12151,
     "historyBytes": 33933,
     "historyPresent": true
@@ -16,6 +19,8 @@
     "reductionBytes": 5219,
     "reductionPercent": 24.26,
     "injectedBytes": 6933,
+    "retrievalInputReductionBytes": 39151,
+    "retrievalInputReductionPercent": 84.96,
     "selectedIds": [
       "decisions:f908e92312f4866b",
       "decisions:63e4bdc3c1cfcac5",

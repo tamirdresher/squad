@@ -5,11 +5,11 @@ import { describe, expect, it } from 'vitest';
 describe('v0.12 coordinator externalization simulation', () => {
   const output = execFileSync(
     process.execPath,
-    [join(process.cwd(), 'scripts', 'measure-v012-feasibility.mjs')],
+    [join(process.cwd(), 'scripts', 'measure-v012-feasibility.mjs'), '--no-write'],
     { cwd: process.cwd(), encoding: 'utf8' },
   );
   const measurement = JSON.parse(output) as {
-    inputs: { coordinatorPromptBytes: number };
+    inputs: { templateCoordinatorPromptBytes: number };
     coordinatorExternalization: {
       coreBytes: number;
       onDemandBytes: number;
@@ -22,7 +22,7 @@ describe('v0.12 coordinator externalization simulation', () => {
   it('externalizes substantial on-demand guidance while preserving core contracts', () => {
     expect(measurement.coordinatorExternalization.onDemandBytes).toBeGreaterThan(20_000);
     expect(measurement.coordinatorExternalization.coreBytes).toBeLessThan(
-      measurement.inputs.coordinatorPromptBytes,
+      measurement.inputs.templateCoordinatorPromptBytes,
     );
     expect(
       Object.values(measurement.coordinatorExternalization.coreContractMarkers),

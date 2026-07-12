@@ -55,11 +55,10 @@ interface RetrievalChunk {
 
 export function retrieveSpawnContext(input: SelectiveRetrievalInput): SelectiveRetrievalResult {
   const maxItems = normalizePositiveInteger(input.maxItems, DEFAULT_MAX_ITEMS);
-  const maxInjectedBytes = normalizePositiveInteger(
-    input.maxInjectedBytes,
-    DEFAULT_MAX_INJECTED_BYTES,
-    MIN_INJECTED_BYTES,
-  );
+  const maxInjectedBytes = input.maxInjectedBytes ?? DEFAULT_MAX_INJECTED_BYTES;
+  if (!Number.isInteger(maxInjectedBytes) || maxInjectedBytes < MIN_INJECTED_BYTES) {
+    throw new RangeError(`maxInjectedBytes must be an integer >= ${MIN_INJECTED_BYTES}`);
+  }
   const querySha256 = sha256(input.query);
   const queryTokens = new Set(tokenize(input.query));
   const chunks = [
@@ -169,11 +168,8 @@ function sourceOrder(source: RetrievalChunk['source']): number {
 function normalizePositiveInteger(
   value: number | undefined,
   fallback: number,
-  minimum = 1,
 ): number {
-  return value !== undefined && Number.isInteger(value) && value > 0
-    ? Math.max(value, minimum)
-    : fallback;
+  return value !== undefined && Number.isInteger(value) && value > 0 ? value : fallback;
 }
 
 function byteLength(value: string): number {

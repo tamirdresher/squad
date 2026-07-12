@@ -80,4 +80,14 @@ describe('selective spawn-time retrieval experiment', () => {
     expect(result.context).toContain('selected=none');
     expect(result.metrics.injectedBytes).toBe(Buffer.byteLength(result.context, 'utf8'));
   });
+
+  it('rejects an explicit byte bound too small for provenance', () => {
+    expect(() => retrieveSpawnContext({
+      agentName: 'fido',
+      query: 'authentication',
+      decisions: DECISIONS,
+      history: HISTORY,
+      maxInjectedBytes: 255,
+    })).toThrow(/maxInjectedBytes must be an integer >= 256/);
+  });
 });

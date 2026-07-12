@@ -506,6 +506,22 @@ describe('Nap — Decision archival', () => {
     expect(archived).not.toContain('Security policy');
   });
 
+  it('does not duplicate an undated protected entry during count-based archival', async () => {
+    const today = new Date().toISOString().slice(0, 10);
+    let decisions = '# Decisions\n\n';
+    decisions += '### Security policy\nclass: POLICY\nloadGuidance: ALWAYS\nKeep once.\n\n';
+    for (let i = 0; i < 40; i++) {
+      decisions += `### ${today}: Routine ${i + 1}\n${'r'.repeat(600)}\n\n`;
+    }
+    const squadDir = createTestSquadDir({ 'decisions.md': decisions });
+
+    await runNap({ squadDir });
+    const remaining = readFileSync(join(squadDir, 'decisions.md'), 'utf8');
+
+    expect(remaining.match(/### Security policy/g)).toHaveLength(1);
+    expect(remaining.match(/Keep once\./g)).toHaveLength(1);
+  });
+
   it('count-based fallback: exactly at threshold does NOT archive (boundary case)', async () => {
     // Build content that is exactly at or just under 20KB with all-recent entries
     const today = new Date().toISOString().slice(0, 10);

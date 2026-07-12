@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 import { execFileSync } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +9,7 @@ import {
   compileCharterFull,
   retrieveSpawnContext,
 } from '../packages/squad-sdk/dist/agents/index.js';
+import { buildCoordinatorPrompt } from '../packages/squad-cli/dist/cli/shell/coordinator.js';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const QUERY =
@@ -107,8 +109,21 @@ function percentReduction(baseline, treatment) {
   return baseline === 0 ? 0 : Number((((baseline - treatment) / baseline) * 100).toFixed(2));
 }
 
-function measure() {
+function measurementSourceHash(paths) {
+  const hash = createHash('sha256');
+  for (const filePath of [...paths].sort()) {
+    const relativePath = filePath.slice(ROOT.length + 1).replaceAll('\\', '/');
+    hash.update(relativePath);
+    hash.update('\0');
+    hash.update(readFileSync(filePath));
+    hash.update('\0');
+  }
+  return hash.digest('hex');
+}
+
+async function measure() {
   const coordinatorPrompt = read(join(ROOT, '.squad-templates', 'squad.agent.md'));
+  const shellCoordinatorPrompt = await buildCoordinatorPrompt({ teamRoot: ROOT });
   const split = splitCoordinatorPrompt(coordinatorPrompt);
   const charter = read(join(ROOT, '.squad', 'agents', 'eecom', 'charter.md'));
   const team = read(join(ROOT, '.squad', 'team.md'));
@@ -116,6 +131,21 @@ function measure() {
   const decisions = read(join(ROOT, '.squad', 'decisions.md'));
   const historyPath = join(ROOT, '.squad', 'agents', 'eecom', 'history.md');
   const history = readIfPresent(historyPath);
+  const sourcePaths = [
+    join(ROOT, '.squad-templates', 'squad.agent.md'),
+    join(ROOT, '.squad', 'agents', 'eecom', 'charter.md'),
+    join(ROOT, '.squad', 'team.md'),
+    join(ROOT, '.squad', 'routing.md'),
+    join(ROOT, '.squad', 'decisions.md'),
+    join(ROOT, 'packages', 'squad-sdk', 'src', 'agents', 'selective-retrieval.ts'),
+    join(ROOT, 'packages', 'squad-sdk', 'src', 'agents', 'charter-compiler.ts'),
+    join(ROOT, 'packages', 'squad-sdk', 'dist', 'agents', 'index.js'),
+    join(ROOT, 'packages', 'squad-sdk', 'dist', 'agents', 'selective-retrieval.js'),
+    join(ROOT, 'packages', 'squad-sdk', 'dist', 'agents', 'charter-compiler.js'),
+    join(ROOT, 'packages', 'squad-cli', 'dist', 'cli', 'shell', 'coordinator.js'),
+    fileURLToPath(import.meta.url),
+  ];
+  if (existsSync(historyPath)) sourcePaths.push(historyPath);
 
   const baselineAgentPrompt = compileCharterFull({
     agentName: 'eecom',
@@ -161,10 +191,17 @@ function measure() {
       cwd: ROOT,
       encoding: 'utf8',
     }).trim(),
+    sourceDirty: execFileSync(
+      'git',
+      ['status', '--porcelain', '--untracked-files=no'],
+      { cwd: ROOT, encoding: 'utf8' },
+    ).trim().length > 0,
+    measurementSourceSha256: measurementSourceHash(sourcePaths),
     packageVersion: JSON.parse(read(join(ROOT, 'package.json'))).version,
     querySha256: retrieval.metrics.querySha256,
     inputs: {
-      coordinatorPromptBytes: bytes(coordinatorPrompt),
+      templateCoordinatorPromptBytes: bytes(coordinatorPrompt),
+      shellCoordinatorPromptBytes: bytes(shellCoordinatorPrompt),
       decisionBytes: bytes(decisions),
       historyBytes: bytes(history),
       historyPresent: history.length > 0,
@@ -178,6 +215,12 @@ function measure() {
         bytes(treatmentAgentPrompt),
       ),
       injectedBytes: retrieval.metrics.injectedBytes,
+      retrievalInputReductionBytes:
+        bytes(decisions) + bytes(history) - retrieval.metrics.injectedBytes,
+      retrievalInputReductionPercent: percentReduction(
+        bytes(decisions) + bytes(history),
+        retrieval.metrics.injectedBytes,
+      ),
       selectedIds: retrieval.metrics.selectedIds,
       record: contextRecord,
     },
@@ -197,13 +240,15 @@ function measure() {
 }
 
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const result = measure();
-  mkdirSync(dirname(OUTPUT_JSON), { recursive: true });
-  writeFileSync(OUTPUT_JSON, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
-  writeFileSync(
-    OUTPUT_JSONL,
-    `${JSON.stringify(result.selectiveRetrieval.record)}\n`,
-    'utf8',
-  );
+  const result = await measure();
+  if (!process.argv.includes('--no-write')) {
+    mkdirSync(dirname(OUTPUT_JSON), { recursive: true });
+    writeFileSync(OUTPUT_JSON, `${JSON.stringify(result, null, 2)}\n`, 'utf8');
+    writeFileSync(
+      OUTPUT_JSONL,
+      `${JSON.stringify(result.selectiveRetrieval.record)}\n`,
+      'utf8',
+    );
+  }
   process.stdout.write(`${JSON.stringify(result, null, 2)}\n`);
 }

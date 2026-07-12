@@ -392,7 +392,7 @@ function archiveDecisions(squadDir: string, dryRun: boolean): NapAction | null {
   // Undated entries are preserved — they are often foundational directives.
   if (old.length === 0) {
     const dated = recent.filter(e => e.daysAgo !== null && !e.protected);
-    const undated = recent.filter(e => e.daysAgo === null);
+    const undated = recent.filter(e => e.daysAgo === null && !e.protected);
     const protectedEntries = recent.filter(e => e.protected);
 
     if (dated.length === 0) return null; // only undated entries, nothing to archive
