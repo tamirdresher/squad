@@ -19,7 +19,17 @@
       "LongMemEval-V2 performance percentage",
       "LongMemEval-V2 venue classification",
       "OpenViking performance percentage"
-    ]
+    ],
+    "systematicSourceAudit": {
+      "reference": "PR #905 at c30231e",
+      "identitiesRetrieved": "25/26",
+      "fullyVerified": 9,
+      "qualifiedOrPartial": 14,
+      "contradictedParaphrases": 3,
+      "numericTraceabilityGate": "FAILED",
+      "D1InheritedEvidenceVerdict": "INSUFFICIENT_EVIDENCE",
+      "implementationEstimatesAffected": false
+    }
   },
   "overall": {
     "status": "HALT",
@@ -199,7 +209,7 @@
       "O": 0.5,
       "G": 0,
       "verdict": "REJECTED",
-      "evidence": "SC-4 affects PR-5; no E4 payload families, clean corpora, reviewer agreement, or bypass tests ran."
+      "evidence": "SC-4 affects PR-5; no E4 payload families, clean corpora, reviewer agreement, or bypass tests ran. v0.11 already ships the three disputed skills, so remaining scope is integrity, provenance, and manifest consistency only."
     },
     {
       "item": "D-1 ship v0.12 as five-PR train",
@@ -210,7 +220,8 @@
       "O": 0.5,
       "G": 0,
       "verdict": "REJECTED",
-      "evidence": "Three required PRs are rejected and S = 0.30 independently crosses the frozen rejection boundary."
+      "sourceAuditVerdict": "INSUFFICIENT_EVIDENCE",
+      "evidence": "PR #905 grades inherited five-PR evidence insufficient. Separately, three required PRs are rejected and S = 0.30 crosses the frozen implementation/security rejection boundary."
     },
     {
       "item": "D-2 contextTier to modelContextWindow",

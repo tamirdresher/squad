@@ -21,8 +21,23 @@
 | Class-aware `nap` phase 1 | **INSUFFICIENT EVIDENCE for the 0.5-day scope** | Current `nap` never reads `.squad/memory/index.json` and does not archive governed memory entries. POLICY/load-guidance metadata has no flow into its decision-markdown parser. The earlier regex prototype was removed. |
 | GitHub-native governance baseline | **REJECTED by the frozen gate** | SC-4 affects PR-4, no A-Bypass cases were run, and S = 0.00 crosses the rejection boundary. Existing controls remain factual but do not confirm the proposed PR. |
 | `AGENTS.md` / `SKILL.md` integrity and provenance lint | **REJECTED by the frozen gate** | SC-4 affects PR-5, no E4 corpus or reviewer agreement exists, and S = 0.00 crosses the rejection boundary. |
-| Memory API unification | **Keep in v0.13** | Scribe still operates through `squad_state_*`, while governed `memory.*` has separate tools and CLI callers. |
+| Memory API convergence | **Direction supported; schedule unproven** | Scribe still operates through `squad_state_*`, while governed `memory.*` has separate tools and CLI callers. Convergence is justified, but this study does not establish a v0.13 delivery date. |
 | Runtime tiered memory | **Wait for evidence** | No `contextTier` or `context_tier` runtime symbol exists at the exact base. |
+
+## Systematic source-audit reconciliation
+
+PR #905 at `c30231e` retrieved 25/26 source identities, but fully verified only 9; 14 remained qualified/partial, three paraphrases were contradicted, and numeric traceability failed.
+
+Scope consequences:
+
+- inherited D-1 evidence is **INSUFFICIENT EVIDENCE** and does not support the unchanged five-PR package;
+- this branch's separate frozen implementation/security pass still rejects shipping that package because SC-3, SC-4, and SC-6 trigger;
+- repo hygiene/governance work must be split from measurement prototypes;
+- PR-5 must not ship already-present skills again; remaining scope is integrity lint, provenance, and manifest consistency;
+- AgentRunbook-C equivalence and its inherited baseline are excluded;
+- MCP memory remains optional, runtime tiering remains deferred, and memory API convergence has stronger direction but no proven schedule.
+
+The source audit does not alter implementation estimates, which remain based only on pinned code, reproduced measurements, diff scope, and executed validation.
 
 ## Frozen confidence-gate outcome
 
@@ -166,6 +181,8 @@ At `25eae44b`, the old “missing from manifest” claim is false:
 
 The apparent drift comes from two canonical roots: ordinary templates are sourced from `.squad-templates`, while skills are sourced from `.squad/skills` and copied by `sync-skill-templates.mjs` into package templates. The three skills are correctly absent from `.squad-templates/skills`; that directory is not their source of truth. A live v0.11 upgrade scaffolding them is consistent with current source.
 
+No v0.12 PR should add or re-ship those skills. A narrowed PR-5, if independently re-evidenced, is limited to integrity/provenance lint and manifest consistency.
+
 ### 9. Published `state-mcp` failure
 
 Observed evidence must remain separate:
@@ -235,4 +252,4 @@ Rollback is direct: omit `selectiveRetrieval` or set `enabled: false`. Coordinat
 4. Do not claim the 75,883-byte custom-agent template is the default CLI shell system body.
 5. Do not ship coordinator externalisation under the stated gate; it reaches only 37.32% and has no mode-regression evidence.
 6. Return the half-day `nap` guard to design/evidence gathering until the target and metadata flow are defined; do not approve or reject it on this pass.
-7. Keep memory API unification in v0.13 and runtime tiering evidence-gated.
+7. Keep MCP memory optional and runtime tiering deferred; pursue memory API convergence as a direction without committing to an unproven release schedule.
