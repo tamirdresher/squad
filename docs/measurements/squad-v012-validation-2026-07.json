@@ -1,6 +1,7 @@
 {
-  "schemaVersion": 1,
-  "baselineCommit": "25eae44b53bb2842f15bb2cd71c97a0ad7d6e598",
+  "schemaVersion": 2,
+  "baseCommit": "25eae44b53bb2842f15bb2cd71c97a0ad7d6e598",
+  "forkMainObserved": "ffcd439980c99cdec038b72b1cca964deeddda46",
   "environment": {
     "os": "Windows_NT",
     "node": "v24.14.0",
@@ -56,65 +57,102 @@
   "treatment": {
     "commands": [
       {
-        "command": "npm test -- --reporter=json",
-        "durationMs": 442763,
-        "exitCode": 1,
-        "tests": {
-          "total": 7055,
-          "passed": 6843,
-          "failed": 104,
-          "pending": 61,
-          "failedFiles": 16
-        }
-      },
-      {
-        "command": "focused treatment suite --no-file-parallelism",
-        "exitCode": 0,
-        "tests": {
-          "total": 399,
-          "passed": 399,
-          "failed": 0
-        }
+        "command": "npm run build",
+        "durationMs": 14609,
+        "exitCode": 0
       },
       {
         "command": "npm run lint",
+        "durationMs": 7452,
         "exitCode": 0
       },
       {
         "command": "npm run lint:eslint -- --quiet",
+        "durationMs": 24531,
         "exitCode": 0
+      },
+      {
+        "command": "experiment-focused suite --no-file-parallelism",
+        "exitCode": 0,
+        "tests": {
+          "total": 73,
+          "passed": 73,
+          "failed": 0
+        }
+      },
+      {
+        "command": "comparable focused suite --no-file-parallelism",
+        "exitCode": 1,
+        "tests": {
+          "total": 401,
+          "passed": 400,
+          "failed": 1,
+          "failure": "pre-existing state-mcp test exceeded the default 5000ms timeout"
+        }
+      },
+      {
+        "command": "isolated state-mcp suite --no-file-parallelism --testTimeout=15000",
+        "exitCode": 0,
+        "tests": {
+          "total": 2,
+          "passed": 2,
+          "failed": 0
+        }
+      },
+      {
+        "command": "npm test -- --reporter=json",
+        "durationMs": 602689,
+        "exitCode": 1,
+        "tests": {
+          "total": 7057,
+          "passed": 6835,
+          "failed": 114,
+          "pending": 61,
+          "failedFiles": 17
+        }
       }
     ],
     "failureComparison": {
-      "sharedFailedFiles": 12,
+      "sharedFailedFiles": 10,
       "newFailedFiles": [
+        "test/consumer-imports.test.ts",
         "test/init-leak-mutable-state.test.ts",
-        "test/init-sdk.test.ts",
         "test/speed-gates.test.ts",
-        "test/cli/init.test.ts"
+        "test/ux-gates.test.ts",
+        "test/acceptance/hostile.test.ts",
+        "test/cli/consult.test.ts",
+        "test/cli/notes-promote.test.ts"
       ],
       "resolvedFailedFiles": [
-        "test/init-scaffolding.test.ts",
+        "test/init.test.ts",
         "test/platform-adapter.test.ts",
+        "test/remote-control.test.ts",
         "test/repl-ux-e2e.test.ts",
         "test/template-sync.test.ts",
-        "test/cli/doctor.test.ts"
+        "test/cli/doctor.test.ts",
+        "test/cli/upgrade.test.ts"
       ],
-      "interpretation": "The changing failure set indicates baseline Windows concurrency/environment instability. No new experiment test failed, and the focused treatment suite passed."
+      "interpretation": "The changing failure set indicates baseline Windows concurrency, filesystem, timing, and subprocess instability. All experiment-focused tests passed."
     }
   },
   "publishedPackageReproduction": {
-    "compatible": {
+    "reportedDirectObservation": {
+      "command": "npx -y @bradygaster/squad-cli@latest state-mcp",
+      "result": "failed at module load",
+      "error": "The requested module '@bradygaster/squad-sdk' does not provide an export named 'addSquadStateGitignoreBlock'"
+    },
+    "cleanMatchedInstall": {
       "cli": "0.11.0",
       "sdk": "0.11.0",
-      "stateMcpExitCode": 0,
+      "stateMcpStarted": true,
       "sdkExportsAddSquadStateGitignoreBlock": true
     },
-    "mismatched": {
+    "forcedMismatch": {
       "cli": "0.11.0",
       "sdk": "0.10.0",
       "stateMcpExitCode": 1,
       "error": "The requested module '@bradygaster/squad-sdk' does not provide an export named 'addSquadStateGitignoreBlock'"
-    }
+    },
+    "rootCauseProven": false
   }
 }

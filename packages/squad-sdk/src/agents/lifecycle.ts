@@ -220,7 +220,7 @@ export class AgentLifecycleManager {
         retrievedContext = retrieval.context;
         retrievalMetrics = retrieval.metrics;
         const configuredRecordPath = selectiveRetrieval.recordPath
-          ?? path.join('.squad', 'measurements', 'context-injection.jsonl');
+          ?? path.join('.squad', 'log', 'context-injections.jsonl');
         recordPath = path.isAbsolute(configuredRecordPath)
           ? configuredRecordPath
           : path.join(this.teamRoot, configuredRecordPath);
@@ -269,14 +269,23 @@ export class AgentLifecycleManager {
         ...(validEffort ? { reasoningEffort: validEffort } : {}),
       };
 
-      if (retrievalMetrics && recordPath) {
-        await appendContextInjectionRecord(this.storage, recordPath, {
-          ...retrievalMetrics,
-          systemPromptBytes: Buffer.byteLength(agentConfig.prompt, 'utf8'),
-        });
-      }
-      
       const session = await this.client.createSession(sessionConfig);
+
+      if (retrievalMetrics && recordPath) {
+        try {
+          await appendContextInjectionRecord(this.storage, recordPath, {
+            ...retrievalMetrics,
+            timestamp: new Date().toISOString(),
+            taskSha256: retrievalMetrics.querySha256,
+            model: resolvedModel.model,
+            sessionId: session.sessionId,
+            systemPromptBytes: Buffer.byteLength(agentConfig.prompt, 'utf8'),
+          });
+        } catch (error) {
+          await session.close();
+          throw error;
+        }
+      }
       
       // Step 5: Create handle with event handlers
       const handle = new AgentHandleImpl({

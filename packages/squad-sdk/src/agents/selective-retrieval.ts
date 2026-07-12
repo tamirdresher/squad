@@ -3,7 +3,7 @@ import path from 'node:path';
 import type { StorageProvider } from '../storage/storage-provider.js';
 
 const DEFAULT_MAX_ITEMS = 6;
-const DEFAULT_MAX_INJECTED_BYTES = 8 * 1024;
+const DEFAULT_MAX_INJECTED_BYTES = 4 * 1024;
 const MIN_INJECTED_BYTES = 256;
 const ALGORITHM = 'bounded-lexical-v1';
 
@@ -21,12 +21,20 @@ export interface ContextInjectionRecord {
   event: 'squad.context-injection';
   algorithm: typeof ALGORITHM;
   agentName: string;
+  timestamp: string;
+  taskSha256: string;
   querySha256: string;
+  model: string;
+  sessionId: string;
   systemPromptBytes: number;
   decisionInputBytes: number;
   historyInputBytes: number;
   injectedBytes: number;
   selectedIds: string[];
+  matchCount: number;
+  omittedMatches: number;
+  omittedDecisionMatches: number;
+  omittedHistoryMatches: number;
   maxItems: number;
   maxInjectedBytes: number;
 }
@@ -42,7 +50,10 @@ export interface SelectiveRetrievalInput {
 
 export interface SelectiveRetrievalResult {
   context: string;
-  metrics: Omit<ContextInjectionRecord, 'systemPromptBytes'>;
+  metrics: Omit<
+    ContextInjectionRecord,
+    'timestamp' | 'taskSha256' | 'model' | 'sessionId' | 'systemPromptBytes'
+  >;
 }
 
 interface RetrievalChunk {
@@ -80,12 +91,15 @@ export function retrieveSpawnContext(input: SelectiveRetrievalInput): SelectiveR
   for (const chunk of chunks) {
     if (selected.length >= maxItems) break;
     const candidate = [...selected, chunk];
-    if (byteLength(formatContext(querySha256, candidate)) <= maxInjectedBytes) {
+    const omissions = countOmissions(chunks, candidate);
+    if (byteLength(formatContext(querySha256, candidate, omissions)) <= maxInjectedBytes) {
       selected.push(chunk);
     }
   }
 
-  const context = formatContext(querySha256, selected);
+  const omissions = countOmissions(chunks, selected);
+  const omittedMatches = omissions.decisions + omissions.history;
+  const context = formatContext(querySha256, selected, omissions);
   return {
     context,
     metrics: {
@@ -98,6 +112,10 @@ export function retrieveSpawnContext(input: SelectiveRetrievalInput): SelectiveR
       historyInputBytes: byteLength(input.history),
       injectedBytes: byteLength(context),
       selectedIds: selected.map(chunk => chunk.id),
+      matchCount: chunks.length,
+      omittedMatches,
+      omittedDecisionMatches: omissions.decisions,
+      omittedHistoryMatches: omissions.history,
       maxItems,
       maxInjectedBytes,
     },
@@ -137,12 +155,41 @@ function parseChunks(content: string, source: RetrievalChunk['source']): Retriev
   }).filter(chunk => chunk.content.length > 0);
 }
 
-function formatContext(querySha256: string, chunks: RetrievalChunk[]): string {
+function formatContext(
+  querySha256: string,
+  chunks: RetrievalChunk[],
+  omissions: { decisions: number; history: number },
+): string {
   const selected = chunks.map(chunk => chunk.id).join(',');
   const provenance =
     `> Provenance: ${ALGORITHM}; query-sha256=${querySha256}; selected=${selected || 'none'}`;
-  if (chunks.length === 0) return provenance;
-  return `${provenance}\n\n${chunks.map(chunk => chunk.content).join('\n\n')}`;
+  const omittedMatches = omissions.decisions + omissions.history;
+  let readTarget = '';
+  if (omissions.decisions > 0 && omissions.history > 0) {
+    readTarget = 'decisions.md and agent history.md';
+  } else if (omissions.decisions > 0) {
+    readTarget = 'decisions.md';
+  } else if (omissions.history > 0) {
+    readTarget = 'agent history.md';
+  }
+  const overflow = omittedMatches > 0
+    ? `[+${omittedMatches} more matches — read ${readTarget}]`
+    : '';
+  return [provenance, ...chunks.map(chunk => chunk.content), overflow]
+    .filter(Boolean)
+    .join('\n\n');
+}
+
+function countOmissions(
+  chunks: RetrievalChunk[],
+  selected: RetrievalChunk[],
+): { decisions: number; history: number } {
+  const selectedIds = new Set(selected.map(chunk => chunk.id));
+  const omitted = chunks.filter(chunk => !selectedIds.has(chunk.id));
+  return {
+    decisions: omitted.filter(chunk => chunk.source === 'decisions').length,
+    history: omitted.filter(chunk => chunk.source === 'history').length,
+  };
 }
 
 function tokenize(value: string): string[] {

@@ -41,6 +41,8 @@ describe('selective spawn-time retrieval experiment', () => {
     expect(result.context).not.toContain('navigation spacing');
     expect(result.metrics.selectedIds).toHaveLength(2);
     expect(result.metrics.injectedBytes).toBeLessThanOrEqual(1024);
+    expect(result.metrics.omittedMatches).toBeGreaterThan(0);
+    expect(result.context).toContain('more matches — read decisions.md and agent history.md');
   });
 
   it('is deterministic and keeps instrumentation free of source content', () => {
@@ -62,6 +64,8 @@ describe('selective spawn-time retrieval experiment', () => {
     expect(serializedMetrics).not.toContain('replay bug');
     expect(first.metrics.querySha256).toMatch(/^[a-f0-9]{64}$/);
     expect(first.metrics.selectedIds[0]).toMatch(/^(decisions|history):[a-f0-9]{16}$/);
+    expect(first.metrics.omittedMatches).toBeGreaterThan(0);
+    expect(first.context).toMatch(/\[\+\d+ more matches — read decisions\.md\]/);
   });
 
   it('reports input and injected bytes without selecting unrelated sections', () => {
@@ -77,6 +81,9 @@ describe('selective spawn-time retrieval experiment', () => {
     expect(result.metrics.decisionInputBytes).toBe(Buffer.byteLength(DECISIONS, 'utf8'));
     expect(result.metrics.historyInputBytes).toBe(Buffer.byteLength(HISTORY, 'utf8'));
     expect(result.metrics.selectedIds).toEqual([]);
+    expect(result.metrics.omittedMatches).toBe(0);
+    expect(result.metrics.omittedDecisionMatches).toBe(0);
+    expect(result.metrics.omittedHistoryMatches).toBe(0);
     expect(result.context).toContain('selected=none');
     expect(result.metrics.injectedBytes).toBe(Buffer.byteLength(result.context, 'utf8'));
   });
@@ -103,5 +110,16 @@ describe('selective spawn-time retrieval experiment', () => {
     expect(result.context).toContain('令牌必须定期轮换');
     expect(result.context).not.toContain('PostgreSQL');
     expect(result.metrics.selectedIds).toHaveLength(1);
+  });
+
+  it('defaults to the proposed 4096-byte budget', () => {
+    const result = retrieveSpawnContext({
+      agentName: 'eecom',
+      query: 'authentication',
+      decisions: DECISIONS,
+      history: HISTORY,
+    });
+
+    expect(result.metrics.maxInjectedBytes).toBe(4096);
   });
 });

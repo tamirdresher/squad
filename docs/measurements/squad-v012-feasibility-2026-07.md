@@ -1,207 +1,204 @@
 # Squad v0.12 implementation feasibility and measurement study
 
-**Date:** 2026-07-12  
-**Repository:** `tamirdresher/squad`  
-**Baseline:** upstream default branch `main` at `25eae44b` (`v0.11.0`)  
-**Experiment:** off by default; no defaults changed; no upstream issue or PR filed
+**Date:** 2026-07-12
+
+**Repository:** `tamirdresher/squad`
+
+**Exact base:** upstream `main` at `25eae44b53bb2842f15bb2cd71c97a0ad7d6e598`
+
+**Fork drift observed:** `origin/main` at `ffcd439980c99cdec038b72b1cca964deeddda46`, two commits behind
+
+**Experiment:** off by default; no default branch changed; no upstream issue or PR filed
 
 ## Executive verdict
 
 | Recommendation | Verdict | Evidence / required change |
 |---|---|---|
-| Selective spawn-time retrieval + provenance | **Feasible for v0.12** | Real lifecycle prototype, 84.96% retrieval-input reduction and 24.26% system-prompt reduction in the measured case. Reword the claim: current runtime accepts optional full decisions but does not inject full agent history by default. |
-| Coordinator prompt externalisation | **Feasible, validation estimate must increase** | Static split reduces the 76,930-byte template by 28,812 bytes (37.45%) while retaining six core contract markers. This is not model-mode correctness evidence; runtime A/B coverage is still required. |
-| Class-aware `nap` phase 1 | **Feasible for v0.12** | One-file prototype protects `class: POLICY` and `loadGuidance: [ALWAYS]` entries from age- and size-based archival. |
-| GitHub-native governance baseline | **Mostly already present; narrow the PR** | The repository already has 20 workflows, `CODEOWNERS`, PR requirements, CI policy gates, label enforcement, readiness, scope checks, and PR nudges. A v0.12 PR should audit/consolidate gaps rather than introduce a second governance system. |
-| `AGENTS.md` / `SKILL.md` integrity and provenance lint | **Split the recommendation** | There is no `AGENTS.md`. `SKILL.md` sync has byte-parity coverage for one template tree but no checksums/provenance and a 26-source/19-manifest mismatch. Ship SKILL integrity first; define AGENTS ownership before linting it. |
-| Memory API unification | **Keep in v0.13** | Memory governance, Squad state, state backends, history/decision I/O, and MCP tools remain separate public/write paths. Unification is larger than a v0.12 safety change. |
-| Runtime tiered memory | **Wait for evidence** | No `contextTier`/`context_tier` runtime symbol exists. Tiered memory currently ships as guidance/docs, not a runtime tier selector. |
+| Selective spawn-time retrieval + provenance | **Feasible, but larger than 2–3 days** | The 4 KiB/top-6 synthetic treatment passes the proposed reduction/coverage gate. The 2 KiB/top-3 treatment fails coverage, which demonstrates that the budget matters. Current spawn paths are split across SDK lifecycle, fan-out, and CLI shell code; the prototype only wires SDK lifecycle. |
+| Coordinator prompt externalisation | **Does not meet the stated v0.12 gate** | The exact-base template split reduces 75,883 B to 47,560 B (37.32%), below the 40% gate. No documented-mode behavior suite was run, so the overall gate also fails. |
+| Class-aware `nap` phase 1 | **Not implementable as stated in 0.5 day** | Current `nap` never reads `.squad/memory/index.json` and does not archive governed memory entries. POLICY/load-guidance metadata has no flow into its decision-markdown parser. The earlier regex prototype was removed. |
+| GitHub-native governance baseline | **Mostly already present; narrow the PR** | The repository already has 20 workflows, `CODEOWNERS`, PR requirements, policy gates, readiness, scope checks, label governance, and PR nudges. |
+| `AGENTS.md` / `SKILL.md` integrity and provenance lint | **Split the recommendation** | No `AGENTS.md` exists. Skill install coverage exists, but sync/provenance remains spread across two template roots. Ship SKILL provenance only after defining the canonical source map. |
+| Memory API unification | **Keep in v0.13** | Scribe still operates through `squad_state_*`, while governed `memory.*` has separate tools and CLI callers. |
+| Runtime tiered memory | **Wait for evidence** | No `contextTier` or `context_tier` runtime symbol exists at the exact base. |
 
-## Baseline drift from the July 10–12 report
+## Claim-by-claim reconciliation
 
-The local fork's `origin/main` was at `ffcd4399` and two commits behind upstream `main`. The study rebased its experimental branch onto upstream `25eae44b`, which promoted v0.11.0 and added the agency front-matter tool wildcard. Measurements against the stale fork baseline would have reported v0.10.0 package versions and older dependency surfaces.
+### 1. Coordinator prompt baseline
 
-Current versions and constraints:
+The reported 86,018 B / 814-line hypothesis does not match `25eae44b`.
 
-- Root, CLI, and SDK packages: `0.11.0`.
-- Node engine: `>=22.5.0`.
-- `@github/copilot-sdk`: `^1.0.4`.
-- TypeScript: `^6.0.3`; Vitest: `^4.1.9`.
-- CLI dependency on SDK: `"*"`, with a root workspace override to the local SDK.
+| Surface | Exact measurement | Runtime role |
+|---|---:|---|
+| Git blob `.squad-templates/squad.agent.md` | **75,883 B / 1,047 logical lines** | Prompt-only custom-agent template |
+| Git blob `.github/agents/squad.agent.md` | **75,883 B / 1,047 logical lines** | Mirrored custom-agent prompt |
+| Windows checkout of the same LF blob | 76,930 B | CRLF adds one byte per newline; not the Git-blob baseline |
+| Composed default interactive-shell coordinator prompt | **8,741 B** | Actual system message created by `squad` with no arguments for this base repo |
 
-The report assumption that agents load full decisions and full history on every spawn is not true in the current runtime:
+`packages/squad-cli/src/cli-entry.ts` explicitly maps no arguments to `runShell()`. The shell calls `buildCoordinatorPrompt()` and passes its result to `createSession({ systemMessage })`. Therefore the 75,883-byte custom-agent file is **not** the every-turn system body of the default no-argument CLI shell. It remains relevant to custom-agent surfaces, but the two prompts must not be conflated.
 
-- `packages/squad-sdk/src/agents/lifecycle.ts` accepts optional caller-supplied `decisions`; it did not read history before this experiment.
-- `packages/squad-sdk/src/agents/charter-compiler.ts` appended full decisions only when supplied.
-- `packages/squad-cli/src/cli/shell/spawn.ts` constructs a separate charter plus optional `systemContext` prompt.
-- `.squad-templates/squad.agent.md` is the prompt-only coordinator used by agent surfaces, not the SDK lifecycle prompt.
+### 2. Full decision concatenation
 
-The recommendation should therefore describe selective retrieval as replacing caller-supplied full decision context **and adding bounded relevant history**, not as removing an existing unconditional full-history load.
+`compileCharterFull()` appends the complete `decisions` string under `## Relevant Decisions` whenever a caller supplies it. The current call graph is fragmented:
 
-## Exact implementation points
+- `packages/squad-sdk/src/agents/lifecycle.ts` accepts optional `decisions` and calls `compileCharterFull()`.
+- `packages/squad-sdk/src/coordinator/fan-out.ts` does not call `compileCharterFull()` directly; it receives an injected `compileCharter` dependency.
+- `packages/squad-cli/src/cli/shell/spawn.ts` independently builds charter plus optional `systemContext` and does not load decisions/history.
 
-| Surface | Current implementation | Experiment point |
-|---|---|---|
-| Prompt-only coordinator | `.squad-templates/squad.agent.md`, mirrored by `scripts/sync-templates.mjs` | `scripts/measure-v012-feasibility.mjs` simulates core/on-demand externalisation. |
-| Shell coordinator | `packages/squad-cli/src/cli/shell/coordinator.ts` builds team + routing prompt | Measured separately; no behavior change. |
-| SDK agent prompt | `packages/squad-sdk/src/agents/charter-compiler.ts` | Adds a distinct `## Retrieved Context` section. |
-| Spawn lifecycle | `packages/squad-sdk/src/agents/lifecycle.ts` | Explicit `selectiveRetrieval.enabled` gate reads decisions/history, injects selection, and appends JSONL. |
-| Retrieval algorithm | New `packages/squad-sdk/src/agents/selective-retrieval.ts` | Deterministic heading chunks, lexical overlap, stable SHA-256 IDs, item and byte bounds. |
-| Decision compaction | `packages/squad-cli/src/cli/core/nap.ts` | Protects POLICY/ALWAYS entries from archival. |
-| State writes | `packages/squad-sdk/src/state/`, `state-backend.ts`, `tools/index.ts`, CLI `state-mcp.ts` | Inspected only; no unification. |
-| Governed memory writes | `packages/squad-sdk/src/memory/index.ts` | Inspected only; POLICY/DECISION map to `ALWAYS`. |
-| Template manifest | `packages/squad-cli/src/cli/core/templates.ts`; SDK curated list in `config/init.ts` | Inspected only. |
+The measurement uses a deterministic **168,550-byte synthetic decision ledger** and **32,768-byte synthetic history**, with no private content. Full decision concatenation produces a 168,830-byte agent system prompt in the synthetic baseline. Current runtime does not unconditionally add full history.
 
-## Measurements
+### 3. Selective retrieval proposal
 
-Machine-readable data:
+The prototype now matches the proposed operational shape:
+
+- default 4,096-byte budget;
+- configurable top 3–8 excerpts;
+- deterministic lexical selection over decisions + one agent history;
+- provenance line and stable content-hash IDs;
+- source-aware overflow markers, including the proposed `[+N more matches — read decisions.md]` for decision-only omissions;
+- default log path: `.squad/log/context-injections.jsonl`;
+- content-free records with timestamp, agent, task hash, selected IDs, source/injected/system bytes, model, and session.
+
+Seven hand-labeled synthetic tasks were run at three budgets. One task is an intentional negative query; it selects no context at every budget. One relevant section is intentionally too large for the 2 KiB treatment.
+
+| Configuration | Injected range | p50 system-byte reduction | Mean recall | Mean precision | Gate |
+|---|---:|---:|---:|---:|---|
+| 2 KiB / top 3 | 126–734 B | 99.54% | 85.71% | 66.67% | **FAIL** — 14.29% coverage decrease |
+| 4 KiB / top 6 | 126–3,829 B | 99.45% | 100% | 69.05% | **PASS** |
+| 8 KiB / top 8 | 126–4,956 B | 99.45% | 100% | 67.86% | **PASS** |
+
+The large percentage is a property of the reported 168,550-byte consumer scale; it must not be generalized to ordinary repositories. Precision is materially below 100%, so lexical retrieval still injects irrelevant matches even when recall is preserved. That negative result should remain visible.
+
+Machine-readable artifacts:
 
 - `docs/measurements/squad-v012-feasibility-2026-07.json`
 - `docs/measurements/squad-v012-context-injection-2026-07.jsonl`
 - `docs/measurements/squad-v012-validation-2026-07.json`
 
-### Prompt and retrieval bytes
+### 4. Coordinator externalisation
 
-| Metric | Baseline | Treatment | Delta |
-|---|---:|---:|---:|
-| Prompt-only coordinator template | 76,930 B | 48,118 B core | -28,812 B (-37.45%) |
-| Externalized on-demand coordinator content | — | 29,715 B | — |
-| Shell coordinator prompt | 8,886 B | unchanged | 0 |
-| Decision input | 12,151 B | lexical source | — |
-| Agent history input | 33,933 B | lexical source | — |
-| Retrieved injection | 46,084 B available | 6,933 B selected | -39,151 B (-84.96%) |
-| Measured agent system prompt | 21,517 B | 16,298 B | -5,219 B (-24.26%) |
+The static split keeps coordinator identity, directive capture, memory governance, routing, spawn instructions, and reviewer lockout in core. It moves personal squads, issue lifecycle, worktrees, ceremonies, marketplace, casting, Rai, and fact-checker guidance on demand.
 
-The agent-prompt comparison is intentionally conservative: baseline contains the current full decision injection but no history, while treatment contains selected decisions **and** selected history. Six stable content-hash IDs were selected. The JSONL record contains byte counts, query hash, selected IDs, limits, and system-prompt bytes; it contains no source text. The JSON report also records the Git commit, dirty-tree state, and a SHA-256 over measurement code and inputs.
+| Metric | Result |
+|---|---:|
+| Exact-base template | 75,883 B |
+| Simulated core | 47,560 B |
+| Externalized sections | 29,226 B |
+| Reduction | **28,323 B / 37.32%** |
+| Required byte gate | 40% |
+| Byte gate | **FAIL** |
+| Documented-mode regression suite | Not run |
+| Overall gate | **FAIL** |
 
-### Coordinator split limitations
+Static markers and byte counts do not establish routing, mode-selection, or tool-use correctness. The 1–2 day estimate is not credible if zero documented-mode regressions is a hard gate.
 
-The simulation externalizes operational reference sections such as personal squads, issue lifecycle, worktree reference, ceremonies, plugin marketplace, casting, Rai, and fact-checker guidance. It retains these contract markers in the core:
+### 5. `contextTier`
 
-- coordinator identity;
-- directive capture;
-- memory governance tools;
-- routing;
-- agent spawn instructions;
-- reviewer rejection lockout.
+There is no `contextTier` or `context_tier` implementation in source, templates, or tests at `25eae44b`. The repository has response/model tier logic, but no runtime option that selects a context-window tier, and nothing by that name mutates `agentConfig.prompt`.
 
-Static marker and byte checks cannot establish routing, mode-selection, or tool-use correctness. A production PR needs prompt-contract tests plus real CLI/VS Code/App A/B scenarios before claiming behavioral parity.
+The prior claim cannot be verified against this base and should be recorded as **path/version drift**, not as current behavior.
 
-## `nap` class protection
+### 6. `nap` phase 1
 
-Baseline `nap` used file size, heading count, and age only:
+Baseline `packages/squad-cli/src/cli/core/nap.ts`:
 
-- histories over 15 KB keep five entries (three in deep mode);
-- decisions over 20 KB archive entries older than 30 days, then use a count-based fallback;
-- logs older than seven days are deleted.
+- compresses `agents/*/history.md` over 15 KiB by heading count;
+- archives `decisions.md` over 20 KiB by heading date/size;
+- prunes old log files;
+- merges decision inbox files.
 
-The prototype marks a decision entry protected when it contains either `class: POLICY` or `loadGuidance: [ALWAYS]`. Protected entries remain in `decisions.md` during both age and count fallback compaction. This is feasible as phase 1, but production should replace regex recognition with typed decision metadata once the memory/state API direction is settled.
+It contains no memory-index, `class`, `POLICY`, or `loadGuidance` read. Governed memory metadata exists in `.squad/memory/index.json`, but `nap` does not archive those entries at all. Therefore “protect memory/index entries from nap archival” is currently a no-op requirement.
 
-## State and memory write-path findings
+If the intended target is decision markdown generated from governed memory, a typed metadata bridge must be designed first. A regex over arbitrary decision body text is not a reliable implementation and was removed from this experiment.
 
-There is no unified memory API today:
+### 7. Memory schism
 
-- `SquadState` and state backends own mutable team state.
-- Decision and history serializers live under `packages/squad-sdk/src/state/io/`.
-- Governed memory writes local, decision-inbox, policy-inbox, semantic-inbox, index, audit, and tombstone artifacts under `.squad/memory/`.
-- `state-mcp` exposes state and governed-memory tools through `ToolRegistry`.
-- CLI memory commands and shell memory commands are additional callers.
+The “zero non-test callers” claim for `LocalMemoryStore.promote()` is false at the current base. Production callers exist in:
 
-This supports deferring unification to v0.13. The v0.12 retrieval PR should consume these paths without renaming or merging them.
+- `packages/squad-sdk/src/tools/index.ts` (`memory.promote`);
+- `packages/squad-cli/src/cli/commands/memory.ts` (`squad memory promote`).
 
-## Published-package `state-mcp` reproduction
+The Scribe bypass claim is supported. Active and package Scribe charters perform operational persistence with `squad_state_read`, `squad_state_write`, `squad_state_append`, and `squad_state_delete`; they do not call `memory.classify`, `memory.write`, or `memory.promote`. The coordinator template prefers `memory.write` for directives but explicitly falls back to state tools. Memory governance and operational state therefore remain two partially connected write paths.
 
-### Observed facts
+### 8. Skills and manifest drift
 
-1. Fresh `@bradygaster/squad-cli@0.11.0` + `@bradygaster/squad-sdk@0.11.0` installation starts `state-mcp`; the SDK package exports `addSquadStateGitignoreBlock`.
-2. Forcing CLI `0.11.0` with SDK `0.10.0` reproduces the reported startup failure:
+At `25eae44b`, the old “missing from manifest” claim is false:
 
-   `SyntaxError: The requested module '@bradygaster/squad-sdk' does not provide an export named 'addSquadStateGitignoreBlock'`
+- CLI `TEMPLATE_MANIFEST` explicitly includes `tiered-memory`, `iterative-retrieval`, and `reflect`.
+- SDK `MANIFEST_SKILL_NAMES` includes all three and contains 19 curated skills.
+- Package template directories contain all three.
+- `test/init.test.ts` verifies every curated skill is installed.
 
-3. The stack points to the published CLI's `dist/cli/commands/migrate-backend.js`, even when launching `state-mcp`.
-4. Published CLI 0.11.0 declares the SDK range as `"*"`. The source workspace masks skew through a local file dependency/override.
+The apparent drift comes from two canonical roots: ordinary templates are sourced from `.squad-templates`, while skills are sourced from `.squad/skills` and copied by `sync-skill-templates.mjs` into package templates. The three skills are correctly absent from `.squad-templates/skills`; that directory is not their source of truth. A live v0.11 upgrade scaffolding them is consistent with current source.
 
-### Inferred root cause
+### 9. Published `state-mcp` failure
 
-Version skew permits CLI 0.11.0 to run against an SDK lacking the named export, and eager CLI command-module loading evaluates the unrelated migrate-backend import during `state-mcp` startup. This study does not fix or file the issue.
+Observed evidence must remain separate:
 
-## Template and integrity findings
+1. The reported `npx -y @bradygaster/squad-cli@latest state-mcp` run failed with the missing `addSquadStateGitignoreBlock` export.
+2. This study's fresh matched CLI 0.11.0 + SDK 0.11.0 install started and exported the symbol.
+3. Forcing CLI 0.11.0 + SDK 0.10.0 reproduced the exact named-export failure from `migrate-backend.js`.
+4. CLI 0.11.0 declares its SDK dependency as `"*"`.
+5. The global bundled CLI and `squad doctor` were reported working.
 
-- CLI `TEMPLATE_MANIFEST`: 57 entries, 53 overwrite-on-upgrade, four user-owned.
-- Manifest skills: 19.
-- Canonical `.squad/skills` directories: 26.
-- `sync-skill-templates.mjs` recursively copies all 26 skills to package templates but does not delete stale destinations or emit hashes/provenance.
-- `test/template-sync.test.ts` provides byte parity for `.squad-templates` mirrors, not a provenance manifest for `.squad/skills`.
-- No `AGENTS.md` exists.
+These facts localize the failure to a published-package/API resolution mismatch, but they do not prove whether the direct `npx` observation was caused by cache, registry replication, dependency resolution, or another packaging condition. No fix or upstream issue is included.
 
-Feasible v0.12 scope: generate a deterministic SKILL manifest containing source path, destination path, SHA-256, and source revision; lint package/install copies against it. Do not claim AGENTS integrity until an AGENTS source-of-truth and install policy exist.
+### 10. Effort hypotheses
+
+| PR | Earlier hypothesis | Estimate from current code | Reason |
+|---|---:|---:|---|
+| Selective retrieval + instrumentation | 2–3 days | **4–6 days** | Must unify or cover lifecycle, injected fan-out compiler, and CLI shell spawn; add coverage fixtures, JSONL schema, failure handling, and client compatibility tests. |
+| Coordinator externalisation | 1–2 days | **4–7 days** | Current split misses the 40% byte gate and lacks documented-mode A/B tests across custom-agent and shell surfaces. |
+| `nap` POLICY guard | 0.5 day | **2–4 days after design**, or no PR | Current nap does not touch governed memory. A typed bridge and precise archival target are prerequisites. |
+
+## Exact implementation points and path drift
+
+| Path | Finding |
+|---|---|
+| `packages/squad-cli/src/cli/shell/spawn.ts` | Builds charter + optional context only; no decisions/history retrieval. |
+| `packages/squad-sdk/src/coordinator/fan-out.ts` | Uses an injected `compileCharter` function; no direct file loads or `compileCharterFull()` call. |
+| `packages/squad-sdk/src/agents/lifecycle.ts` | Only concrete current path where optional full decisions reach `compileCharterFull()`; experiment gate is wired here. |
+| `.squad-templates/squad.agent.md` | Custom-agent prompt, not default no-argument shell prompt. |
+| `packages/squad-cli/src/cli/core/nap.ts` | Decision/history/log maintenance only; no governed memory index flow. |
+| `packages/squad-sdk/src/memory/index.ts` | Owns governed classes, load guidance, index, audit, promotion, and providers. |
+| `.squad/agents/scribe/charter.md` and package Scribe templates | Operational writes use state tools, bypassing memory classification. |
+| `packages/squad-cli/src/cli/core/templates.ts` | Contains the three disputed skills. |
+| `packages/squad-sdk/src/config/init.ts` | Curates the same skills through `MANIFEST_SKILL_NAMES`. |
 
 ## GitHub-native governance baseline
 
 The repository already has 20 workflow files and substantive native controls:
 
 - CI build/test and consolidated policy gates;
-- changelog/changeset enforcement;
+- changeset enforcement;
 - source-tree and large-deletion guards;
 - scope boundary checks;
 - PR readiness and stale-PR nudges;
 - label synchronization/enforcement and issue assignment;
-- broad repository `CODEOWNERS`;
+- repository `CODEOWNERS`;
 - versioned `.github/PR_REQUIREMENTS.md`.
 
-Gaps are narrower than the original recommendation implies:
-
-- no `.github/ISSUE_TEMPLATE` directory;
-- `CODEOWNERS` is repository-wide rather than risk/surface-specific;
-- PR requirements document acknowledges manual enforcement gaps;
-- branch protection/settings are not represented by repository files.
-
-A governance PR is feasible only as a gap audit and targeted hardening PR. Duplicating existing policy workflows is not recommended.
+Gaps are narrower than the original recommendation implies: there is no issue-template directory, `CODEOWNERS` is broad rather than surface-specific, some requirements remain manual, and branch settings are not represented in files. A v0.12 governance PR should be a targeted gap audit, not a second policy framework.
 
 ## Validation
 
-| Phase | Command | Result |
-|---|---|---|
-| Baseline | `npm ci --no-audit --no-fund` | pass |
-| Baseline | `npm run build` | pass |
-| Baseline | `npm run lint` | pass |
-| Baseline | `npm run lint:eslint` | pass, 2,028 existing warnings |
-| Baseline | focused serial suite | 386/386 pass |
-| Baseline | full `npm test` | 6,818/7,042 pass; 116 failures |
-| Treatment | focused serial suite + new tests | 399/399 pass |
-| Treatment | full `npm test` | 6,843/7,055 pass; 104 failures |
-| Treatment | `npm run lint` | pass |
-| Treatment | `npm run lint:eslint -- --quiet` | pass |
+The baseline Windows checkout is not green. Build, TypeScript lint, ESLint, and focused serial tests pass, while the full parallel suite has unstable filesystem, timing, and subprocess failures. The experiment's focused tests pass; no experiment failure was found in the full-suite comparisons. Exact command results are retained in `squad-v012-validation-2026-07.json`.
 
-The full Windows suite is not a clean release signal in this checkout. Twelve failing files were shared between runs; five baseline failing files passed in treatment; four unrelated init/speed files newly failed. No new experiment test failed. The dominant repeated failures include Windows storage/symlink behavior and concurrent filesystem tests. Focused source, lifecycle, memory, `nap`, template, and `state-mcp` tests pass serially. No stable treatment regression was localized.
+## Compatibility and rollback
 
-## Proposed PR slices and effort
+Selective retrieval is disabled unless `selectiveRetrieval.enabled` is true. Disabled lifecycle behavior remains unchanged. The experiment supports modern `.squad` and legacy `.ai-team` state roots and deterministic Unicode tokens.
 
-The request did not include numeric estimates from the earlier report, so the ranges below are implementation estimates derived from this checkout.
+Risks include lexical false positives, heading-format sensitivity, divergent spawn paths, write failures after session creation, and telemetry schema compatibility. The prototype closes a newly created session if instrumentation fails.
 
-| PR | Files / work | Estimate | Feasible? |
-|---|---|---:|---|
-| Selective retrieval + instrumentation | SDK retrieval module, lifecycle gate, prompt section, tests, JSONL schema, docs | 3–5 engineering days | **Yes** |
-| Coordinator externalisation | Split canonical template, loader/reference contract, sync/manifest updates, prompt tests, cross-client A/B | 4–7 days | **Yes, but not as a byte-only 1–2 day change** |
-| Class-aware `nap` phase 1 | Typed/protected entry recognition, archive invariants, tests | 1–2 days | **Yes** |
-| GitHub governance gap baseline | Audit existing workflows, targeted CODEOWNERS/templates/settings documentation | 1–3 days | **Yes, narrowed** |
-| SKILL integrity/provenance lint | Generated hash manifest, sync deletion policy, CI lint, install/upgrade tests | 2–4 days | **Yes** |
-| AGENTS integrity | Define source, ownership, install and upgrade semantics first | 2–4 days after design | **Not ready as a combined lint PR** |
-
-## Compatibility risks and rollback
-
-Selective retrieval risks lexical false negatives, heading-format sensitivity, prompt-order changes, and recording-path failures. Production should fail the spawn if an explicitly requested instrumentation write fails, as this prototype does, rather than silently claiming measurement coverage.
-
-`nap` protection is additive and can leave decisions above the size threshold when protected content dominates. That is preferable to deleting policy, but should be reported in the action summary.
-
-Coordinator externalisation risks client-specific lazy-loading differences and lost cross-section dependencies. Rollback is straightforward: keep the current canonical prompt and disable the loader. The retrieval rollback is also direct: omit `selectiveRetrieval` or set `enabled: false`; the baseline path remains unchanged.
+Rollback is direct: omit `selectiveRetrieval` or set `enabled: false`. Coordinator externalisation remains simulation-only. No `nap` behavior change remains.
 
 ## Final recommendation changes
 
-1. Ship selective retrieval in v0.12 only behind an explicit feature flag, with provenance and content-free telemetry.
-2. Describe the benefit accurately: replace optional full decisions and add selected history; do not claim removal of unconditional full-history injection.
-3. Ship class-aware `nap` protection, but keep typed metadata integration for the memory API follow-up.
-4. Treat coordinator externalisation as a separate PR with a larger validation estimate and no model-correctness claim until live A/B evidence exists.
-5. Narrow governance work to existing-gap hardening.
-6. Split SKILL provenance lint from AGENTS policy.
-7. Keep memory API unification in v0.13 and runtime tiering evidence-gated.
+1. Keep selective retrieval as a v0.12 candidate, but budget 4–6 days and cover every spawn surface before shipping.
+2. Use 4 KiB/top 6 as the current evidence-backed default. Preserve the failed 2 KiB result.
+3. Do not claim the 75,883-byte custom-agent template is the default CLI shell system body.
+4. Do not ship coordinator externalisation under the stated gate; it currently reaches only 37.32% and has no mode-regression evidence.
+5. Drop the half-day `nap` guard recommendation until the target and metadata flow are defined.
+6. Correct the manifest claim: the three skills are present and installed in v0.11 source.
+7. Correct the promotion claim: production callers exist, while Scribe still bypasses classification.
+8. Keep memory API unification in v0.13 and runtime tiering evidence-gated.

@@ -246,9 +246,17 @@ Test collaboration patterns.
     expect(systemPrompt).not.toContain('Reduced spacing');
 
     const record = JSON.parse((await fs.readFile(recordPath, 'utf8')).trim()) as {
+      timestamp: string;
+      taskSha256: string;
+      model: string;
+      sessionId: string;
       systemPromptBytes: number;
       selectedIds: string[];
     };
+    expect(record.timestamp).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+    expect(record.taskSha256).toMatch(/^[a-f0-9]{64}$/);
+    expect(record.model).toBeTruthy();
+    expect(record.sessionId).toMatch(/^test-session-/);
     expect(record.systemPromptBytes).toBe(Buffer.byteLength(systemPrompt, 'utf8'));
     expect(record.selectedIds).toHaveLength(2);
     expect(JSON.stringify(record)).not.toContain('replay attacks');
