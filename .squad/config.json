@@ -1,5 +1,16 @@
 {
   "version": 1,
   "stateBackend": "worktree",
-  "defaultModel": "claude-opus-4.7"
+  "defaultModel": "claude-sonnet-5",
+  "agentModelOverrides": {
+    "picard": "claude-opus-4.8",
+    "data": "claude-sonnet-5",
+    "belanna": "claude-sonnet-5",
+    "geordi": "claude-sonnet-5",
+    "seven": "gemini-3.1-pro-preview",
+    "worf": "claude-opus-4.8",
+    "troi": "claude-sonnet-5",
+    "scribe": "gpt-5.4-mini",
+    "ralph": "gpt-5.4-mini"
+  }
 }
