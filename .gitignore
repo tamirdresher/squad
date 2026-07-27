@@ -8,6 +8,7 @@
 .squad-workstream
 # Squad: ignore runtime state (logs, inbox, sessions)
 .squad/orchestration-log/
+.squad/orchestration-log/dispatchguard/
 .squad/log/
 .squad/.cache/
 # Squad: per-request session state and SQLite database (operational, never committed)
