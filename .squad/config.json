@@ -12,5 +12,6 @@
     "troi": "claude-sonnet-5",
     "scribe": "gpt-5.4-mini",
     "ralph": "gpt-5.4-mini"
-  }
+  },
+  "dispatchEnforcement": "warn"
 }

@@ -32,10 +32,11 @@ How to decide who handles what.
 ## Rules
 
 1. **Eager by default** — spawn all agents who could usefully start work, including anticipatory downstream work.
-2. **Scribe always runs** after substantial work, always as `mode: "background"`. Never blocks.
+2. **Scribe always runs** after substantial work, always as `mode: "background"`. Never blocks. Also spawned in **DispatchGuard mode** at every session start (see `squad.agent.md` §Session Init) to mechanically audit coordinator turns for dispatch compliance.
 3. **Quick facts → coordinator answers directly.** Don't spawn an agent for simple status checks.
 4. **When two agents could handle it**, pick the one whose domain is the primary concern.
 5. **"Team, ..." → fan-out.** Spawn all relevant agents in parallel as `mode: "background"`.
 6. **Anticipate downstream work.** If a feature is being built, spawn reviewers/testers/researchers from requirements in parallel when useful.
 7. **Issue-labeled work** — when a `squad:{member}` label is applied to an issue, route to that member. Picard handles all `squad` base-label triage.
 8. **Content work** — Troi drafts, Worf/Crusher-equivalent safety review is Worf here, and Picard resolves publication tradeoffs.
+9. **Ralph consumes DispatchGuard verdicts.** When Ralph's work-monitor loop is active, it reads `.squad/orchestration-log/dispatchguard/verdicts-{SESSION_ID}.jsonl` and alerts the coordinator on `warn`/`block` verdicts.it infrastructure)
