@@ -34,7 +34,7 @@ release `SHA256SUMS.txt`, unpacks it into `$PREFIX/lib/squad`, and symlinks
 ```sh
 # pin a version and install somewhere specific
 curl -fsSL https://raw.githubusercontent.com/bradygaster/squad/main/scripts/install.sh \
-  | VERSION="v0.13.1" PREFIX="$HOME/tools" sh
+  | VERSION="v1.0.0" PREFIX="$HOME/tools" sh
 ```
 
 ### Windows
@@ -133,7 +133,7 @@ The `squad-init` action wraps the install and init steps:
 ```yaml
 - uses: bradygaster/squad/.github/actions/squad-init@<sha>
   with:
-    version: v0.13.1        # default: latest release
+    version: v1.0.0         # default: latest release
     preset: default
     state-backend: local
 ```
@@ -144,7 +144,7 @@ Point `repository:` at an internal mirror if your runners cannot reach
 ```yaml
 - name: Install Squad
   env:
-    SQUAD_VERSION: v0.13.1
+    SQUAD_VERSION: v1.0.0
   run: |
     curl -fsSL https://raw.githubusercontent.com/bradygaster/squad/main/scripts/install.sh \
       | VERSION="${SQUAD_VERSION}" PREFIX="${HOME}/.local" sh
@@ -210,7 +210,7 @@ so their manifests cannot be hand-maintained without going stale every release.
 They are generated from the release's own `SHA256SUMS.txt`:
 
 ```sh
-node scripts/generate-packaging.mjs --version v0.11.0
+node scripts/generate-packaging.mjs --version v1.0.0
 ```
 
 That writes a channel-specific Homebrew cask (`squad.rb`, `squad-preview.rb`,
@@ -218,10 +218,17 @@ or `squad-insider.rb`) and three channel-specific winget manifests (version,
 installer, locale). The release workflow runs this automatically, updates the
 Homebrew tap, and opens a pull request against `winget-pkgs`.
 The `packaging-manifests` artifact is retained for audit and manual recovery.
-Homebrew updates are available as soon as the release workflow finishes;
-WinGet updates become available after the community repository accepts the
-generated pull request. Stable, preview, and insider releases each publish
+Homebrew updates require a successful tap publish; WinGet updates become
+available after the community repository accepts the generated pull request.
+Stable, preview, and insider releases each publish
 standalone archives and use isolated Homebrew casks and WinGet identifiers.
+
+For v1.0.0, the standalone GitHub archives are published, but the external-repo
+authentication fix for Homebrew/WinGet publishing automation
+([#2164](https://github.com/bradygaster/squad/pull/2164)) is still open and awaiting
+review. A GitHub release alone does not confirm that a package-manager update is
+available. Use the release archive or install script if your package manager does
+not offer the version you need.
 
 ## Known limitations
 

@@ -1,6 +1,6 @@
 # Squad.Agents.AI
 
-`Squad.Agents.AI` **1.0.0** is the stable package version and multi-targets `net8.0`, `net9.0`, and `net10.0`. It uses Microsoft Agent Framework 1.23.0 and GitHub Copilot SDK 1.0.14. Source versioning does not confirm NuGet publication; use the local package instructions below until 1.0.0 is published.
+`Squad.Agents.AI` **1.0.0** is published as a NuGet package and multi-targets `net8.0`, `net9.0`, and `net10.0`. It uses Microsoft Agent Framework 1.23.0 and GitHub Copilot SDK 1.0.14. Its release lifecycle is independent of the Squad CLI and TypeScript SDK npm packages.
 
 ## What it does
 
@@ -18,10 +18,10 @@ Repository: <https://github.com/bradygaster/squad>
 ## Install
 
 ```bash
-dotnet add package Squad.Agents.AI --version 1.0.0
+dotnet add package Squad.Agents.AI --version 1.0.0 --source https://packagefeedproxy.microsoft.io/nuget/v3/index.json
 ```
 
-If you are consuming the PR before publish, pack it locally and add the generated package source:
+For development against an unpublished source change, you can instead pack locally and use the generated package source:
 
 ```bash
 dotnet pack src/Squad.Agents.AI/Squad.Agents.AI.csproj -c Release -o nupkgs
@@ -65,6 +65,19 @@ var session = await squad.CreateSessionAsync();
 var response = await squad.RunAsync("What can this Squad team do?", session);
 Console.WriteLine(response.Text);
 ```
+
+### Team root configuration
+
+When resolving an agent from DI, set `SquadAgentOptions.SquadFolderPath` through
+the registration callback or a connection string. Resolving an agent with a null,
+empty, or whitespace-only value throws `ArgumentException`. If constructing the
+agent directly, pass the team root to `new SquadAgent(teamRoot, options)`.
+
+Use the directory containing `.squad/`, not the `.squad/` directory itself.
+`Cwd` overrides the CLI working directory but does not replace the required
+`SquadFolderPath` value. Squad does not validate that the folder exists; validate
+deployment paths yourself. These .NET options are separate from the TypeScript
+SDK's `SquadDirConfig` and typed team configuration.
 
 ## Streaming
 
@@ -324,7 +337,7 @@ not prove that subagents were dispatched; inspect the captured events and spans.
 |---|---|---|
 | `GitHub Copilot CLI was not found on PATH` | `copilot` binary is missing or not on `PATH` | Install from [github.com/github/copilot-cli](https://github.com/github/copilot-cli); verify with `copilot --version` |
 | `Authentication failed` / `401` | Copilot CLI is not signed in | Run `gh auth login` or `copilot auth login` |
-| `SquadFolderPath does not exist` | `SQUAD_TEAM_ROOT` points to a non-existent path | Set `SQUAD_TEAM_ROOT` to an initialized Squad team directory |
+| `SquadAgentOptions.SquadFolderPath must be set` | DI options do not contain a team root | Set `SquadFolderPath` in the registration callback or provide a connection string; validate that the directory exists separately |
 | `The system cannot find the file specified` (Win32Exception) | Copilot CLI not found | Same as first row above |
 | Build error: `Package Squad.Agents.AI not found` | Sample uses a project reference; ensure you run from the repo root | Run `dotnet build` from the repository root or pass `--project src/Squad.Agents.AI/samples/Squad.Agents.AI.Sample/` |
 

@@ -331,7 +331,7 @@ If you import Squad as a library, the package name and API have changed.
 npm install @bradygaster/squad
 
 # NEW
-npm install @bradygaster/squad-sdk
+npm install @bradygaster/squad-sdk --registry=https://packagefeedproxy.microsoft.io/npm/
 ```
 
 ### Import Change
@@ -340,15 +340,24 @@ npm install @bradygaster/squad-sdk
 // OLD
 import { Squad } from '@bradygaster/squad';
 
-// NEW
-import { Squad } from '@bradygaster/squad-sdk';
+// NEW: choose the current public API for your integration
+import { defineSquad, defineTeam } from '@bradygaster/squad-sdk';
+
+export default defineSquad({
+  team: defineTeam({ name: 'My Squad', members: [] }),
+  agents: [],
+});
 ```
 
 ### API Notes
 
 - The SDK is now fully typed (TypeScript strict mode).
-- Some methods were renamed or reorganized. Check the [SDK documentation](../reference/sdk.md) for the current API surface.
+- The current package does not export a `Squad` class. Updating the package name alone is not a migration of an older `Squad` integration; adapt calls manually to the documented [SDK APIs](../reference/sdk.md).
 - If you were relying on internal/undocumented APIs, those have changed. Stick to the documented public API.
+- `defineSquad()` requires `team` metadata (`name` and `members`) and `agents`. `defineConfig()` is a different helper that fills defaults, including a default team. These requirements already existed in v0.13.1; they are not newly introduced by 1.0.0.
+- `SquadDirConfig` is the separate `.squad/config.json` directory-linkage contract. Typed objects require numeric `version`, string `teamRoot`, and `projectKey` (`string` or `null`); `loadDirConfig()` normalizes missing `projectKey` to `null`. Do not confuse this file with a typed team configuration. See [required settings](../reference/sdk.md#required-team-and-directory-settings).
+- **v0.13.1 → v1.0.0 source compatibility:** `ResolvedSquadPaths` adds the required `teamSquadDir` property. If your code constructs typed objects or test doubles, add this path manually. In local mode it equals `projectDir`; for linked teams it is the actual squad directory, regardless of whether `teamRoot` names the repository or its `.squad/` directory. Use it for team-state paths rather than blindly appending `.squad/` to `teamDir`. SDK-produced resolved paths include the field automatically.
+- Back up custom configuration before migrating, update imports and object shapes, then type-check and test your integration. `squad upgrade` refreshes installed Squad files; it does not rewrite your application's SDK calls or test fixtures.
 
 ---
 

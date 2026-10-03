@@ -1,10 +1,25 @@
 # What's New
 
-Full release history for Squad — from beta through the v1 TypeScript replatform. Jump to the version you're looking for, or read top-down to see how the project evolved.
+Release highlights for Squad — from beta through the v1 TypeScript replatform. For the complete release history, see the [repository changelog](https://github.com/bradygaster/squad/blob/main/CHANGELOG.md).
 
 ---
 
-## v0.9.1 — Current Release
+## v1.0.1 — Planned patch (unreleased)
+
+- **Health routing validation** — The merged [#2165 fix](https://github.com/bradygaster/squad/pull/2165) lets `squad health` accept registered `persistent_name` values such as `Frontend Lead`, as well as registry IDs. Unknown routing references still fail validation.
+- **Availability** — This fix is merged into `dev`, but v1.0.1 is not released. Published v1.0.0 does not include it. Keep installation and `SQUAD_CLI_VERSION` activation pins on a published release; do not pin them to v1.0.1 yet.
+
+## v1.0.0 — Current release
+
+The [v1.0.0 release](https://github.com/bradygaster/squad/releases/tag/v1.0.0) is available. The Squad CLI and SDK npm packages graduate to stable 1.0.0. This is a stabilization release, not a guarantee that every older SDK integration is source-compatible.
+
+- **Documentation status** — Removed the blanket alpha disclaimer. Feature-specific limitations and preview/insider channel warnings still apply.
+- **SDK dependency floor** — The CLI now declares `@bradygaster/squad-sdk >=1.0.0`.
+- **SDK migration** — `ResolvedSquadPaths` adds required `teamSquadDir`; consumers constructing typed objects or test doubles must supply it. Team metadata and `SquadDirConfig` requirements already existed in v0.13.1. Older package/API migrations still require manual application changes; see [SDK migration notes](get-started/migration.md#api-notes).
+- **Standalone installation** — GitHub release archives include all six supported platform/architecture bundles and `SHA256SUMS.txt`. See [Standalone Install](features/standalone-install.md) for installation and package-manager availability.
+- **Independent package versions** — `Squad.Agents.AI` reached NuGet 1.0.0 separately; the CLI/SDK milestone does not change its versioning policy.
+
+## v0.9.1
 
 - **Shell agent name extraction** — Robust multi-pattern fallback for extracting agent names from shell transcripts (#577)
 - **Init scaffolding** — `squad init --sdk` now scaffolds typed casting files; silences remote-lookup warnings (#579)

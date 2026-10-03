@@ -73,6 +73,26 @@ The configuration schema includes:
 - `models`: default model, default tier, tier lists, agent overrides, task mappings, and cost policy.
 - `hooks`, `ceremonies`, and `plugins`: optional team capabilities.
 
+### Required team and directory settings
+
+These are distinct contracts, not interchangeable configuration files:
+
+| Contract | Required settings | Default or validation behavior |
+|---|---|---|
+| `defineSquad(config)` / `SquadSDKConfig` builders | `team` with a non-empty `name` and a `members` array; an `agents` array | Builders validate the team and each agent. Empty arrays are allowed. |
+| `SquadConfig` from `config/schema` | `version`, `team.name`, `routing.rules`, `models.default`, and `agents` | `defineConfig()` accepts a partial configuration and fills defaults, including a default team. The schema's `validateConfig()` checks a complete object. |
+| `SquadDirConfig` / `loadDirConfig(squadDir)` | The TypeScript type requires numeric `version`, string `teamRoot`, and `projectKey` (`string` or `null`) | Reads `.squad/config.json`. The loader requires numeric `version` and string `teamRoot`; it normalizes an absent or non-string `projectKey` to `null`. Missing, malformed, or incompatible input returns `null`. |
+
+`SquadDirConfig` describes directory linkage, not the team roster or the
+`squad.config.ts` builder schema. Do not add a `team` object to `.squad/config.json`
+just to satisfy a builder type. A `teamRoot` can identify either the team repository
+or its `.squad/` directory; the resolved `ResolvedSquadPaths.teamSquadDir` identifies
+the directory containing `team.md`, `agents/`, and `casting/`.
+
+These team and `SquadDirConfig` requirements already existed in v0.13.1.
+For older integrations and hand-built resolved-path objects, see the
+[manual SDK migration notes](../get-started/migration.md#api-notes).
+
 ### `loadConfig(squadPath)` and `loadConfigSync(squadPath)`
 
 Load and validate Squad configuration asynchronously or synchronously.

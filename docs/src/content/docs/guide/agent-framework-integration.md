@@ -3,7 +3,7 @@ title: "Microsoft Agent Framework integration"
 description: "Expose any Squad team as a MAF AIAgent for durable .NET workflows, Aspire dashboard observability, and multi-model composition."
 ---
 
-`Squad.Agents.AI` **1.0.0** is the stable package version for .NET 8, 9, and 10. Source versioning is separate from publication; until 1.0.0 is available on NuGet, follow the [local package instructions](https://github.com/bradygaster/squad/blob/dev/src/Squad.Agents.AI/README.md#install).
+`Squad.Agents.AI` **1.0.0** is published as a NuGet package for .NET 8, 9, and 10. Its release lifecycle is independent of the Squad CLI and TypeScript SDK npm packages. Use the install command below; [local packaging](https://github.com/bradygaster/squad/blob/main/src/Squad.Agents.AI/README.md#install) is an alternative for testing unpublished source changes.
 
 `Squad.Agents.AI` exposes any Squad team as a Microsoft Agent Framework (MAF) `AIAgent`. Once registered, a `SquadAgent` participates in durable workflows alongside Azure OpenAI, Anthropic, and every other MAF provider — with DTS checkpointing, Aspire dashboard observability, and streaming out of the box.
 
@@ -35,7 +35,7 @@ Authentication uses the signed-in GitHub Copilot CLI user by default. No separat
 ## Install
 
 ```bash
-dotnet add package Squad.Agents.AI --version 1.0.0
+dotnet add package Squad.Agents.AI --version 1.0.0 --source https://packagefeedproxy.microsoft.io/nuget/v3/index.json
 ```
 
 Minimum version for Aspire dashboard observability: **0.5.1**. Stable package version: **1.0.0**.
@@ -75,6 +75,14 @@ builder.Services.AddSquadAgent(o =>
 ```
 
 `AddSquadAgent` registers both `SquadAgent` and the base `AIAgent` with scoped lifetime. Inject either type.
+
+Set `SquadFolderPath` through the callback or a connection string before resolving
+the agent from DI. A null, empty, or whitespace-only value throws
+`ArgumentException`. The path is the team root **containing** `.squad/`, not
+`.squad/` itself. `Cwd` can override the CLI working directory but does not replace
+this required option. Squad does not check that the folder exists; validate your
+deployment paths yourself. For direct construction, use
+`new SquadAgent(teamRoot, options)`.
 
 ### Multiple teams (keyed DI, .NET 8+)
 
@@ -228,8 +236,8 @@ The Copilot CLI runs as a subprocess. It must be present in the deployment envir
 | `InvalidOperationException: Copilot runtime not found` | Native CLI binary not in output; old package version | Upgrade to `Squad.Agents.AI` version 0.5.6-rc1 or later; if still failing, add direct `GitHub.Copilot.SDK` reference |
 | `GitHub Copilot CLI was not found on PATH` | `copilot` binary missing | Install from [github.com/github/copilot-cli](https://github.com/github/copilot-cli) and verify with `copilot --version` |
 | `Authentication failed` / `401` | CLI not signed in | Run `gh auth login` or `copilot auth login` |
-| `SquadFolderPath does not exist` | Path does not point to an initialized team root | Run `squad init` in the target directory |
-| `Package Squad.Agents.AI not found` | Package not yet published; using local build | Pack locally: `dotnet pack src/Squad.Agents.AI/ -c Release -o nupkgs` and add `--source ./nupkgs` |
+| `SquadAgentOptions.SquadFolderPath must be set` | DI options do not contain a team root | Set `SquadFolderPath` in the registration callback or provide a connection string; validate that the directory exists separately |
+| `Package Squad.Agents.AI not found` | Configured NuGet sources cannot resolve the published package | Check that the Microsoft CFS feed (`https://packagefeedproxy.microsoft.io/nuget/v3/index.json`) is enabled and reachable, including package-source mapping. For an unpublished source change, use the local packaging instructions linked above. |
 
 ---
 

@@ -6,7 +6,7 @@ All notable changes to this project will be documented in this file.
 
 ## [1.0.0] - 2026-10-02
 
-Squad CLI and SDK (the `@bradygaster/squad-cli` and `@bradygaster/squad-sdk` npm packages) graduate to 1.0.0. This is a stabilization release: there are no breaking API or command changes from 0.13.1. It marks the npm packages as stable per the project's independent per-package versioning policy (distinct from the already-stable `Squad.Agents.AI` NuGet package, which reached 1.0.0 separately in #2143).
+Squad CLI and SDK (the `@bradygaster/squad-cli` and `@bradygaster/squad-sdk` npm packages) graduate to 1.0.0. This is a stabilization release. One SDK source-compatibility caveat applies when upgrading from 0.13.1: `ResolvedSquadPaths` adds required `teamSquadDir`, so consumers constructing typed objects or test doubles must supply it; SDK-produced paths include it automatically. See the [manual SDK migration notes](docs/src/content/docs/get-started/migration.md#api-notes). It marks the npm packages as stable per the project's independent per-package versioning policy (distinct from the already-stable `Squad.Agents.AI` NuGet package, which reached 1.0.0 separately in #2143).
 
 ### Changed
 
