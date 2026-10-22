@@ -7,7 +7,7 @@
  * cycle detection, soft failure for missing/stale/unavailable sources, and no network I/O.
  */
 
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -22,6 +22,8 @@ import {
 import { ToolRegistry } from '../packages/squad-sdk/src/tools/index.js';
 import { createStateMcpSession } from '../packages/squad-cli/src/cli/commands/state-mcp.js';
 import { checkUpstreams } from '../packages/squad-cli/src/cli/commands/doctor.js';
+import { runUpgrade } from '../packages/squad-cli/src/cli/core/upgrade.js';
+import { runInit } from '../packages/squad-cli/src/cli/core/init.js';
 import { clearResolveSquadCache } from '../packages/squad-sdk/src/resolution.js';
 
 let tmp: string;
@@ -254,8 +256,75 @@ describe('squad_state_upstreams: the bridge hosts call at session start', () => 
   });
 });
 
-describe('squad doctor: upstream inheritance check', () => {
-  it('passes when every upstream resolves, warns on stale, fails with the diagnostics when one cannot be read, and is absent without upstream.json', () => {
+describe('resolveUpstreams: restart, monorepo and upgrade stability', () => {
+  it('is deterministic across repeated resolutions (a restarted session sees the identical order, provenance and statuses)', () => {
+    const org = squad(path.join(tmp, 'org'), { skills: { a: '1', b: '2' }, decisions: '# org\n' });
+    const team = squad(path.join(tmp, 'team'), { skills: { b: '3' }, upstreams: [local('org', path.dirname(org)), local('gone', path.join(tmp, 'nope'))] });
+    const repo = squad(path.join(tmp, 'repo'), { upstreams: [local('team', path.dirname(team)), local('org', path.dirname(org))] });
+    const now = new Date('2026-10-22T00:00:00Z');
+    const first = resolveUpstreams(repo, undefined, { now })!;
+    const second = resolveUpstreams(repo, undefined, { now })!;
+    expect(JSON.stringify(second)).toBe(JSON.stringify(first));
+    expect(first.upstreams.map((u) => `${u.name}:${u.status}:${u.depth}`)).toEqual(['team:ok:1', 'org:ok:2', 'gone:missing:2']);
+    const eff1 = formatUpstreamReport(first, buildEffectiveUpstreamContext(first, []), { detail: true });
+    const eff2 = formatUpstreamReport(second, buildEffectiveUpstreamContext(second, []), { detail: true });
+    expect(eff2).toBe(eff1);
+  });
+
+  it('state-mcp launched from a monorepo subfolder resolves the root upstream.json', async () => {
+    const org = squad(path.join(tmp, 'org'), { decisions: '# org\n\n### Root-level rule\n' });
+    const repo = path.join(tmp, 'mono');
+    squad(repo, { decisions: '# mono\n', upstreams: [local('org', path.dirname(org))] });
+    fs.writeFileSync(path.join(repo, '.squad', 'config.json'), JSON.stringify({ version: 1 }));
+    const sub = path.join(repo, 'packages', 'api');
+    fs.mkdirSync(sub, { recursive: true });
+    clearResolveSquadCache();
+    const out: Array<{ id: unknown; result?: any; error?: unknown }> = [];
+    const session = createStateMcpSession(sub, (m) => out.push(m as never));
+    await session.handleRequest({ jsonrpc: '2.0', id: 1, method: 'tools/call', params: { name: 'squad_state_upstreams', arguments: { detail: true } } });
+    const text: string = out[0]!.result.content[0].text;
+    expect(out[0]!.result.isError).not.toBe(true);
+    expect(text, 'root upstream.json applies from a subfolder').toContain('upstream:org@local');
+    expect(text).toContain('Root-level rule');
+    expect(fs.existsSync(path.join(sub, '.squad')), 'no stray .squad under the subfolder').toBe(false);
+    clearResolveSquadCache();
+  });
+
+  it('squad upgrade leaves upstream.json and the synced clone untouched, and the resolution is identical afterwards', async () => {
+    const project = path.join(tmp, 'project');
+    fs.mkdirSync(project, { recursive: true });
+    const silence = [vi.spyOn(console, 'log').mockImplementation(() => {}), vi.spyOn(console, 'warn').mockImplementation(() => {}), vi.spyOn(console, 'error').mockImplementation(() => {})];
+    try {
+      vi.stubEnv('SQUAD_INIT_NO_COLOR', '1');
+      await runInit(project);
+      clearResolveSquadCache();
+      const sq = path.join(project, '.squad');
+      const org = squad(path.join(tmp, 'org'), { decisions: '# org\n' });
+      squad(path.join(sq, '_upstream_repos', 'platform'), { decisions: '# platform\n' });
+      fs.writeFileSync(path.join(sq, 'upstream.json'), JSON.stringify({ upstreams: [
+        local('org', path.dirname(org)),
+        { name: 'platform', type: 'git', source: 'https://example.invalid/p.git', ref: 'main', added_at: '2026-10-01T00:00:00.000Z', last_synced: '2026-10-20T00:00:00.000Z' },
+      ] }, null, 2));
+      const upstreamJsonBefore = fs.readFileSync(path.join(sq, 'upstream.json'), 'utf8');
+      const cloneBefore = fs.readFileSync(path.join(sq, '_upstream_repos', 'platform', '.squad', 'decisions.md'), 'utf8');
+      const now = new Date('2026-10-22T00:00:00Z');
+      const before = JSON.stringify(resolveUpstreams(sq, undefined, { now }));
+
+      await runUpgrade(project, { force: true });
+
+      expect(fs.readFileSync(path.join(sq, 'upstream.json'), 'utf8'), 'upgrade must not rewrite upstream.json').toBe(upstreamJsonBefore);
+      expect(fs.readFileSync(path.join(sq, '_upstream_repos', 'platform', '.squad', 'decisions.md'), 'utf8'), 'upgrade must not touch synced clones').toBe(cloneBefore);
+      expect(JSON.stringify(resolveUpstreams(sq, undefined, { now })), 'resolution identical after upgrade').toBe(before);
+      expect(resolveUpstreams(sq, undefined, { now })!.upstreams.map((u) => `${u.name}:${u.status}`)).toEqual(['org:ok', 'platform:ok']);
+    } finally {
+      for (const s of silence) s.mockRestore();
+      vi.unstubAllEnvs();
+      clearResolveSquadCache();
+    }
+  }, 120_000);
+});
+
+describe('squad doctor: upstream inheritance check', () => {  it('passes when every upstream resolves, warns on stale, fails with the diagnostics when one cannot be read, and is absent without upstream.json', () => {
     const org = squad(path.join(tmp, 'org'), { decisions: '# org\n' });
     const plain = squad(path.join(tmp, 'plain'));
     expect(checkUpstreams(plain)).toBeUndefined();
