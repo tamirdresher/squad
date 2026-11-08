@@ -108,6 +108,78 @@ contain `defaultProvider: "copilot"` for forward compatibility, but status repor
 configured and unavailable, and governed reads/writes fail closed until a real callable API
 exists.
 
+### Optional registered providers and lifecycle exclusion
+
+SDK hosts can opt into generic `MemoryProvider` instances through
+`LocalMemoryStore`'s `registeredProviders` option, or the seventh trailing
+`ToolRegistry` constructor argument for the existing memory tools. No external
+provider is registered by default.
+
+#### Native optional project discovery
+
+Ordinary SDK stores, CLI memory commands, and the stock `squad state-mcp`
+memory tools also discover opt-in providers from the resolved team's
+`.squad/config.json`. No custom MCP bridge or trailing registry argument is
+needed:
+
+```json
+{
+  "memory": {
+    "providers": [{
+      "module": ".squad/providers/example.mjs",
+      "trusted": true,
+      "options": { "scope": "example-project" }
+    }]
+  }
+}
+```
+
+The compiled local JavaScript module must export
+`createMemoryProvider({ projectRoot, squadRoot, options })`, returning a valid
+`MemoryProvider` (or a promise). Provider namespaces must be unique, and the
+built-in `local`, `copilot`, and `hostInjectedCopilotAdapter` IDs are reserved.
+Relative module paths resolve from the parent of the resolved `.squad` directory.
+Contained absolute paths work; URLs, external paths, symlink/junction escapes,
+and uncompiled TypeScript do not. Validate and review the module and its imports:
+`trusted: true` explicitly authorizes privileged project code, **not a sandbox**.
+Options are factory-specific; never put credentials in committed config.
+
+Discovery runs once per store; restart the MCP/store process after changing its
+configuration. Absent/empty provider config retains existing behavior. Malformed
+configuration, missing/invalid factories, or duplicate IDs fail explicitly and
+are audited rather than silently disabling discovery. This mechanism currently
+uses `.squad/config.json`, not executable `squad.config.ts` discovery.
+
+Registered-provider writes receive the already-persisted local UUID as generic
+`sourceId`. Factories can derive a stable, namespaced replica key and configure
+their scope without adding provider-specific fields to stock tools. Provider
+acknowledgements still bind the actual returned replica ID. Failed replication
+preserves the local write but reports an explicit partial-success/error result
+from `memory.write`/`memory.promote`; consult `memory.audit`.
+
+After an acknowledged provider write, the local index persists the exact
+provider ID and replica ID. Federated search excludes that replica after local
+deletion or supersession, including after restart. A durable deletion tombstone
+also excludes it if later index persistence failed. This is an identity-based
+exclusion scoped to the local `.squad` root, not text-based filtering or global
+revocation. Unrelated remote-only records remain searchable. Provider IDs must
+be unique within a store and stable for the same logical namespace; intentional
+replacement of a retired replica requires a new reviewed ID.
+
+Generic deletion/promotion does not delete or retire external data, propagate
+exclusions to other roots, or atomically update local and remote state. Entries
+written before replica bindings existed, and unacknowledged writes, cannot gain
+this protection automatically. Provider failures retain existing audit and
+local-first behavior. History and external copies are not securely erased.
+
+The optional [Dolt memory experiment](https://github.com/tamirdresher/squad-memory-dolt-poc) tests deliberately stale
+provider candidates against actual `memory.search` model-facing output, disk
+restart and two local Dolt clones. It also explicitly feeds the filtered output
+to the existing charter compiler. There is no automatic retrieval-to-system-prompt
+pipeline: direct provider access, manually supplied decisions and cached prompts
+remain the host's responsibility. The sample is not a production deployment or
+validation of hosted sharing.
+
 ---
 
 ## Personal Memory: `history.md`

@@ -4,8 +4,10 @@
  */
 
 import type { CostPolicyConfig } from './models.js';
+import type { MemoryProviderModuleConfig } from '../memory/discovery.js';
 
 export interface SquadConfig {
+  memory?: { providers?: MemoryProviderModuleConfig[] };
   version: string;
   team: TeamConfig;
   routing: RoutingConfig;

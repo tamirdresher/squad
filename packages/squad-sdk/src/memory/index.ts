@@ -1,6 +1,8 @@
 import path from 'node:path';
 import { randomUUID } from 'node:crypto';
 import type { StorageProvider } from '../storage/storage-provider.js';
+import { discoverMemoryProviders } from './discovery.js';
+export type { MemoryProviderModuleConfig, MemoryProviderFactoryContext } from './discovery.js';
 
 export type MemoryClass =
   | 'TRANSIENT'
@@ -53,6 +55,8 @@ export interface MemoryWriteResult {
   id?: string;
   classification: MemoryClassification;
   path?: string;
+  /** Local persistence succeeded, but these external replicas failed; inspect the audit for details. */
+  providerErrors?: string[];
 }
 
 export interface MemorySearchResult {
@@ -79,6 +83,8 @@ export interface MemoryAuditRecord {
 }
 
 export interface CopilotMemoryProviderWriteRequest {
+  /** Stable identity of the already-persisted local entry, supplied for registered-provider writes. */
+  sourceId?: string;
   content: string;
   title: string;
   author?: string;
@@ -336,6 +342,8 @@ interface MemoryIndexEntry {
   createdAt: string;
   updatedAt: string;
   deletedAt?: string;
+  /** Exact acknowledged replica identities, scoped by this store's .squad root. */
+  replicas?: Array<{ provider: string; id: string }>;
 }
 
 const DEFAULT_CONFIG: MemoryGovernanceConfig = {
@@ -559,7 +567,10 @@ export class LocalMemoryStore {
     this.copilotProvider = new HostInjectedCopilotMemoryAdapter(
       options.hostInjectedCopilotAdapterClient ?? options.copilotMemoryClient,
     );
-    this.registeredProviders = options.registeredProviders ?? [];
+    this.registeredProviders = [...(options.registeredProviders ?? [])];
+    if (new Set(this.registeredProviders.map(provider => provider.id)).size !== this.registeredProviders.length) {
+      throw new Error('Registered memory provider ids must be unique within a store');
+    }
   }
 
   /**
@@ -826,16 +837,29 @@ export class LocalMemoryStore {
     // Governance classification has already run; FORBIDDEN and TRANSIENT never
     // reach this point. Providers receive only safe, non-copilot content.
     const providerWriteRequest: CopilotMemoryProviderWriteRequest = {
+      sourceId: id,
       content: request.content.trim(),
       title,
       author: request.author,
       metadata: request.metadata,
       classification,
     };
+    const providerErrors: string[] = [];
     for (const provider of this.registeredProviders) {
       if (!provider.supportedClasses.includes(classification.class)) continue;
       try {
         const providerResult = await provider.write(providerWriteRequest);
+        if (!providerResult || typeof providerResult.id !== 'string' || !providerResult.id.trim()) {
+          throw new Error('Memory provider write must acknowledge a nonempty replica ID');
+        }
+        await this.withIndexLock(async () => {
+          const nextIndex = await this.readIndex();
+          const local = nextIndex.find(item => item.id === id);
+          if (!local) throw new Error('Local memory disappeared before replica identity was recorded');
+          local.replicas ??= [];
+          local.replicas.push({ provider: provider.id, id: providerResult.id });
+          await this.writeIndex(nextIndex);
+        });
         await this.audit({
           action: 'write',
           id: providerResult.id,
@@ -846,6 +870,7 @@ export class LocalMemoryStore {
           actor: request.author,
         });
       } catch (error) {
+        providerErrors.push(provider.id);
         await this.audit({
           action: 'provider-error',
           class: classification.class,
@@ -857,7 +882,8 @@ export class LocalMemoryStore {
       }
     }
 
-    return { stored: true, id, classification, path: entry.path };
+    return { stored: true, id, classification, path: entry.path,
+      ...(providerErrors.length ? { providerErrors } : {}) };
   }
 
   async search(query: string): Promise<MemorySearchResult[]> {
@@ -887,8 +913,21 @@ export class LocalMemoryStore {
 
     const normalized = query.toLowerCase();
     const index = await this.readIndex();
+    const retiredLocalIds = new Set<string>();
+    const excludedReplicas = new Map<string, Set<string>>();
+    for (const entry of index) {
+      const retired = entry.status !== 'active'
+        || await this.storage.exists(path.join(this.squadDir, 'memory', 'tombstones', `${entry.id}.json`));
+      if (!retired) continue;
+      retiredLocalIds.add(entry.id);
+      for (const replica of entry.replicas ?? []) {
+        const ids = excludedReplicas.get(replica.provider) ?? new Set<string>();
+        ids.add(replica.id);
+        excludedReplicas.set(replica.provider, ids);
+      }
+    }
     const results: MemorySearchResult[] = [];
-    for (const entry of index.filter(item => item.status === 'active')) {
+    for (const entry of index.filter(item => item.status === 'active' && !retiredLocalIds.has(item.id))) {
       if (
         entry.class === 'COPILOT_MEMORY'
         || entry.path.startsWith('copilot-memory:')
@@ -911,7 +950,7 @@ export class LocalMemoryStore {
     }
     if (isHostInjectedCopilotAdapterConfigured(config)) {
       const activeCopilotIds = new Set(index
-        .filter(item => item.status === 'active' && item.class === 'COPILOT_MEMORY')
+        .filter(item => item.status === 'active' && !retiredLocalIds.has(item.id) && item.class === 'COPILOT_MEMORY')
         .map(item => item.id));
       const externalResults = await this.copilotProvider.search(query);
       for (const result of externalResults) {
@@ -935,6 +974,7 @@ export class LocalMemoryStore {
       try {
         const providerResults = await provider.search(query);
         for (const result of providerResults) {
+          if (excludedReplicas.get(provider.id)?.has(result.id)) continue;
           if (seenIds.has(result.id)) continue;
           seenIds.add(result.id);
           results.push({
@@ -1187,6 +1227,8 @@ export class LocalMemoryStore {
       .map(line => JSON.parse(line) as MemoryAuditRecord);
   }
 
+  private discovery: Promise<void> | undefined;
+
   private async ensureInitialized(): Promise<void> {
     const memoryDir = path.join(this.squadDir, 'memory');
     for (const dir of ['local', 'policy-inbox', 'semantic-inbox', 'tombstones']) {
@@ -1203,6 +1245,23 @@ export class LocalMemoryStore {
     const auditPath = path.join(memoryDir, 'audit.jsonl');
     if (!await this.storage.exists(auditPath)) {
       await this.storage.write(auditPath, '');
+    }
+    this.discovery ??= this.initializeDiscoveredProviders();
+    await this.discovery;
+  }
+
+  private async initializeDiscoveredProviders(): Promise<void> {
+    try {
+      const discovered = await discoverMemoryProviders(this.storage, this.squadDir,
+        this.registeredProviders.map(provider => provider.id));
+      this.registeredProviders.push(...discovered.map(entry => entry.provider));
+      for (const entry of discovered) {
+        await this.audit({ action: 'configure', provider: entry.provider.id,
+          path: entry.module, reason: 'Loaded explicitly trusted project memory provider factory' });
+      }
+    } catch (error) {
+      await this.audit({ action: 'provider-error', reason: 'Trusted project memory provider discovery failed' });
+      throw error;
     }
   }
 

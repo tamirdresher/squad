@@ -13,6 +13,7 @@ import { FSStorageProvider } from '../storage/fs-storage-provider.js';
 import { MODELS } from './constants.js';
 import type { AgentRole } from './constants.js';
 import { MODEL_CATALOG } from '../config/models.js';
+import type { MemoryProviderModuleConfig } from '../memory/discovery.js';
 
 const storage = new FSStorageProvider();
 
@@ -291,6 +292,7 @@ export interface PlatformOverrides {
  * Root Squad configuration object.
  */
 export interface SquadConfig {
+  memory?: { providers?: MemoryProviderModuleConfig[] };
   /** Config schema version */
   version: string;
   

@@ -19,7 +19,7 @@ import { FSStorageProvider } from '../storage/fs-storage-provider.js';
 import type { SquadState } from '../state/squad-state.js';
 import { validateStateKey } from '../state-backend.js';
 import { spawnParallel, type FanOutDependencies } from '../coordinator/fan-out.js';
-import { LocalMemoryStore, type CopilotMemoryProviderClient, type MemoryClass } from '../memory/index.js';
+import { LocalMemoryStore, type CopilotMemoryProviderClient, type MemoryClass, type MemoryProvider } from '../memory/index.js';
 
 const tracer = trace.getTracer('squad-sdk');
 
@@ -298,6 +298,7 @@ export class ToolRegistry {
     state?: SquadState,
     fanOutDepsGetter?: () => FanOutDependencies | undefined,
     hostInjectedCopilotAdapterClient?: CopilotMemoryProviderClient,
+    registeredMemoryProviders?: MemoryProvider[],
   ) {
     this.squadRoot = squadRoot;
     this.sessionPoolGetter = sessionPoolGetter;
@@ -307,6 +308,7 @@ export class ToolRegistry {
     this.memoryStore = new LocalMemoryStore(storage, squadRoot, {
       rootKind: 'squad',
       hostInjectedCopilotAdapterClient,
+      registeredProviders: registeredMemoryProviders,
     });
     this.registerSquadTools();
   }
@@ -886,15 +888,18 @@ export class ToolRegistry {
           approved: args.approved,
         });
         return {
-          textResultForLlm: result.stored
+          textResultForLlm: result.providerErrors?.length
+            ? `Stored local memory ${result.id}; external replication failed for ${result.providerErrors.join(', ')}. Inspect memory.audit.`
+            : result.stored
             ? `Stored ${result.classification.class} memory ${result.id} at ${result.path}`
             : `Rejected ${result.classification.class} memory: ${result.classification.reason}`,
-          resultType: result.stored ? 'success' : 'failure',
+          resultType: result.stored && !result.providerErrors?.length ? 'success' : 'failure',
           toolTelemetry: {
             id: result.id,
             class: result.classification.class,
             path: result.path,
             stored: result.stored,
+            ...(result.providerErrors?.length ? { providerErrors: result.providerErrors } : {}),
           },
         };
       },
@@ -947,10 +952,12 @@ export class ToolRegistry {
       handler: async (args) => {
         const result = await this.memoryStore.promote(args.id, args.targetClass, args.actor);
         return {
-          textResultForLlm: result.stored
+          textResultForLlm: result.providerErrors?.length
+            ? `Promoted locally as ${result.id}; external replication failed for ${result.providerErrors.join(', ')}. Inspect memory.audit.`
+            : result.stored
             ? `Promoted memory ${args.id} to ${args.targetClass} as ${result.id}`
             : `Promotion rejected: ${result.classification.reason}`,
-          resultType: result.stored ? 'success' : 'failure',
+          resultType: result.stored && !result.providerErrors?.length ? 'success' : 'failure',
           toolTelemetry: { sourceId: args.id, targetId: result.id, stored: result.stored },
         };
       },
