@@ -1575,7 +1575,7 @@ function normalizeBackendType(type: string): StateBackendType {
         "'squad-state' orphan branch in your repository. " +
         "To suppress this warning, update .squad/config.json: " +
         "set \"stateBackend\": \"two-layer\". " +
-        "See https://github.com/bradygaster/squad/blob/dev/docs/state-backends.md for upgrade instructions."
+        "See https://github.com/github/squad/blob/dev/docs/src/content/docs/features/state-backends.md for upgrade instructions."
       );
     }
     return 'two-layer';

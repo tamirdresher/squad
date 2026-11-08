@@ -210,7 +210,7 @@ export async function checkForUpdate(
 
   return {
     newVersion: latest,
-    releaseUrl: `https://github.com/bradygaster/squad/releases/tag/v${latest}`,
+    releaseUrl: `https://github.com/github/squad/releases/tag/v${latest}`,
     changelog: `Update from ${currentVersion} to ${latest}`,
   };
 }

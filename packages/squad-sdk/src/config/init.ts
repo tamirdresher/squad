@@ -1354,7 +1354,7 @@ ${projectDescription ? `- **Description:** ${projectDescription}\n` : ''}- **Cre
           `MANIFEST_SKILL_NAMES references ${missing.length} skill(s) ` +
           `missing from the SDK templates dir (${skillsSrc}): ${missing.join(', ')}. ` +
           `This is a packaging bug — try \`squad upgrade\` or reinstall the SDK; ` +
-          `if it persists, please report it at https://github.com/bradygaster/squad/issues. ` +
+          `if it persists, please report it at https://github.com/github/squad/issues. ` +
           `(Contributors: re-run \`node scripts/sync-templates.mjs --sync\` from the repo root before packaging.)`
         );
       }
