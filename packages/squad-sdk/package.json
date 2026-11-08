@@ -249,7 +249,7 @@
     "node": ">=22.5.0"
   },
   "dependencies": {
-    "@github/copilot-sdk": "^1.0.19",
+    "@github/copilot-sdk": ">=1.0.19 <1.0.29-0",
     "vscode-jsonrpc": "^9.0.3"
   },
   "optionalDependencies": {
