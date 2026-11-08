@@ -6,7 +6,7 @@ This page covers known issues and mitigations when running Squad inside VS Code'
 
 ## Symptom: VS Code closes unexpectedly during Squad execution
 
-**Reported in:** [Issue #259](https://github.com/bradygaster/squad/issues/259), [Discussion #174](https://github.com/bradygaster/squad/discussions/174)
+**Reported in:** [Issue #259](https://github.com/github/squad/issues/259), [Discussion #174](https://github.com/github/squad/discussions/174)
 
 VS Code (especially Insiders/Nightly builds) may close without a crash dialog while Squad tasks are executing. This is most often caused by resource pressure — not a bug in Squad itself — but Squad's runtime patterns can contribute to the problem.
 
@@ -80,7 +80,7 @@ Squad uses the Ink framework for rendering, which batches React state updates. D
 
 5. **Close unused terminals** in VS Code before starting a Squad session. Each terminal consumes renderer memory.
 
-6. **Disable terminal GPU acceleration** if you see flickering (related: [#254](https://github.com/bradygaster/squad/issues/254)):
+6. **Disable terminal GPU acceleration** if you see flickering (related: [#254](https://github.com/github/squad/issues/254)):
    ```json
    {
      "terminal.integrated.gpuAcceleration": "off"
@@ -100,6 +100,6 @@ Squad uses the Ink framework for rendering, which batches React state updates. D
 
 | Issue | Description | Status |
 |-------|-------------|--------|
-| [#259](https://github.com/bradygaster/squad/issues/259) | VS Code crash during Squad execution | This investigation |
-| [#254](https://github.com/bradygaster/squad/issues/254) | Terminal flicker in VS Code | Open |
-| [Discussion #174](https://github.com/bradygaster/squad/discussions/174) | Original crash report by @diberry | Open |
+| [#259](https://github.com/github/squad/issues/259) | VS Code crash during Squad execution | This investigation |
+| [#254](https://github.com/github/squad/issues/254) | Terminal flicker in VS Code | Open |
+| [Discussion #174](https://github.com/github/squad/discussions/174) | Original crash report by @diberry | Open |

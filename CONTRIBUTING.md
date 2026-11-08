@@ -62,7 +62,7 @@ Each package has independent versioning via changesets. A change to squad-sdk ma
 
 **Step 1: Fork the repo on GitHub**
 
-Go to https://github.com/bradygaster/squad and click "Fork" to create your own copy.
+Go to https://github.com/github/squad and click "Fork" to create your own copy.
 
 **Step 2: Clone your fork**
 
@@ -74,7 +74,7 @@ cd squad
 **Step 3: Add upstream remote**
 
 ```bash
-git remote add upstream git@github.com:bradygaster/squad.git
+git remote add upstream git@github.com:github/squad.git
 ```
 
 **Step 4: Fetch the dev branch**
@@ -187,7 +187,7 @@ The Co-authored-by trailer is **required** for all commits (added by Copilot CLI
 
 1. Add a changeset: `npx changeset add` (required before PR — see Changesets section)
 2. Push your branch: `git push origin {yourusername}/217-readme-help-update`
-3. Create a PR **as a draft**: `gh pr create --draft --base dev --repo bradygaster/squad --head {yourusername}:your-branch`
+3. Create a PR **as a draft**: `gh pr create --draft --base dev --repo github/squad --head {yourusername}:your-branch`
 4. Link the issue: Add `Closes #217` to PR description
 5. Work on your changes until CI passes and you're satisfied
 6. **Mark as "Ready for review"** — this is the handoff signal to the core team (see below)
@@ -390,7 +390,7 @@ CI watches for drift: `scripts/check-changeset-drift.mjs` warns on PRs and fails
 
 - **main** — Stable, published releases. All merges include changesets.
 - **preview** — Staging branch for release candidates (promote: dev → preview → main).
-- **bradygaster/dev** — Integration branch. **All PRs from forks must target this branch**, not `main`.
+- **dev** — Integration branch on `github/squad`. **All PRs from forks must target this branch**, not `main`.
 - **user/issue-slug** — Feature branches from users or agents.
 
 > **Note:** The `insider` npm tag (`@bradygaster/squad-cli@insider`) publishes from `dev` via manual workflow dispatch. There is no separate insider branch.

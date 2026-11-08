@@ -278,7 +278,7 @@ benchmarks/swe-bench/
 
 Squad is a multi-agent orchestration framework that turns AI coding assistants into coordinated engineering teams. Each agent has a persistent identity, charter, and memory — enabling the kind of specialization and institutional knowledge that makes human teams effective.
 
-Learn more at [bradygaster.github.io/squad](https://bradygaster.github.io/squad/).
+Learn more at [bradygaster.github.io/squad](https://github.github.com/squad/).
 
 ---
 

@@ -178,7 +178,7 @@ squad plugin marketplace add github/my-org/my-team-plugins
 
 ## Real examples
 
-- **Client-delivery workflow** ([RFC #328](https://github.com/bradygaster/squad/issues/328)) — discovery, research, multi-round review with evidence gates
+- **Client-delivery workflow** ([RFC #328](https://github.com/github/squad/issues/328)) — discovery, research, multi-round review with evidence gates
 - **Azure infrastructure patterns** — VM provisioning, Cosmos DB design, monitoring rules
 - **Knowledge libraries** — document structured analysis, reference synthesis
 - **External integration samples** — see `samples/plugin-knowledge-graphify` for the real Graphify knowledge graph tool, `samples/plugin-knowledge-index-server` for the real Index Server instruction/knowledge MCP server, and `samples/plugin-memory-mempalace` for the real MemPalace memory CLI/MCP system
@@ -194,4 +194,4 @@ squad plugin marketplace add github/my-org/my-team-plugins
 
 ---
 
-**Ready to share?** [Open a discussion](https://github.com/bradygaster/squad/discussions) in the Squad community.
+**Ready to share?** [Open a discussion](https://github.com/github/squad/discussions) in the Squad community.

@@ -19,13 +19,13 @@ The Insider Program gives you access to cutting-edge features before they ship. 
 
 ### How to Join
 
-Install from the insider branch using the honor system:
+Install the insider build from npm using the honor system:
 
 ```bash
-npx github:bradygaster/squad#insider
+npm install -g @bradygaster/squad-cli@insider
 ```
 
-That's it. You're now on insider builds.
+That's it. You're now on insider builds. For Homebrew and WinGet, see the [Insider Program guide](https://github.github.com/squad/docs/insider-program/).
 
 ### What to Expect
 
@@ -36,7 +36,7 @@ That's it. You're now on insider builds.
 
 ### Report Issues
 
-Found a bug in an insider build? Please [open a GitHub issue](https://github.com/bradygaster/squad/issues) with:
+Found a bug in an insider build? Please [open a GitHub issue](https://github.com/github/squad/issues) with:
 
 - **Version** — The full version string from your `squad.agent.md`
 - **What happened** — Clear description of the bug or unexpected behavior
@@ -130,4 +130,4 @@ These community members shaped Squad through issues, discussions, and feedback. 
 
 Contributing code? See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
 
-Questions? [GitHub Discussions](https://github.com/bradygaster/squad/discussions).
+Questions? [GitHub Discussions](https://github.com/github/squad/discussions).

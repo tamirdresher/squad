@@ -212,7 +212,7 @@ and optional `## Model`, before any `## X-` extensions. Use it for representativ
 requests and expected behavior as quick checks. Structured charter edits preserve
 Examples, but Squad does not run them or treat them as permissions or proof of a
 passing evaluation. They are prompt-visible guidance, not hidden evaluation cases.
-See the [Charter Profile](https://github.com/bradygaster/squad/blob/dev/docs/specification/charter-v0.1.md#71-optional-examples)
+See the [Charter Profile](https://github.com/github/squad/blob/dev/docs/specification/charter-v0.1.md#71-optional-examples)
 for the format and a YAML example.
 
 **@copilot** (🤖) appears on the roster and works via GitHub issue assignment. It reads `.github/copilot-instructions.md` instead of a charter.

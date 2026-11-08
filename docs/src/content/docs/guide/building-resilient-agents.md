@@ -121,5 +121,5 @@ Log state transitions and include the circuit state in agent status or dashboard
 
 ## See also
 
-- [PR #552](https://github.com/bradygaster/squad/pull/552) — Circuit breaker implementation
+- [PR #552](https://github.com/github/squad/pull/552) — Circuit breaker implementation
 - [Failure handling](../reference/tools-and-hooks) — Error boundaries and fallbacks

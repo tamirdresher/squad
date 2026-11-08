@@ -164,5 +164,5 @@ Configured SubSquads
 ## See Also
 
 - [Multi-Codespace Setup](multi-codespace.md) — Walkthrough of the Tetris experiment
-- [SubSquads PRD](https://github.com/bradygaster/squad/blob/main/docs/_internal/specs/streams-prd.md) — Full specification
+- [SubSquads PRD](https://github.com/github/squad/blob/main/docs/_internal/specs/streams-prd.md) — Full specification
 - [SubSquads Feature Guide](../features/streams.md) — API reference

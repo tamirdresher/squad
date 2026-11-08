@@ -12,7 +12,7 @@ squad init --mcp-frontmatter
 
 By default, `squad init` writes MCP server configuration to two places:
 - `.copilot/mcp-config.json` (workspace-level for Copilot CLI)
-- `~/.copilot/mcp-config.json` (user-level, ensures `copilot -p` non-interactive mode also sees the MCP — see [#1247](https://github.com/bradygaster/squad/issues/1247))
+- `~/.copilot/mcp-config.json` (user-level, ensures `copilot -p` non-interactive mode also sees the MCP — see [#1247](https://github.com/github/squad/issues/1247))
 
 The `--mcp-frontmatter` flag changes this: instead of writing JSON config files, MCP server declarations go directly into the YAML frontmatter of `.github/agents/squad.agent.md` (or `.github/agents/squad.md` if you've exported with [Coordinator-as-Agent Export](/squad/docs/features/coordinator-as-agent-export/)).
 
@@ -88,7 +88,7 @@ To switch modes after init, re-run `squad init --mcp-frontmatter` (or run `squad
 
 ## Limitations
 
-- **Less robust for `copilot -p` non-interactive mode.** Standard mode pins MCP at user level too, which solves the workspace-only loading gap (PR [#1251](https://github.com/bradygaster/squad/pull/1251)). Frontmatter mode skips that user-level write — so `copilot -p` may not see the squad MCP unless the harness reads frontmatter directly.
+- **Less robust for `copilot -p` non-interactive mode.** Standard mode pins MCP at user level too, which solves the workspace-only loading gap (PR [#1251](https://github.com/github/squad/pull/1251)). Frontmatter mode skips that user-level write — so `copilot -p` may not see the squad MCP unless the harness reads frontmatter directly.
 - **No second-layer fallback.** If the harness that reads frontmatter MCP fails to load it correctly, there's no `.copilot/mcp-config.json` to fall back to. Test in your specific harness before adopting.
 - **Schema is harness-specific.** The frontmatter `mcpServers` key follows the Copilot CLI convention, but other harnesses may expect different key names (`mcp_servers`, `mcp.servers`, etc.). Check your harness's spec.
 

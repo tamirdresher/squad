@@ -231,7 +231,7 @@ The product goal is simple pluggability: install, enable, refresh, and give agen
 
 See [Plugin security model](../reference/plugin-security.md) for the threat model and the negative checks that gate this feature.
 
-The follow-up roadmap tracks remote marketplace distribution, broader built-in providers, and the trusted executable-provider RFC in [#1102](https://github.com/bradygaster/squad/issues/1102), [#1103](https://github.com/bradygaster/squad/issues/1103), [#1104](https://github.com/bradygaster/squad/issues/1104), and [#1105](https://github.com/bradygaster/squad/issues/1105).
+The follow-up roadmap tracks remote marketplace distribution, broader built-in providers, and the trusted executable-provider RFC in [#1102](https://github.com/github/squad/issues/1102), [#1103](https://github.com/github/squad/issues/1103), [#1104](https://github.com/github/squad/issues/1104), and [#1105](https://github.com/github/squad/issues/1105).
 
 ---
 

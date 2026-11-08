@@ -2,7 +2,7 @@
 
 Build a CLI-wrapped autonomous agent pipeline that picks up tasks, coordinates work across teammates, and runs unattended.
 
-**Try this:** Clone the [autonomous-pipeline sample](https://github.com/bradygaster/squad/tree/dev/samples/autonomous-pipeline) and run `npm run dev` to see the pattern in action.
+**Try this:** Clone the [autonomous-pipeline sample](https://github.com/github/squad/tree/dev/samples/autonomous-pipeline) and run `npm run dev` to see the pattern in action.
 
 This guide walks you through the pattern used by production autonomous agents — like a docs agent that monitors a repo for changes and generates documentation without human intervention.
 
@@ -531,7 +531,7 @@ streaming.clear();
 
 ## Next steps
 
-- Run the [autonomous-pipeline sample](https://github.com/bradygaster/squad/tree/dev/samples/autonomous-pipeline) to see the full pattern with OTel, cost dashboards, and skill matching
+- Run the [autonomous-pipeline sample](https://github.com/github/squad/tree/dev/samples/autonomous-pipeline) to see the full pattern with OTel, cost dashboards, and skill matching
 - Read the [SDK reference](/reference/sdk/) for the complete API surface
 - See the [extensibility guide](/guide/extensibility/) for where your agent fits in the Squad ecosystem
 - Check the [Aspire dashboard scenario](/scenarios/aspire-dashboard/) for observability setup

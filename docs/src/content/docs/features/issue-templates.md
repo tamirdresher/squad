@@ -274,10 +274,10 @@ GitHub supports multiple templates. Create a config file to customize the issue 
 blank_issues_enabled: false
 contact_links:
   - name: Squad Community Discussions
-    url: https://github.com/bradygaster/squad/discussions
+    url: https://github.com/github/squad/discussions
     about: Ask questions or share ideas in Discussions
   - name: Squad Documentation
-    url: https://squad.dev
+    url: https://github.github.com/squad/
     about: Read the full Squad documentation
 ```
 

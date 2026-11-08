@@ -1,6 +1,6 @@
 # Frequently asked questions
 
-Common questions, troubleshooting tips, and clarifications based on community feedback. Can't find your answer? [Open an issue](https://github.com/bradygaster/squad/issues/new).
+Common questions, troubleshooting tips, and clarifications based on community feedback. Can't find your answer? [Open an issue](https://github.com/github/squad/issues/new).
 
 ---
 
@@ -268,9 +268,9 @@ See [Disaster Recovery](../scenarios/disaster-recovery.md) for more recovery pat
 
 ## Where should I report bugs or request features?
 
-[Open an issue on GitHub](https://github.com/bradygaster/squad/issues/new) with:
+[Open an issue on GitHub](https://github.com/github/squad/issues/new) with:
 - **Environment:** OS, Node.js version, Squad version (`squad --version`)
 - **Reproduction steps:** What you ran, what happened, what you expected
 - **Output:** Copy the full terminal output, including any errors
 
-For questions or discussions, use [GitHub Discussions](https://github.com/bradygaster/squad/discussions).
+For questions or discussions, use [GitHub Discussions](https://github.com/github/squad/discussions).

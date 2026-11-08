@@ -153,7 +153,7 @@ squad upgrade                                   # Apply stable version
 Homebrew and WinGet users should uninstall the insider package, install the
 stable package, and then run `squad upgrade`.
 
-Then [report the issue](https://github.com/bradygaster/squad/issues).
+Then [report the issue](https://github.com/github/squad/issues).
 
 ---
 
@@ -161,4 +161,4 @@ Then [report the issue](https://github.com/bradygaster/squad/issues).
 
 Insiders help us ship better software. Your bug reports, feature requests, and feedback make Squad stronger. Thank you for being part of the journey.
 
-Have questions? [Start a discussion](https://github.com/bradygaster/squad/discussions).
+Have questions? [Start a discussion](https://github.com/github/squad/discussions).

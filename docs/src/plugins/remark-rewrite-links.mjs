@@ -12,7 +12,7 @@ import { visit } from 'unist-util-visit';
  * Links that escape the content directory (../../README.md) go to GitHub.
  */
 
-const GITHUB_REPO = 'https://github.com/bradygaster/squad';
+const GITHUB_REPO = 'https://github.com/github/squad';
 
 // Map old section paths to new locations
 const SECTION_REDIRECTS = {

@@ -4,10 +4,10 @@ Squad is built by contributors who believe in democratizing multi-agent developm
 
 ## Project Metrics
 
-[![GitHub stars](https://img.shields.io/github/stars/bradygaster/squad?style=flat-square&logo=github)](https://github.com/bradygaster/squad/stargazers)
-[![GitHub forks](https://img.shields.io/github/forks/bradygaster/squad?style=flat-square&logo=github)](https://github.com/bradygaster/squad/network/members)
-[![GitHub issues](https://img.shields.io/github/issues/bradygaster/squad?style=flat-square&logo=github)](https://github.com/bradygaster/squad/issues)
-[![GitHub pull requests](https://img.shields.io/github/issues-pr/bradygaster/squad?style=flat-square&logo=github)](https://github.com/bradygaster/squad/pulls)
+[![GitHub stars](https://img.shields.io/github/stars/github/squad?style=flat-square&logo=github)](https://github.com/github/squad/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/github/squad?style=flat-square&logo=github)](https://github.com/github/squad/network/members)
+[![GitHub issues](https://img.shields.io/github/issues/github/squad?style=flat-square&logo=github)](https://github.com/github/squad/issues)
+[![GitHub pull requests](https://img.shields.io/github/issues-pr/github/squad?style=flat-square&logo=github)](https://github.com/github/squad/pulls)
 
 ## How to Contribute
 
@@ -16,13 +16,13 @@ We welcome contributions in all forms:
 **For detailed contribution guidelines, including branch rules and PR process, see the [Contributing Guide](./guide/contributing.html).**
 
 ### Report Issues
-Found a bug, have a feature request, or want to discuss an idea? [Open an issue](https://github.com/bradygaster/squad/issues).
+Found a bug, have a feature request, or want to discuss an idea? [Open an issue](https://github.com/github/squad/issues).
 
 ### Submit a Pull Request
-Ready to contribute code? [Check out the open issues](https://github.com/bradygaster/squad/issues) and submit a PR. See the [Contributing Guide](./guide/contributing.html) for branch protection rules and the branch model.
+Ready to contribute code? [Check out the open issues](https://github.com/github/squad/issues) and submit a PR. See the [Contributing Guide](./guide/contributing.html) for branch protection rules and the branch model.
 
 ### Join the Discussion
-Have questions, want to share how you're using Squad, or discuss the roadmap? [Start a discussion](https://github.com/bradygaster/squad/discussions).
+Have questions, want to share how you're using Squad, or discuss the roadmap? [Start a discussion](https://github.com/github/squad/discussions).
 
 ### External Deployments & Case Studies
 Deploy Squad on your project and share your experience. These real-world deployments inform our roadmap and help the community learn from each other.
@@ -72,6 +72,6 @@ If you're using Squad, consider:
 
 ## Contact & Support
 
-- **Issues & Feature Requests:** [GitHub Issues](https://github.com/bradygaster/squad/issues)
-- **Discussion & Questions:** [GitHub Discussions](https://github.com/bradygaster/squad/discussions)
+- **Issues & Feature Requests:** [GitHub Issues](https://github.com/github/squad/issues)
+- **Discussion & Questions:** [GitHub Discussions](https://github.com/github/squad/discussions)
 - **Security Issues:** Report privately via GitHub Security Advisory

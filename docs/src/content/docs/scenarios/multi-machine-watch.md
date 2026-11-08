@@ -11,7 +11,7 @@ description: Run squad watch --execute on several machines or pods without two o
 
 Work claims are opt-in and off by default. The design and its guarantees
 are recorded in
-[ADR-002: Work Claims and External Work Queues](https://github.com/bradygaster/squad/blob/dev/docs/specification/adr-002-work-claims-and-external-queues.md).
+[ADR-002: Work Claims and External Work Queues](https://github.com/github/squad/blob/dev/docs/specification/adr-002-work-claims-and-external-queues.md).
 
 ## Why: double-pick
 
@@ -347,7 +347,7 @@ and a local `squad watch` process cannot be one. Work claims don't depend
 on gh-aw and work the same with or without it.
 
 Integration with the gh-aw work queue is deferred until the gates in
-[ADR-002](https://github.com/bradygaster/squad/blob/dev/docs/specification/adr-002-work-claims-and-external-queues.md#gh-aw-adapter-gates)
+[ADR-002](https://github.com/github/squad/blob/dev/docs/specification/adr-002-work-claims-and-external-queues.md#gh-aw-adapter-gates)
 pass, including a stable queue protocol and daily use of `git-ref` claims
 on at least two machines.
 

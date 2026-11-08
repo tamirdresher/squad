@@ -6,7 +6,7 @@ order: 15
 
 # State Backend Selection
 
-> 🔗 **Full backend documentation:** [State Backends](/squad/docs/features/state-backends/) · [Container Image — Env Var Contract](/squad/docs/reference/container-image/) · [#1402](https://github.com/bradygaster/squad/issues/1402) (external state gaps — tracked separately)
+> 🔗 **Full backend documentation:** [State Backends](/squad/docs/features/state-backends/) · [Container Image — Env Var Contract](/squad/docs/reference/container-image/) · [#1402](https://github.com/github/squad/issues/1402) (external state gaps — tracked separately)
 
 ---
 
@@ -31,7 +31,7 @@ Choose a backend based on your deployment shape:
 > - **`local`:** Files on disk. Two pods writing to the same PVC simultaneously will corrupt state — no locking, no merge. This is data loss, not a merge conflict.
 > - **`orphan` / `two-layer`:** Branch-based. The second pod to push `squad-state` gets a non-fast-forward rejection. The losing pod's state changes are silently discarded unless the operator manually resolves the conflict. Under high concurrency this causes regular state loss.
 >
-> **If you run more than one Squad replica at a time, you must use an external state store.** The external state backend ([#1402](https://github.com/bradygaster/squad/issues/1402)) is not yet GA — see [External State](/squad/docs/features/external-state/) for current status and workarounds.
+> **If you run more than one Squad replica at a time, you must use an external state store.** The external state backend ([#1402](https://github.com/github/squad/issues/1402)) is not yet GA — see [External State](/squad/docs/features/external-state/) for current status and workarounds.
 >
 > The `squad-per-pod` deployment mode (via `SQUAD_DEPLOYMENT_MODE=squad-per-pod`) assigns each pod a stable identity and partition of the issue queue — but it does not eliminate shared-state write conflicts. It reduces them by partitioning work, but does not make any built-in backend safe for concurrent writers.
 
@@ -118,17 +118,17 @@ git fetch origin squad-state:squad-state
 
 ## Known bug: FSStorageProvider `rootDir` (#1555)
 
-> ⚠️ **Open bug [#1555](https://github.com/bradygaster/squad/issues/1555):** `FSStorageProvider` is constructed without a `rootDir` argument in `resolveSquadState()`. All relative state keys resolve against the Node.js process working directory (the repo root) rather than `.squad/`, silently creating a shadow state tree that diverges from the authoritative `.squad/` copy agents actually read.
+> ⚠️ **Open bug [#1555](https://github.com/github/squad/issues/1555):** `FSStorageProvider` is constructed without a `rootDir` argument in `resolveSquadState()`. All relative state keys resolve against the Node.js process working directory (the repo root) rather than `.squad/`, silently creating a shadow state tree that diverges from the authoritative `.squad/` copy agents actually read.
 >
-> **There is no configuration-level workaround.** Because `FSStorageProvider` is constructed with zero arguments regardless of any user configuration, setting `rootDir` in `config.json` has no effect — the constructor call ignores it. This must be fixed in the SDK itself ([#1555](https://github.com/bradygaster/squad/issues/1555)).
+> **There is no configuration-level workaround.** Because `FSStorageProvider` is constructed with zero arguments regardless of any user configuration, setting `rootDir` in `config.json` has no effect — the constructor call ignores it. This must be fixed in the SDK itself ([#1555](https://github.com/github/squad/issues/1555)).
 >
-> **Until #1555 is resolved:** Run only a single Squad replica. Avoid deployment paths where the MCP server process `cwd` differs from the volume mount path. Track [#1555](https://github.com/bradygaster/squad/issues/1555) for the fix.
+> **Until #1555 is resolved:** Run only a single Squad replica. Avoid deployment paths where the MCP server process `cwd` differs from the volume mount path. Track [#1555](https://github.com/github/squad/issues/1555) for the fix.
 
 ---
 
 ## Multi-pod: external state (future)
 
-The external state backend — designed to be safe for concurrent writers via a centralized, transactional store — is tracked in [#1402](https://github.com/bradygaster/squad/issues/1402). It is not yet available as a GA backend.
+The external state backend — designed to be safe for concurrent writers via a centralized, transactional store — is tracked in [#1402](https://github.com/github/squad/issues/1402). It is not yet available as a GA backend.
 
 Until #1402 lands, the recommended mitigation for multi-pod deployments is:
 

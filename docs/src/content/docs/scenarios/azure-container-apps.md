@@ -197,7 +197,7 @@ Azure Container Apps has [built-in KEDA support](https://learn.microsoft.com/azu
 
 ### Option A — ACA built-in HTTP scaler
 
-For HTTP-triggered workflows (webhook dispatch, future `--remote` mode — see [#1189](https://github.com/bradygaster/squad/issues/1189)):
+For HTTP-triggered workflows (webhook dispatch, future `--remote` mode — see [#1189](https://github.com/github/squad/issues/1189)):
 
 ```bash
 az containerapp update \
@@ -289,7 +289,7 @@ az containerapp job start \
   --resource-group $RESOURCE_GROUP
 ```
 
-> **Future:** Remote dispatch (`squad --remote`) is being designed in [#1189](https://github.com/bradygaster/squad/issues/1189). Once available, ACA Jobs will be the recommended execution backend for remote dispatch.
+> **Future:** Remote dispatch (`squad --remote`) is being designed in [#1189](https://github.com/github/squad/issues/1189). Once available, ACA Jobs will be the recommended execution backend for remote dispatch.
 
 ---
 
@@ -303,7 +303,7 @@ For durable state:
 2. **Azure Files volume mount**: Mount an Azure Files share to `/app/.squad/` for shared file-system persistence across replicas.
 3. **Single replica**: If scaling to one replica (min=max=1), ephemeral state survives in-memory but not across restarts.
 
-> ⚠️ **Multi-replica safety:** The `local` state backend is **not safe for concurrent writes** from multiple replicas. Use the orphan or two-layer backend, or constrain to one replica. See [State Backends](/squad/docs/features/state-backends/) and [#1402](https://github.com/bradygaster/squad/issues/1402).
+> ⚠️ **Multi-replica safety:** The `local` state backend is **not safe for concurrent writes** from multiple replicas. Use the orphan or two-layer backend, or constrain to one replica. See [State Backends](/squad/docs/features/state-backends/) and [#1402](https://github.com/github/squad/issues/1402).
 
 ---
 
@@ -348,7 +348,7 @@ az containerapp identity show \
 
 **Symptom:** First issue pickup after scale-from-zero is slow (15–45 s typical).
 
-- This is expected behavior — Squad has no readiness endpoint yet (see [#1577](https://github.com/bradygaster/squad/issues/1577)). ACA restarts exited containers automatically; no HTTP probe is needed.
+- This is expected behavior — Squad has no readiness endpoint yet (see [#1577](https://github.com/github/squad/issues/1577)). ACA restarts exited containers automatically; no HTTP probe is needed.
 - Set `--min-replicas 1` to keep one warm replica if latency matters.
 - Use `node:22-alpine` base image (not `node:22`) for a smaller, faster startup.
 
@@ -366,11 +366,11 @@ az containerapp identity show \
 
 | Feature | Status |
 |---|---|
-| `--remote` dispatch (webhook-triggered issue execution) | RFC — [#1189](https://github.com/bradygaster/squad/issues/1189) |
-| External state gap for multi-replica deployments | Design — [#1402](https://github.com/bradygaster/squad/issues/1402) |
-| FSStorageProvider rootDir bug (no env-var override; set `rootDir` in `config.json`) | Open — [#1555](https://github.com/bradygaster/squad/issues/1555) |
-| HTTP health/readiness endpoints | Planned — [#1577](https://github.com/bradygaster/squad/issues/1577) |
-| ACA Dynamic Sessions / Sandbox execution | Planned — [#1564](https://github.com/bradygaster/squad/issues/1564) |
+| `--remote` dispatch (webhook-triggered issue execution) | RFC — [#1189](https://github.com/github/squad/issues/1189) |
+| External state gap for multi-replica deployments | Design — [#1402](https://github.com/github/squad/issues/1402) |
+| FSStorageProvider rootDir bug (no env-var override; set `rootDir` in `config.json`) | Open — [#1555](https://github.com/github/squad/issues/1555) |
+| HTTP health/readiness endpoints | Planned — [#1577](https://github.com/github/squad/issues/1577) |
+| ACA Dynamic Sessions / Sandbox execution | Planned — [#1564](https://github.com/github/squad/issues/1564) |
 
 ---
 

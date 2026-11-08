@@ -14,7 +14,7 @@ This page is the operational security reference for teams running Squad in produ
 | This page | Operational threat model — runtime risks, mitigations, and production posture |
 | [Plugin Security](/squad/docs/reference/plugin-security/) | Plugin install sandbox — manifest validation and static-file restrictions |
 | [Skill Security Scanner](/squad/docs/features/skill-security-scanner/) | CI-time credential and privilege-escalation scanning for skill files |
-| [#1427](https://github.com/bradygaster/squad/issues/1427) | Corporate security policy page (in progress — separate scope) |
+| [#1427](https://github.com/github/squad/issues/1427) | Corporate security policy page (in progress — separate scope) |
 
 ---
 
@@ -22,7 +22,7 @@ This page is the operational security reference for teams running Squad in produ
 
 Before reading the mitigations below, be aware of what Squad does **not** yet provide:
 
-- **No HTTP health or readiness endpoints.** Squad exposes no `/healthz` or `/readyz` endpoint. Container restart policy is the current liveness mechanism. HTTP readiness is planned in [#1577](https://github.com/bradygaster/squad/issues/1577).
+- **No HTTP health or readiness endpoints.** Squad exposes no `/healthz` or `/readyz` endpoint. Container restart policy is the current liveness mechanism. HTTP readiness is planned in [#1577](https://github.com/github/squad/issues/1577).
 - **No built-in network egress filtering.** Squad does not sandbox agent network access beyond what the host OS or container runtime provides.
 - **No formal CVE/vulnerability disclosure process.** This page describes risks and recommended mitigations, not incident history.
 - **`PermissionHandler.ApproveAll` is not a production-safe default.** See [Least-Privilege Permission Handlers](#least-privilege-permission-handlers--approveall-warning) below.
@@ -156,7 +156,7 @@ GITHUB_TOKEN=ghp_realtoken1234567890abcdef
 GITHUB_TOKEN=<your-github-pat-here>
 ```
 
-Cross-reference: [closed #267](https://github.com/bradygaster/squad/issues/267).
+Cross-reference: [closed #267](https://github.com/github/squad/issues/267).
 
 Add `.env` and `.env.*` to `.gitignore`. The skill security scanner ([Skill Security Scanner](/squad/docs/features/skill-security-scanner/)) catches credential patterns in skill files; extend this discipline to all generated code.
 
@@ -301,7 +301,7 @@ const pipeline = new HookPipeline({ allowedWritePaths: ['.squad/**'] });
 pipeline.addPreToolHook(writeGuardHook);
 ```
 
-> **Source:** `PreToolUseContext` properties (`toolName`, `arguments`, `agentName`, `sessionId`) and `addPreToolHook` method are verified against [`packages/squad-sdk/src/hooks/index.ts`](https://github.com/bradygaster/squad/blob/dev/packages/squad-sdk/src/hooks/index.ts).
+> **Source:** `PreToolUseContext` properties (`toolName`, `arguments`, `agentName`, `sessionId`) and `addPreToolHook` method are verified against [`packages/squad-sdk/src/hooks/index.ts`](https://github.com/github/squad/blob/dev/packages/squad-sdk/src/hooks/index.ts).
 
 See [Custom Tools & Hooks](/squad/docs/reference/tools-and-hooks/) for the full `HookPipeline` API.
 
@@ -321,7 +321,7 @@ Squad-generated GitHub Actions workflows should pin every `uses:` reference to a
 - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683  # v4.2.2
 ```
 
-[#1462](https://github.com/bradygaster/squad/issues/1462) tracks completing SHA pinning for the `squad-insider-release.yml` template. All other Squad workflow templates use SHA pinning with weekly Dependabot updates.
+[#1462](https://github.com/github/squad/issues/1462) tracks completing SHA pinning for the `squad-insider-release.yml` template. All other Squad workflow templates use SHA pinning with weekly Dependabot updates.
 
 When you extend Squad-generated workflows, maintain this pattern. If you add a new `uses:` step, resolve its current SHA immediately:
 
@@ -472,7 +472,7 @@ Use this checklist before moving a Squad deployment to production.
 - [ ] Shared state files are periodically inspected for unexpected entries
 
 ### Supply chain
-- [ ] All GitHub Actions `uses:` references are SHA-pinned (see [#1462](https://github.com/bradygaster/squad/issues/1462))
+- [ ] All GitHub Actions `uses:` references are SHA-pinned (see [#1462](https://github.com/github/squad/issues/1462))
 - [ ] Container image is pinned to digest in production manifests
 - [ ] MCP servers in `.mcp.json` are version-pinned and sourced from trusted organizations
 - [ ] Skill files pass the [Skill Security Scanner](/squad/docs/features/skill-security-scanner/) on every PR
@@ -481,7 +481,7 @@ Use this checklist before moving a Squad deployment to production.
 - [ ] OTEL telemetry is routing to Azure Monitor or equivalent
 - [ ] Token revocation and rotation procedure is documented
 - [ ] Incident response runbook covers shared-state compromise
-- [ ] HTTP health probes: note that readiness endpoints are not yet available ([#1577](https://github.com/bradygaster/squad/issues/1577)); container restart policy is the current liveness mechanism
+- [ ] HTTP health probes: note that readiness endpoints are not yet available ([#1577](https://github.com/github/squad/issues/1577)); container restart policy is the current liveness mechanism
 
 ---
 

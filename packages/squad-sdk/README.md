@@ -144,7 +144,7 @@ await tool.handler({
 
 Agents learn as they work. Next session, Frontend reads this and knows immediately. No context hunting, no re-explaining.
 
-> Two more tools — `squad_status` (query the session pool) and `squad_skill` (read/write compressed learnings) — round out the coordination layer. See the [full docs](https://github.com/bradygaster/squad#the-custom-tools) for details.
+> Two more tools — `squad_status` (query the session pool) and `squad_skill` (read/write compressed learnings) — round out the coordination layer. See the [full docs](https://github.com/github/squad#the-custom-tools) for details.
 
 ---
 
@@ -354,9 +354,9 @@ When agents complete work, record decisions, or hit errors — Ralph knows. If a
 
 ## Links
 
-- **Repository:** [github.com/bradygaster/squad](https://github.com/bradygaster/squad)
+- **Repository:** [github.com/github/squad](https://github.com/github/squad)
 - **CLI package:** [@bradygaster/squad-cli](https://www.npmjs.com/package/@bradygaster/squad-cli)
-- **Issues:** [github.com/bradygaster/squad/issues](https://github.com/bradygaster/squad/issues)
+- **Issues:** [github.com/github/squad/issues](https://github.com/github/squad/issues)
 
 ---
 

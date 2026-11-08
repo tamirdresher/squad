@@ -130,7 +130,7 @@ Squad refreshes the backlog and shows remaining open issues.
 ## Sample Prompts
 
 ```
-connect to bradygaster/squad
+connect to github/squad
 ```
 
 Links Squad to a GitHub repository for issue-driven development.

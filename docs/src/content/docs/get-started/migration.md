@@ -387,7 +387,7 @@ You may be using the old package name. Use the correct name:
 npm install -g @bradygaster/squad-cli
 ```
 
-If the package genuinely isn't published yet, check [the npm page](https://www.npmjs.com/package/@bradygaster/squad-cli) or the [GitHub repo](https://github.com/bradygaster/squad) for release status.
+If the package genuinely isn't published yet, check [the npm page](https://www.npmjs.com/package/@bradygaster/squad-cli) or the [GitHub repo](https://github.com/github/squad) for release status.
 
 ### Permission denied during install
 
@@ -529,8 +529,8 @@ Key improvements since the migration from v0.5.4 beta:
 - **Casting system:** Universe-based agent naming with persistent registries (v0.8.25+).
 - **Stable v1 packages:** The CLI and SDK graduated from prerelease status in v1.0.0.
 
-For the full list of changes, see the [CHANGELOG](https://github.com/bradygaster/squad/blob/main/CHANGELOG.md).
+For the full list of changes, see the [CHANGELOG](https://github.com/github/squad/blob/main/CHANGELOG.md).
 
 ---
 
-*Questions or issues? Open an issue at [github.com/bradygaster/squad](https://github.com/bradygaster/squad/issues).*
+*Questions or issues? Open an issue at [github.com/github/squad](https://github.com/github/squad/issues).*

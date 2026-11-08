@@ -455,7 +455,7 @@ function printFinalReport(
   }
 
   console.log();
-  console.log(chalk.dim(`  Squad SDK v${VERSION} · github.com/bradygaster/squad-pr`));
+  console.log(chalk.dim(`  Squad SDK v${VERSION} · github.com/github/squad`));
   console.log();
 }
 

@@ -116,10 +116,10 @@ docs/src/content/docs/reference/
 ### URL Structure
 
 \\\
-https://bradygaster.github.io/squad/reference/api-reference/     (overview page)
-https://bradygaster.github.io/squad/reference/api/               (index)
-https://bradygaster.github.io/squad/reference/api/classes/squad-coordinator/
-https://bradygaster.github.io/squad/reference/api/interfaces/agent/
+https://github.github.com/squad/reference/api-reference/     (overview page)
+https://github.github.com/squad/reference/api/               (index)
+https://github.github.com/squad/reference/api/classes/squad-coordinator/
+https://github.github.com/squad/reference/api/interfaces/agent/
 \\\
 
 ### Build Workflow

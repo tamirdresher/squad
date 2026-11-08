@@ -8,7 +8,7 @@ import { createRequire } from 'module';
 const require = createRequire(import.meta.url);
 
 export default defineConfig({
-  site: 'https://bradygaster.github.io',
+  site: 'https://github.github.com',
   base: '/squad/',
   integrations: [sitemap()],
   vite: {

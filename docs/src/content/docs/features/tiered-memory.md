@@ -85,7 +85,7 @@ The exact savings depend on what fraction of each agent's history is task-releva
 
 - **The tier split is currently advisory** — the skill defines hot/cold/wiki semantics, but the spawn template doesn't yet enforce `--include-cold` / `--include-wiki` flags as part of the runtime contract. Adoption is per-team via spawn-template edits.
 - **Wiki has no UI** — there's no `squad wiki list` command yet. Entries live as files in `.squad/wiki/` (when teams create that directory) and the coordinator references them by path.
-- **Issue [#1268](https://github.com/bradygaster/squad/issues/1268) and [#1269](https://github.com/bradygaster/squad/issues/1269)** propose making Scribe enforce these tiers via the governed memory pipeline. Until those land, tier maintenance is best-effort.
+- **Issue [#1268](https://github.com/github/squad/issues/1268) and [#1269](https://github.com/github/squad/issues/1269)** propose making Scribe enforce these tiers via the governed memory pipeline. Until those land, tier maintenance is best-effort.
 
 ---
 

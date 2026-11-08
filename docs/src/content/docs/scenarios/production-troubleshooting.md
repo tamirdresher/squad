@@ -153,11 +153,11 @@ If the PVC mount is missing, the pod is writing state to the container's ephemer
 
 ### FSStorageProvider rootDir bug (#1555)
 
-If Squad logs show state files at the repo root (e.g., `agents/`, `log/`, `decisions.md` appearing at `/app/` rather than `/app/.squad/`), this is [#1555](https://github.com/bradygaster/squad/issues/1555): `FSStorageProvider` is constructed without a `rootDir` argument, so all state keys resolve against the process `cwd` (the repo root) instead of `.squad/`.
+If Squad logs show state files at the repo root (e.g., `agents/`, `log/`, `decisions.md` appearing at `/app/` rather than `/app/.squad/`), this is [#1555](https://github.com/github/squad/issues/1555): `FSStorageProvider` is constructed without a `rootDir` argument, so all state keys resolve against the process `cwd` (the repo root) instead of `.squad/`.
 
 > ⚠️ **There is no configuration-level workaround for #1555.** Setting `rootDir` in `config.json` has no effect — `FSStorageProvider` ignores constructor arguments in the affected code path. This must be fixed in the SDK itself.
 >
-> **Mitigation until #1555 is resolved:** Run only a single Squad replica. Avoid deployment shapes where the MCP server process `cwd` differs from the intended state path. Track [#1555](https://github.com/bradygaster/squad/issues/1555) for status.
+> **Mitigation until #1555 is resolved:** Run only a single Squad replica. Avoid deployment shapes where the MCP server process `cwd` differs from the intended state path. Track [#1555](https://github.com/github/squad/issues/1555) for status.
 
 See [State Backend Selection — Known bug #1555](/squad/docs/reference/state-backend-selection/#known-bug-fsstorageprovider-rootdir-1555) for background.
 
@@ -167,7 +167,7 @@ See [State Backend Selection — Known bug #1555](/squad/docs/reference/state-ba
 kubectl logs -n squad <pod> | grep "non-fast-forward\|push rejected"
 ```
 
-If you see push rejections, two pods wrote to `squad-state` concurrently. One pod's state changes were discarded. For multi-pod deployments, do not use branch-based backends — see [State Backend Selection](/squad/docs/reference/state-backend-selection/) and track [#1402](https://github.com/bradygaster/squad/issues/1402).
+If you see push rejections, two pods wrote to `squad-state` concurrently. One pod's state changes were discarded. For multi-pod deployments, do not use branch-based backends — see [State Backend Selection](/squad/docs/reference/state-backend-selection/) and track [#1402](https://github.com/github/squad/issues/1402).
 
 ---
 
@@ -274,7 +274,7 @@ kubectl top pod -n squad  # requires metrics-server
 >
 > **Workaround:** Alert on GitHub 401 errors in structured logs (Log Analytics KQL or Grafana log panel). Treat repeated 401s as a readiness failure requiring manual intervention.
 >
-> Track [#1577](https://github.com/bradygaster/squad/issues/1577) for HTTP health endpoint implementation.
+> Track [#1577](https://github.com/github/squad/issues/1577) for HTTP health endpoint implementation.
 
 ---
 
@@ -300,7 +300,7 @@ kubectl describe scaledobject -n squad squad-agents > squad-scaledobject.txt
 kubectl exec -n squad <pod> -- cat /app/.squad/config.json 2>/dev/null
 ```
 
-Open an issue at [bradygaster/squad](https://github.com/bradygaster/squad/issues) and attach the above files. Redact any GitHub tokens, connection strings, or personal data from log excerpts before attaching.
+Open an issue at [github/squad](https://github.com/github/squad/issues) and attach the above files. Redact any GitHub tokens, connection strings, or personal data from log excerpts before attaching.
 
 ---
 
@@ -308,7 +308,7 @@ Open an issue at [bradygaster/squad](https://github.com/bradygaster/squad/issues
 
 | Issue | This runbook covers |
 |---|---|
-| [#1144](https://github.com/bradygaster/squad/issues/1144) | Embedded host (copilot-sdk) telemetry not available in production — agents must use Squad CLI container mode |
-| [#1402](https://github.com/bradygaster/squad/issues/1402) | External state backend for multi-pod deployments — not yet GA |
-| [#1555](https://github.com/bradygaster/squad/issues/1555) | FSStorageProvider `rootDir` bug — no configuration-level workaround; run single replica and track issue for fix |
-| [#1577](https://github.com/bradygaster/squad/issues/1577) | HTTP health/readiness endpoints — not yet implemented |
+| [#1144](https://github.com/github/squad/issues/1144) | Embedded host (copilot-sdk) telemetry not available in production — agents must use Squad CLI container mode |
+| [#1402](https://github.com/github/squad/issues/1402) | External state backend for multi-pod deployments — not yet GA |
+| [#1555](https://github.com/github/squad/issues/1555) | FSStorageProvider `rootDir` bug — no configuration-level workaround; run single replica and track issue for fix |
+| [#1577](https://github.com/github/squad/issues/1577) | HTTP health/readiness endpoints — not yet implemented |

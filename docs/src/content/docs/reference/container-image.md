@@ -73,9 +73,9 @@ volumeMounts:
     mountPath: /app/.squad
 ```
 
-The config is injected at runtime from a ConfigMap or Azure Files share. Supports live config updates without rebuilding the image. Note that FSStorageProvider may resolve state paths relative to the process working directory rather than the volume mount when `rootDir` is not set in `config.json` — see [#1555](https://github.com/bradygaster/squad/issues/1555).
+The config is injected at runtime from a ConfigMap or Azure Files share. Supports live config updates without rebuilding the image. Note that FSStorageProvider may resolve state paths relative to the process working directory rather than the volume mount when `rootDir` is not set in `config.json` — see [#1555](https://github.com/github/squad/issues/1555).
 
-> ⚠️ **Multi-replica state warning:** The `local` state backend (files on disk) is **not safe for concurrent writes** from multiple pod replicas. If you scale beyond one replica, use the `orphan` or `two-layer` state backend, or persist state to an external store. See [State Backends](/squad/docs/features/state-backends/) and [#1402](https://github.com/bradygaster/squad/issues/1402).
+> ⚠️ **Multi-replica state warning:** The `local` state backend (files on disk) is **not safe for concurrent writes** from multiple pod replicas. If you scale beyond one replica, use the `orphan` or `two-layer` state backend, or persist state to an external store. See [State Backends](/squad/docs/features/state-backends/) and [#1402](https://github.com/github/squad/issues/1402).
 
 ---
 
@@ -127,14 +127,14 @@ CMD ["squad", "watch", "--execute"]
 
 ## Process Lifecycle and Health
 
-Squad does not expose an HTTP health server or liveness/readiness endpoints. There is no `SQUAD_HEALTH_PORT`, `/healthz`, or `/readyz` — these are planned features tracked in [#1577](https://github.com/bradygaster/squad/issues/1577).
+Squad does not expose an HTTP health server or liveness/readiness endpoints. There is no `SQUAD_HEALTH_PORT`, `/healthz`, or `/readyz` — these are planned features tracked in [#1577](https://github.com/github/squad/issues/1577).
 
 **Current container health behavior:**
 - The container is healthy as long as the `squad watch --execute` process is running.
 - If `squad` exits for any reason, the container exits. Kubernetes and ACA restart exited containers automatically via the container restart policy — this is sufficient for the current release.
 - Do **not** configure HTTP liveness or readiness probes — there is no listener and probes will always fail, crash-looping your pod.
 
-If your cluster policy requires an exec probe, use Node.js (already present in the image) to check that PID 1 is still running. This is a **shallow** check — it only confirms the process table entry for PID 1 exists; it does not verify GitHub API connectivity or queue health. An HTTP readiness endpoint is the tracked solution in [#1577](https://github.com/bradygaster/squad/issues/1577).
+If your cluster policy requires an exec probe, use Node.js (already present in the image) to check that PID 1 is still running. This is a **shallow** check — it only confirms the process table entry for PID 1 exists; it does not verify GitHub API connectivity or queue health. An HTTP readiness endpoint is the tracked solution in [#1577](https://github.com/github/squad/issues/1577).
 
 ```yaml
 # Shallow PID-1 existence check (no procps / pgrep required)
@@ -152,7 +152,7 @@ livenessProbe:
   failureThreshold: 3
 ```
 
-> **Tracking:** An explicit HTTP health/readiness contract is planned. See [#1577](https://github.com/bradygaster/squad/issues/1577) for status.
+> **Tracking:** An explicit HTTP health/readiness contract is planned. See [#1577](https://github.com/github/squad/issues/1577) for status.
 
 ---
 
@@ -233,10 +233,10 @@ Azure Container Apps supports [Key Vault secret references](https://learn.micros
 
 | Limitation | Status | Workaround |
 |---|---|---|
-| FSStorageProvider may resolve state paths relative to process working directory instead of volume mount when `rootDir` is not explicit in `config.json` | Open — [#1555](https://github.com/bradygaster/squad/issues/1555) | Set `rootDir` explicitly in `.squad/config.json` to the absolute volume mount path; no env var override exists yet |
-| No HTTP health/readiness endpoints | Planned — [#1577](https://github.com/bradygaster/squad/issues/1577) | Use process-check exec probe; Kubernetes restarts exited containers automatically |
-| `local` state backend not safe for concurrent multi-replica writes | Design gap — [#1402](https://github.com/bradygaster/squad/issues/1402) | Use `orphan` or `two-layer` backend, or scale to one replica |
-| Remote dispatch (`--remote` flag) | RFC in progress — [#1189](https://github.com/bradygaster/squad/issues/1189) | Use KEDA queue-based scaling as a near-term alternative |
+| FSStorageProvider may resolve state paths relative to process working directory instead of volume mount when `rootDir` is not explicit in `config.json` | Open — [#1555](https://github.com/github/squad/issues/1555) | Set `rootDir` explicitly in `.squad/config.json` to the absolute volume mount path; no env var override exists yet |
+| No HTTP health/readiness endpoints | Planned — [#1577](https://github.com/github/squad/issues/1577) | Use process-check exec probe; Kubernetes restarts exited containers automatically |
+| `local` state backend not safe for concurrent multi-replica writes | Design gap — [#1402](https://github.com/github/squad/issues/1402) | Use `orphan` or `two-layer` backend, or scale to one replica |
+| Remote dispatch (`--remote` flag) | RFC in progress — [#1189](https://github.com/github/squad/issues/1189) | Use KEDA queue-based scaling as a near-term alternative |
 
 ---
 
@@ -286,4 +286,4 @@ az aks update \
 - [State Backends](/squad/docs/features/state-backends/) — choosing a backend safe for multi-replica deployments
 - [Azure Container Apps deployment](../scenarios/azure-container-apps) — end-to-end ACA scenario
 - [AKS deployment runbook](../scenarios/aks-deployment) — Kubernetes scenario with workload identity and KEDA
-- [#1577](https://github.com/bradygaster/squad/issues/1577) — health/readiness endpoint product gap
+- [#1577](https://github.com/github/squad/issues/1577) — health/readiness endpoint product gap

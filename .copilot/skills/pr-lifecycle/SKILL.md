@@ -138,7 +138,7 @@ For advanced scenarios (worktrees, multi-repo coordination), see `.copilot/skill
 
 2. **Create PR targeting dev:**
    ```bash
-   gh pr create --repo bradygaster/squad --base dev \
+   gh pr create --repo github/squad --base dev \
      --title "fix: brief description (#issue-number)" \
      --body "Closes #{issue-number}
 
@@ -351,7 +351,7 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 
 # Push and PR
 git push -u origin squad/610-fix-broken-link
-gh pr create --repo bradygaster/squad --base dev \
+gh pr create --repo github/squad --base dev \
   --title "docs: fix broken link (#610)" \
   --body "Closes #610"
 ```
@@ -386,7 +386,7 @@ Co-authored-by: Copilot <223556219+Copilot@users.noreply.github.com>"
 
 # Push and PR
 git push -u origin squad/42-add-profile-api
-gh pr create --repo bradygaster/squad --base dev \
+gh pr create --repo github/squad --base dev \
   --title "feat: add profile API (#42)" \
   --body "Closes #42
 

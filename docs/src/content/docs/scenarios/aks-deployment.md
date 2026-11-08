@@ -455,7 +455,7 @@ Add to `squad-deployment.yaml` volumes and volumeMounts:
   mountPath: /app/.squad/state
 ```
 
-> ⚠️ **Multi-replica write safety:** `ReadWriteOnce` (Azure Disk) only supports one writer pod at a time. For multiple replicas, use `ReadWriteMany` with an Azure Files storage class, **and** switch to the orphan or two-layer state backend. See [#1402](https://github.com/bradygaster/squad/issues/1402).
+> ⚠️ **Multi-replica write safety:** `ReadWriteOnce` (Azure Disk) only supports one writer pod at a time. For multiple replicas, use `ReadWriteMany` with an Azure Files storage class, **and** switch to the orphan or two-layer state backend. See [#1402](https://github.com/github/squad/issues/1402).
 
 ---
 
@@ -561,7 +561,7 @@ kubectl exec -it <pod-name> --namespace $NAMESPACE -- \
   cat /app/.squad/config.json | grep stateBackend
 ```
 
-**Fix:** Switch to the `orphan` or `two-layer` state backend, which uses Git-native structures safe for concurrent access. See [State Backends](/squad/docs/features/state-backends/) and open issue [#1402](https://github.com/bradygaster/squad/issues/1402).
+**Fix:** Switch to the `orphan` or `two-layer` state backend, which uses Git-native structures safe for concurrent access. See [State Backends](/squad/docs/features/state-backends/) and open issue [#1402](https://github.com/github/squad/issues/1402).
 
 The `local` (file-based) backend is **not safe** for multi-replica deployments.
 
@@ -586,7 +586,7 @@ Common causes:
 
 > ⚠️ The `local` state backend (default) is **not safe for concurrent writes** from multiple Squad pods. The orphan-branch state backend uses a dedicated Git branch (`squad-state`) that is safe for multi-replica deployments because commits serialize writes. The two-layer backend further separates immutable assets from mutable state for better concurrency. Use one of these backends when scaling beyond a single replica.
 >
-> See [State Backends](/squad/docs/features/state-backends/) and [#1402](https://github.com/bradygaster/squad/issues/1402) for details and planned improvements.
+> See [State Backends](/squad/docs/features/state-backends/) and [#1402](https://github.com/github/squad/issues/1402) for details and planned improvements.
 
 ---
 
@@ -594,10 +594,10 @@ Common causes:
 
 | Feature | Status |
 |---|---|
-| Remote dispatch (`--remote` flag for webhook-triggered runs) | RFC — [#1189](https://github.com/bradygaster/squad/issues/1189) |
-| External state backend safety for multi-replica writes | Design — [#1402](https://github.com/bradygaster/squad/issues/1402) |
-| FSStorageProvider rootDir bug (no env-var override; set `rootDir` explicitly in `config.json`) | Open — [#1555](https://github.com/bradygaster/squad/issues/1555) |
-| HTTP health/readiness endpoints | Planned — [#1577](https://github.com/bradygaster/squad/issues/1577) |
+| Remote dispatch (`--remote` flag for webhook-triggered runs) | RFC — [#1189](https://github.com/github/squad/issues/1189) |
+| External state backend safety for multi-replica writes | Design — [#1402](https://github.com/github/squad/issues/1402) |
+| FSStorageProvider rootDir bug (no env-var override; set `rootDir` explicitly in `config.json`) | Open — [#1555](https://github.com/github/squad/issues/1555) |
+| HTTP health/readiness endpoints | Planned — [#1577](https://github.com/github/squad/issues/1577) |
 | Helm chart for Squad (community request) | Not planned in this issue — contributions welcome |
 
 ---

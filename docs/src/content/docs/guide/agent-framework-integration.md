@@ -3,7 +3,7 @@ title: "Microsoft Agent Framework integration"
 description: "Expose any Squad team as a MAF AIAgent for durable .NET workflows, Aspire dashboard observability, and multi-model composition."
 ---
 
-`Squad.Agents.AI` **1.0.0** is the stable package version for .NET 8, 9, and 10. Source versioning is separate from publication; until 1.0.0 is available on NuGet, follow the [local package instructions](https://github.com/bradygaster/squad/blob/dev/src/Squad.Agents.AI/README.md#install).
+`Squad.Agents.AI` **1.0.0** is the stable package version for .NET 8, 9, and 10. Source versioning is separate from publication; until 1.0.0 is available on NuGet, follow the [local package instructions](https://github.com/github/squad/blob/dev/src/Squad.Agents.AI/README.md#install).
 
 `Squad.Agents.AI` exposes any Squad team as a Microsoft Agent Framework (MAF) `AIAgent`. Once registered, a `SquadAgent` participates in durable workflows alongside Azure OpenAI, Anthropic, and every other MAF provider — with DTS checkpointing, Aspire dashboard observability, and streaming out of the box.
 
@@ -170,7 +170,7 @@ builder.Services.AddSquadAgent(o =>
 });
 ```
 
-Cross-reference: open issue [#1144](https://github.com/bradygaster/squad/issues/1144) tracks additional telemetry from embedded hosts.
+Cross-reference: open issue [#1144](https://github.com/github/squad/issues/1144) tracks additional telemetry from embedded hosts.
 
 ---
 
@@ -243,7 +243,7 @@ The Copilot CLI runs as a subprocess. It must be present in the deployment envir
 | 10-minute tutorial gist (Tamir Dresher) | [gist.github.com/tamirdresher/d0e38cbadd962de18e8373706eccad97](https://gist.github.com/tamirdresher/d0e38cbadd962de18e8373706eccad97) |
 | Squad + MAF demo repo | [github.com/tamirdresher/squad-agent-framework-demo](https://github.com/tamirdresher/squad-agent-framework-demo) |
 | Microsoft devblogs post | [devblogs.microsoft.com/agent-framework/building-agent-teams-with-agent-framework-github-copilot-cli-and-squad/](https://devblogs.microsoft.com/agent-framework/building-agent-teams-with-agent-framework-github-copilot-cli-and-squad/) |
-| `Squad.Agents.AI` package source | [`src/Squad.Agents.AI/`](https://github.com/bradygaster/squad/tree/main/src/Squad.Agents.AI) |
+| `Squad.Agents.AI` package source | [`src/Squad.Agents.AI/`](https://github.com/github/squad/tree/main/src/Squad.Agents.AI) |
 | `microsoft/agent-framework#6457` | [Upstream `buildTransitive` fix (merged 2026-06-10; not yet in NuGet preview)](https://github.com/microsoft/agent-framework/issues/6457) |
 
 > **Credit:** The integration pattern and companion demo were co-authored with [Tamir Dresher](https://www.tamirdresher.com). The tutorial gist and blog post are the original source of record for this guide.

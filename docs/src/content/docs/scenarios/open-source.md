@@ -255,7 +255,7 @@ Add a badge to your README:
 ```markdown
 ## Contributing
 
-This project uses [Squad](https://github.com/bradygaster/squad) for AI-assisted development.
+This project uses [Squad](https://github.com/github/squad) for AI-assisted development.
 
 - **Triaging:** Issues are auto-labeled by Squad's Ralph agent
 - **Patterns:** See `.ai-team/skills/` for coding conventions

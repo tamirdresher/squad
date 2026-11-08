@@ -42,14 +42,14 @@ Choose the install method for your platform:
 | npm (all platforms, Node.js 22.5+) | `npm install -g @bradygaster/squad-cli` |
 | Homebrew (macOS) | `brew install --cask bradygaster/squad/squad` |
 | WinGet (Windows) | `winget install --id bradygaster.Squad --exact` |
-| Install script (macOS/Linux, no npm) | See [Standalone Install](https://bradygaster.github.io/squad/docs/features/standalone-install/) |
+| Install script (macOS/Linux, no npm) | See [Standalone Install](https://github.github.com/squad/docs/features/standalone-install/) |
 
 Preview and insider builds are available as `squad-preview` and
 `squad-insider` Homebrew casks, or as `bradygaster.Squad.Preview` and
 `bradygaster.Squad.Insider` WinGet packages.
 
 Direct archives for macOS, Linux, and Windows are also available from
-[GitHub Releases](https://github.com/bradygaster/squad/releases/latest).
+[GitHub Releases](https://github.com/github/squad/releases/latest).
 
 ```bash
 squad init
@@ -57,7 +57,7 @@ squad init
 
 All methods install the same CLI. Standalone installs vendor Node.js, so they do
 not require Node.js or access to the npm registry. See the
-[complete installation guide](https://bradygaster.github.io/squad/docs/get-started/installation/)
+[complete installation guide](https://github.github.com/squad/docs/get-started/installation/)
 for prerequisites and platform details.
 
 > **⚡ Want to be up and running in under a second?** Use `squad init --preset default` to start with a fully-configured squad — complete with members, charters, and routing rules — ready to go immediately. The default `squad init` (without the flag) walks you through setup step by step, ideal if you prefer to build and customize your squad deliberately.
@@ -112,8 +112,8 @@ Use the same channel you installed from:
 | npm | `npm install -g @bradygaster/squad-cli@latest` |
 | Homebrew | `brew upgrade --cask squad` |
 | WinGet | `winget upgrade --id bradygaster.Squad --exact` |
-| Install script | Re-run the [install script](https://bradygaster.github.io/squad/docs/features/standalone-install/#macos-and-linux) |
-| Direct archive | Download the newer archive from [GitHub Releases](https://github.com/bradygaster/squad/releases/latest) |
+| Install script | Re-run the [install script](https://github.github.com/squad/docs/features/standalone-install/#macos-and-linux) |
+| Direct archive | Download the newer archive from [GitHub Releases](https://github.com/github/squad/releases/latest) |
 
 **Step 2: Update Squad-owned files in your project**
 
@@ -144,7 +144,7 @@ To install and run Squad from source for development:
 
 ```bash
 # Clone the repository
-git clone https://github.com/bradygaster/squad.git
+git clone https://github.com/github/squad.git
 cd squad
 
 # Install dependencies (npm workspaces)
@@ -442,7 +442,7 @@ When agents finish, the coordinator records follow-up work and leaves a breadcru
 
 **And it's all in git.** Anyone who clones your repo gets the team — with all their accumulated knowledge.
 
-**Each agent gets the right model.** Squad picks models quality-first by default: premium for architecture, research and review, standard for code and docs, fast for mechanical work. Opt in to the `balanced` or `economy` profile, or to the `hydrafusion` research preview with `"modelProfile": "hydrafusion"` in `.squad/config.json`. Per-agent selection works in the Copilot CLI and app; VS Code runs every agent on the one session model. See [Model Selection](https://bradygaster.github.io/squad/docs/features/model-selection/).
+**Each agent gets the right model.** Squad picks models quality-first by default: premium for architecture, research and review, standard for code and docs, fast for mechanical work. Opt in to the `balanced` or `economy` profile, or to the `hydrafusion` research preview with `"modelProfile": "hydrafusion"` in `.squad/config.json`. Per-agent selection works in the Copilot CLI and app; VS Code runs every agent on the one session model. See [Model Selection](https://github.github.com/squad/docs/features/model-selection/).
 
 ---
 
@@ -654,7 +654,7 @@ durable human handoff after exhaustion. Both workers produce drafts only;
 open, merged and closed-unmerged linked PRs suppress automatic duplicates.
 Human review and merge are always required.
 
-See [the gh-aw guide](https://bradygaster.github.io/squad/docs/guide/gh-aw/#retrospective-auto-implementation-opt-in) for the full authority model.
+See [the gh-aw guide](https://github.github.com/squad/docs/guide/gh-aw/#retrospective-auto-implementation-opt-in) for the full authority model.
 
 ### Slash commands
 
@@ -675,7 +675,7 @@ See [the gh-aw guide](https://bradygaster.github.io/squad/docs/guide/gh-aw/#retr
 
 Write a detailed team description in the issue body, then comment `/squad cast` — the issue becomes your casting brief. The more context you give, the better Squad tailors your team.
 
-📖 See [GitHub Agentic Workflows guide](https://bradygaster.github.io/squad/docs/guide/gh-aw/) for the complete setup, configuration, and usage reference.
+📖 See [GitHub Agentic Workflows guide](https://github.github.com/squad/docs/guide/gh-aw/) for the complete setup, configuration, and usage reference.
 
 ---
 

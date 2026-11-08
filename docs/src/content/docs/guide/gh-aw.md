@@ -1614,7 +1614,7 @@ comment, ignore a missing proof, or dispatch partial bindings.
 #### Run the existing executable example
 
 The repository's
-[activation finalization integration fixture](https://github.com/bradygaster/squad/blob/dev/test/gh-aw-activation-finalization.test.ts)
+[activation finalization integration fixture](https://github.com/github/squad/blob/dev/test/gh-aw-activation-finalization.test.ts)
 is the executable producer/consumer example. In
 `continues after a later-phase pending-source recovery and validates the complete transitive reader chain`,
 it obtains proofs through the real workflow `verifyReconciliationRequest`,
@@ -1623,7 +1623,7 @@ both the SDK selector and canonical checker. These helpers belong to
 `workflows/shared/squad-activation.mjs`; they are **not** public `/casting` verifier
 exports. The `trusted synchronous publication completion (source and strict-compiled jobs)`
 group also executes emitted job scripts and the pinned issue-creation API adapter.
-The companion [selector contract tests](https://github.com/bradygaster/squad/blob/dev/test/agent-provenance.test.ts)
+The companion [selector contract tests](https://github.com/github/squad/blob/dev/test/agent-provenance.test.ts)
 cover selection, no-record results and rejection cases; their hand-built evidence
 is test data, not production authorization.
 
@@ -2610,7 +2610,7 @@ other refs.
 
 ## See also
 
-- [Squad README](https://github.com/bradygaster/squad#readme) — project overview and local CLI usage
-- [Workflow definition](https://github.com/bradygaster/squad/blob/dev/workflows/squad.md) — full slash command specification
-- [Implementation worker](https://github.com/bradygaster/squad/blob/dev/workflows/squad-implement-worker.md) — isolated issue implementation workflow
-- [Bootstrap component](https://github.com/bradygaster/squad/blob/dev/workflows/shared/squad.md) — activation and artifact lifecycle
+- [Squad README](https://github.com/github/squad#readme) — project overview and local CLI usage
+- [Workflow definition](https://github.com/github/squad/blob/dev/workflows/squad.md) — full slash command specification
+- [Implementation worker](https://github.com/github/squad/blob/dev/workflows/squad-implement-worker.md) — isolated issue implementation workflow
+- [Bootstrap component](https://github.com/github/squad/blob/dev/workflows/shared/squad.md) — activation and artifact lifecycle

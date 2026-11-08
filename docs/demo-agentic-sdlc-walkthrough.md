@@ -519,4 +519,4 @@ Accept:   "Reply /squad plan activate..."
 
 ---
 
-*Demo created for the Squad project — [github.com/bradygaster/squad](https://github.com/bradygaster/squad)*
+*Demo created for the Squad project — [github.com/github/squad](https://github.com/github/squad)*

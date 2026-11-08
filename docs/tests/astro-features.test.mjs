@@ -7,6 +7,15 @@ import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import path from 'node:path';
+import {
+  RETIRED_SITE_LINK,
+  SCANNED_PATHS,
+  SITE_SETTINGS,
+  findLinks,
+  readScannedFiles,
+  readSetting,
+  scanOldRepoLinks,
+} from '../../scripts/docs-site-location.mjs';
 
 const DOCS_ROOT = path.resolve(import.meta.dirname, '..');
 const SRC = path.join(DOCS_ROOT, 'src');
@@ -52,7 +61,7 @@ describe('"Edit this page" link', () => {
   it('DocsLayout.astro contains edit-this-page link', () => {
     const layout = fs.readFileSync(path.join(SRC, 'layouts', 'DocsLayout.astro'), 'utf-8');
     assert.ok(layout.includes('edit-this-page') || layout.includes('Edit this page'), 'DocsLayout should include Edit this page link');
-    assert.ok(layout.includes('github.com/bradygaster/squad/edit'), 'Edit link should point to GitHub edit URL');
+    assert.ok(layout.includes('github.com/github/squad/edit'), 'Edit link should point to the github/squad edit URL');
   });
 });
 
@@ -135,5 +144,37 @@ describe('View Transitions', () => {
   it('BaseLayout.astro renders <ClientRouter /> in the <head>', () => {
     const layout = fs.readFileSync(path.join(SRC, 'layouts', 'BaseLayout.astro'), 'utf-8');
     assert.ok(layout.includes('<ClientRouter />') || layout.includes('<ClientRouter/>'), 'BaseLayout should render <ClientRouter />');
+  });
+});
+
+// 11. site location: the repo moved to github/squad, and GitHub Pages does not redirect the
+// retired bradygaster.github.io site to github.github.com/squad/. The contract lives in
+// scripts/docs-site-location.mjs, shared with test/docs-site-location.test.ts (CI), which also
+// pins its patterns and allowlist with examples.
+describe('docs site location', () => {
+  let scanned;
+  const scannedFiles = () => (scanned ??= readScannedFiles());
+
+  for (const setting of SITE_SETTINGS) {
+    it(`${setting.name} in ${setting.file} is ${setting.expected}`, () => {
+      const { value, at } = readSetting(setting);
+      assert.equal(value, setting.expected, `${at}: ${setting.name} is ${value}`);
+    });
+  }
+
+  it('scans the tracked docs, samples, READMEs and contributor guides', () => {
+    const paths = scannedFiles().map((file) => file.path);
+    const emptyRoots = SCANNED_PATHS.filter((root) => !paths.some((file) => file === root || file.startsWith(`${root}/`)));
+    assert.deepEqual(emptyRoots, [], `scanned paths with no tracked text files: ${emptyRoots.join(', ')}`);
+  });
+
+  it('nothing scanned links to the retired bradygaster.github.io site', () => {
+    const offenders = findLinks(scannedFiles(), RETIRED_SITE_LINK);
+    assert.deepEqual(offenders, [], `Links to the retired docs site (use https://github.github.com/squad/...):\n${offenders.join('\n')}`);
+  });
+
+  it('everything scanned links to github/squad, apart from the historical records in HISTORICAL_REPO_LINKS', () => {
+    const { offenders } = scanOldRepoLinks(scannedFiles());
+    assert.deepEqual(offenders, [], `Links to the old bradygaster/squad repository (use https://github.com/github/squad):\n${offenders.join('\n')}`);
   });
 });

@@ -43,7 +43,7 @@ them together.
 
 **Step 1: Fork the repo on GitHub**
 
-Go to [github.com/bradygaster/squad](https://github.com/bradygaster/squad) and click "Fork" to create your own copy.
+Go to [github.com/github/squad](https://github.com/github/squad) and click "Fork" to create your own copy.
 
 **Step 2: Clone your fork**
 
@@ -55,7 +55,7 @@ cd squad
 **Step 3: Add upstream remote**
 
 ```bash
-git remote add upstream git@github.com:bradygaster/squad.git
+git remote add upstream git@github.com:github/squad.git
 ```
 
 **Step 4: Fetch the dev branch**
@@ -154,7 +154,7 @@ The Co-authored-by trailer is **required** for all commits (added by Copilot CLI
 
 1. Add a changeset: `npx changeset add` (required before PR — see Changesets section)
 2. Push your branch: `git push origin {yourusername}/217-readme-help-update`
-3. Create a PR with explicit base and head: `gh pr create --base dev --repo bradygaster/squad --head {yourusername}:your-branch`
+3. Create a PR with explicit base and head: `gh pr create --base dev --repo github/squad --head {yourusername}:your-branch`
 4. Link the issue: Add `Closes #217` to PR description
 5. Wait for CI checks to pass
 6. Request review from the team (agents will respond via comments)

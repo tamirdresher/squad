@@ -6,7 +6,7 @@ order: 26
 
 # Production Observability
 
-> 🔗 **Related:** [Aspire Dashboard](./aspire-dashboard) (local dev telemetry) · [Production Troubleshooting Runbook](./production-troubleshooting) · [Container Image — Env Var Contract](/squad/docs/reference/container-image/) · [#1144](https://github.com/bradygaster/squad/issues/1144) (embedded-host telemetry — tracked separately)
+> 🔗 **Related:** [Aspire Dashboard](./aspire-dashboard) (local dev telemetry) · [Production Troubleshooting Runbook](./production-troubleshooting) · [Container Image — Env Var Contract](/squad/docs/reference/container-image/) · [#1144](https://github.com/github/squad/issues/1144) (embedded-host telemetry — tracked separately)
 
 ---
 
@@ -228,7 +228,7 @@ When filing a support issue or escalating an incident:
 2. Collect events: `kubectl get events -n squad --sort-by=.lastTimestamp > squad-events.txt`
 3. Export a 30-minute trace sample from Application Insights or Grafana Tempo
 4. Attach `kubectl describe pod -n squad <pod>` output
-5. Open an issue at [bradygaster/squad](https://github.com/bradygaster/squad/issues) with the above artifacts, redacting any PII from log excerpts
+5. Open an issue at [github/squad](https://github.com/github/squad/issues) with the above artifacts, redacting any PII from log excerpts
 
 ---
 
@@ -236,8 +236,8 @@ When filing a support issue or escalating an incident:
 
 | Issue | Status | Impact |
 |---|---|---|
-| [#1144](https://github.com/bradygaster/squad/issues/1144) | Open — embedded host telemetry | Squad running via `@github/copilot-sdk` does not yet expose OTLP. Production telemetry requires Squad CLI container mode. |
-| [#1577](https://github.com/bradygaster/squad/issues/1577) | Open — HTTP health endpoints | No `/healthz` or `/readyz` endpoint exists. Readiness cannot be confirmed via HTTP; Kubernetes relies on process restart policy only. |
+| [#1144](https://github.com/github/squad/issues/1144) | Open — embedded host telemetry | Squad running via `@github/copilot-sdk` does not yet expose OTLP. Production telemetry requires Squad CLI container mode. |
+| [#1577](https://github.com/github/squad/issues/1577) | Open — HTTP health endpoints | No `/healthz` or `/readyz` endpoint exists. Readiness cannot be confirmed via HTTP; Kubernetes relies on process restart policy only. |
 
 ---
 

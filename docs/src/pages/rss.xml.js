@@ -10,7 +10,7 @@ export async function GET(context) {
   return rss({
     title: 'Squad Docs - Blog',
     description: 'Updates, releases, and stories from the Squad team.',
-    site: context.site ?? 'https://bradygaster.github.io/squad/',
+    site: context.site ?? 'https://github.github.com/squad/',
     items: sorted.map((post) => ({
       title: post.data.title ?? post.id,
       pubDate: new Date(post.data.date),

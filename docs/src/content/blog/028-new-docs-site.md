@@ -61,7 +61,7 @@ Both contributors are now credited in [CONTRIBUTORS.md](https://github.com/brady
 
 ---
 ## Try It
-Visit the docs at [bradygaster.github.io/squad](https://bradygaster.github.io/squad/) or run them locally:
+Visit the docs at [bradygaster.github.io/squad](https://github.github.com/squad/) or run them locally:
 ```bash
 cd docs
 npm install

@@ -18,7 +18,7 @@ your environment can reach the npm registry.
 ### macOS and Linux
 
 ```sh
-curl -fsSL https://raw.githubusercontent.com/bradygaster/squad/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/github/squad/main/scripts/install.sh | sh
 ```
 
 The installer picks the right bundle for your platform, verifies it against the
@@ -29,11 +29,11 @@ release `SHA256SUMS.txt`, unpacks it into `$PREFIX/lib/squad`, and symlinks
 |----------|---------|---------|
 | `VERSION` | latest release | Install a specific version |
 | `PREFIX` | `/usr/local` as root, else `$HOME/.local` | Install location |
-| `REPO` | `bradygaster/squad` | Source repository or internal mirror |
+| `REPO` | `github/squad` | Source repository or internal mirror |
 
 ```sh
 # pin a version and install somewhere specific
-curl -fsSL https://raw.githubusercontent.com/bradygaster/squad/main/scripts/install.sh \
+curl -fsSL https://raw.githubusercontent.com/github/squad/main/scripts/install.sh \
   | VERSION="v0.13.1" PREFIX="$HOME/tools" sh
 ```
 
@@ -46,7 +46,7 @@ winget install bradygaster.Squad
 ```
 
 Or download `squad-win32-x64.zip` (or `squad-win32-arm64.zip`) from the
-[releases page](https://github.com/bradygaster/squad/releases), unpack it, and
+[releases page](https://github.com/github/squad/releases), unpack it, and
 add the folder to your `PATH`.
 
 ### macOS
@@ -146,7 +146,7 @@ Point `repository:` at an internal mirror if your runners cannot reach
   env:
     SQUAD_VERSION: v0.13.1
   run: |
-    curl -fsSL https://raw.githubusercontent.com/bradygaster/squad/main/scripts/install.sh \
+    curl -fsSL https://raw.githubusercontent.com/github/squad/main/scripts/install.sh \
       | VERSION="${SQUAD_VERSION}" PREFIX="${HOME}/.local" sh
     echo "${HOME}/.local/bin" >> "${GITHUB_PATH}"
 

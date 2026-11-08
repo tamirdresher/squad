@@ -173,7 +173,7 @@ See the [Notifications Guide](../features/notifications.md) for [platform setup]
 ---
 ## Sample Prompts
 ```
-connect to bradygaster/squad and show me the backlog
+connect to github/squad and show me the backlog
 ```
 Links Squad to a GitHub repo and displays all open issues.
 ```

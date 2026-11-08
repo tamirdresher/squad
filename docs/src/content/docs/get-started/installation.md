@@ -41,7 +41,7 @@ The verified install script selects the correct archive, checks its SHA-256,
 and installs it under `/usr/local` or `$HOME/.local`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/bradygaster/squad/main/scripts/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/github/squad/main/scripts/install.sh | sh
 ```
 
 ### Homebrew on macOS
@@ -82,7 +82,7 @@ Homebrew cask or WinGet package before switching channels.
 ### Direct download
 
 Download the archive for your operating system and CPU from
-[GitHub Releases](https://github.com/bradygaster/squad/releases/latest):
+[GitHub Releases](https://github.com/github/squad/releases/latest):
 
 ```text
 squad-linux-x64.tar.gz     squad-darwin-x64.tar.gz    squad-win32-x64.zip

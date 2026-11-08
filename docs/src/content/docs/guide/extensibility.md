@@ -44,7 +44,7 @@ Where does your change idea belong? Squad core, marketplace plugin, or team conf
 
 ## Worked example: Client-delivery RFC
 
-[RFC #328](https://github.com/bradygaster/squad/issues/328) proposed a sophisticated client-delivery workflow: discovery interviews, research sprints, multi-round review with `SHIP`/`NEEDS_WORK`/`BLOCKED` verdicts, evidence bundles.
+[RFC #328](https://github.com/github/squad/issues/328) proposed a sophisticated client-delivery workflow: discovery interviews, research sprints, multi-round review with `SHIP`/`NEEDS_WORK`/`BLOCKED` verdicts, evidence bundles.
 
 **The realization:** It maps entirely to existing Squad primitives. No core changes needed.
 
@@ -131,8 +131,8 @@ Install records lock data and leaves the plugin disabled. Enable activates the r
 - [Ceremonies](../features/ceremonies.md) — How to define team meetings and gates
 - [Routing](../features/routing.md) — How to configure work assignment rules
 - [Building extensions](./building-extensions.md) — Step-by-step guide to building and sharing extensions
-- [Contributing](https://github.com/bradygaster/squad/blob/main/CONTRIBUTING.md) — How to propose changes to Squad core
+- [Contributing](https://github.com/github/squad/blob/main/CONTRIBUTING.md) — How to propose changes to Squad core
 
 ---
 
-**Questions?** [Open an issue](https://github.com/bradygaster/squad/issues/new) or join the discussion in the Squad community.
+**Questions?** [Open an issue](https://github.com/github/squad/issues/new) or join the discussion in the Squad community.

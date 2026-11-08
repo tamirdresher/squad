@@ -1,4 +1,4 @@
 User-agent: *
 Allow: /
-Sitemap: https://squad.dev/sitemap-index.xml
+Sitemap: https://github.github.com/squad/sitemap-index.xml
 

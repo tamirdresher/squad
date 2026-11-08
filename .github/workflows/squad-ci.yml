@@ -68,6 +68,10 @@ jobs:
         with:
           node-version: '22.23.4'
           cache: 'npm'
+      # Docs-only pull requests skip the `test` job, so the docs site location guard runs here
+      # as well. The suite uses Node built-ins only, so it needs no npm install.
+      - name: Docs feature and site location tests
+        run: node --test docs/tests/astro-features.test.mjs
       - name: Install docs tools
         run: |
           success=false
