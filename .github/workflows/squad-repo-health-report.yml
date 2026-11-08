@@ -1,0 +1,100 @@
+name: Repo Health Report
+
+# Privileged half of Repo Health (squad-repo-health.yml). The github org blocks
+# pull_request_target, so the scanners run under `pull_request` and upload their
+# results as artifacts. workflow_run runs THIS file from the default branch with
+# a write token.
+#
+# Trust boundary:
+# - Only default-branch scripts run. PR code is never checked out or executed,
+#   and the PR head is not fetched here at all.
+# - The results are untrusted data. Each scanner's artifact is downloaded by its
+#   exact name into its own directory. scripts/repo-health-report.mjs enforces a
+#   size limit and an exact schema, requires every result to name the same PR
+#   and head SHA, and binds them to the workflow_run payload and the live PR
+#   (same head SHA, same head repository, this base repository, still open,
+#   based on dev).
+# - Results are posted only when the run's head commit (workflow_run.head_sha)
+#   holds the same squad-repo-health.yml blob as its merge base with dev. Both
+#   blobs are read by commit SHA, so a push after binding cannot change the
+#   answer. Then that run used the base branch's definition, so its scanners
+#   came from the PR's base commit. Otherwise nothing is posted, and the bot's
+#   existing marker comments are overwritten with a fixed notice naming the
+#   refused commit (see .github/REPO_HEALTH_RUNBOOK.md).
+on:
+  workflow_run:
+    workflows: ["Repo Health"]
+    types: [completed]
+
+permissions:
+  actions: read
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
+  cancel-in-progress: true
+
+jobs:
+  report:
+    name: Post Repo Health findings
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    # `failure` is included so a red Bootstrap Protection check does not hide the
+    # other scanners' findings. Scanners that failed upload nothing.
+    if: >-
+      github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.path == '.github/workflows/squad-repo-health.yml'
+      && (github.event.workflow_run.conclusion == 'success'
+          || github.event.workflow_run.conclusion == 'failure')
+      && github.event.workflow_run.actor.login != 'dependabot[bot]'
+    steps:
+      - name: Checkout reporter scripts (default branch only)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/git-path-decoder.mjs
+            scripts/repo-health-comment.mjs
+            scripts/repo-health-report.mjs
+            scripts/workflow-run-pr-binding.mjs
+          sparse-checkout-cone-mode: false
+
+      # Each artifact by its exact name, into its own directory. A scanner that
+      # failed uploads nothing, so a missing artifact is expected, not an error.
+      - name: Download leakage result (untrusted data)
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 #v8
+        continue-on-error: true
+        with:
+          name: repo-health-leakage
+          path: ${{ runner.temp }}/repo-health/leakage
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Download architectural result (untrusted data)
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 #v8
+        continue-on-error: true
+        with:
+          name: repo-health-architectural
+          path: ${{ runner.temp }}/repo-health/architectural
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Download security result (untrusted data)
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 #v8
+        continue-on-error: true
+        with:
+          name: repo-health-security
+          path: ${{ runner.temp }}/repo-health/security
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      # Results reach the reporter as files named by env, never as script source (#1770).
+      - name: Validate, bind and post findings
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 #v9
+        env:
+          REPO_HEALTH_RESULTS: ${{ runner.temp }}/repo-health
+        with:
+          script: |
+            const { report } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/repo-health-report.mjs`);
+            await report({ github, context, core, dir: process.env.REPO_HEALTH_RESULTS });

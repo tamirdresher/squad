@@ -271,11 +271,20 @@ for (const root of roots) {
 
     it('heartbeat explicitly hands enabled Copilot auto-routing to issue-assign', async () => {
       const workflow = load(root, 'squad-heartbeat.yml');
+      // This repository's org blocks pull_request_target, so its active copy hears PR
+      // closes through the unprivileged squad-heartbeat-pr-closed.yml run. Shipped
+      // templates still use pull_request_target for customer repositories.
+      const prClosed = root === '.github'
+        ? { workflow_run: { workflows: ['Squad Heartbeat PR Closed'], types: ['completed'] } }
+        : { pull_request_target: { types: ['closed'] } };
       expect(workflow.on, `${root}: monitoring triggers must remain`).toMatchObject({
         issues: { types: ['closed', 'labeled'] },
-        pull_request_target: { types: ['closed'] },
+        ...prClosed,
         workflow_dispatch: null,
       });
+      if (root === '.github') {
+        expect(workflow.on, `${root}: pull_request_target is blocked here`).not.toHaveProperty('pull_request_target');
+      }
       const result = await execute(workflow);
       expect(result.failures, root).toEqual([]);
       expect(result.labels, `${root}: heartbeat must still apply triage decisions`).toContainEqual(['squad:copilot']);

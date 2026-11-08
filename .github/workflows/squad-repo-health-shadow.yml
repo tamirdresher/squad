@@ -6,18 +6,21 @@ on:
     types: [opened, synchronize, reopened]
     paths:
       - '.github/workflows/squad-repo-health.yml'
+      - '.github/workflows/squad-repo-health-report.yml'
       - '.github/workflows/squad-repo-health-shadow.yml'
       - 'scripts/architectural-review.mjs'
       - 'scripts/check-squad-leakage.mjs'
       - 'scripts/git-path-decoder.mjs'
       - 'scripts/repo-health-comment.mjs'
+      - 'scripts/repo-health-report.mjs'
       - 'scripts/security-review.mjs'
+      - 'scripts/workflow-run-pr-binding.mjs'
       - 'test/scripts/check-squad-leakage.test.ts'
       - 'test/scripts/repo-health-comment-transport.test.ts'
 
 # This workflow intentionally runs the PR-head implementation with a read-only token.
 # Its scanner output and fake-Octokit reporter exercise are shadow evidence only.
-# The pull_request_target workflow remains the authoritative, base-controlled writer.
+# Repo Health Report (workflow_run, default branch) remains the authoritative writer.
 permissions:
   contents: read
 
@@ -50,7 +53,7 @@ jobs:
             echo '# Repo Health PR-head Shadow'
             echo
             echo '> **NON-AUTHORITATIVE:** These scanners came from the PR head and have no write token.'
-            printf '%s\n' "> Only a post-merge canary through \`Repo Health\` is authoritative for workflow/reporter changes."
+            printf '%s\n' "> Only a post-merge canary through \`Repo Health\` and \`Repo Health Report\` is authoritative for workflow/reporter changes."
             echo
             echo '## Squad leakage'
             echo '```text'

@@ -1,0 +1,26 @@
+name: Squad Heartbeat PR Closed
+
+# Unprivileged PR-close signal for Squad Heartbeat (Ralph).
+#
+# The github org blocks pull_request_target, and a `pull_request` run from a
+# fork or Dependabot gets a read-only token and no secrets. This run does not
+# check out or execute anything and uploads nothing: its completion is the whole
+# signal. squad-heartbeat.yml listens for it through workflow_run and does the
+# privileged work from the default branch, without reading anything from here.
+on:
+  pull_request:
+    types: [closed]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    steps:
+      - name: Signal PR close (no checkout, no PR code)
+        run: echo "PR closed; Squad Heartbeat (Ralph) runs from the default branch via workflow_run."

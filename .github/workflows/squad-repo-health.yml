@@ -1,17 +1,29 @@
 name: Repo Health
 
 on:
-  pull_request_target:
+  pull_request:
     branches: [dev]
     types: [opened, synchronize, reopened]
 
-# pull_request_target gives write token even for fork PRs.
-# SAFETY: We check out the BASE branch (trusted scripts) and fetch the PR
-# head only as a git ref for analysis — no PR-supplied code is executed.
+# Unprivileged half of Repo Health. The github org blocks pull_request_target,
+# so every job runs under `pull_request` with a read-only token and no secrets.
+# - A pull_request run uses this file as it is in the PR merge commit. Every
+#   checkout below is the PR's base commit (`ref: base.sha`), so the scanners and
+#   checks are base-controlled only when the PR leaves this file unchanged. A PR
+#   that edits this file controls every job of its own run, including the result
+#   of the Bootstrap Protection check. The compensating control is code-owner
+#   review: .github/CODEOWNERS line 4 requests it on every PR (whether dev
+#   requires it is a branch rule; see .github/REPO_HEALTH_RUNBOOK.md).
+# - The PR head is fetched only as Git data for diff/show and is never checked
+#   out or executed.
+# - Bootstrap Protection and Diff Size Guard report as PR checks, as before.
+# - Leakage, architectural and security results are uploaded as artifacts.
+#   squad-repo-health-report.yml (workflow_run, default branch) validates them,
+#   binds them to this PR head and posts the marker comments. It posts only when
+#   the run's head commit holds the same copy of this file as its merge base
+#   with dev (see .github/REPO_HEALTH_RUNBOOK.md).
 permissions:
   contents: read
-  pull-requests: write
-  issues: write
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
@@ -27,6 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
           sparse-checkout: |
             scripts/check-bootstrap-deps.mjs
           sparse-checkout-cone-mode: false
@@ -57,6 +70,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
       - name: Fetch PR head (data only — not executed)
         run: git fetch origin ${{ github.event.pull_request.head.sha }}
@@ -84,6 +98,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
       - name: Fetch PR head (data only — not executed)
         run: git fetch origin ${{ github.event.pull_request.head.sha }}
@@ -91,31 +106,29 @@ jobs:
         with:
           node-version: '22'
       - name: Detect .squad/ leakage
-        id: leakage
         run: |
           git fetch origin dev --quiet
-          OUTPUT=$(node scripts/check-squad-leakage.mjs origin/dev ${{ github.event.pull_request.head.sha }})
-          echo "$OUTPUT"
-          echo "result<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$OUTPUT" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-      # Report content is passed through the environment, never interpolated into
-      # the script body — findings legitimately contain backticks and `${`, which
-      # would terminate a template literal and corrupt the parsed script (#1770).
-      - name: Comment on leakage
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 #v9
+          mkdir -p "$RUNNER_TEMP/repo-health"
+          node scripts/check-squad-leakage.mjs origin/dev ${{ github.event.pull_request.head.sha }} > "$RUNNER_TEMP/repo-health/output.txt"
+          cat "$RUNNER_TEMP/repo-health/output.txt"
+      # Scanner output is data for squad-repo-health-report.yml, never script source (#1770).
+      - name: Package result for Repo Health Report
         env:
-          REPO_HEALTH_OUTPUT: ${{ steps.leakage.outputs.result }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          jq -n --arg job leakage --argjson pr_number "$PR_NUMBER" --arg head_sha "$HEAD_SHA" \
+            --rawfile output "$RUNNER_TEMP/repo-health/output.txt" \
+            '{schema: "squad-repo-health-result/v1", job: $job, pr_number: $pr_number, head_sha: $head_sha, output: $output}' \
+            > "$RUNNER_TEMP/repo-health/leakage.json"
+      - name: Upload result for Repo Health Report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7
         with:
-          script: |
-            const { run } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/repo-health-comment.mjs`);
-            await run({
-              github,
-              context,
-              output: process.env.REPO_HEALTH_OUTPUT || '',
-              job: 'leakage',
-            });
+          name: repo-health-leakage
+          path: ${{ runner.temp }}/repo-health/leakage.json
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
 
   # ─── Architectural Review (INFORMATIONAL) ───────────────────────────
   architectural-review:
@@ -126,6 +139,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
       - name: Fetch PR head (data only — not executed)
         run: git fetch origin ${{ github.event.pull_request.head.sha }}
@@ -133,29 +147,29 @@ jobs:
         with:
           node-version: '22'
       - name: Run architectural review
-        id: arch
         run: |
           git fetch origin dev --quiet
-          OUTPUT=$(node scripts/architectural-review.mjs origin/dev ${{ github.event.pull_request.head.sha }} 2>&1)
-          echo "$OUTPUT"
-          echo "result<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$OUTPUT" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-      # See #1770 — report content must never be spliced into the script source.
-      - name: Comment on findings
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 #v9
+          mkdir -p "$RUNNER_TEMP/repo-health"
+          node scripts/architectural-review.mjs origin/dev ${{ github.event.pull_request.head.sha }} > "$RUNNER_TEMP/repo-health/output.txt"
+          cat "$RUNNER_TEMP/repo-health/output.txt"
+      # Scanner output is data for squad-repo-health-report.yml, never script source (#1770).
+      - name: Package result for Repo Health Report
         env:
-          REPO_HEALTH_OUTPUT: ${{ steps.arch.outputs.result }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          jq -n --arg job architectural --argjson pr_number "$PR_NUMBER" --arg head_sha "$HEAD_SHA" \
+            --rawfile output "$RUNNER_TEMP/repo-health/output.txt" \
+            '{schema: "squad-repo-health-result/v1", job: $job, pr_number: $pr_number, head_sha: $head_sha, output: $output}' \
+            > "$RUNNER_TEMP/repo-health/architectural.json"
+      - name: Upload result for Repo Health Report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7
         with:
-          script: |
-            const { run } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/repo-health-comment.mjs`);
-            await run({
-              github,
-              context,
-              output: process.env.REPO_HEALTH_OUTPUT || '',
-              job: 'architectural',
-            });
+          name: repo-health-architectural
+          path: ${{ runner.temp }}/repo-health/architectural.json
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true
 
   # ─── Security Review (INFORMATIONAL) ────────────────────────────────
   security-review:
@@ -166,6 +180,7 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7
         with:
+          ref: ${{ github.event.pull_request.base.sha }}
           fetch-depth: 0
       - name: Fetch PR head (data only — not executed)
         run: git fetch origin ${{ github.event.pull_request.head.sha }}
@@ -173,26 +188,26 @@ jobs:
         with:
           node-version: '22'
       - name: Run security review
-        id: security
         run: |
           git fetch origin dev --quiet
-          OUTPUT=$(node scripts/security-review.mjs origin/dev ${{ github.event.pull_request.head.sha }} 2>&1)
-          echo "$OUTPUT"
-          echo "result<<EOF" >> "$GITHUB_OUTPUT"
-          echo "$OUTPUT" >> "$GITHUB_OUTPUT"
-          echo "EOF" >> "$GITHUB_OUTPUT"
-      # See #1770 — report content must never be spliced into the script source.
-      - name: Comment on findings
-        if: always()
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 #v9
+          mkdir -p "$RUNNER_TEMP/repo-health"
+          node scripts/security-review.mjs origin/dev ${{ github.event.pull_request.head.sha }} > "$RUNNER_TEMP/repo-health/output.txt"
+          cat "$RUNNER_TEMP/repo-health/output.txt"
+      # Scanner output is data for squad-repo-health-report.yml, never script source (#1770).
+      - name: Package result for Repo Health Report
         env:
-          REPO_HEALTH_OUTPUT: ${{ steps.security.outputs.result }}
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          jq -n --arg job security --argjson pr_number "$PR_NUMBER" --arg head_sha "$HEAD_SHA" \
+            --rawfile output "$RUNNER_TEMP/repo-health/output.txt" \
+            '{schema: "squad-repo-health-result/v1", job: $job, pr_number: $pr_number, head_sha: $head_sha, output: $output}' \
+            > "$RUNNER_TEMP/repo-health/security.json"
+      - name: Upload result for Repo Health Report
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7
         with:
-          script: |
-            const { run } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/repo-health-comment.mjs`);
-            await run({
-              github,
-              context,
-              output: process.env.REPO_HEALTH_OUTPUT || '',
-              job: 'security',
-            });
+          name: repo-health-security
+          path: ${{ runner.temp }}/repo-health/security.json
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true

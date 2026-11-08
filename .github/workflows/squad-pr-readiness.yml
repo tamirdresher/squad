@@ -1,51 +1,90 @@
 name: Squad PR Readiness
 
+# Privileged half of the PR readiness checklist. The github org blocks
+# pull_request_target, so PR events arrive through squad-pr-readiness-request.yml
+# (`pull_request`, read-only token, no secrets, no checkout), which uploads only
+# a claim: the PR number and head SHA it ran for. Squad CI completions still
+# refresh the checklist. workflow_run runs THIS file from the default branch.
+#
+# Trust boundary:
+# - Only default-branch scripts run. PR code is never checked out or executed;
+#   every check reads the GitHub API.
+# - The claim is untrusted data: a fork controls the request workflow. It is
+#   parsed strictly and bound to the workflow_run payload and the live PR (same
+#   head SHA, same head repository, this base repository, still open) before
+#   anything is written. See scripts/workflow-run-pr-binding.mjs.
+# - Squad CI runs carry no claim, so only GitHub's own
+#   workflow_run.pull_requests (same-repository PRs) are bound, as before.
 on:
-  pull_request_target:
-    branches: [dev, main, insider]
-    types: [opened, synchronize, reopened, edited, ready_for_review]
   workflow_run:
-    workflows: ["Squad CI"]
+    workflows: ["Squad CI", "Squad PR Readiness Request"]
     types: [completed]
 
-# NOTE: Using pull_request_target so we get a write token even for fork PRs.
-# This is safe because we never check out or execute PR code — all data
-# comes from the GitHub API.
 permissions:
+  actions: read
   contents: read
   pull-requests: write
-  issues: write
   statuses: read
   checks: read
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
 jobs:
   readiness:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    # Skip bots, and skip workflow_run events with no associated PR
+    # Skip Dependabot, push runs of Squad CI, Squad CI runs with no
+    # same-repository PR, and request runs that did not succeed.
     if: >-
-      github.actor != 'dependabot[bot]'
-      && (github.event_name != 'workflow_run'
-          || github.event.workflow_run.pull_requests[0] != null)
+      github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.actor.login != 'dependabot[bot]'
+      && ((github.event.workflow_run.path == '.github/workflows/squad-ci.yml'
+           && github.event.workflow_run.pull_requests[0] != null)
+          || (github.event.workflow_run.path == '.github/workflows/squad-pr-readiness-request.yml'
+              && github.event.workflow_run.conclusion == 'success'))
     steps:
-      - name: Checkout scripts
+      - name: Checkout scripts (default branch only)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7
         with:
-          sparse-checkout: scripts/pr-readiness.mjs
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/pr-readiness.mjs
+            scripts/workflow-run-pr-binding.mjs
           sparse-checkout-cone-mode: false
+      - name: Download PR claim (untrusted data)
+        if: github.event.workflow_run.path == '.github/workflows/squad-pr-readiness-request.yml'
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 #v8
+        with:
+          name: squad-pr-readiness-request
+          path: ${{ runner.temp }}/pr-readiness-request
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+      - name: Bind the workflow run to its pull request
+        id: bind
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 #v9
+        env:
+          CLAIM_DIR: ${{ runner.temp }}/pr-readiness-request
+        with:
+          script: |
+            const { bindWorkflowRun } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/workflow-run-pr-binding.mjs`);
+            await bindWorkflowRun({
+              github,
+              context,
+              core,
+              claimDir: process.env.CLAIM_DIR,
+              claimWorkflowPath: '.github/workflows/squad-pr-readiness-request.yml',
+            });
       - name: Check PR readiness
+        if: steps.bind.outputs.bound == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ github.event.pull_request.number || github.event.workflow_run.pull_requests[0].number }}
-          PR_AUTHOR: ${{ github.event.pull_request.user.login || github.event.workflow_run.actor.login }}
-          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha || github.event.workflow_run.head_sha }}
-          PR_BASE_REF: ${{ github.event.pull_request.base.ref || github.event.workflow_run.pull_requests[0].base.ref }}
-          PR_DRAFT: ${{ github.event.pull_request.draft || 'false' }}
-          PR_LABELS: ${{ toJson(github.event.pull_request.labels) }}
+          PR_NUMBER: ${{ steps.bind.outputs.pr_number }}
+          PR_HEAD_SHA: ${{ steps.bind.outputs.head_sha }}
+          PR_BASE_REF: ${{ steps.bind.outputs.base_ref }}
+          PR_DRAFT: ${{ steps.bind.outputs.draft }}
+          PR_LABELS: ${{ steps.bind.outputs.labels }}
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
           RUN_NAME: ${{ github.workflow }}

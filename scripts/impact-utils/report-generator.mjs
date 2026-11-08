@@ -80,7 +80,7 @@ export function generateReport({ prNumber, risk, modules, files, criticalFiles }
 
   lines.push('---');
   lines.push(
-    '*This report is generated automatically for every PR. See [#733](https://github.com/bradygaster/squad/issues/733) for details.*',
+    '*This report is generated automatically for every PR. See [#733](https://github.com/github/squad/issues/733) for details.*',
   );
 
   return lines.join('\n');

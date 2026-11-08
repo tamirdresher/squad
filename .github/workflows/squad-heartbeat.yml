@@ -16,14 +16,16 @@ on:
   # React to completed work or new squad work
   issues:
     types: [closed, labeled]
-  # pull_request_target (not pull_request): GITHUB_TOKEN is forced read-only
-  # for `pull_request` events triggered by a fork, so write steps below
-  # (addLabels/createComment) 403 on fork PR closes (#2080-class bug).
-  # Safe here because the checkout step below has no `ref:` override, so it
-  # always checks out the BASE ref — no fork code or fork-controlled input
-  # is ever read or executed by this job.
-  pull_request_target:
-    types: [closed]
+  # PR closes (same-repo, fork and Dependabot). The github org blocks
+  # pull_request_target, and a fork `pull_request` run only gets a read-only
+  # token, so write steps below would 403 there (#2080-class bug). The
+  # unprivileged squad-heartbeat-pr-closed.yml run only signals the close;
+  # workflow_run then runs THIS default-branch file with the write token. The
+  # checkout below has no `ref:`, so it is the default branch, and this job
+  # reads no artifact, output or field from the PR run.
+  workflow_run:
+    workflows: ["Squad Heartbeat PR Closed"]
+    types: [completed]
 
   # Manual trigger
   workflow_dispatch:
@@ -42,6 +44,11 @@ concurrency:
 jobs:
   heartbeat:
     runs-on: ubuntu-latest
+    if: >-
+      github.event_name != 'workflow_run'
+      || (github.event.workflow_run.event == 'pull_request'
+          && github.event.workflow_run.conclusion == 'success'
+          && github.event.workflow_run.path == '.github/workflows/squad-heartbeat-pr-closed.yml')
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7
 

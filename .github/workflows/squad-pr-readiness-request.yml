@@ -1,0 +1,47 @@
+name: Squad PR Readiness Request
+
+# Unprivileged half of Squad PR Readiness (squad-pr-readiness.yml).
+#
+# The github org blocks pull_request_target. This `pull_request` run has a
+# read-only token and no secrets, checks out nothing, and runs no PR code. It
+# only uploads a claim: the PR number and head SHA it ran for. The privileged
+# half treats that claim as untrusted, binds it to the workflow_run payload and
+# the live PR, and computes every check itself from the GitHub API.
+#
+# The job keeps the name `readiness` so scripts/pr-readiness.mjs still excludes
+# this workflow's own check run from the "CI passing" check (SELF_CHECK_NAMES).
+on:
+  pull_request:
+    branches: [dev, main, insider]
+    types: [opened, synchronize, reopened, edited, ready_for_review]
+
+permissions: {}
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  readiness:
+    runs-on: ubuntu-latest
+    timeout-minutes: 2
+    if: github.actor != 'dependabot[bot]'
+    steps:
+      - name: Write PR claim (no checkout, no PR code)
+        env:
+          PR_NUMBER: ${{ github.event.pull_request.number }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+        run: |
+          mkdir -p "$RUNNER_TEMP/claim"
+          jq -n --argjson pr_number "$PR_NUMBER" --arg head_sha "$HEAD_SHA" \
+            '{schema: "squad-pr-claim/v1", pr_number: $pr_number, head_sha: $head_sha}' \
+            > "$RUNNER_TEMP/claim/claim.json"
+
+      - name: Upload PR claim
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 #v7
+        with:
+          name: squad-pr-readiness-request
+          path: ${{ runner.temp }}/claim/claim.json
+          if-no-files-found: error
+          retention-days: 1
+          overwrite: true

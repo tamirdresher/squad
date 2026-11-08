@@ -1,53 +1,97 @@
 name: Squad Impact Analysis
 
+# Privileged half of the impact report. The github org blocks
+# pull_request_target, so squad-impact-request.yml runs on `pull_request`
+# (read-only token, no secrets, no checkout) and uploads only a claim: the PR
+# number and head SHA it ran for. workflow_run runs THIS file from the default
+# branch with a write token.
+#
+# Trust boundary:
+# - The claim is untrusted data: a fork controls the request workflow. It is
+#   parsed strictly and bound to the workflow_run payload and the live PR (same
+#   head SHA, same head repository, this base repository, still open) before
+#   anything is written. See scripts/workflow-run-pr-binding.mjs.
+# - Only default-branch scripts run. PR code is never checked out or executed;
+#   the report is computed from the GitHub API file list.
 on:
-  pull_request_target:
-    branches: [dev]
-    types: [opened, synchronize, reopened]
+  workflow_run:
+    workflows: ["Squad Impact Analysis Request"]
+    types: [completed]
 
-# Security: Using pull_request_target so we get a write token for fork PRs.
-# Scripts are checked out from the BASE branch (trusted), not the PR head.
-# PR data is fetched read-only via gh CLI — no untrusted code is executed.
 permissions:
+  actions: read
   contents: read
   pull-requests: write
-  issues: write
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
   cancel-in-progress: true
 
 jobs:
   impact:
     runs-on: ubuntu-latest
     timeout-minutes: 5
-    if: github.actor != 'dependabot[bot]'
+    if: >-
+      github.event.workflow_run.event == 'pull_request'
+      && github.event.workflow_run.conclusion == 'success'
+      && github.event.workflow_run.path == '.github/workflows/squad-impact-request.yml'
+      && github.event.workflow_run.actor.login != 'dependabot[bot]'
     steps:
-      - name: Checkout scripts (base branch only)
+      - name: Checkout scripts (default branch only)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7
         with:
+          persist-credentials: false
           sparse-checkout: |
             scripts/analyze-impact.mjs
             scripts/impact-utils/parse-diff.mjs
             scripts/impact-utils/risk-scorer.mjs
             scripts/impact-utils/report-generator.mjs
+            scripts/workflow-run-pr-binding.mjs
           sparse-checkout-cone-mode: false
 
+      - name: Download PR claim (untrusted data)
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 #v8
+        with:
+          name: squad-impact-request
+          path: ${{ runner.temp }}/impact-request
+          run-id: ${{ github.event.workflow_run.id }}
+          github-token: ${{ github.token }}
+
+      - name: Bind claim to the workflow run and live PR
+        id: bind
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 #v9
+        env:
+          CLAIM_DIR: ${{ runner.temp }}/impact-request
+        with:
+          script: |
+            const { bindWorkflowRun } = await import(`${process.env.GITHUB_WORKSPACE}/scripts/workflow-run-pr-binding.mjs`);
+            await bindWorkflowRun({
+              github,
+              context,
+              core,
+              claimDir: process.env.CLAIM_DIR,
+              claimWorkflowPath: '.github/workflows/squad-impact-request.yml',
+            });
+
       - name: Setup Node.js
+        if: steps.bind.outputs.bound == 'true'
         uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 #v6
         with:
           node-version: 22
 
       - name: Run impact analysis
+        if: steps.bind.outputs.bound == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITHUB_REPOSITORY: ${{ github.repository }}
-        run: node scripts/analyze-impact.mjs ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.bind.outputs.pr_number }}
+        run: node scripts/analyze-impact.mjs "$PR_NUMBER"
 
       - name: Post impact report
+        if: steps.bind.outputs.bound == 'true'
         uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 #v9
         env:
-          PR_NUMBER: ${{ github.event.pull_request.number }}
+          PR_NUMBER: ${{ steps.bind.outputs.pr_number }}
         with:
           script: |
             const fs = require('fs');
