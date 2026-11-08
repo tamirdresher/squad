@@ -15,6 +15,17 @@ name: Squad PR Readiness
 #   anything is written. See scripts/workflow-run-pr-binding.mjs.
 # - Squad CI runs carry no claim, so only GitHub's own
 #   workflow_run.pull_requests (same-repository PRs) are bound, as before.
+#
+# Concurrency: only bound runs deduplicate, one group per PR head. A
+# workflow-level group is joined by every delivery before any job's `if:` is
+# evaluated, so a skipped run (a fork or push run of Squad CI, a failed request)
+# could cancel a real refresh, and PRs from one head branch to different bases
+# would share a key. So `bind` joins no group, and `readiness` joins one keyed
+# by the bound PR number and head SHA. It is skipped when nothing was bound.
+# `bind` checks the head outside any group, so a delivery can bind head A and
+# start `readiness` after head B's refresh started. Keyed by head, it cannot
+# cancel or replace B's refresh, and scripts/pr-readiness.mjs writes nothing
+# once the PR head is no longer A.
 on:
   workflow_run:
     workflows: ["Squad CI", "Squad PR Readiness Request"]
@@ -27,12 +38,12 @@ permissions:
   statuses: read
   checks: read
 
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.workflow_run.head_repository.full_name }}-${{ github.event.workflow_run.head_branch }}
-  cancel-in-progress: true
-
 jobs:
-  readiness:
+  bind:
+    # workflow_run check runs land on the default-branch tip, the head commit of
+    # any PR from dev (dev to main). scripts/pr-readiness.mjs lists this name and
+    # `readiness` in SELF_CHECK_NAMES, so that PR's "CI passing" ignores them.
+    name: readiness-bind
     runs-on: ubuntu-latest
     timeout-minutes: 5
     # Skip Dependabot, push runs of Squad CI, Squad CI runs with no
@@ -44,13 +55,19 @@ jobs:
            && github.event.workflow_run.pull_requests[0] != null)
           || (github.event.workflow_run.path == '.github/workflows/squad-pr-readiness-request.yml'
               && github.event.workflow_run.conclusion == 'success'))
+    outputs:
+      bound: ${{ steps.bind.outputs.bound }}
+      pr_number: ${{ steps.bind.outputs.pr_number }}
+      head_sha: ${{ steps.bind.outputs.head_sha }}
+      base_ref: ${{ steps.bind.outputs.base_ref }}
+      draft: ${{ steps.bind.outputs.draft }}
+      labels: ${{ steps.bind.outputs.labels }}
     steps:
-      - name: Checkout scripts (default branch only)
+      - name: Checkout binding script (default branch only)
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7
         with:
           persist-credentials: false
           sparse-checkout: |
-            scripts/pr-readiness.mjs
             scripts/workflow-run-pr-binding.mjs
           sparse-checkout-cone-mode: false
       - name: Download PR claim (untrusted data)
@@ -76,15 +93,33 @@ jobs:
               claimDir: process.env.CLAIM_DIR,
               claimWorkflowPath: '.github/workflows/squad-pr-readiness-request.yml',
             });
+
+  readiness:
+    needs: bind
+    # Runs only for a bound PR. When bind is skipped, fails or binds nothing,
+    # this job is skipped and never joins the group below.
+    if: needs.bind.outputs.bound == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    concurrency:
+      group: squad-pr-readiness-${{ needs.bind.outputs.pr_number }}-${{ needs.bind.outputs.head_sha }}
+      cancel-in-progress: true
+    steps:
+      - name: Checkout readiness script (default branch only)
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 #v7
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            scripts/pr-readiness.mjs
+          sparse-checkout-cone-mode: false
       - name: Check PR readiness
-        if: steps.bind.outputs.bound == 'true'
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          PR_NUMBER: ${{ steps.bind.outputs.pr_number }}
-          PR_HEAD_SHA: ${{ steps.bind.outputs.head_sha }}
-          PR_BASE_REF: ${{ steps.bind.outputs.base_ref }}
-          PR_DRAFT: ${{ steps.bind.outputs.draft }}
-          PR_LABELS: ${{ steps.bind.outputs.labels }}
+          PR_NUMBER: ${{ needs.bind.outputs.pr_number }}
+          PR_HEAD_SHA: ${{ needs.bind.outputs.head_sha }}
+          PR_BASE_REF: ${{ needs.bind.outputs.base_ref }}
+          PR_DRAFT: ${{ needs.bind.outputs.draft }}
+          PR_LABELS: ${{ needs.bind.outputs.labels }}
           REPO_OWNER: ${{ github.repository_owner }}
           REPO_NAME: ${{ github.event.repository.name }}
           RUN_NAME: ${{ github.workflow }}

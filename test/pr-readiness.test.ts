@@ -824,7 +824,7 @@ describe('run()', () => {
       compare: { behind_by: 0 },
       reviews: [{ user: { login: 'copilot-pull-request-reviewer' }, state: 'APPROVED', submitted_at: '2025-01-01T00:00:00Z' }],
       files: [{ filename: '.changeset/feat.md', additions: 5, deletions: 0 }],
-      pr: { mergeable: true },
+      pr: { head: { sha: 'abc123' }, mergeable: true },
       checkRuns: { check_runs: [{ name: 'build', conclusion: 'success', status: 'completed' }] },
       status: { statuses: [{ state: 'success' }] },
       comments: [],
@@ -844,6 +844,8 @@ describe('run()', () => {
       },
     };
     const data = { ...defaults, ...overrides };
+    // The live PR keeps the bound head (PR_HEAD_SHA) unless a test overrides it.
+    data.pr = { ...defaults.pr, ...data.pr };
 
     return vi.fn().mockImplementation(async (url, opts) => {
       const headers = new Map([['link', '']]);
@@ -940,7 +942,7 @@ describe('run()', () => {
       if (url.includes('/check-runs?')) return ok({ check_runs: [] });
       if (url.includes('/status')) return ok({ statuses: [] });
       if (url.includes('/comments?')) return ok([]);
-      if (url.match(/\/pulls\/\d+$/)) return ok({ mergeable: true });
+      if (url.match(/\/pulls\/\d+$/)) return ok({ head: { sha: 'abc123' }, mergeable: true });
       if (url.includes('/comments')) return ok({ id: 1 });
       return ok({});
     });
@@ -1063,13 +1065,17 @@ describe('run()', () => {
 
   it('falls back to env PR_DRAFT when PR API fetch fails', async () => {
     const mockFetch = createMockFetch();
+    let prReads = 0;
     mockFetch.mockImplementation(async (url, opts) => {
       const headers = new Map([['link', '']]);
       const ok = (json) => ({ ok: true, json: async () => json, headers });
 
       if (url === 'https://api.github.com/graphql') return ok({ data: { repository: { pullRequest: { reviewThreads: { nodes: [] } } } } });
-      // PR endpoint fails
-      if (url.match(/\/pulls\/\d+$/)) return { ok: false, status: 500, headers };
+      // The first PR read fails; the read before writing succeeds.
+      if (url.match(/\/pulls\/\d+$/)) {
+        prReads += 1;
+        return prReads === 1 ? { ok: false, status: 500, headers } : ok({ head: { sha: 'abc123' } });
+      }
       if (url.includes('/commits?')) return ok([{ sha: '1' }]);
       if (url.includes('/compare/')) return ok({ behind_by: 0 });
       if (url.includes('/reviews?')) return ok([]);
@@ -1107,5 +1113,102 @@ describe('run()', () => {
     expect(body).toContain('| `src/index.ts` | +25 −10 |');
     expect(body).toContain('| `test/index.test.ts` | +50 −0 |');
     expect(body).toContain('**Total: +75 −10**');
+  });
+
+  // -------------------------------------------------------------------------
+  // Out-of-order completion: bind checks the head outside the posting job's
+  // concurrency group, so a run bound to head A can post after head B was
+  // pushed and refreshed. It must not replace B's checklist with A's.
+  // -------------------------------------------------------------------------
+
+  describe('writes only while the PR head is still the bound head', () => {
+    const BOUND = 'a'.repeat(40);
+    const LIVE = 'b'.repeat(40);
+    const env = { ...baseEnv, PR_HEAD_SHA: BOUND };
+
+    /** Each read of the PR returns the next head (null: the read fails); the last one repeats. */
+    function prReads(...heads) {
+      const mockFetch = createMockFetch({ comments: [{ id: 123, body: `${COMMENT_MARKER}\nB's checklist` }] });
+      const respond = mockFetch.getMockImplementation();
+      let reads = 0;
+      mockFetch.mockImplementation(async (url, opts) => {
+        if (!/\/pulls\/\d+$/.test(url)) return respond(url, opts);
+        const sha = heads[Math.min(reads++, heads.length - 1)];
+        const headers = new Map([['link', '']]);
+        if (sha === null) return { ok: false, status: 500, headers };
+        return { ok: true, json: async () => ({ head: { sha }, mergeable: true }), headers };
+      });
+      return mockFetch;
+    }
+
+    const writesOf = (mockFetch) => mockFetch.mock.calls
+      .filter(([url, opts]) => url.includes('/comments') && ['POST', 'PATCH'].includes(opts?.method))
+      .map(([url, opts]) => `${opts.method} ${url}`);
+    const ciQueriesFor = (mockFetch, sha) => mockFetch.mock.calls
+      .map(([url]) => url)
+      .filter((url) => url.includes(`/commits/${sha}/`));
+
+    async function runLogged(mockFetch) {
+      const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+      try {
+        const outcome = await run({ env, fetchFn: mockFetch }).then(
+          (result) => ({ result, error: null }),
+          (error) => ({ result: null, error }),
+        );
+        return { ...outcome, lines: log.mock.calls.map((args) => args.join(' ')) };
+      } finally {
+        log.mockRestore();
+      }
+    }
+    const naming = (lines, ...shas) => lines.filter((line) => shas.every((sha) => line.includes(sha)));
+
+    it('skips a late run bound to a head the PR no longer has, before querying CI', async () => {
+      const mockFetch = prReads(LIVE);
+      const { result, error, lines } = await runLogged(mockFetch);
+
+      expect(writesOf(mockFetch), `the run bound to ${BOUND} wrote while PR #42 is at ${LIVE}`).toEqual([]);
+      expect(error, `the run bound to ${BOUND} must exit cleanly while PR #42 is at ${LIVE}`).toBeNull();
+      expect(result, `the run bound to ${BOUND} while PR #42 is at ${LIVE}`).toEqual({ checks: [], action: 'skipped' });
+      expect(ciQueriesFor(mockFetch, BOUND), `the run bound to ${BOUND} queried CI after reading head ${LIVE}`)
+        .toEqual([]);
+      expect(naming(lines, BOUND, LIVE), `one log line must name ${BOUND} and ${LIVE}; logged ${JSON.stringify(lines)}`)
+        .toHaveLength(1);
+    });
+
+    it('skips when the head moves while the checks run, by reading it again before writing', async () => {
+      const mockFetch = prReads(BOUND, LIVE);
+      const { result, error, lines } = await runLogged(mockFetch);
+
+      expect(writesOf(mockFetch), `PR #42 moved from ${BOUND} to ${LIVE} before the write, but the run wrote`)
+        .toEqual([]);
+      expect(error, `the run bound to ${BOUND} must exit cleanly once PR #42 is at ${LIVE}`).toBeNull();
+      expect(result, `the run bound to ${BOUND} once PR #42 is at ${LIVE}`).toEqual({ checks: [], action: 'skipped' });
+      expect(naming(lines, BOUND, LIVE), `one log line must name ${BOUND} and ${LIVE}; logged ${JSON.stringify(lines)}`)
+        .toHaveLength(1);
+    });
+
+    it('writes nothing, and fails, when the head cannot be read before writing', async () => {
+      const mockFetch = prReads(BOUND, null);
+      const { error } = await runLogged(mockFetch);
+
+      expect(writesOf(mockFetch), `the run bound to ${BOUND} wrote although PR #42 could not be read before writing`)
+        .toEqual([]);
+      expect(String(error), `the run bound to ${BOUND} must fail when PR #42 cannot be read before writing`)
+        .toContain(`cannot confirm head ${BOUND}`);
+    });
+
+    it('still writes when the live head is the bound head', async () => {
+      const mockFetch = prReads(BOUND);
+      const { result, error, lines } = await runLogged(mockFetch);
+
+      expect(error, `the run bound to ${BOUND} failed while PR #42 is still at ${BOUND}`).toBeNull();
+      expect(writesOf(mockFetch), `PR #42 is still at bound head ${BOUND}, so the run must update its comment`)
+        .toEqual(['PATCH https://api.github.com/repos/testorg/testrepo/issues/comments/123']);
+      expect(result?.action, `the run bound to ${BOUND} while PR #42 is still at ${BOUND}`).toBe('updated');
+      expect(result?.checks).toHaveLength(9);
+      expect(ciQueriesFor(mockFetch, BOUND), `CI must be read for bound head ${BOUND}`).toHaveLength(2);
+      expect(naming(lines, BOUND), `nothing is skipped while PR #42 is at ${BOUND}; logged ${JSON.stringify(lines)}`)
+        .toEqual([]);
+    });
   });
 });

@@ -22,11 +22,21 @@ type Step = {
   env?: Record<string, string>;
   with?: Record<string, string | number | boolean>;
 };
-type Job = { name?: string; if?: string; permissions?: Record<string, string>; steps: Step[] };
+type Concurrency = string | { group: string; 'cancel-in-progress'?: boolean | string };
+type Job = {
+  name?: string;
+  if?: string;
+  needs?: string | string[];
+  outputs?: Record<string, string>;
+  concurrency?: Concurrency;
+  permissions?: Record<string, string>;
+  steps: Step[];
+};
 type Workflow = {
   name: string;
   on: Record<string, Record<string, unknown> | null>;
   permissions?: Record<string, string>;
+  concurrency?: Concurrency;
   jobs: Record<string, Job>;
 };
 
@@ -35,6 +45,8 @@ const text = (file: string) => readFileSync(join(workflowsDir, file), 'utf8');
 const load = (file: string) => parse(text(file)) as Workflow;
 const stepsOf = (workflow: Workflow) => Object.values(workflow.jobs).flatMap((job) => job.steps ?? []);
 const scriptOf = (step: Step) => String(step.with?.script ?? '');
+const needsOf = (job: Job) => [job.needs ?? []].flat();
+const groupOf = (concurrency: Concurrency) => (typeof concurrency === 'string' ? concurrency : concurrency.group);
 
 function triggers(workflow: Workflow): string[] {
   const on = workflow.on as unknown;
@@ -55,6 +67,46 @@ function workflowRunEvent(workflowRun: Record<string, unknown>) {
     actor: (workflowRun.actor as { login: string }).login,
     event: { workflow_run: workflowRun },
   };
+}
+
+/** Render the `${{ }}` expressions in a string like the runner; a missing value renders as ''. */
+function render(template: string, contexts: Record<string, unknown>): string {
+  return template.replace(/\$\{\{([\s\S]*?)\}\}/g, (_match, expression: string) => {
+    const value = runInNewContext(expression, contexts);
+    return value === undefined || value === null ? '' : String(value);
+  });
+}
+
+/**
+ * The concurrency groups one workflow_run delivery joins. GitHub puts the whole
+ * run in a workflow-level group before it evaluates any job's `if:`. A job-level
+ * group is joined only by a job that runs: every job it needs succeeded (the
+ * implicit success()) and its `if:` holds. `binding` is what the bind step sets,
+ * or null when it throws, which fails its job (a forged or malformed claim).
+ */
+function joinedGroups(
+  workflow: Workflow,
+  workflowRun: Record<string, unknown>,
+  binding: Record<string, string> | null,
+): string[] {
+  const github = { ...workflowRunEvent(workflowRun), workflow: workflow.name };
+  const groups = workflow.concurrency ? [render(groupOf(workflow.concurrency), { github })] : [];
+  const succeeded = new Map<string, Record<string, string>>();
+  for (const [id, job] of Object.entries(workflow.jobs)) {
+    if (!needsOf(job).every((need) => succeeded.has(need))) continue;
+    const needs = Object.fromEntries(
+      needsOf(job).map((need) => [need, { result: 'success', outputs: succeeded.get(need) }]),
+    );
+    if (job.if && !runInNewContext(job.if, { github, needs })) continue;
+    if (job.concurrency) groups.push(render(groupOf(job.concurrency), { github, needs }));
+    const binds = job.steps.some((step) => step.id === 'bind');
+    if (binds && binding === null) continue;
+    const steps = { bind: { outputs: binds ? binding ?? {} : {} } };
+    succeeded.set(id, Object.fromEntries(
+      Object.entries(job.outputs ?? {}).map(([key, value]) => [key, render(value, { steps })]),
+    ));
+  }
+  return groups;
 }
 
 interface Split {
@@ -194,10 +246,13 @@ for (const split of SPLITS) {
     });
 
     it('the writer checks out only the default branch and never fetches or runs PR code', () => {
-      const checkouts = writerSteps.filter((step) => step.uses?.startsWith('actions/checkout@'));
-      expect(checkouts.length, `${split.writer} checkouts`).toBe(1);
-      expect(checkouts[0].with?.ref, `${split.writer} checkout must not choose a ref`).toBeUndefined();
-      expect(checkouts[0].with?.repository, `${split.writer} checkout must not choose a repository`).toBeUndefined();
+      for (const [id, job] of Object.entries(writer.jobs)) {
+        const checkouts = job.steps.filter((step) => step.uses?.startsWith('actions/checkout@'));
+        expect(checkouts.length, `${split.writer} job ${id} checkouts`).toBe(1);
+        expect(checkouts[0].with?.ref, `${split.writer} job ${id} checkout must not choose a ref`).toBeUndefined();
+        expect(checkouts[0].with?.repository, `${split.writer} job ${id} checkout must not choose a repository`)
+          .toBeUndefined();
+      }
       const source = text(split.writer);
       expect(source, `${split.writer} has no pull_request payload`).not.toMatch(/github\.event\.pull_request\b/);
       expect(source, `${split.writer} must not fetch or switch to PR commits`).not.toMatch(/\bgit (?:fetch|checkout|switch)\b/);
@@ -208,9 +263,13 @@ for (const split of SPLITS) {
     });
 
     if (split.artifact) {
-      it('the writer downloads the request run\'s artifact as data, with a read-only checkout', () => {
-        const checkout = writerSteps.find((step) => step.uses?.startsWith('actions/checkout@'))!;
-        expect(checkout.with?.['persist-credentials'], `${split.writer} must not persist the write token`).toBe(false);
+      it('the writer downloads the request run\'s artifact as data, with read-only checkouts', () => {
+        for (const checkout of writerSteps.filter((step) => step.uses?.startsWith('actions/checkout@'))) {
+          expect(
+            checkout.with?.['persist-credentials'],
+            `${split.writer} / ${checkout.name ?? checkout.uses}: must not persist the write token`,
+          ).toBe(false);
+        }
         const download = writerSteps.find((step) => step.uses?.startsWith('actions/download-artifact@'));
         expect(download, `${split.writer} downloads the request artifact`).toBeTruthy();
         expect(download!.with).toMatchObject({
@@ -240,19 +299,35 @@ describe('claim-carrying requests upload only the claim the writer validates', (
     });
 
     it(`${split.writer} binds the claim before anything writes`, () => {
-      const steps = stepsOf(load(split.writer));
+      const jobs = Object.entries(load(split.writer).jobs);
+      const [bindJobId, bindJob] = jobs.find(([, job]) => job.steps.some((step) => step.id === 'bind')) ?? [];
+      expect(bindJobId, `${split.writer} needs a bind step`).toBeDefined();
+      expect(bindJobId, `${split.writer}: the first job, which the event filter gates, must bind`).toBe(jobs[0][0]);
+      const steps = bindJob!.steps;
       const download = steps.findIndex((step) => step.uses?.startsWith('actions/download-artifact@'));
       const bind = steps.findIndex((step) => step.id === 'bind');
-      expect(bind, `${split.writer} needs a bind step`).toBeGreaterThan(download);
+      expect(download, `${split.writer} job ${bindJobId} must download the claim it binds`).toBeGreaterThanOrEqual(0);
+      expect(bind, `${split.writer} must bind after downloading the claim`).toBeGreaterThan(download);
       expect(scriptOf(steps[bind])).toContain('/scripts/workflow-run-pr-binding.mjs');
       expect(scriptOf(steps[bind])).toContain(`claimWorkflowPath: '.github/workflows/${split.request}'`);
       expect(steps[bind].env).toEqual({ CLAIM_DIR: String(steps[download].with?.path) });
       const afterBind = steps.slice(bind + 1);
-      expect(afterBind.length).toBeGreaterThan(0);
       for (const step of afterBind) {
         expect(step.if, `${split.writer} / ${step.name ?? step.uses} must wait for the binding`)
           .toBe("steps.bind.outputs.bound == 'true'");
       }
+      // Any other job writes for the bound PR only, after the binding job.
+      const dependents = jobs.filter(([id]) => id !== bindJobId);
+      for (const [id, job] of dependents) {
+        expect(needsOf(job), `${split.writer} job ${id} must wait for job ${bindJobId}`).toContain(bindJobId);
+        expect(job.if, `${split.writer} job ${id} must run only for a bound PR`)
+          .toBe(`needs.${bindJobId}.outputs.bound == 'true'`);
+      }
+      if (dependents.length > 0) {
+        expect(bindJob!.outputs?.bound, `${split.writer} job ${bindJobId} must expose the binding`)
+          .toBe('${{ steps.bind.outputs.bound }}');
+      }
+      expect(afterBind.length + dependents.length, `${split.writer} does nothing after binding`).toBeGreaterThan(0);
     });
   }
 });
@@ -307,13 +382,23 @@ describe('Squad PR Readiness keeps its Squad CI refresh and old inputs', () => {
   });
 
   it('feeds the checklist only bound, API-sourced PR facts', () => {
-    const check = job.steps.find((step) => step.run === 'node scripts/pr-readiness.mjs');
-    expect(check?.env).toMatchObject({
-      PR_NUMBER: '${{ steps.bind.outputs.pr_number }}',
-      PR_HEAD_SHA: '${{ steps.bind.outputs.head_sha }}',
-      PR_BASE_REF: '${{ steps.bind.outputs.base_ref }}',
-      PR_DRAFT: '${{ steps.bind.outputs.draft }}',
-      PR_LABELS: '${{ steps.bind.outputs.labels }}',
+    expect(readiness.jobs.bind?.outputs, 'squad-pr-readiness.yml job bind must pass on only the bind step outputs')
+      .toEqual({
+        bound: '${{ steps.bind.outputs.bound }}',
+        pr_number: '${{ steps.bind.outputs.pr_number }}',
+        head_sha: '${{ steps.bind.outputs.head_sha }}',
+        base_ref: '${{ steps.bind.outputs.base_ref }}',
+        draft: '${{ steps.bind.outputs.draft }}',
+        labels: '${{ steps.bind.outputs.labels }}',
+      });
+    const check = stepsOf(readiness).find((step) => step.run === 'node scripts/pr-readiness.mjs');
+    const facts = Object.fromEntries(Object.entries(check?.env ?? {}).filter(([key]) => key.startsWith('PR_')));
+    expect(facts, 'squad-pr-readiness.yml / Check PR readiness: PR facts must come from job bind').toEqual({
+      PR_NUMBER: '${{ needs.bind.outputs.pr_number }}',
+      PR_HEAD_SHA: '${{ needs.bind.outputs.head_sha }}',
+      PR_BASE_REF: '${{ needs.bind.outputs.base_ref }}',
+      PR_DRAFT: '${{ needs.bind.outputs.draft }}',
+      PR_LABELS: '${{ needs.bind.outputs.labels }}',
     });
   });
 
@@ -322,6 +407,150 @@ describe('Squad PR Readiness keeps its Squad CI refresh and old inputs', () => {
     for (const [id, requestJob] of Object.entries(request.jobs)) {
       expect(SELF_CHECK_NAMES, `squad-pr-readiness-request.yml job ${id}`).toContain(requestJob.name ?? id);
     }
+  });
+
+  it('the writer check runs keep names the CI check excludes', () => {
+    // workflow_run check runs land on the default-branch tip: the head commit of any PR from dev.
+    for (const [id, writerJob] of Object.entries(readiness.jobs)) {
+      expect(SELF_CHECK_NAMES, `squad-pr-readiness.yml job ${id}`).toContain(writerJob.name ?? id);
+    }
+  });
+});
+
+// #2420: a workflow-level group is joined by every workflow_run delivery before any
+// job's `if:` is evaluated. Keyed by head branch, it let skipped runs (fork and push
+// runs of Squad CI) cancel real refreshes, and let PRs from one branch to different
+// bases cancel each other. Only bound runs may join a group, one per PR head.
+describe('Squad PR Readiness deduplicates only bound refreshes, per PR head', () => {
+  const FILE = 'squad-pr-readiness.yml';
+  const readiness = load(FILE);
+  const CI = '.github/workflows/squad-ci.yml';
+  const REQUEST = '.github/workflows/squad-pr-readiness-request.yml';
+  const HEAD_SHA = 'c'.repeat(40);
+  const delivery = (
+    path: string,
+    headRepository: string,
+    headBranch: string,
+    overrides: Record<string, unknown> = {},
+  ) => ({
+    event: 'pull_request',
+    conclusion: 'success',
+    path,
+    head_sha: HEAD_SHA,
+    head_branch: headBranch,
+    head_repository: { full_name: headRepository },
+    actor: { login: 'octocat' },
+    pull_requests: [],
+    ...overrides,
+  });
+  const bound = (pr: number, base: string, head = HEAD_SHA) => ({
+    bound: 'true', pr_number: String(pr), head_sha: head, base_ref: base, draft: 'false', labels: '[]',
+  });
+
+  it('sets no workflow-level group; only the bound posting job joins one, keyed by the PR number and head SHA', () => {
+    const workflowGroup = readiness.concurrency && groupOf(readiness.concurrency);
+    expect(readiness.concurrency, `${FILE} sets workflow-level group "${workflowGroup}"; every delivery joins it`)
+      .toBeUndefined();
+    const grouped = Object.fromEntries(Object.entries(readiness.jobs)
+      .filter(([, job]) => job.concurrency !== undefined)
+      .map(([id, job]) => [id, job.concurrency]));
+    expect(grouped, `${FILE} job-level concurrency groups: ${JSON.stringify(grouped)}`).toEqual({
+      readiness: {
+        group: 'squad-pr-readiness-${{ needs.bind.outputs.pr_number }}-${{ needs.bind.outputs.head_sha }}',
+        'cancel-in-progress': true,
+      },
+    });
+    expect(readiness.jobs.readiness?.needs, `${FILE} job readiness must wait for job bind`).toBe('bind');
+    expect(readiness.jobs.readiness?.if, `${FILE} job readiness must run only for a bound PR`)
+      .toBe("needs.bind.outputs.bound == 'true'");
+  });
+
+  const neverGrouped: Array<[string, Record<string, unknown>, Record<string, string> | null]> = [
+    ['a Squad CI run of a fork PR, which lists no PR', delivery(CI, 'contributor/squad', 'feature'), null],
+    ['a Squad CI push run on dev', delivery(CI, 'github/squad', 'dev', { event: 'push' }), null],
+    [
+      'a Dependabot Squad CI run',
+      delivery(CI, 'github/squad', 'dependabot/npm', {
+        actor: { login: 'dependabot[bot]' },
+        pull_requests: [{ number: 11 }],
+      }),
+      null,
+    ],
+    [
+      'a cancelled request run',
+      delivery(REQUEST, 'github/squad', 'feature', { conclusion: 'cancelled', pull_requests: [{ number: 7 }] }),
+      null,
+    ],
+    [
+      'a request run whose PR moved on or closed (unbound)',
+      delivery(REQUEST, 'contributor/squad', 'feature'),
+      { bound: 'false' },
+    ],
+    ['a request run with a forged claim (bind fails)', delivery(REQUEST, 'contributor/squad', 'feature'), null],
+  ];
+
+  it.each(neverGrouped)('%s joins no concurrency group', (label, workflowRun, binding) => {
+    const groups = joinedGroups(readiness, workflowRun, binding);
+    expect(groups, `${FILE}: ${label} joined ${groups.map((group) => `"${group}"`).join(', ')}`).toEqual([]);
+  });
+
+  it('runs for different PRs never share a group, and runs for one PR head still do', () => {
+    // #7 and #8 share a head branch but target different bases; #9 is a fork PR; #10 is dev → main.
+    const listed = { pull_requests: [{ number: 7 }, { number: 8 }] };
+    const ciOf7 = delivery(CI, 'github/squad', 'feature', { ...listed, conclusion: 'failure' });
+    const runs: Array<[number, string, Record<string, unknown>, Record<string, string>]> = [
+      [7, 'request run of #7 (feature → dev)', delivery(REQUEST, 'github/squad', 'feature', listed), bound(7, 'dev')],
+      [7, 'Squad CI run of #7', ciOf7, bound(7, 'dev')],
+      [8, 'request run of #8 (feature → main)', delivery(REQUEST, 'github/squad', 'feature', listed), bound(8, 'main')],
+      [9, 'request run of fork PR #9', delivery(REQUEST, 'contributor/squad', 'feature'), bound(9, 'dev')],
+      [
+        10,
+        'request run of #10 (dev → main)',
+        delivery(REQUEST, 'github/squad', 'dev', { pull_requests: [{ number: 10 }] }),
+        bound(10, 'main'),
+      ],
+    ];
+    const prsByGroup = new Map<string, { group: string; prs: Set<number> }>();
+    for (const [pr, label, workflowRun, binding] of runs) {
+      const groups = joinedGroups(readiness, workflowRun, binding);
+      expect(groups, `${FILE}: the ${label} must join exactly one group`).toHaveLength(1);
+      // GitHub compares group names case-insensitively.
+      const entry = prsByGroup.get(groups[0].toLowerCase()) ?? { group: groups[0], prs: new Set<number>() };
+      entry.prs.add(pr);
+      prsByGroup.set(groups[0].toLowerCase(), entry);
+    }
+    const shared = [...prsByGroup.values()]
+      .filter(({ prs }) => prs.size > 1)
+      .map(({ group, prs }) => `"${group}" is shared by ${[...prs].map((pr) => `#${pr}`).join(' and ')}`);
+    expect(shared, `${FILE}: concurrency groups shared by different PRs: ${shared.join('; ')}`).toEqual([]);
+    expect(prsByGroup.size, `${FILE}: runs of one PR head must share its group, so a newer refresh cancels an older one`)
+      .toBe(new Set(runs.map(([pr]) => pr)).size);
+  });
+
+  // GitHub cancels (cancel-in-progress) or replaces (while pending) only jobs in the same
+  // group. bind checks the head outside any group, so a delivery can bind head A and
+  // reach the posting job after head B's refresh started. In B's group it would cancel
+  // or replace that refresh, then skip as stale: B's checklist would never be posted.
+  it('a late run bound to an older head cannot cancel or replace the current head\'s refresh', () => {
+    const OLD = 'a'.repeat(40);
+    const NEW = 'b'.repeat(40);
+    const listed = { pull_requests: [{ number: 7 }] };
+    const groupFor = (label: string, path: string, head: string) => {
+      const workflowRun = delivery(path, 'github/squad', 'feature', { ...listed, head_sha: head });
+      const groups = joinedGroups(readiness, workflowRun, bound(7, 'dev', head));
+      expect(groups, `${FILE}: the ${label} must join exactly one group`).toHaveLength(1);
+      return groups[0];
+    };
+    const late = groupFor(`Squad CI run of #7 bound to ${OLD}`, CI, OLD);
+    const current = groupFor(`request run of #7 bound to ${NEW}`, REQUEST, NEW);
+    const currentCi = groupFor(`Squad CI run of #7 bound to ${NEW}`, CI, NEW);
+    // GitHub compares group names case-insensitively.
+    expect(
+      late.toLowerCase(),
+      `${FILE}: the late run bound to ${OLD} joins "${late}", the group of the refresh for current head ${NEW}`,
+    ).not.toBe(current.toLowerCase());
+    expect(currentCi.toLowerCase(), `${FILE}: refreshes of head ${NEW} must share one group, so the newer one wins`)
+      .toBe(current.toLowerCase());
   });
 });
 
