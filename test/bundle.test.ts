@@ -256,6 +256,15 @@ describe('npm-package', () => {
       const entry = pkg.exports['.'] as Record<string, string>;
       expect(entry.types).toBe('./dist/index.d.ts');
     });
+
+    it('points repository at the canonical github/squad source repo', () => {
+      // npm --provenance rejects a publish whose repository.url names a different repo.
+      const pkg = generatePackageJson(baseConfig);
+      expect(pkg.repository, 'generatePackageJson().repository').toEqual({
+        type: 'git',
+        url: 'https://github.com/github/squad.git',
+      });
+    });
   });
 
   describe('validatePackageJson', () => {
@@ -378,9 +387,9 @@ describe('github-dist', () => {
       expect(script).toContain('REPO="myrepo"');
     });
 
-    it('uses bradygaster/squad as default', () => {
+    it('uses github/squad as default', () => {
       const script = generateInstallScript();
-      expect(script).toContain('OWNER="bradygaster"');
+      expect(script).toContain('OWNER="github"');
       expect(script).toContain('REPO="squad"');
     });
 
@@ -398,7 +407,7 @@ describe('github-dist', () => {
 
   describe('validateGitHubRelease', () => {
     const config: GitHubDistConfig = {
-      owner: 'bradygaster',
+      owner: 'github',
       repo: 'squad',
       binaryName: 'squad',
       installCommandTemplate: 'npx @bradygaster/squad-cli',
@@ -481,9 +490,9 @@ describe('github-dist', () => {
   });
 
   describe('getDefaultDistConfig', () => {
-    it('returns config with bradygaster owner', () => {
+    it('returns config with github owner', () => {
       const config = getDefaultDistConfig();
-      expect(config.owner).toBe('bradygaster');
+      expect(config.owner).toBe('github');
     });
 
     it('returns config with squad repo', () => {
@@ -495,7 +504,7 @@ describe('github-dist', () => {
       const a = getDefaultDistConfig();
       a.owner = 'changed';
       const b = getDefaultDistConfig();
-      expect(b.owner).toBe('bradygaster');
+      expect(b.owner).toBe('github');
     });
   });
 });

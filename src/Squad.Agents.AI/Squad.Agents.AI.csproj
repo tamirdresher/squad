@@ -10,8 +10,8 @@
     <Description>Community SquadAgent for Microsoft Agent Framework. Exposes the Squad multi-agent CLI as an AIAgent that can be composed into any MAF app or workflow.</Description>
     <Authors>Tamir Dresher</Authors>
     <PackageTags>squad;agents;ai;copilot;maf;multi-agent</PackageTags>
-    <PackageProjectUrl>https://github.com/bradygaster/squad</PackageProjectUrl>
-    <RepositoryUrl>https://github.com/bradygaster/squad.git</RepositoryUrl>
+    <PackageProjectUrl>https://github.com/github/squad</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/github/squad.git</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
     <RepositoryBranch>main</RepositoryBranch>
     <PackageLicenseExpression>MIT</PackageLicenseExpression>

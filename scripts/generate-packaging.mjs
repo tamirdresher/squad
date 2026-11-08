@@ -31,9 +31,10 @@ import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
-const DEFAULT_REPO = 'bradygaster/squad';
+const DEFAULT_REPO = 'github/squad';
 const PACKAGE_IDENTIFIER = 'bradygaster.Squad';
-const HOMEPAGE = 'https://github.com/bradygaster/squad';
+const HOMEPAGE = 'https://github.com/github/squad';
+const DOCS_URL = 'https://github.github.com/squad/';
 
 /** Manifest schema version. Matches what winget-pkgs currently accepts. */
 const WINGET_SCHEMA = '1.12.0';
@@ -309,7 +310,7 @@ Tags:
 ReleaseNotesUrl: https://github.com/${repo}/releases/tag/${version}
 Documentations:
 - DocumentLabel: Documentation
-  DocumentUrl: https://bradygaster.github.io/squad/
+  DocumentUrl: ${DOCS_URL}
 ManifestType: defaultLocale
 ManifestVersion: ${WINGET_SCHEMA}
 `;

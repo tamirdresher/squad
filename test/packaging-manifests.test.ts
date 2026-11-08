@@ -8,6 +8,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
+import { execFileSync } from 'node:child_process';
+import path from 'node:path';
 import {
   parseChecksums,
   homebrewToken,
@@ -18,6 +20,8 @@ import {
   renderWingetVersion,
   wingetPackageIdentifier,
 } from '../scripts/generate-packaging.mjs';
+
+const GENERATOR = path.join(process.cwd(), 'scripts', 'generate-packaging.mjs');
 
 const SHA = {
   darwinArm: 'a'.repeat(64),
@@ -33,7 +37,7 @@ const CHECKSUMS = {
   'squad-win32-arm64.zip': SHA.winArm,
 };
 
-const BASE = { version: 'v1.2.3', repo: 'bradygaster/squad', checksums: CHECKSUMS };
+const BASE = { version: 'v1.2.3', repo: 'github/squad', checksums: CHECKSUMS };
 
 describe('parseChecksums', () => {
   it('parses GNU sha256sum output', () => {
@@ -188,5 +192,41 @@ describe('release channel metadata', () => {
 
   it('rejects unsupported prerelease identifiers', () => {
     expect(() => releaseChannel('v1.2.3-beta.1')).toThrow(/Unsupported release version/);
+  });
+});
+
+describe('repository and documentation links', () => {
+  const rendered: Record<string, string> = {
+    'Homebrew cask': renderHomebrewCask(BASE),
+    'winget version manifest': renderWingetVersion(BASE),
+    'winget installer manifest': renderWingetInstaller(BASE),
+    'winget locale manifest': renderWingetLocale(BASE),
+  };
+  const lines = (manifest: string) => manifest.split(/\r?\n/).map((line) => line.trim());
+
+  it('points package homepages at github/squad and docs at github.github.com/squad', () => {
+    expect(lines(rendered['Homebrew cask'])).toContain('homepage "https://github.com/github/squad"');
+    const locale = lines(rendered['winget locale manifest']);
+    expect(locale).toContain('PackageUrl: https://github.com/github/squad');
+    expect(locale).toContain('DocumentUrl: https://github.github.com/squad/');
+  });
+
+  it('never emits the pre-move repository or the retired docs host', () => {
+    for (const [name, manifest] of Object.entries(rendered)) {
+      const stale = lines(manifest).filter((line) => /bradygaster\/squad|bradygaster\.github\.io/.test(line));
+      expect(stale, `${name} lines naming bradygaster/squad or bradygaster.github.io`).toEqual([]);
+    }
+  });
+
+  it('keeps PublisherUrl on the Publisher, which the repo move did not change', () => {
+    // Publisher is a person and matches the bradygaster.Squad identifier prefix; it is not the repo.
+    const locale = lines(rendered['winget locale manifest']);
+    expect(locale).toContain('Publisher: Brady Gaster');
+    expect(locale).toContain('PublisherUrl: https://github.com/bradygaster');
+  });
+
+  it('defaults --repo to github/squad', () => {
+    const help = execFileSync(process.execPath, [GENERATOR, '--help'], { encoding: 'utf8' });
+    expect(help).toContain('--repo <owner/repo>   Source repository (default: github/squad)');
   });
 });

@@ -5,7 +5,7 @@
 # short-lived (1 hour) NuGet API key via the NuGet/login@v1 action. A Trusted
 # Publishing policy must be configured at https://www.nuget.org/account/trusted-publishing
 # under the package owner (Squad organization) with:
-#   Repository Owner: bradygaster
+#   Repository Owner: github
 #   Repository:       squad
 #   Workflow File:    squad-agents-ai-release.yml
 #   Environment:      (leave empty)

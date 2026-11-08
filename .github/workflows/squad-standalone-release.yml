@@ -1082,7 +1082,7 @@ jobs:
               --base master \
               --head "tamirdresher:${BRANCH}" \
               --title "New version: ${PACKAGE_IDENTIFIER} version ${VERSION}" \
-              --body "Automated manifest update for [Squad ${TAG}](https://github.com/bradygaster/squad/releases/tag/${TAG}), using the release run's packaging-manifests artifact.")"
+              --body "Automated manifest update for [Squad ${TAG}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG}), using the release run's packaging-manifests artifact.")"
             pr_status="Opened"
           else
             pr_status="Reused"

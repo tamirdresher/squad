@@ -1077,6 +1077,9 @@ describe('automated package publication', () => {
     expect(publish).toContain('--base master');
     expect(publish).toContain('--head "tamirdresher:${BRANCH}"');
     expect(publish).toContain('New version: ${PACKAGE_IDENTIFIER} version ${VERSION}');
+    // The PR body links the release in whichever repository ran this workflow, so a repo move can't strand it.
+    expect(publish).toContain('[Squad ${TAG}](${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/releases/tag/${TAG})');
+    expect(publish).not.toMatch(/github\.com\/[\w.-]+\/squad\/releases/);
     expect(publish).not.toMatch(/git add (?:\.|-A)|git push .*--force/);
   });
 

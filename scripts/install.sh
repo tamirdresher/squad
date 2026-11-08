@@ -1,7 +1,7 @@
 #!/bin/sh
 # Squad standalone installer.
 #
-#   curl -fsSL https://raw.githubusercontent.com/bradygaster/squad/dev/scripts/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/github/squad/dev/scripts/install.sh | sh
 #
 # Downloads a self-contained Squad bundle from GitHub Releases. The bundle
 # vendors its own Node.js runtime, so neither Node nor npm needs to be present.
@@ -10,13 +10,13 @@
 # Environment:
 #   VERSION   Squad version to install (default: latest release)
 #   PREFIX    Install prefix (default: /usr/local as root, else $HOME/.local)
-#   REPO      Source repository (default: bradygaster/squad)
+#   REPO      Source repository (default: github/squad)
 #
 # Mirrors the shape of GitHub Copilot CLI's installer so the two feel the same.
 
 set -eu
 
-REPO="${REPO:-bradygaster/squad}"
+REPO="${REPO:-github/squad}"
 VERSION="${VERSION:-latest}"
 
 if [ -z "${PREFIX:-}" ]; then

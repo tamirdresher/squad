@@ -94,7 +94,7 @@ export function generatePackageJson(config: NpmPackageConfig): PackageJsonOutput
       : {}),
     engines: config.engines ? { ...config.engines } : { node: '>=20.0.0' },
     license: 'MIT',
-    repository: { type: 'git', url: 'https://github.com/bradygaster/squad.git' },
+    repository: { type: 'git', url: 'https://github.com/github/squad.git' },
     keywords: ['copilot', 'multi-agent', 'squad', 'sdk'],
   };
 }

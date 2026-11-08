@@ -13,7 +13,7 @@ Public surface:
 - `SquadConnectionFactory` — parses PATH or `squad://` connection strings into options.
 - `SquadServiceCollectionExtensions` — registers `SquadAgent` and base `AIAgent` in DI, with standard and keyed overloads.
 
-Repository: <https://github.com/bradygaster/squad>
+Repository: <https://github.com/github/squad>
 
 ## Install
 
@@ -32,7 +32,7 @@ dotnet add package Squad.Agents.AI --version 1.0.0 --source ./nupkgs
 
 - .NET 8, 9, or 10 for consumers; .NET 10 SDK to build this repository and run the sample.
 - GitHub Copilot CLI available on `PATH` (`copilot --version`).
-- Squad CLI and an initialized Squad team root; see the [Squad CLI repo](https://github.com/bradygaster/squad).
+- Squad CLI and an initialized Squad team root; see the [Squad CLI repo](https://github.com/github/squad).
 - GitHub Copilot authentication through the signed-in user. The quickstart below does not require an app key or environment variable.
 
 For a bounded sample check without authentication, CLI startup, or model calls:
@@ -272,7 +272,7 @@ the `ConfigureCopilotClient` delegate, streaming via `RunStreamingAsync`, and su
 |---|---|
 | [.NET 10 SDK](https://dotnet.microsoft.com/download/dotnet/10.0) | `dotnet --version` should print `10.x.x` |
 | GitHub Copilot CLI on `PATH` | Install from [github.com/github/copilot-cli](https://github.com/github/copilot-cli); verify with `copilot --version` |
-| Squad CLI installed | Follow the install guide in the [Squad repository README](https://github.com/bradygaster/squad#readme) |
+| Squad CLI installed | Follow the install guide in the [Squad repository README](https://github.com/github/squad#readme) |
 | Initialized Squad team root | Run `squad init` in a directory; this becomes your team root |
 | GitHub Copilot authentication | Run `gh auth login` or `copilot auth login` once before running the sample |
 
@@ -340,10 +340,10 @@ not prove that subagents were dispatched; inspect the captured events and spans.
 
 ## See also
 
-- Root repo: <https://github.com/bradygaster/squad>
+- Root repo: <https://github.com/github/squad>
 - Microsoft Agent Framework: <https://github.com/microsoft/agents>
 - GitHub Copilot SDK authentication: <https://github.com/github/copilot-sdk/blob/main/docs/auth/authenticate.md>
 - GitHub Copilot CLI: <https://github.com/github/copilot-cli>
-- Changelog: <https://github.com/bradygaster/squad/blob/main/CHANGELOG.md>
+- Changelog: <https://github.com/github/squad/blob/main/CHANGELOG.md>
 
 License: MIT.

@@ -184,9 +184,16 @@ describe('install.sh', () => {
 
   it('supports VERSION, PREFIX and REPO overrides', () => {
     // REPO is what lets an air-gapped org point at an internal mirror.
-    expect(install).toMatch(/REPO="\$\{REPO:-bradygaster\/squad\}"/);
+    expect(install).toMatch(/REPO="\$\{REPO:-github\/squad\}"/);
     expect(install).toMatch(/VERSION="\$\{VERSION:-latest\}"/);
     expect(install).toMatch(/PREFIX="\/usr\/local"/);
+  });
+
+  it('documents and defaults to the canonical github/squad repository', () => {
+    // Includes the header's curl one-liner, which users copy verbatim.
+    expect(install).toContain('raw.githubusercontent.com/github/squad/dev/scripts/install.sh');
+    const stale = install.split('\n').filter((line) => line.includes('bradygaster/squad'));
+    expect(stale, 'install.sh lines still naming the pre-move bradygaster/squad repo').toEqual([]);
   });
 
   it('maps uname output to the published asset names', () => {

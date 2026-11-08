@@ -3,7 +3,7 @@
   "source": "squad-2.0-closure-matrix.md (reviewer closure matrix for Stack #2281), carried from the f22847a9 re-verification",
   "stack": {
     "id": 2281,
-    "repo": "bradygaster/squad",
+    "repo": "github/squad",
     "base": "559e0f98e611b6006cf5da716dcb75fc3f5000b5",
     "mergedDev": "f22847a9898d5c90d70a679ee63d9d5f49cd5fed",
     "layers": [
@@ -38,7 +38,7 @@
     ],
     "citedCiRun": {
       "id": 39907736729,
-      "url": "https://github.com/bradygaster/squad/actions/runs/39907736729",
+      "url": "https://github.com/github/squad/actions/runs/39907736729",
       "workflow": "Squad CI",
       "headSha": "f22847a9898d5c90d70a679ee63d9d5f49cd5fed",
       "consoleSummary": {

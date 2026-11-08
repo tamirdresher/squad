@@ -635,7 +635,7 @@ jobs:
   #
   # EXTERNAL ACTION REQUIRED after this PR merges to close the
   # merge-with-failed-checks gap that allowed #1873 and #1874 to merge:
-  #   1. https://github.com/bradygaster/squad/settings/rules/12703724
+  #   1. https://github.com/github/squad/settings/rules/12703724
   #   2. Set enforcement → Active
   #   3. Conditions → branch patterns: refs/heads/dev AND refs/heads/main
   #   4. Rules → Required status checks → add:
