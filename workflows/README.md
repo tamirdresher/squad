@@ -25,6 +25,26 @@ the `gh-aw-enlistment` skill. After installation, follow the enlistment skill to
 materialize runtime resources, strictly compile every workflow, and verify the
 package-owned topology before opening the bootstrap pull request.
 
+## Cast producer and review contracts
+
+The generated coordinator's literal `## Cast sources` section must itself
+contain all four canonical support-charter paths as well as shared Cast paths
+and selected specialist charters. A separate `## Built-in Support Agents`
+section describes behavior; placing the links only there fails validation.
+Proposal Evidence backticks are existing repository paths only, not symbols
+or commands. Each focused research command belongs inside its own proposal
+section, not only in the launch-work summary. Bootstrap includes examples
+checked against the unchanged payload validator.
+
+Profile A human-opened Cast PRs are review-eligible only after the existing
+base-controlled guard's fallback-issue/run provenance checks succeed. The
+review prompt documents that path alongside bot-opened Casts; no attribution,
+permission, successful-run, exact-head or missing-review gate is relaxed.
+Eligibility never forces a verdict or replaces independent diff review and
+human merge approval. Local contract tests do not establish hosted model
+behavior; install a newly approved coherent immutable package revision and
+verify the real hosted pipeline separately.
+
 ## Optional CAO research evidence
 
 Ordinary `/squad research` remains the only per-wave user action. A normal

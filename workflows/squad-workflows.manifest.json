@@ -15,9 +15,9 @@
       "source": "workflows/package/squad.md",
       "destination": ".github/workflows/squad.md",
       "lock": ".github/workflows/squad.lock.yml",
-      "source_sha256": "b3e9b33c8ddbf578e277d036c21ea5d1a5136cd234aa6b153627dc5f345bbf3d",
-      "lock_sha256": "36e56e20eedb07007d81a64ebcae38fffe7441c69ff0dbc792048ea9c5576e48",
-      "package_lock_sha256": "f744139e41ce8667555d8b6508b30391d4bf2a142bbefc85e418035c95c7dd97"
+      "source_sha256": "dc290974f2eaa466d72e7b1fc76f25d07c07aeaaeec4c47bf16de2642496133f",
+      "lock_sha256": "0d76ef010eca75e8325d37613289a7b7005cf4c34619ef76b8774a4e6007e3a5",
+      "package_lock_sha256": "fe8180c3fd8d232207e35179ae0b231582515d34a52ba0e3da0f696bdb480ffa"
     },
     {
       "name": "squad-implement-worker",
@@ -33,9 +33,9 @@
       "source": "workflows/package/squad-review.md",
       "destination": ".github/workflows/squad-review.md",
       "lock": ".github/workflows/squad-review.lock.yml",
-      "source_sha256": "f620707fd8d117d235c8c3ea1b90fdb198ebbb99a9fe87363b5229674abebc57",
-      "lock_sha256": "888a1235f3bd917b7a6ed18dbbf1cb0063a422ff7284982b3b77cc2ac07ad90e",
-      "package_lock_sha256": "f5fa30aec22fe08985c544c741078ea8168cc69ca581b9aaaf95b08a75361f48"
+      "source_sha256": "de4cad42730eba63a59b067cef4ff468e4b04d7368919e58f0fa59d5120ff867",
+      "lock_sha256": "b29bebcd24208f08a5472600e901d7f00253afe2a53fcb2396c24cc22d298d71",
+      "package_lock_sha256": "a1e548de9b596ba77918c89dbd2014398dc5feb36d85b48cdfcd6b9d4abf3f89"
     },
     {
       "name": "squad-deps-worker",
@@ -69,9 +69,9 @@
       "source": "workflows/package/squad-bootstrap.md",
       "destination": ".github/workflows/squad-bootstrap.md",
       "lock": ".github/workflows/squad-bootstrap.lock.yml",
-      "source_sha256": "fe92a3c7a4402f3f57cf1e041fb78f11ed62312c919271a931773612eceb87bf",
-      "lock_sha256": "7a9cb513812da3c43e03d14ba06ecff0375d41b3720e64e0d7937001082fd3d0",
-      "package_lock_sha256": "a3b20ed0fb1823b56ba82144b39eb020448bb8674ad5aa957781a41be54a00b8"
+      "source_sha256": "30fbcc5254f6b2b121ee4ac94e1b6812c7a6d783f4ae6f4d5f42623d6ff4cc09",
+      "lock_sha256": "c72ff2f9e2c83fbeac458086d039dda816a5809591f5d4fda14bdb7d6b98b208",
+      "package_lock_sha256": "325b0cfbbb8b4c9bd7c96ad2e8517165a1c3d67847114852f46e6b93b8c41482"
     },
     {
       "name": "squad-command-router",
@@ -89,8 +89,8 @@
       "workflows": [
         {
           "name": "squad",
-          "lock_sha256": "36e56e20eedb07007d81a64ebcae38fffe7441c69ff0dbc792048ea9c5576e48",
-          "package_lock_sha256": "f744139e41ce8667555d8b6508b30391d4bf2a142bbefc85e418035c95c7dd97"
+          "lock_sha256": "0d76ef010eca75e8325d37613289a7b7005cf4c34619ef76b8774a4e6007e3a5",
+          "package_lock_sha256": "fe8180c3fd8d232207e35179ae0b231582515d34a52ba0e3da0f696bdb480ffa"
         },
         {
           "name": "squad-implement-worker",
@@ -99,8 +99,8 @@
         },
         {
           "name": "squad-review",
-          "lock_sha256": "e1ac795472ca5bd737e4728c2b54668c4570b6cc2a7de262d172f04d8edd7927",
-          "package_lock_sha256": "01092b66488b090eb236f3182adf945057aaa451ab14b88551452378c378d5e4"
+          "lock_sha256": "b371b7079585859a0563c6deca2464df16f33cbbb6dc331c72059372235a30be",
+          "package_lock_sha256": "0bd1589e19e0b4ffdd4a6847c61dcf55f5cb73120ffddee374b743a69c017e06"
         },
         {
           "name": "squad-deps-worker",
@@ -119,8 +119,8 @@
         },
         {
           "name": "squad-bootstrap",
-          "lock_sha256": "e5fbfe1af46967e453d37aa1222d97704f00cc5e52e39cd2070f7cc7538d4222",
-          "package_lock_sha256": "507b720abf3ec96106a2f1ab21b2fde6cd1088814f06ea6054f3c58ee7291ef4"
+          "lock_sha256": "49b01c8c64e9e8ec7de62a21b7e59b6e98d0518004501767ebe9c37df5a6e810",
+          "package_lock_sha256": "3d184cb76a692f005c6229abf7cf137432c985039e4ee66e052513ddb9d8e854"
         },
         {
           "name": "squad-command-router",
