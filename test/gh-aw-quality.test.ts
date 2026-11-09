@@ -4897,7 +4897,7 @@ describe('gh-aw: canonical package integrity contract', () => {
       ...record, package: 'attacker/squad/workflows', source: `attacker/squad/workflows@${revisionA}`,
     }));
     expect(verifyInstall(unknown).failures.join('\n')).toContain(
-      `Expected exactly one ${PACKAGE_NAME} or ${LEGACY_PACKAGE_NAME} ownership record; found 0.`,
+      'Unsupported Squad package origin: "attacker/squad/workflows".',
     );
 
     const crossed = makeConsumer(revisionA, true, 'package', LEGACY_PACKAGE_NAME);

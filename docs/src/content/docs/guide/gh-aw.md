@@ -609,6 +609,24 @@ the Squad CLI from the separately controlled `bradygaster/squad` fork, which
 has no releases. Use a revision whose manifest declares
 `github/squad/workflows`, or ask the Squad maintainers for one.
 
+**Personal forks are a separate package-origin boundary.**
+
+A successful native `gh aw add OWNER/REPO/workflows@SHA` installation does
+not make that origin an approved Squad package. gh-aw records the identity
+exactly as requested, while this revision's integrity contract declares
+`github/squad/workflows`. An unsupported origin claiming the Squad manifest
+fails both installed and staged verification, even if its owned bytes and
+revision are otherwise coherent or an accepted ownership record also exists.
+
+Do not rewrite native ownership, change source bindings, add a fork to the
+accepted-identity list, or install a fork-only revision through the canonical
+repository merely because GitHub's fork network can serve that commit.
+Fork-network accessibility is not upstream adoption. Obtain a reviewed
+package-origin migration with coherent generated integrity metadata, or
+wait for an upstream-adopted revision. The verifier intentionally provides
+no canonical reinstall command for an unsupported-origin installation.
+Strict compilation alone does not clear this boundary.
+
 The nested `workflows/aw.yml` is the canonical package registration. Its
 package boundary prevents unrelated repository skills or agents from being
 auto-discovered. It installs exactly eight agentic workflows, twenty-one runtime

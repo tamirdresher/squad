@@ -441,6 +441,53 @@ describe('gh-aw: verified ownership staging under consumer ignore rules', () => 
     expect(canonical.stderr, `a ${PACKAGE_NAME} install must not print the legacy notice`).not.toContain('Notice:');
   }, 120_000);
 
+  it('ignores unrelated native package ownership that does not claim the Squad manifest', () => {
+    const root = consumer();
+    write(root, '.github/aw/packages/unrelated.json', JSON.stringify({
+      package: 'example/unrelated/workflows',
+      files: [{ destination: '.github/aw/unrelated.manifest.json' }],
+    }));
+    expect(verifyInstall(root, { expectedRevision: revision }).failures).toEqual([]);
+  }, 120_000);
+
+  it.each([false, true])('rejects native fork ownership without suggesting canonical relabeling (canonical record: %s)',
+    (retainCanonical) => {
+      const packageName = 'example/squad/workflows';
+      const root = retainCanonical ? consumer() : mkdtempSync(join(tmpdir(), 'squad-install-staging-'));
+      if (!retainCanonical) roots.push(root);
+      const fixture = createFirstInstallFixture(revision, 'package', packageName);
+      if (!retainCanonical) {
+        git(root, 'init', '--quiet');
+        for (const [path, content] of fixture.consumerFiles) write(root, path, content);
+        materializeRuntime(root);
+      }
+      const slug = packageName.replaceAll('/', '-');
+      const hash = createHash('sha256').update(packageName).digest('hex').slice(0, 12);
+      const ownership = `.github/aw/packages/${slug}-${hash}.json`;
+      const ownershipBytes = `${JSON.stringify(fixture.provenance, null, 2)}\n`;
+      write(root, ownership, ownershipBytes);
+      if (!retainCanonical) {
+        for (const entry of fixture.provenance.files) {
+          expect(createHash('sha256').update(readFileSync(join(root, entry.destination))).digest('hex'),
+            `native fork-owned bytes must be coherent: ${entry.destination}`).toBe(entry.sha256);
+        }
+      }
+      for (const mode of ['--verify-install', '--verify-staged-install']) {
+        const failed = spawnSync(process.execPath, [verifier, mode, '--source-revision', revision], {
+          cwd: root, encoding: 'utf8',
+        });
+        expect(failed.status, failed.stderr).toBe(1);
+        expect(failed.stderr).toContain(`Unsupported Squad package origin: "${packageName}".`);
+        expect(failed.stderr).toContain(`This source revision declares ${PACKAGE_NAME}.`);
+        expect(failed.stderr).toContain('Native installation and fork-network commit accessibility');
+        expect(failed.stderr).toContain('do not relabel ownership or reinstall this fork revision');
+        expect(failed.stderr).not.toContain('Safe recovery');
+        expect(failed.stderr).not.toContain(`gh aw add ${PACKAGE_NAME}@${revision}`);
+      }
+      expect(readFileSync(join(root, ownership), 'utf8'), 'verification must not rewrite native ownership')
+        .toBe(ownershipBytes);
+    }, 120_000);
+
   it.each([
     [1, [LEGACY_OWNERSHIP, UNOWNED_MUTABLE_ROUTER_SKILL], []],
     [0, [], ['CALL node .github/workflows/shared/squad-install-verifier.mjs --materialize-runtime',

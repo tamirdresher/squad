@@ -771,11 +771,14 @@ function parseInstalledContract(root) {
   return { bytes, contract };
 }
 
+class UnsupportedPackageOriginError extends Error {}
+
 function findOwnershipRecord(root) {
   const packageDir = safePath(root, '.github/aw/packages');
   if (!existsSync(packageDir)) throw new Error('Package ownership metadata is missing.');
   const matches = [];
   const caseVariants = [];
+  const unsupportedOrigins = [];
   // Sorted, so the records and the cleanup advice below read the same on every platform.
   for (const name of readdirSync(packageDir).sort()) {
     if (!name.endsWith('.json')) continue;
@@ -790,7 +793,19 @@ function findOwnershipRecord(root) {
       matches.push({ path: relativePath, record });
     } else if (isCaseVariantPackageName(record?.package)) {
       caseVariants.push({ path: relativePath, record });
+    } else if (Array.isArray(record?.files)
+        && record.files.some(file => file?.destination === CONTRACT_DESTINATION)) {
+      unsupportedOrigins.push(JSON.stringify(record.package));
     }
+  }
+  if (unsupportedOrigins.length > 0) {
+    throw new UnsupportedPackageOriginError(
+      `Unsupported Squad package origin: ${unsupportedOrigins.join(', ')}. `
+      + `This source revision declares ${PACKAGE_NAME}. `
+      + 'Native installation and fork-network commit accessibility do not establish an approved package origin. '
+      + 'Obtain a reviewed package-origin migration or an upstream-adopted revision; '
+      + `do not relabel ownership or reinstall this fork revision under ${PACKAGE_NAME}.`,
+    );
   }
   const describeRecords = records => records.map(({ path, record }) => `${path} (${record.package})`).join(', ');
   // A successful `gh aw add PACKAGE_NAME@<sha> --force` writes OWNERSHIP_DESTINATION, so every other
@@ -1074,6 +1089,7 @@ export function verifyInstall(root, { expectedRevision = '', strictCompile = fal
   const failures = [];
   let revision = expectedRevision;
   let packageName;
+  let unsupportedPackageOrigin = false;
   try {
     if (expectedRevision && !REVISION_PATTERN.test(expectedRevision)) {
       throw new Error('Expected revision must be a lowercase 40-character SHA.');
@@ -1087,8 +1103,9 @@ export function verifyInstall(root, { expectedRevision = '', strictCompile = fal
     if (strictCompile) strictCompileMatches(root);
   } catch (error) {
     failures.push(error instanceof Error ? error.message : String(error));
+    unsupportedPackageOrigin = error instanceof UnsupportedPackageOriginError;
   }
-  return { failures, revision, packageName };
+  return { failures, revision, packageName, unsupportedPackageOrigin };
 }
 
 export function verifyStagedInstall(root, { expectedRevision = '', stageOwnership = false } = {}) {
@@ -1344,7 +1361,7 @@ export function run(argv = process.argv.slice(2), cwd = process.cwd()) {
       if (result.failures.length > 0) {
         console.error('Squad gh-aw installation is incomplete, stale, or incoherent:');
         for (const failure of result.failures) console.error(`- ${failure}`);
-        console.error(recoveryMessage(result.revision));
+        if (!result.unsupportedPackageOrigin) console.error(recoveryMessage(result.revision));
         return 1;
       }
       console.log(`Squad gh-aw installation verified at ${result.revision}.`);

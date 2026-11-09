@@ -160,7 +160,7 @@ pre-agent-steps:
         node --check "$path" >/dev/null
       }
       # BEGIN GENERATED RESOURCE DIGESTS
-      check_hash "$install_verifier" "514683e50c87644a1bf3977727f84e7bece7a94afc1f5ff5b5cf4c5e3ec2b77e"
+      check_hash "$install_verifier" "75cd900e65488c91cbcdfc1d0b2d02c02d52e302a315a5a1f29f5c90235f81b6"
       check_hash "$cast_validator" "15f0d47917d269b5b967dc2a782a0eb761c39af7a92ddb64fed687a427070760"
       check_hash "$bootstrap_validator" "d552d041f006249bfaa67b10a75877f813796b7698c718ac7eb7cf16f3a72e31"
       # END GENERATED RESOURCE DIGESTS
