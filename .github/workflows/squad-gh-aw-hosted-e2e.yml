@@ -23,8 +23,10 @@ concurrency:
 jobs:
   hosted-e2e:
     name: Install, merge, bootstrap, and probe
+    # Bound to the immutable repository ID of github/squad rather than its name, so a
+    # rename or transfer reaches source-preflight and fails loudly instead of skipping.
     if: >-
-      github.repository == 'bradygaster/squad'
+      github.repository_id == '1151205052'
       && github.ref_name == github.event.repository.default_branch
     runs-on: ubuntu-latest
     timeout-minutes: 45

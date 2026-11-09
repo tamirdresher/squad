@@ -600,7 +600,24 @@ test "$(gh api "repos/${owner_repo}" --jq '.has_issues')" = "true" || {
 }
 
 SQUAD_SHA="<40-character-commit-sha>"  # explicit, maintainer-approved; never `commits/dev`
-gh aw add "bradygaster/squad/workflows@${SQUAD_SHA}"
+[[ "${SQUAD_SHA}" =~ ^[0-9a-f]{40}$ ]] || {
+  echo "STOP: SQUAD_SHA must be an explicit 40-character Squad commit SHA, not a branch name or shortened hash." >&2
+  exit 1
+}
+squad_package="$(gh api --hostname github.com -H 'Accept: application/vnd.github.raw+json' \
+  "repos/github/squad/contents/workflows/squad-workflows.manifest.json?ref=${SQUAD_SHA}" \
+  --jq '.package')" || squad_package=""
+test "${squad_package}" = "github/squad/workflows" || {
+  if [ -z "${squad_package}" ]; then
+    echo "STOP: cannot read workflows/squad-workflows.manifest.json from github/squad at ${SQUAD_SHA}." >&2
+    echo "Check gh auth status --hostname github.com and network access, and confirm SQUAD_SHA is a github/squad commit that has this manifest, then retry." >&2
+  else
+    echo "STOP: Squad ${SQUAD_SHA} does not declare the github/squad/workflows package (found '${squad_package}')." >&2
+    echo "Use a revision whose manifest declares github/squad/workflows, or ask the Squad maintainers for one. Older revisions download the Squad CLI from the bradygaster/squad fork, which has no releases." >&2
+  fi
+  exit 1
+}
+gh aw add "github/squad/workflows@${SQUAD_SHA}"
 rm -f .github/skills/agentic-workflows/SKILL.md
 git add -- \
   .github/aw/ \
@@ -610,6 +627,14 @@ git add -- \
 git commit -m "Add Squad workflow"
 git push
 ```
+
+`github/squad/workflows` verifies only at Squad revisions whose
+`workflows/squad-workflows.manifest.json` declares
+`"package": "github/squad/workflows"`, so the identity check stops on any other
+revision. Do not install an older revision as `bradygaster/squad/workflows`
+instead: its activation downloads the Squad CLI from the separately controlled
+`bradygaster/squad` fork, which has no releases. Use a revision whose manifest
+declares `github/squad/workflows`, or ask the Squad maintainers for one.
 
 `gh aw add` compiles the workflows automatically. If it reports unapproved
 safe-update changes, review them and run `gh aw compile --approve`.

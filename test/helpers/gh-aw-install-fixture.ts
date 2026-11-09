@@ -77,7 +77,7 @@ function sha256(content: Buffer): string {
   return createHash('sha256').update(content).digest('hex');
 }
 
-function withSource(content: Buffer, source: string, revision: string): Buffer {
+function withSource(content: Buffer, source: string, revision: string, repository: string): Buffer {
   const text = content.toString('utf8');
   const eol = text.includes('\r\n') ? '\r\n' : '\n';
   const normalized = text.replace(/\r\n/g, '\n');
@@ -85,7 +85,7 @@ function withSource(content: Buffer, source: string, revision: string): Buffer {
   const end = normalized.indexOf(marker, 4);
   if (!normalized.startsWith('---\n') || end < 0) throw new Error(`Invalid workflow source: ${source}`);
   return Buffer.from(
-    `${normalized.slice(0, end)}\nsource: bradygaster/squad/${source}@${revision}${normalized.slice(end)}`
+    `${normalized.slice(0, end)}\nsource: ${repository}/${source}@${revision}${normalized.slice(end)}`
       .replace(/\n/g, eol),
   );
 }
@@ -104,13 +104,19 @@ export function githubFile(content: Buffer): {
   };
 }
 
+/**
+ * Builds the files a consumer has after `gh aw add <packageName>@<revision>` plus strict
+ * compilation. `packageName` is the identity the consumer typed (gh-aw records it verbatim).
+ */
 export function createFirstInstallFixture(
   revision: string,
   sourceBinding: 'workflow' | 'package' | 'mixed' = 'workflow',
+  packageName: string = PACKAGE_NAME,
 ): InstallFixture {
-  const cacheKey = `${revision}:${sourceBinding}`;
+  const cacheKey = `${revision}:${sourceBinding}:${packageName}`;
   const cached = fixtureCache.get(cacheKey);
   if (cached) return cloneFixture(cached);
+  const repository = packageName.replace(/\/workflows$/, '');
   const root = process.cwd();
   const manifestBytes = readFileSync(resolve(root, CONTRACT_SOURCE));
   const manifest = JSON.parse(manifestBytes.toString('utf8'));
@@ -127,7 +133,7 @@ export function createFirstInstallFixture(
       canonicalFiles.set(entry.source, canonical);
       const source = sourceBinding === 'package' || (sourceBinding === 'mixed' && index % 2 === 0)
         ? 'workflows' : entry.source;
-      const installed = withSource(canonical, source, revision);
+      const installed = withSource(canonical, source, revision, repository);
       consumerFiles.set(entry.destination, installed);
       const path = resolve(scratch, entry.destination);
       mkdirSync(dirname(path), { recursive: true });
@@ -167,8 +173,8 @@ export function createFirstInstallFixture(
       manifest,
       provenance: {
         schemaVersion: 1,
-        package: PACKAGE_NAME,
-        source: `${PACKAGE_NAME}@${revision}`,
+        package: packageName,
+        source: `${packageName}@${revision}`,
         resolvedCommit: revision,
         installer: 'gh-aw v0.91.5 test',
         files,

@@ -9,7 +9,7 @@ const revision = '5c662ba015ec4f99befa51b0e8ca4f2148b0497f';
 const files = {};
 for (const path of ['.github/actions/squad-init/action.yml', 'scripts/install.sh']) {
   const remote = JSON.parse(execFileSync('gh', [
-    'api', `repos/bradygaster/squad/contents/${path}?ref=${revision}`,
+    'api', `repos/github/squad/contents/${path}?ref=${revision}`,
   ], { encoding: 'utf8' }));
   const bytes = Buffer.from(remote.content, 'base64');
   const blob = createHash('sha1')
@@ -22,7 +22,7 @@ for (const path of ['.github/actions/squad-init/action.yml', 'scripts/install.sh
   };
 }
 writeFileSync('test/fixtures/squad-init-approved.json', `${JSON.stringify({
-  repository: 'bradygaster/squad',
+  repository: 'github/squad',
   revision,
   files,
 }, null, 2)}\n`);

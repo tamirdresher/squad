@@ -414,12 +414,25 @@ describe('gh-aw enforcing Squad reviewer', () => {
   }, 20000);
 
   it('keeps all consumer install surfaces on the isolated native package', () => {
-    for (const surface of [GUIDE, README, AGENT_GUIDE, SHARED_BOOTSTRAP]) {
-      expect(surface).toContain('bradygaster/squad/workflows@${SQUAD_SHA}');
-      expect(surface).not.toMatch(/gh aw add \\\n\s+bradygaster\/squad\/workflows\/squad\.md/);
+    const fenced = (text: string) => [...text.matchAll(/^```[^\n]*\n([\s\S]*?)^```/gm)].map(match => match[1]);
+    for (const [name, surface, executable] of [
+      ['docs guide', GUIDE, fenced(GUIDE)],
+      ['README.md', README, fenced(README)],
+      ['.github/agents.md', AGENT_GUIDE, fenced(AGENT_GUIDE)],
+      ['workflows/shared/squad.md', SHARED_BOOTSTRAP, [SHARED_BOOTSTRAP]],
+    ] as const) {
+      expect(surface, `${name} must install github/squad/workflows`)
+        .toContain('gh aw add "github/squad/workflows@${SQUAD_SHA}"');
+      // Prose may name the legacy command for revisions that only verify it; executable blocks never use it.
+      for (const block of executable) {
+        expect(block, `${name} must not install the legacy identity`)
+          .not.toContain('gh aw add "bradygaster/squad/workflows@');
+      }
+      expect(surface, `${name} must not install a single workflow`)
+        .not.toMatch(/gh aw add \\\r?\n\s+(?:github|bradygaster)\/squad\/workflows\/squad\.md/);
     }
     expect(DEMO).toContain("gh-aw guide's install command");
-    expect(DEMO).not.toContain('gh aw add bradygaster/squad/workflows/squad.md@latest');
+    expect(DEMO).not.toMatch(/gh aw add (?:github|bradygaster)\/squad\/workflows\/squad\.md@latest/);
   });
 
   it('documents enforcement, explicit override, and the independent human approval requirement', () => {

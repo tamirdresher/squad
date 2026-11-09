@@ -262,10 +262,11 @@ describe('gh-aw implement workflows', () => {
 
   it('documents one immutable nested native package installation', () => {
     const normalizedGuide = guide.replace(/\r\n/g, '\n');
-    expect(normalizedGuide).toContain('gh aw add "bradygaster/squad/workflows@${SQUAD_SHA}"');
+    expect(normalizedGuide, 'docs guide must install github/squad/workflows')
+      .toContain('gh aw add "github/squad/workflows@${SQUAD_SHA}"');
     expect(normalizedGuide).toContain('exactly eight agentic workflows, twenty-one runtime');
     expect(normalizedGuide).toContain('one enlistment skill');
-    expect(normalizedGuide).not.toMatch(/gh aw add \\\n\s+bradygaster\/squad\/workflows\/squad\.md/);
+    expect(normalizedGuide).not.toMatch(/gh aw add \\\n\s+(?:github|bradygaster)\/squad\/workflows\/squad\.md/);
   });
 });
 

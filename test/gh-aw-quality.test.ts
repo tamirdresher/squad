@@ -33,7 +33,10 @@ import {
 import {
   CONTRACT_DESTINATION,
   CONTRACT_SOURCE,
+  LEGACY_OWNERSHIP_DESTINATIONS,
+  LEGACY_PACKAGE_NAMES,
   MIN_GH_AW_VERSION,
+  OWNERSHIP_DESTINATION,
   OWNERSHIP_ENTRY_COUNT,
   PACKAGE_NAME,
   RUNTIME_TUPLES,
@@ -46,10 +49,12 @@ import {
   compileWithPinnedActions,
   materializeRuntime,
   normalizeCompiledLock,
+  packageOwnershipDestination,
   validateContract,
   validateCompilerActionPins,
   verifyInstall,
   verifyCanonicalManifest,
+  verifyResource,
   writeLocalTestOwnership,
 } from '../workflows/shared/squad-install-verifier.mjs';
 
@@ -1936,11 +1941,13 @@ describe('gh-aw: compiled workflow shell input security contract', () => {
       /- name: Install Squad CLI from standalone release[\s\S]*?(?=\n\s+- name:)/,
     )?.[0];
     expect(install, 'compiled squad.lock.yml must retain the standalone installer').toContain(
-      'uses: bradygaster/squad/.github/actions/squad-init@5c662ba015ec4f99befa51b0e8ca4f2148b0497f',
+      'uses: github/squad/.github/actions/squad-init@5c662ba015ec4f99befa51b0e8ca4f2148b0497f',
     );
     expect(install, 'compiled squad.lock.yml must omit version to use the pinned action latest default')
       .not.toMatch(/^\s+version:/m);
     expect(install).toContain('skip-init: "true"');
+    expect(install, 'compiled squad.lock.yml must download releases from github/squad, not the pinned action default')
+      .toMatch(/^\s+repository: "?github\/squad"?$/m);
     expect(compiled, 'compiled squad.lock.yml must not contain the obsolete release resolver')
       .not.toContain('squad-release');
     expect(compiled).not.toContain('vars.SQUAD_CLI_VERSION');
@@ -3609,8 +3616,8 @@ describe('gh-aw: shared bootstrap health-before-dispatch contract (#1605)', () =
 
     const healthLine = lines[healthLineIdx];
     expect(healthLine, 'health must invoke the installed squad binary').toMatch(/\bsquad health --json/);
-    expect(sharedContent).toContain(
-      'uses: bradygaster/squad/.github/actions/squad-init@5c662ba015ec4f99befa51b0e8ca4f2148b0497f',
+    expect(sharedContent, 'shared/squad.md must pin squad-init through the canonical github/squad owner').toContain(
+      'uses: github/squad/.github/actions/squad-init@5c662ba015ec4f99befa51b0e8ca4f2148b0497f',
     );
     expect(sharedContent).not.toContain('squad-release');
     expect(sharedContent).toContain('SQUAD_CLI_VERSION: ${{ steps.squad-cli.outputs.version }}');
@@ -4013,6 +4020,9 @@ describe('gh-aw: CI compiler pin contract', () => {
 describe('gh-aw: canonical package integrity contract', () => {
   const revisionA = 'a'.repeat(40);
   const revisionB = 'b'.repeat(40);
+  const [LEGACY_PACKAGE_NAME] = LEGACY_PACKAGE_NAMES;
+  // The verifier finds records by their `package` field, so the fixture filename is neutral.
+  const OWNERSHIP_FIXTURE = '.github/aw/packages/squad-workflows-test.json';
 
   function copyInto(root: string, source: string, destination: string): void {
     const target = join(root, destination);
@@ -4024,9 +4034,10 @@ describe('gh-aw: canonical package integrity contract', () => {
     revision = revisionA,
     materialize = true,
     sourceBinding: 'workflow' | 'package' | 'mixed' = 'workflow',
+    packageName: string = PACKAGE_NAME,
   ): string {
     const root = createTestWorkspace('gh-aw-package-contract-');
-    const install = createFirstInstallFixture(revision, sourceBinding);
+    const install = createFirstInstallFixture(revision, sourceBinding, packageName);
     copyInto(root, CONTRACT_SOURCE, CONTRACT_DESTINATION);
     const contract = JSON.parse(readFileSync(join(process.cwd(), CONTRACT_SOURCE), 'utf8'));
     for (const workflow of contract.workflows) {
@@ -4058,12 +4069,12 @@ describe('gh-aw: canonical package integrity contract', () => {
       destination: entry.destination,
       sha256: createHash('sha256').update(readFileSync(join(root, entry.destination))).digest('hex'),
     })).sort((left, right) => left.destination.localeCompare(right.destination));
-    const ownership = join(root, '.github/aw/packages/bradygaster-squad-workflows-test.json');
+    const ownership = join(root, OWNERSHIP_FIXTURE);
     mkdirSync(dirname(ownership), { recursive: true });
     writeFileSync(ownership, `${JSON.stringify({
       schemaVersion: 1,
-      package: PACKAGE_NAME,
-      source: `${PACKAGE_NAME}@${revision}`,
+      package: packageName,
+      source: `${packageName}@${revision}`,
       resolvedCommit: revision,
       installer: 'gh-aw v0.91.5 test',
       files: owned,
@@ -4124,7 +4135,7 @@ describe('gh-aw: canonical package integrity contract', () => {
     }));
     expect(contract.skills).toHaveLength(SKILL_TUPLES.length);
     expect(contract.skills).toHaveLength(1);
-    expect(contract.package).toBe('bradygaster/squad/workflows');
+    expect(contract.package).toBe('github/squad/workflows');
     expect(contract.manifest).toBe('workflows/aw.yml');
     expect(contract.bootstrap.trigger_probe).toBe(TRIGGER_PROBE);
     expect(contract.shared_runtime.some((entry: { path: string }) => entry.path === TRIGGER_PROBE)).toBe(false);
@@ -4191,10 +4202,7 @@ describe('gh-aw: canonical package integrity contract', () => {
   it('accepts a coherent consumer with the exact ownership cardinality', () => {
     const root = makeConsumer();
     expect(verifyInstall(root, { expectedRevision: revisionA }).failures).toEqual([]);
-    const record = JSON.parse(readFileSync(
-      join(root, '.github/aw/packages/bradygaster-squad-workflows-test.json'),
-      'utf8',
-    ));
+    const record = JSON.parse(readFileSync(join(root, OWNERSHIP_FIXTURE), 'utf8'));
     expect(record.files).toHaveLength(OWNERSHIP_ENTRY_COUNT);
   });
 
@@ -4315,7 +4323,7 @@ describe('gh-aw: canonical package integrity contract', () => {
   it.each(['v0.89.22', 'v0.91.4', 'v0.91.50', 'v0.91.5-preview'])(
     'rejects ownership from unsupported installer %s', version => {
       const root = makeConsumer();
-      const path = join(root, '.github/aw/packages/bradygaster-squad-workflows-test.json');
+      const path = join(root, OWNERSHIP_FIXTURE);
       const record = JSON.parse(readText(path));
       record.installer = `gh-aw ${version}`;
       writeFileSync(path, JSON.stringify(record));
@@ -4476,7 +4484,7 @@ describe('gh-aw: canonical package integrity contract', () => {
   }, 120_000);
 
   function updateOwnedDigest(root: string, destination: string): void {
-    const path = join(root, '.github/aw/packages/bradygaster-squad-workflows-test.json');
+    const path = join(root, OWNERSHIP_FIXTURE);
     const record = JSON.parse(readFileSync(path, 'utf8'));
     const entry = record.files.find((file: { destination: string }) => file.destination === destination);
     entry.sha256 = createHash('sha256').update(readFileSync(join(root, destination))).digest('hex');
@@ -4488,8 +4496,10 @@ describe('gh-aw: canonical package integrity contract', () => {
     const sourcePath = '.github/workflows/squad-review.md';
     const lockPath = '.github/workflows/squad-review.lock.yml';
     const mutations: Array<[string, (text: string) => string]> = [
-      ['wrong owner', text => text.replaceAll('bradygaster/squad', 'attacker/squad')],
-      ['wrong repo', text => text.replaceAll('bradygaster/squad', 'bradygaster/other')],
+      ['wrong owner', text => text.replaceAll('github/squad', 'attacker/squad')],
+      ['wrong repo', text => text.replaceAll('github/squad', 'github/other')],
+      // An ownership record binds exactly one identity; a legacy binding must not mix in.
+      ['legacy owner', text => text.replaceAll(PACKAGE_NAME, LEGACY_PACKAGE_NAME)],
       ['wrong package', text => text.replaceAll('/workflows', '/other')],
       ['wrong workflow', text => text.replaceAll(source, `${PACKAGE_NAME}/package/squad.md@${revisionA}`)],
       ['wrong revision', text => text.replaceAll(revisionA, revisionB)],
@@ -4508,8 +4518,9 @@ describe('gh-aw: canonical package integrity contract', () => {
     }
 
     const lockMutations: Array<[string, (text: string) => string]> = [
-      ...mutations.slice(0, 6),
-      ['wrong URL', text => text.replace('/bradygaster/squad/blob/', '/attacker/squad/blob/')],
+      ...mutations.slice(0, 7),
+      ['wrong URL', text => text.replace('/github/squad/blob/', '/attacker/squad/blob/')],
+      ['legacy URL', text => text.replace('/github/squad/blob/', '/bradygaster/squad/blob/')],
       ['mixed annotation', text => text.replace(`GH_AW_WORKFLOW_SOURCE: "${source}"`, 'GH_AW_WORKFLOW_SOURCE: "unknown"')],
       ['missing annotation', text => text.replace(`          GH_AW_INFO_FRONTMATTER_SOURCE: "${source}"\n`, '')],
       ['duplicate annotation', text => text.replace(`GH_AW_WORKFLOW_SOURCE: "${source}"`, `GH_AW_WORKFLOW_SOURCE: "${source}"\n          GH_AW_WORKFLOW_SOURCE: "${source}"`)],
@@ -4674,20 +4685,295 @@ describe('gh-aw: canonical package integrity contract', () => {
 
   it('rejects ownership mismatches and mixed revisions', () => {
     const root = makeConsumer();
-    const ownershipPath = join(root, '.github/aw/packages/bradygaster-squad-workflows-test.json');
+    const ownershipPath = join(root, OWNERSHIP_FIXTURE);
     const ownership = JSON.parse(readFileSync(ownershipPath, 'utf8'));
     ownership.source = `${PACKAGE_NAME}@${revisionB}`;
     writeFileSync(ownershipPath, `${JSON.stringify(ownership, null, 2)}\n`);
     expect(verifyInstall(root).failures.join('\n')).toContain('Package ownership source');
 
     const extra = makeConsumer();
-    const extraPath = join(extra, '.github/aw/packages/bradygaster-squad-workflows-test.json');
+    const extraPath = join(extra, OWNERSHIP_FIXTURE);
     const extraOwnership = JSON.parse(readFileSync(extraPath, 'utf8'));
     extraOwnership.files.push(extraOwnership.files[0]);
     writeFileSync(extraPath, `${JSON.stringify(extraOwnership, null, 2)}\n`);
     expect(verifyInstall(extra).failures.join('\n')).toContain(
       `Package ownership files must contain exactly ${OWNERSHIP_ENTRY_COUNT} entries.`,
     );
+  });
+
+  it('derives the gh-aw v0.91.5 native ownership record path for each accepted identity', () => {
+    // Both literals were observed from real `gh aw add <identity>@<sha>` installs.
+    expect(OWNERSHIP_DESTINATION, `gh-aw native record path for ${PACKAGE_NAME}`)
+      .toBe('.github/aw/packages/github-squad-workflows-23a7638f599e.json');
+    expect(LEGACY_OWNERSHIP_DESTINATIONS, `gh-aw native record path for ${LEGACY_PACKAGE_NAME}`).toEqual([
+      '.github/aw/packages/bradygaster-squad-workflows-3632054824e8.json',
+    ]);
+    expect(packageOwnershipDestination(PACKAGE_NAME)).toBe(OWNERSHIP_DESTINATION);
+    expect(() => packageOwnershipDestination('attacker/squad/workflows'))
+      .toThrow('Unsupported Squad package identity: "attacker/squad/workflows".');
+  });
+
+  it('translates only gh-aw source metadata lines when hashing a legacy-identity lock', () => {
+    const lock = (repository: string, body: string) => [
+      `# gh-aw-metadata: {"frontmatter_hash":"${'a'.repeat(64)}"}`,
+      `# To update this file, edit ${repository}/workflows@${revisionA} and run:`,
+      `# Source: ${repository}/workflows/package/squad-retro.md@${revisionA}`,
+      `          GH_AW_WORKFLOW_SOURCE: "${repository}/workflows@${revisionA}"`,
+      `          GH_AW_INFO_FRONTMATTER_SOURCE: "${repository}/workflows/package/squad-retro.md@${revisionA}"`,
+      `          GH_AW_WORKFLOW_SOURCE_URL: "\${{ github.server_url }}/${repository}/blob/${revisionA}/workflows"`,
+      body,
+    ].join('\n');
+    // Same bytes in both installs, so they must survive translation unchanged.
+    const body = [
+      `        uses: bradygaster/squad/.github/actions/squad-init@${revisionA}`,
+      `          # gh aw add bradygaster/squad/workflows@${revisionA}`,
+    ].join('\n');
+    const canonical = normalizeCompiledLock(lock('github/squad', body), revisionA);
+    expect(
+      normalizeCompiledLock(lock('bradygaster/squad', body), revisionA, LEGACY_PACKAGE_NAME),
+      'a legacy lock must hash exactly like its canonical twin',
+    ).toBe(canonical);
+    expect(normalizeCompiledLock(lock('bradygaster/squad', body), revisionA)).not.toBe(canonical);
+    expect(() => normalizeCompiledLock(lock('github/squad', body), revisionA, LEGACY_PACKAGE_NAME),
+      `a ${LEGACY_PACKAGE_NAME} lock carrying github/squad source metadata must be rejected`).toThrow(
+      `Compiled lock mixes ${PACKAGE_NAME} source metadata into a ${LEGACY_PACKAGE_NAME} installation.`,
+    );
+    expect(() => normalizeCompiledLock(lock('attacker/squad', body), revisionA, 'attacker/squad/workflows'))
+      .toThrow('Unsupported Squad package identity');
+  });
+
+  it.each(['workflow', 'package', 'mixed'] as const)(
+    'verifies a coherent legacy bradygaster/squad/workflows %s install against canonical digests',
+    sourceBinding => {
+      const root = makeConsumer(revisionA, true, sourceBinding, LEGACY_PACKAGE_NAME);
+      const result = verifyInstall(root, { expectedRevision: revisionA });
+      expect(result.failures, `legacy ${sourceBinding} install must verify`).toEqual([]);
+      expect(result.packageName).toBe(LEGACY_PACKAGE_NAME);
+      expect(verifyResource(root, '.github/workflows/squad-review.md')).toMatch(/^[0-9a-f]{64}$/);
+      expect(verifyInstall(makeConsumer(revisionA, true, sourceBinding)).packageName).toBe(PACKAGE_NAME);
+    },
+    120_000,
+  );
+
+  it('strict-compiles a legacy-identity consumer without relaxing lock comparison', () => {
+    const root = makeConsumer(revisionA, true, 'package', LEGACY_PACKAGE_NAME);
+    execFileSync('git', ['init', '--quiet'], { cwd: root });
+    execFileSync('git', ['remote', 'add', 'origin', 'https://github.com/example/squad-consumer.git'], { cwd: root });
+    compileWithPinnedActions(root);
+    expect(verifyInstall(root, { expectedRevision: revisionA, strictCompile: true }).failures).toEqual([]);
+    const lockPath = join(root, '.github/workflows/squad-review.lock.yml');
+    writeFileSync(lockPath, readText(lockPath).replace('contents: read', 'contents: write'));
+    expect(verifyInstall(root).failures.join('\n'))
+      .toContain('Installed digest mismatch for .github/workflows/squad-review.lock.yml');
+  }, 120_000);
+
+  it('rejects a legacy install whose compiled lock carries canonical source metadata', () => {
+    const root = makeConsumer(revisionA, true, 'package', LEGACY_PACKAGE_NAME);
+    const lockPath = join(root, '.github/workflows/squad-review.lock.yml');
+    const legacySource = `GH_AW_WORKFLOW_SOURCE: "${LEGACY_PACKAGE_NAME}@${revisionA}"`;
+    const original = readText(lockPath);
+    expect(original).toContain(legacySource);
+    writeFileSync(lockPath, original.replace(legacySource, `GH_AW_WORKFLOW_SOURCE: "${PACKAGE_NAME}@${revisionA}"`));
+    expect(
+      verifyInstall(root).failures.join('\n'),
+      `.github/workflows/squad-review.lock.yml mixes ${PACKAGE_NAME} metadata into a ${LEGACY_PACKAGE_NAME} install`,
+    ).toContain(
+      `Compiled lock mixes ${PACKAGE_NAME} source metadata into a ${LEGACY_PACKAGE_NAME} installation.`,
+    );
+  });
+
+  it('rejects a canonical source binding inside a legacy-owned install', () => {
+    const root = makeConsumer(revisionA, true, 'package', LEGACY_PACKAGE_NAME);
+    const sourcePath = '.github/workflows/squad-review.md';
+    const original = readText(join(root, sourcePath));
+    const modified = original.replace(`source: ${LEGACY_PACKAGE_NAME}@`, `source: ${PACKAGE_NAME}@`);
+    expect(modified).not.toBe(original);
+    writeFileSync(join(root, sourcePath), modified);
+    updateOwnedDigest(root, sourcePath);
+    expect(
+      verifyInstall(root).failures.join('\n'),
+      `${sourcePath} binds ${PACKAGE_NAME} under a ${LEGACY_PACKAGE_NAME} ownership record`,
+    ).toContain(`Installed source binding is invalid for ${sourcePath}.`);
+  });
+
+  /** Moves the fixture's ownership record to the path gh-aw writes for `packageName`, and returns that path. */
+  function moveRecordToNativePath(root: string, packageName: string): string {
+    const destination = packageOwnershipDestination(packageName);
+    writeFileSync(join(root, destination), readText(join(root, OWNERSHIP_FIXTURE)));
+    unlinkSync(join(root, OWNERSHIP_FIXTURE));
+    return destination;
+  }
+
+  /** Copies the ownership record at `from` to `to`, declaring `packageName`. */
+  function copyRecord(root: string, from: string, to: string, packageName: string): void {
+    const record = JSON.parse(readText(join(root, from)));
+    writeFileSync(join(root, to), `${JSON.stringify({
+      ...record, package: packageName, source: `${packageName}@${record.resolvedCommit}`,
+    }, null, 2)}\n`);
+  }
+
+  /** Deletes exactly the records the verifier's cleanup advice names, as a user following it would. */
+  function followCleanupAdvice(root: string, failure: string, state: string): string[] {
+    const advice = new RegExp(`After reinstalling as ${PACKAGE_NAME}, delete (.+)\\.$`, 'm').exec(failure);
+    expect(advice, `${state}: cleanup advice in ${failure}`).not.toBeNull();
+    const paths = advice![1].split(', ');
+    for (const path of paths) unlinkSync(join(root, path));
+    return paths;
+  }
+
+  it('fails closed with migration guidance while both identity records exist', () => {
+    // `gh aw add github/squad/workflows@<sha> --force` over a legacy install leaves this state.
+    const root = makeConsumer();
+    moveRecordToNativePath(root, PACKAGE_NAME);
+    const [legacyPath] = LEGACY_OWNERSHIP_DESTINATIONS;
+    copyRecord(root, OWNERSHIP_DESTINATION, legacyPath, LEGACY_PACKAGE_NAME);
+    const failure = verifyInstall(root).failures.join('\n');
+    const state = `${OWNERSHIP_DESTINATION} (${PACKAGE_NAME}) and ${legacyPath} (${LEGACY_PACKAGE_NAME}) both present`;
+    expect(failure, `${state} must list both records and delete only the legacy one`).toContain(
+      `Expected exactly one Squad package ownership record; found 2: ${legacyPath} (${LEGACY_PACKAGE_NAME}), `
+      + `${OWNERSHIP_DESTINATION} (${PACKAGE_NAME}), so more than one record claims the installed files. `
+      + `After reinstalling as ${PACKAGE_NAME}, delete ${legacyPath}.`,
+    );
+    expect(failure, `${state}: the guidance must not offer keeping the ${LEGACY_PACKAGE_NAME} record`)
+      .not.toContain('Keep only the record whose identity matches the installed workflow source bindings');
+    expect(followCleanupAdvice(root, failure, state)).toEqual([legacyPath]);
+    expect(verifyInstall(root, { expectedRevision: revisionA }).failures, `${state} after following the advice`)
+      .toEqual([]);
+  });
+
+  it('lists every record and keeps only the native canonical one when canonical, legacy and case-variant '
+    + 'records coexist', () => {
+    const variant = 'GitHub/Squad/workflows';
+    const variantPath = '.github/aw/packages/github-squad-workflows-'
+      + `${createHash('sha256').update(variant).digest('hex').slice(0, 12)}.json`;
+    const [legacyPath] = LEGACY_OWNERSHIP_DESTINATIONS;
+    const root = makeConsumer();
+    moveRecordToNativePath(root, PACKAGE_NAME);
+    copyRecord(root, OWNERSHIP_DESTINATION, legacyPath, LEGACY_PACKAGE_NAME);
+    copyRecord(root, OWNERSHIP_DESTINATION, variantPath, variant);
+    const state = `${OWNERSHIP_DESTINATION} (${PACKAGE_NAME}), ${legacyPath} (${LEGACY_PACKAGE_NAME}) `
+      + `and ${variantPath} (${variant})`;
+    const failure = verifyInstall(root, { expectedRevision: revisionA }).failures.join('\n');
+    expect(failure, `${state} must list all three records`).toContain(
+      `Expected exactly one Squad package ownership record; found 3: ${legacyPath} (${LEGACY_PACKAGE_NAME}), `
+      + `${OWNERSHIP_DESTINATION} (${PACKAGE_NAME}) and case-variant record ${variantPath} (${variant}), `
+      + 'so more than one record claims the installed files.',
+    );
+    expect(failure, `${state} must delete the legacy and case-variant records, never ${OWNERSHIP_DESTINATION}`)
+      .toContain(`After reinstalling as ${PACKAGE_NAME}, delete ${legacyPath}, ${variantPath}.`);
+    expect(followCleanupAdvice(root, failure, state)).toEqual([legacyPath, variantPath]);
+    expect(verifyInstall(root, { expectedRevision: revisionA }).failures, `${state} after following the advice`)
+      .toEqual([]);
+  });
+
+  it.each([
+    ['canonical', PACKAGE_NAME],
+    ['legacy', LEGACY_PACKAGE_NAME],
+  ] as const)('names the actual path of a non-native %s ownership record duplicated beside the canonical record', (
+    label, duplicateName,
+  ) => {
+    const duplicatePath = '.github/aw/packages/squad-workflows-copy.json';
+    const root = makeConsumer();
+    moveRecordToNativePath(root, PACKAGE_NAME);
+    copyRecord(root, OWNERSHIP_DESTINATION, duplicatePath, duplicateName);
+    const state = `${OWNERSHIP_DESTINATION} (${PACKAGE_NAME}) beside ${label} duplicate ${duplicatePath} `
+      + `(${duplicateName})`;
+    const failure = verifyInstall(root, { expectedRevision: revisionA }).failures.join('\n');
+    expect(failure, `${state} must name the duplicate's own path`).toContain(
+      `Expected exactly one Squad package ownership record; found 2: ${OWNERSHIP_DESTINATION} (${PACKAGE_NAME}), `
+      + `${duplicatePath} (${duplicateName}), so more than one record claims the installed files. `
+      + `After reinstalling as ${PACKAGE_NAME}, delete ${duplicatePath}.`,
+    );
+    expect(followCleanupAdvice(root, failure, state)).toEqual([duplicatePath]);
+    expect(verifyInstall(root, { expectedRevision: revisionA }).failures, `${state} after following the advice`)
+      .toEqual([]);
+  });
+
+  it('rejects unknown identities and cross-identity ownership sources', () => {
+    const unknown = makeConsumer();
+    const unknownPath = join(unknown, OWNERSHIP_FIXTURE);
+    const record = JSON.parse(readText(unknownPath));
+    writeFileSync(unknownPath, JSON.stringify({
+      ...record, package: 'attacker/squad/workflows', source: `attacker/squad/workflows@${revisionA}`,
+    }));
+    expect(verifyInstall(unknown).failures.join('\n')).toContain(
+      `Expected exactly one ${PACKAGE_NAME} or ${LEGACY_PACKAGE_NAME} ownership record; found 0.`,
+    );
+
+    const crossed = makeConsumer(revisionA, true, 'package', LEGACY_PACKAGE_NAME);
+    const crossedPath = join(crossed, OWNERSHIP_FIXTURE);
+    writeFileSync(crossedPath, JSON.stringify({
+      ...JSON.parse(readText(crossedPath)), source: `${PACKAGE_NAME}@${revisionA}`,
+    }));
+    expect(verifyInstall(crossed).failures.join('\n'))
+      .toContain(`Package ownership source must be ${LEGACY_PACKAGE_NAME}@${revisionA}.`);
+  });
+
+  it('explains a case-only package identity mismatch without accepting it', () => {
+    const variant = 'GitHub/Squad/workflows';
+    const root = makeConsumer();
+    const ownershipPath = join(root, OWNERSHIP_FIXTURE);
+    const record = JSON.parse(readText(ownershipPath));
+    writeFileSync(ownershipPath, JSON.stringify({ ...record, package: variant, source: `${variant}@${revisionA}` }));
+    const failure = verifyInstall(root).failures.join('\n');
+    const state = `${OWNERSHIP_FIXTURE} declares ${variant}`;
+    expect(failure, state).toContain(
+      `Expected exactly one ${PACKAGE_NAME} or ${LEGACY_PACKAGE_NAME} ownership record; found 0.`,
+    );
+    expect(failure, state).toContain(
+      `Found ${OWNERSHIP_FIXTURE} (${variant}): gh-aw records the package identity exactly as typed`,
+    );
+    expect(failure, `${state} must name the record to delete`)
+      .toContain(`After reinstalling as ${PACKAGE_NAME}, delete ${OWNERSHIP_FIXTURE}.`);
+
+    writeFileSync(ownershipPath, JSON.stringify({
+      ...record, package: 'attacker/squad/workflows', source: `attacker/squad/workflows@${revisionA}`,
+    }));
+    expect(verifyInstall(root).failures.join('\n'), 'an unrelated identity gets no case hint')
+      .not.toContain('exactly as typed');
+  });
+
+  it('asks only for a reinstall when the lone case-variant record sits at the native canonical path', () => {
+    // The canonical reinstall overwrites that record, so nothing is left to delete.
+    const variant = 'GitHub/Squad/workflows';
+    const root = makeConsumer();
+    moveRecordToNativePath(root, PACKAGE_NAME);
+    copyRecord(root, OWNERSHIP_DESTINATION, OWNERSHIP_DESTINATION, variant);
+    const failure = verifyInstall(root).failures.join('\n');
+    const state = `${OWNERSHIP_DESTINATION} declares ${variant}`;
+    expect(failure, state).toContain(
+      `Found ${OWNERSHIP_DESTINATION} (${variant}): gh-aw records the package identity exactly as typed and Squad `
+      + `matches it case-sensitively. Reinstall as ${PACKAGE_NAME}.`,
+    );
+    expect(failure, `${state} must not ask to delete ${OWNERSHIP_DESTINATION}`).not.toMatch(/\bdelete\b/);
+  });
+
+  it.each([
+    ['canonical', PACKAGE_NAME, 'workflow'],
+    ['legacy', LEGACY_PACKAGE_NAME, 'package'],
+  ] as const)('rejects a case-variant ownership record left beside the exact %s record', (label, exactName, binding) => {
+    // gh-aw names each record by a digest of the identity as typed, so reinstalling as
+    // GitHub/Squad/workflows over an exact install leaves both records.
+    const variant = 'GitHub/Squad/workflows';
+    const variantPath = '.github/aw/packages/github-squad-workflows-'
+      + `${createHash('sha256').update(variant).digest('hex').slice(0, 12)}.json`;
+    const root = makeConsumer(revisionA, true, binding, exactName);
+    const exactPath = moveRecordToNativePath(root, exactName);
+    copyRecord(root, exactPath, variantPath, variant);
+    // After the canonical reinstall only OWNERSHIP_DESTINATION stays, so an exact legacy record goes too.
+    const stale = [exactPath, variantPath].filter(path => path !== OWNERSHIP_DESTINATION);
+    const state = `${label} ${exactPath} (${exactName}) beside ${variantPath} (${variant})`;
+    const failure = verifyInstall(root, { expectedRevision: revisionA }).failures.join('\n');
+    expect(failure, `${state} must list both records`).toContain(
+      `Expected exactly one Squad package ownership record; found 2: ${exactPath} (${exactName}) `
+      + `and case-variant record ${variantPath} (${variant}), so more than one record claims the installed files.`,
+    );
+    expect(failure, `${state} must recommend ${PACKAGE_NAME} and name every record to delete`)
+      .toContain(`After reinstalling as ${PACKAGE_NAME}, delete ${stale.join(', ')}.`);
+    if (exactName !== PACKAGE_NAME) return;
+    expect(followCleanupAdvice(root, failure, state)).toEqual([variantPath]);
+    expect(verifyInstall(root, { expectedRevision: revisionA }).failures, `${state} after following the advice`)
+      .toEqual([]);
   });
 
   it('rejects unsafe standalone contract shapes without filesystem access', () => {

@@ -1,10 +1,10 @@
 ---
 # Squad Bootstrap Component — installs and initializes Squad
-# (https://github.com/bradygaster/squad) in the activation job, then hands off
+# (https://github.com/github/squad) in the activation job, then hands off
 # the generated team state to the agent job. This is the DISTRIBUTION version,
 # living under workflows/shared/ so users can pull the standard stack from one
 # immutable nested native package:
-#   gh aw add "bradygaster/squad/workflows@${SQUAD_SHA}"
+#   gh aw add "github/squad/workflows@${SQUAD_SHA}"
 #
 # Adapted from Peli de Halleux's gh-aw integration:
 # https://github.com/github/gh-aw/blob/main/.github/workflows/shared/squad.md
@@ -25,6 +25,8 @@
 # The SHA-pinned squad-init action installs the latest stable GitHub Release
 # using its built-in default and mandatory checksum verification, without npm.
 # CLI release selection is independent of the immutable workflow/action pins.
+# `repository` is explicit because that pinned action still defaults to the
+# superseded bradygaster/squad path for its release downloads.
 #
 # Optional model: vars.SQUAD_MODEL; omit or use 'auto' for the engine default.
 # gh-aw resolves aliases with availability fallback.
@@ -537,9 +539,10 @@ jobs:
 
       - name: Install Squad CLI from standalone release
         id: squad-cli
-        uses: bradygaster/squad/.github/actions/squad-init@5c662ba015ec4f99befa51b0e8ca4f2148b0497f
+        uses: github/squad/.github/actions/squad-init@5c662ba015ec4f99befa51b0e8ca4f2148b0497f
         with:
           skip-init: 'true'
+          repository: 'github/squad'
 
       - name: Initialize Squad team
         env:

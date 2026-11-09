@@ -49,9 +49,18 @@ The quick start installs this workflow set:
 
 ```bash
 SQUAD_SHA="<40-character-commit-sha>"  # explicit, maintainer-approved; never `commits/dev`
-gh aw add "bradygaster/squad/workflows@${SQUAD_SHA}"
+gh aw add "github/squad/workflows@${SQUAD_SHA}"
 rm -f .github/skills/agentic-workflows/SKILL.md
 ```
+
+`github/squad/workflows` verifies only at Squad revisions whose
+`workflows/squad-workflows.manifest.json` declares
+`"package": "github/squad/workflows"`; the quick start's identity check stops
+on any other revision. Do not install an older revision as
+`bradygaster/squad/workflows` instead: its activation downloads the Squad CLI
+from the separately controlled `bradygaster/squad` fork, which has no releases.
+Use a revision whose manifest declares `github/squad/workflows`, or ask the
+Squad maintainers for one.
 
 The removal is intentional: gh-aw v0.91.5 generates that generic tool-owned
 router, which loads mutable prompts from the current `github/gh-aw` repository.

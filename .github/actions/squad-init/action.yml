@@ -9,11 +9,12 @@
 # and the RFC in #1593).
 #
 # Usage:
-#   - uses: bradygaster/squad/.github/actions/squad-init@<sha>
+#   - uses: github/squad/.github/actions/squad-init@<sha>
 #     with:
 #       version: 'v0.11.0'          # default: latest release
 #       preset: 'default'           # default: default
 #       state-backend: 'local'      # default: local
+#       repository: 'github/squad'  # older pins default to the bradygaster/squad fork
 #
 # Every input is optional; the defaults match what the gh-aw shared component
 # runs today.
@@ -41,7 +42,7 @@ inputs:
   repository:
     description: 'Repository to download release assets from. Point this at an internal mirror when github.com is unreachable.'
     required: false
-    default: 'bradygaster/squad'
+    default: 'github/squad'
   skip-init:
     description: 'Install the CLI but do not run squad init'
     required: false

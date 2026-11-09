@@ -2,15 +2,17 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parse } from 'yaml';
 import {
+  TRUSTED_SOURCE,
   assertPristineTarget,
   guardedTargetMutation,
   sanitizedEnvironment,
   selectBootstrapFallback,
   selectBootstrapOutputs,
   selectManualFallbackCastPr,
+  sourcePreflight,
   waitForBaseControlledReviewCanary,
   waitForBootstrapCompletion,
   waitForBootstrapFallback,
@@ -36,11 +38,45 @@ const packageArtifactCases = [
   ...CONTRACT.runtime.map(({ packageDestination }) => ['runtime package destination', packageDestination]),
   ...CONTRACT.runtime.map(({ destination }) => ['materialized runtime destination', destination]),
   ['installed manifest', '.github/aw/squad-workflows.manifest.json'],
-  ['package ownership metadata', '.github/aw/packages/bradygaster-squad-workflows-3632054824e8.json'],
+  ['package ownership metadata', '.github/aw/packages/github-squad-workflows-23a7638f599e.json'],
+  ['legacy package ownership metadata', '.github/aw/packages/bradygaster-squad-workflows-3632054824e8.json'],
   ...CONTRACT.skills.map(({ destination }) => ['installed skill', destination]),
   ['trigger sentinel', '.github/workflows/shared/squad-bootstrap-trigger-probe.json'],
   ['package namespace residue', '.github/aw/squad/unknown-stale-file.md'],
 ] as const;
+
+// Live identity of the trusted source after the move (GET repos/github/squad, 2026-11-07).
+const LIVE_SOURCE = {
+  repository: 'github/squad',
+  repositoryId: 1151205052,
+  owner: 'github',
+  ownerId: 9919,
+} as const;
+
+type GuardContext = Record<string, string>;
+
+const CANONICAL_DISPATCH: GuardContext = {
+  'github.repository': LIVE_SOURCE.repository,
+  'github.repository_id': String(LIVE_SOURCE.repositoryId),
+  'github.repository_owner': LIVE_SOURCE.owner,
+  'github.ref_name': 'dev',
+  'github.event.repository.default_branch': 'dev',
+};
+
+// Evaluates the `==` / `&&` subset used by the job guard; any other syntax or an unmodeled
+// context path fails the test instead of being guessed.
+function evaluateJobGuard(expression: string, context: GuardContext): boolean {
+  return expression.split('&&').map(clause => clause.trim()).every((clause) => {
+    const match = /^([a-z_.]+) == (?:'([^']*)'|([a-z_.]+))$/.exec(clause);
+    if (!match) throw new Error(`Unsupported hosted E2E guard clause: ${clause}`);
+    const [, left, literal, right] = match;
+    const read = (path: string): string => {
+      if (!(path in context)) throw new Error(`Hosted E2E guard reads an unmodeled context path: ${path}`);
+      return context[path];
+    };
+    return read(left) === (literal ?? read(right));
+  });
+}
 
 function fakeGitHub(overrides: Record<string, unknown> = {}) {
   return {
@@ -225,6 +261,32 @@ describe('Squad gh-aw hosted E2E controller', () => {
     expect(parsed.permissions).toEqual({ contents: 'read' });
   });
 
+  it.each([
+    ['the canonical github/squad default branch', {}, true],
+    ['the same repository after a rename or transfer (source-preflight then fails loudly)', {
+      'github.repository': 'github/squad-renamed',
+    }, true],
+    ['a fork with another repository ID', {
+      'github.repository': 'someone/squad',
+      'github.repository_id': '42',
+      'github.repository_owner': 'someone',
+    }, false],
+    ['a non-default branch', { 'github.ref_name': 'feature' }, false],
+  ] as const)('evaluates the hosted job guard for %s', (label, overrides, expected) => {
+    const guard = parse(WORKFLOW).jobs['hosted-e2e'].if as string;
+    expect(
+      evaluateJobGuard(guard, { ...CANONICAL_DISPATCH, ...overrides }),
+      `hosted-e2e if: "${guard}" must be ${expected} for ${label}`,
+    ).toBe(expected);
+  });
+
+  it('binds the hosted job guard to the immutable trusted repository ID, not a mutable name', () => {
+    const guard = parse(WORKFLOW).jobs['hosted-e2e'].if as string;
+    expect(guard, `hosted-e2e if: "${guard}" must not gate on github.repository`)
+      .not.toMatch(/github\.repository ==/);
+    expect(guard).toContain(`github.repository_id == '${TRUSTED_SOURCE.repositoryId}'`);
+  });
+
   it('removes credentials from candidate child process environments', () => {
     process.env.GH_TOKEN = 'secret';
     process.env.SQUAD_GH_AW_E2E_TOKEN = 'secret';
@@ -245,18 +307,51 @@ describe('Squad gh-aw hosted E2E controller', () => {
   });
 
   it('binds source and target identities without caller-selected privileged code', () => {
-    expect(SCRIPT).toContain("repository: 'bradygaster/squad'");
-    expect(SCRIPT).toContain('repositoryId: 1151205052');
+    expect(TRUSTED_SOURCE, 'trusted source must match the live github/squad identity').toEqual(LIVE_SOURCE);
+    expect(Object.isFrozen(TRUSTED_SOURCE)).toBe(true);
     expect(SCRIPT).toContain('sourceRef !== `refs/heads/${info.default_branch}`');
     expect(SCRIPT).toContain('branch.protected !== true || branch.sha !== sourceSha');
     expect(SCRIPT).toContain('info.full_name !== target');
     expect(SCRIPT).toContain('info.id !== expectedRepositoryId || info.owner.id !== expectedOwnerId');
     expect(SCRIPT).toContain('actor.login !== expectedActorLogin || actor.id !== expectedActorId');
+    expect(SCRIPT, 'hosted controller must require a github/squad/workflows-owned install')
+      .toContain('if (result.packageName !== PACKAGE_NAME)');
+  });
+
+  describe('source-preflight repository identity gate', () => {
+    const args = (repository: string, repositoryId: string) => ({
+      source_repository: repository,
+      source_repository_id: repositoryId,
+      source_ref: 'refs/heads/dev',
+      source_sha: 'a'.repeat(40),
+    });
+
+    // No credential may reach the API read; a gate regression must fail here, not call GitHub.
+    beforeEach(() => {
+      vi.stubEnv('SOURCE_READ_TOKEN', undefined);
+      vi.stubEnv('GH_TOKEN', undefined);
+    });
+    afterEach(() => vi.unstubAllEnvs());
+
+    it.each([
+      ['pre-transfer repository name', 'bradygaster/squad', String(LIVE_SOURCE.repositoryId)],
+      ['foreign repository ID', LIVE_SOURCE.repository, '42'],
+    ])('rejects the %s (%s, %s) before any API read', (_label, repository, repositoryId) => {
+      expect(() => sourcePreflight(args(repository, repositoryId), ROOT))
+        .toThrow('Hosted E2E controller must run from the trusted Squad repository.');
+    });
+
+    it('admits github/squad (1151205052) past the identity gate to the token-gated API read', () => {
+      expect(() => sourcePreflight(
+        args(LIVE_SOURCE.repository, String(LIVE_SOURCE.repositoryId)),
+        ROOT,
+      )).toThrow('A source repository read token is required.');
+    });
   });
 
   it('loads only the exact canonical manifest and has no fallback contract', () => {
     const contract = loadBundleContract(ROOT);
-    expect(contract.package).toBe('bradygaster/squad/workflows');
+    expect(contract.package).toBe('github/squad/workflows');
     expect(contract.workflows).toHaveLength(8);
     expect(contract.runtime).toHaveLength(21);
     expect(contract.skills).toHaveLength(1);
@@ -423,7 +518,7 @@ describe('Squad gh-aw hosted E2E controller', () => {
       'main',
       CONTRACT,
       fakeGitHub({ getTree: () => ({ truncated: false, paths: [artifactPath] }) }),
-    )).toThrow(/Target is not pristine/);
+    ), `pristine target check must reject ${artifactPath}`).toThrow(/Target is not pristine/);
   });
 
   it.each([

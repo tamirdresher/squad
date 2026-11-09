@@ -18,14 +18,24 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
-export const PACKAGE_NAME = 'bradygaster/squad/workflows';
+export const PACKAGE_NAME = 'github/squad/workflows';
+// Identities that earlier Squad revisions declare as "package" in
+// workflows/squad-workflows.manifest.json. PACKAGE_NAME verifies only at revisions whose manifest
+// declares it. The cutoff is that declaration, not the repository move: revisions committed after
+// the move to github/squad can still declare a legacy identity. gh-aw records the identity a
+// consumer typed, so their ownership records, workflow `source:` bindings, and compiled lock
+// metadata keep it until they reinstall as PACKAGE_NAME.
+export const LEGACY_PACKAGE_NAMES = Object.freeze(['bradygaster/squad/workflows']);
+export const ACCEPTED_PACKAGE_NAMES = Object.freeze([PACKAGE_NAME, ...LEGACY_PACKAGE_NAMES]);
 export const PACKAGE_MANIFEST = 'workflows/aw.yml';
 export const CONTRACT_SOURCE = 'workflows/squad-workflows.manifest.json';
 export const CONTRACT_DESTINATION = '.github/aw/squad-workflows.manifest.json';
 export const MIN_GH_AW_VERSION = 'v0.91.5';
 export const OWNERSHIP_ENTRY_COUNT = 30;
-export const OWNERSHIP_DESTINATION =
-  '.github/aw/packages/bradygaster-squad-workflows-3632054824e8.json';
+export const OWNERSHIP_DESTINATION = packageOwnershipDestination(PACKAGE_NAME);
+export const LEGACY_OWNERSHIP_DESTINATIONS = Object.freeze(
+  LEGACY_PACKAGE_NAMES.map(packageOwnershipDestination),
+);
 export const UNOWNED_MUTABLE_ROUTER_SKILL =
   '.github/skills/agentic-workflows/SKILL.md';
 export const TRIGGER_PROBE = 'shared/squad-bootstrap-trigger-probe.json';
@@ -116,6 +126,35 @@ function stableJson(value) {
 
 function sha256(content) {
   return createHash('sha256').update(content).digest('hex');
+}
+
+function assertAcceptedPackageName(packageName) {
+  if (!ACCEPTED_PACKAGE_NAMES.includes(packageName)) {
+    throw new Error(`Unsupported Squad package identity: ${JSON.stringify(packageName)}.`);
+  }
+}
+
+function isCaseVariantPackageName(packageName) {
+  return typeof packageName === 'string' && !ACCEPTED_PACKAGE_NAMES.includes(packageName)
+    && ACCEPTED_PACKAGE_NAMES.some(accepted => accepted.toLowerCase() === packageName.toLowerCase());
+}
+
+// Any record findOwnershipRecord counts: an accepted identity in any letter case.
+function isSquadPackageName(packageName) {
+  return ACCEPTED_PACKAGE_NAMES.includes(packageName) || isCaseVariantPackageName(packageName);
+}
+
+// Mirrors gh-aw v0.91.5 stablePackageID: lowercase slug plus the first 12 hex digits of
+// SHA-256 over the package identity exactly as installed.
+export function packageOwnershipDestination(packageName) {
+  assertAcceptedPackageName(packageName);
+  const slug = packageName.toLowerCase().replace(/[/\\:@]/g, '-').replace(/^-+|-+$/g, '');
+  return `.github/aw/packages/${slug}-${sha256(packageName).slice(0, 12)}.json`;
+}
+
+function packageRepository(packageName) {
+  assertAcceptedPackageName(packageName);
+  return packageName.slice(0, -'/workflows'.length);
 }
 
 function validatePathSyntax(value, expected, label) {
@@ -374,7 +413,7 @@ function workflowWithSource(content, name, revision, packageSource) {
 source: ${source}@${revision}${content.slice(end)}`;
 }
 
-export function normalizeCompiledLock(content, revision) {
+export function normalizeCompiledLock(content, revision, packageName = PACKAGE_NAME) {
   if (!REVISION_PATTERN.test(revision)) {
     throw new Error('Compiled lock revision must be a lowercase 40-character SHA.');
   }
@@ -386,13 +425,49 @@ export function normalizeCompiledLock(content, revision) {
     /^(# gh-aw-metadata: \{[^\n]*"frontmatter_hash":")([0-9a-f]{64})("[^\n]*\})$/m,
   );
   if (!metadata) throw new Error('Compiled lock has missing or malformed gh-aw metadata.');
-  return text
+  return canonicalizeLockPackageIdentity(text
     .replace(metadata[0], `${metadata[1]}${'0'.repeat(64)}${metadata[3]}`)
     .replace(
       /^(\s*-\s+cron:\s+)"[^"]+"(\s+# Friendly format: .+ \(scattered\))$/gm,
       '$1"<repository-scattered>"$2',
     )
-    .replaceAll(revision, LOCK_REVISION_PLACEHOLDER);
+    .replaceAll(revision, LOCK_REVISION_PLACEHOLDER), packageName);
+}
+
+function escapeRegExp(value) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+// gh-aw renders the installed package identity into exactly these compiled-lock metadata
+// lines; matching only after revision normalization binds them to the verified revision.
+function lockPackageIdentityPatterns(repository) {
+  const owner = escapeRegExp(repository);
+  const path = '/workflows(?:/package/[a-z0-9-]+\\.md)?';
+  const revision = LOCK_REVISION_PLACEHOLDER;
+  return [
+    new RegExp(`^(# Source: )${owner}(${path}@${revision})$`, 'gm'),
+    new RegExp(`^(# To update this file, edit )${owner}(${path}@${revision} and run:)$`, 'gm'),
+    new RegExp(`^( +GH_AW_(?:WORKFLOW|INFO_FRONTMATTER)_SOURCE: ")${owner}(${path}@${revision}")$`, 'gm'),
+    new RegExp(
+      `^( +GH_AW_WORKFLOW_SOURCE_URL: "\\$\\{\\{ github\\.server_url \\}\\}/)${owner}(/blob/${revision}${path}")$`,
+      'gm',
+    ),
+  ];
+}
+
+// Contract lock digests are computed for PACKAGE_NAME. A legacy-identity install compiles the
+// same bytes except for those metadata lines, so translate only them before hashing.
+function canonicalizeLockPackageIdentity(text, packageName) {
+  assertAcceptedPackageName(packageName);
+  if (packageName === PACKAGE_NAME) return text;
+  const canonical = packageRepository(PACKAGE_NAME);
+  if (lockPackageIdentityPatterns(canonical).some((pattern) => text.search(pattern) !== -1)) {
+    throw new Error(
+      `Compiled lock mixes ${PACKAGE_NAME} source metadata into a ${packageName} installation.`,
+    );
+  }
+  return lockPackageIdentityPatterns(packageRepository(packageName))
+    .reduce((current, pattern) => current.replace(pattern, `$1${canonical}$2`), text);
 }
 
 export function validateCompilerActionPins(content) {
@@ -700,7 +775,9 @@ function findOwnershipRecord(root) {
   const packageDir = safePath(root, '.github/aw/packages');
   if (!existsSync(packageDir)) throw new Error('Package ownership metadata is missing.');
   const matches = [];
-  for (const name of readdirSync(packageDir)) {
+  const caseVariants = [];
+  // Sorted, so the records and the cleanup advice below read the same on every platform.
+  for (const name of readdirSync(packageDir).sort()) {
     if (!name.endsWith('.json')) continue;
     const relativePath = `.github/aw/packages/${name}`;
     let record;
@@ -709,10 +786,38 @@ function findOwnershipRecord(root) {
     } catch {
       continue;
     }
-    if (record.package === PACKAGE_NAME) matches.push({ path: relativePath, record });
+    if (ACCEPTED_PACKAGE_NAMES.includes(record?.package)) {
+      matches.push({ path: relativePath, record });
+    } else if (isCaseVariantPackageName(record?.package)) {
+      caseVariants.push({ path: relativePath, record });
+    }
   }
-  if (matches.length !== 1) {
-    throw new Error(`Expected exactly one ${PACKAGE_NAME} ownership record; found ${matches.length}.`);
+  const describeRecords = records => records.map(({ path, record }) => `${path} (${record.package})`).join(', ');
+  // A successful `gh aw add PACKAGE_NAME@<sha> --force` writes OWNERSHIP_DESTINATION, so every other
+  // Squad record is stale: superseded, duplicated at another path, or a case variant.
+  const cleanup = records => {
+    const stale = records.map(({ path }) => path).filter(path => path !== OWNERSHIP_DESTINATION);
+    return stale.length === 0
+      ? `Reinstall as ${PACKAGE_NAME}.`
+      : `After reinstalling as ${PACKAGE_NAME}, delete ${stale.join(', ')}.`;
+  };
+  const caseHint = 'gh-aw records the package identity exactly as typed and Squad matches it case-sensitively.';
+  if (matches.length > 0 && matches.length + caseVariants.length > 1) {
+    const variants = caseVariants.length === 0 ? ''
+      : ` and case-variant ${caseVariants.length === 1 ? 'record' : 'records'} ${describeRecords(caseVariants)}`;
+    throw new Error(
+      `Expected exactly one Squad package ownership record; found ${matches.length + caseVariants.length}: `
+      + `${describeRecords(matches)}${variants}, so more than one record claims the installed files. `
+      + `${caseVariants.length === 0 ? '' : `${caseHint} `}${cleanup([...matches, ...caseVariants])}`,
+    );
+  }
+  if (matches.length === 0) {
+    // Identity matching stays exact; this only explains a case-only mismatch.
+    const hint = caseVariants.length === 0 ? ''
+      : ` Found ${describeRecords(caseVariants)}: ${caseHint} ${cleanup(caseVariants)}`;
+    throw new Error(
+      `Expected exactly one ${ACCEPTED_PACKAGE_NAMES.join(' or ')} ownership record; found 0.${hint}`,
+    );
   }
   return matches[0].record;
 }
@@ -728,7 +833,7 @@ function expectedOwnership(contract) {
 function verifyOwnership(root, contract, expectedRevision) {
   const record = findOwnershipRecord(root);
   assertKeys(record, ['schemaVersion', 'package', 'source', 'resolvedCommit', 'installer', 'files'], 'Package ownership');
-  if (record.schemaVersion !== 1 || record.package !== PACKAGE_NAME) {
+  if (record.schemaVersion !== 1 || !ACCEPTED_PACKAGE_NAMES.includes(record.package)) {
     throw new Error('Package ownership identity is invalid.');
   }
   if (!REVISION_PATTERN.test(record.resolvedCommit)) {
@@ -737,8 +842,8 @@ function verifyOwnership(root, contract, expectedRevision) {
   if (expectedRevision && record.resolvedCommit !== expectedRevision) {
     throw new Error(`Package revision mismatch: expected ${expectedRevision}, got ${record.resolvedCommit}.`);
   }
-  if (record.source !== `${PACKAGE_NAME}@${record.resolvedCommit}`) {
-    throw new Error(`Package ownership source must be ${PACKAGE_NAME}@${record.resolvedCommit}.`);
+  if (record.source !== `${record.package}@${record.resolvedCommit}`) {
+    throw new Error(`Package ownership source must be ${record.package}@${record.resolvedCommit}.`);
   }
   if (typeof record.installer !== 'string' || !/^gh-aw v0\.91\.5(?:\s|$)/.test(record.installer)) {
     throw new Error('Package ownership installer must be gh-aw v0.91.5.');
@@ -760,7 +865,7 @@ function verifyOwnership(root, contract, expectedRevision) {
       throw new Error(`Package ownership digest is stale for ${owned.destination}.`);
     }
   }
-  return record.resolvedCommit;
+  return { revision: record.resolvedCommit, packageName: record.package };
 }
 
 function digestMatchesWithFinalNewlineTolerance(content, expectedDigest) {
@@ -768,7 +873,7 @@ function digestMatchesWithFinalNewlineTolerance(content, expectedDigest) {
     .some(candidate => sha256(Buffer.from(candidate)) === expectedDigest);
 }
 
-function verifyWorkflowSourceBinding(root, entry, revision, lockEntry = entry) {
+function verifyWorkflowSourceBinding(root, entry, revision, lockEntry, packageName) {
   const installed = readRequired(root, entry.destination);
   const text = installed.toString('utf8');
   const lines = text.split('\n');
@@ -776,9 +881,10 @@ function verifyWorkflowSourceBinding(root, entry, revision, lockEntry = entry) {
   const sourceIndexes = lines
     .map((line, index) => line.startsWith('source:') ? index : -1)
     .filter(index => index >= 0);
+  // Only the identity bound by the verified ownership record is accepted; never mix identities.
   const sourceBindings = new Map([
-    [`source: ${PACKAGE_NAME}@${revision}`, lockEntry.package_lock_sha256],
-    [`source: bradygaster/squad/${entry.source}@${revision}`, lockEntry.lock_sha256],
+    [`source: ${packageName}@${revision}`, lockEntry.package_lock_sha256],
+    [`source: ${packageRepository(packageName)}/${entry.source}@${revision}`, lockEntry.lock_sha256],
   ]);
   const sourceIndex = sourceIndexes[0];
   const sourceBinding = lines[sourceIndex];
@@ -815,12 +921,14 @@ function configuredFailureExpiry(root) {
   return hours;
 }
 
-function verifyInstalledBytes(root, contract, revision) {
+function verifyInstalledBytes(root, contract, revision, packageName) {
   const expiry = configuredFailureExpiry(root);
   const variant = contract.lock_variants.find(entry => entry.action_failure_issue_expires === expiry);
   const lockDigests = new Map();
   for (const [index, entry] of contract.workflows.entries()) {
-    const verified = verifyWorkflowSourceBinding(root, entry, revision, variant?.workflows[index] ?? entry);
+    const verified = verifyWorkflowSourceBinding(
+      root, entry, revision, variant?.workflows[index] ?? entry, packageName,
+    );
     // Select from the verified source, never accept whichever lock digest happens to match.
     lockDigests.set(entry.name, verified.lockDigest);
   }
@@ -838,7 +946,7 @@ function verifyInstalledBytes(root, contract, revision) {
   }
   for (const entry of contract.workflows) readRequired(root, entry.lock);
   for (const entry of contract.workflows) {
-    const normalized = normalizeCompiledLock(readRequired(root, entry.lock), revision);
+    const normalized = normalizeCompiledLock(readRequired(root, entry.lock), revision, packageName);
     const observedDigest = sha256(normalized);
     const expectedDigest = lockDigests.get(entry.name);
     if (observedDigest !== expectedDigest) {
@@ -965,13 +1073,14 @@ function spawnChecked(command, args, cwd, options = {}) {
 export function verifyInstall(root, { expectedRevision = '', strictCompile = false } = {}) {
   const failures = [];
   let revision = expectedRevision;
+  let packageName;
   try {
     if (expectedRevision && !REVISION_PATTERN.test(expectedRevision)) {
       throw new Error('Expected revision must be a lowercase 40-character SHA.');
     }
     const { contract } = parseInstalledContract(root);
-    revision = verifyOwnership(root, contract, expectedRevision);
-    verifyInstalledBytes(root, contract, revision);
+    ({ revision, packageName } = verifyOwnership(root, contract, expectedRevision));
+    verifyInstalledBytes(root, contract, revision, packageName);
     verifyUnownedMutableRouterAbsent(root);
     verifyTriggerNamespace(root);
     verifyTriggerProbe(root, revision);
@@ -979,7 +1088,7 @@ export function verifyInstall(root, { expectedRevision = '', strictCompile = fal
   } catch (error) {
     failures.push(error instanceof Error ? error.message : String(error));
   }
-  return { failures, revision };
+  return { failures, revision, packageName };
 }
 
 export function verifyStagedInstall(root, { expectedRevision = '', stageOwnership = false } = {}) {
@@ -988,13 +1097,17 @@ export function verifyStagedInstall(root, { expectedRevision = '', stageOwnershi
   try {
     const { contract } = parseInstalledContract(root);
     // Only the native package's exact metadata path may bypass consumer ignore rules.
-    const ownership = readRequired(root, OWNERSHIP_DESTINATION);
-    if (JSON.parse(ownership).package !== PACKAGE_NAME) {
-      throw new Error(`Package ownership identity is invalid: ${OWNERSHIP_DESTINATION}`);
+    const ownershipDestination = packageOwnershipDestination(result.packageName);
+    const ownership = readRequired(root, ownershipDestination);
+    if (JSON.parse(ownership).package !== result.packageName) {
+      throw new Error(`Package ownership identity is invalid: ${ownershipDestination}`);
     }
+    const superseded = ACCEPTED_PACKAGE_NAMES
+      .filter(name => name !== result.packageName)
+      .map(packageOwnershipDestination);
     const required = new Set([
       CONTRACT_DESTINATION,
-      OWNERSHIP_DESTINATION,
+      ownershipDestination,
       ...contract.workflows.flatMap(entry => [entry.destination, entry.lock]),
       ...contract.shared_runtime.flatMap(entry => [entry.package_destination, entry.destination]),
       ...contract.skills.map(entry => entry.destination),
@@ -1003,18 +1116,21 @@ export function verifyStagedInstall(root, { expectedRevision = '', stageOwnershi
     const expected = new Map([...required].map(path => [path, fileDigest(root, path)]));
     if (stageOwnership) {
       const ignored = spawnChecked('git', [
-        'ls-files', '--others', '--ignored', '--exclude-standard', '-z', '--', OWNERSHIP_DESTINATION,
+        'ls-files', '--others', '--ignored', '--exclude-standard', '-z', '--', ownershipDestination,
       ], root).stdout.split('\0');
-      if (ignored.includes(OWNERSHIP_DESTINATION)) {
-        spawnChecked('git', ['add', '--force', '--', OWNERSHIP_DESTINATION], root);
+      if (ignored.includes(ownershipDestination)) {
+        spawnChecked('git', ['add', '--force', '--', ownershipDestination], root);
       }
     }
     // Snapshot the index, not HEAD or the working tree, including unchanged tracked files.
     const tree = spawnChecked('git', ['write-tree'], root).stdout.trim();
-    // Exact allowlisted paths bound output; no recursion into unrelated or substituted trees.
+    // Exact allowlisted paths bound output; no recursion into unrelated or substituted trees. The
+    // ownership-record directory is listed one level deep: a case variant's record name hashes the
+    // identity as typed, so its path cannot be predicted.
     const entries = spawnChecked(
       'git',
-      ['ls-tree', '-z', tree, '--', ...required, REPO_CONFIG_PATH, UNOWNED_MUTABLE_ROUTER_SKILL],
+      ['ls-tree', '-z', tree, '--', ...required, REPO_CONFIG_PATH, UNOWNED_MUTABLE_ROUTER_SKILL, ...superseded,
+        '.github/aw/packages/'],
       root,
     ).stdout
       .split('\0').filter(Boolean);
@@ -1042,6 +1158,36 @@ export function verifyStagedInstall(root, { expectedRevision = '', stageOwnershi
     if (!required.has(REPO_CONFIG_PATH) && staged.has(REPO_CONFIG_PATH)) {
       throw new Error(`Unverified compiler configuration remains in staged tree: ${REPO_CONFIG_PATH}`);
     }
+    for (const path of superseded) {
+      if (!staged.has(path)) continue;
+      // The skill's deletion gate never permits deleting the canonical record, so a staged canonical
+      // record in a legacy-owned install must move forward instead of being deleted.
+      throw new Error(path === OWNERSHIP_DESTINATION
+        ? `Squad package ownership record ${path} (${PACKAGE_NAME}) remains in the staged tree of this `
+          + `${result.packageName} installation; do not delete it. Reinstall with `
+          + `gh aw add ${PACKAGE_NAME}@${result.revision} --force; only after it succeeds, delete `
+          + `${ownershipDestination} and stage both changes before commit/push.`
+        : `Superseded Squad package ownership record remains in staged tree: ${path}; `
+          + 'delete it and stage the deletion before commit/push.');
+    }
+    // A record deleted only from the working tree still reaches a clean checkout, where
+    // findOwnershipRecord rejects any other Squad record beside the verified one.
+    for (const [path, [, type, object]] of staged) {
+      if (type !== 'blob' || required.has(path) || !/^\.github\/aw\/packages\/[^/]+\.json$/.test(path)) continue;
+      const bytes = spawnChecked('git', ['cat-file', 'blob', object], root).stdout;
+      let packageName;
+      try {
+        packageName = JSON.parse(bytes)?.package;
+      } catch {
+        continue;
+      }
+      if (isSquadPackageName(packageName)) {
+        throw new Error(
+          `${isCaseVariantPackageName(packageName) ? 'Case-variant' : 'Stale'} Squad package ownership record `
+          + `remains in staged tree: ${path} (${packageName}); delete it and stage the deletion before commit/push.`,
+        );
+      }
+    }
   } catch (error) {
     result.failures.push(error instanceof Error ? error.message : String(error));
   }
@@ -1064,8 +1210,8 @@ export function verifyResource(root, destination) {
     .find((candidate) => candidate.destination === destination);
   if (!entry) throw new Error(`Resource is not registered in the trusted Squad contract: ${destination}`);
   if ('source_sha256' in entry) {
-    const revision = verifyOwnership(root, contract);
-    return verifyWorkflowSourceBinding(root, entry, revision).digest;
+    const { revision, packageName } = verifyOwnership(root, contract);
+    return verifyWorkflowSourceBinding(root, entry, revision, entry, packageName).digest;
   }
   const actual = fileDigest(root, destination);
   if (actual !== entry.sha256) throw new Error(`Squad resource digest mismatch for ${destination}.`);
@@ -1112,7 +1258,7 @@ export function writeLocalTestOwnership(root, revision) {
     ...entry,
     sha256: fileDigest(root, entry.destination),
   }));
-  writePath(root, '.github/aw/packages/bradygaster-squad-workflows-local-test.json', stableJson({
+  writePath(root, '.github/aw/packages/github-squad-workflows-local-test.json', stableJson({
     schemaVersion: 1,
     package: PACKAGE_NAME,
     source: `${PACKAGE_NAME}@${revision}`,
@@ -1122,14 +1268,35 @@ export function writeLocalTestOwnership(root, revision) {
   }));
 }
 
+// One && chain, so a failed reinstall stops before any ownership-record or router cleanup.
+function chainedCommands(commands) {
+  return commands.map((command, index) => `  ${command}${index < commands.length - 1 ? ' &&' : ''}`);
+}
+
 function recoveryMessage(revision) {
   const ref = REVISION_PATTERN.test(revision) ? revision : '<40-character-squad-commit-sha>';
   return [
-    'Safe recovery:',
-    `  gh aw add ${PACKAGE_NAME}@${ref} --force`,
-    `  rm -f ${UNOWNED_MUTABLE_ROUTER_SKILL}`,
-    '  gh aw compile --strict',
-    '  node .github/workflows/shared/squad-install-verifier.mjs --verify-install --strict-compile',
+    'Safe recovery (one command; it stops at the first failure):',
+    ...chainedCommands([
+      `gh aw add ${PACKAGE_NAME}@${ref} --force`,
+      ...LEGACY_OWNERSHIP_DESTINATIONS.map(path => `rm -f ${path}`),
+      `rm -f ${UNOWNED_MUTABLE_ROUTER_SKILL}`,
+      'node .github/workflows/shared/squad-install-verifier.mjs --materialize-runtime',
+      'gh aw compile --strict',
+      'node .github/workflows/shared/squad-install-verifier.mjs --verify-install --strict-compile',
+    ]),
+  ].join('\n');
+}
+
+function legacyIdentityNotice(packageName, revision) {
+  return [
+    `Notice: verified under the legacy ${packageName} package identity, accepted only so that existing `
+      + `installations can move; ${packageRepository(packageName)} is now a separately controlled fork.`,
+    `To move to ${PACKAGE_NAME}, follow the gh-aw guide's Upgrading steps, starting with:`,
+    ...chainedCommands([
+      `gh aw add ${PACKAGE_NAME}@${revision} --force`,
+      ...LEGACY_OWNERSHIP_DESTINATIONS.map(path => `rm -f ${path}`),
+    ]),
   ].join('\n');
 }
 
@@ -1181,6 +1348,7 @@ export function run(argv = process.argv.slice(2), cwd = process.cwd()) {
         return 1;
       }
       console.log(`Squad gh-aw installation verified at ${result.revision}.`);
+      if (result.packageName !== PACKAGE_NAME) console.error(legacyIdentityNotice(result.packageName, result.revision));
       return 0;
     }
     if (argv.includes('--verify-staged-install')) {

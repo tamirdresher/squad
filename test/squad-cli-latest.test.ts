@@ -17,6 +17,56 @@ const actionPath = '.github/actions/squad-init/action.yml';
 const installerPath = 'scripts/install.sh';
 const action = parse(approved.files[actionPath].content);
 
+/** A squad-init input as the runner resolves it for the activation step: its `with:` value, else the action default. */
+function activationInput(name: string): string {
+  const frontmatter = parse(source.slice('---\n'.length, source.indexOf('\n---\n', '---\n'.length)));
+  const steps = frontmatter.jobs.activation.steps.filter(
+    (step: { uses?: string }) => step.uses === `github/squad/.github/actions/squad-init@${revision}`,
+  );
+  expect(steps, `workflows/shared/squad.md activation steps using squad-init@${revision}`).toHaveLength(1);
+  return String(steps[0].with?.[name] ?? action.inputs[name].default);
+}
+
+/**
+ * Every `uses: <owner>/<repo>/.github/actions/squad-init@<ref>` step in tracked docs, skills, templates,
+ * workflows and YAML comments, with the `repository` its `with:` block passes.
+ */
+function squadInitExamples(): { where: string; repository: string | null }[] {
+  const tracked = spawnSync('git', ['ls-files', '-z', '--', '*.md', '*.mdx', '*.yml', '*.yaml'], {
+    cwd: process.cwd(),
+    encoding: 'utf8',
+  });
+  expect(tracked.status, `git ls-files: ${tracked.stderr}`).toBe(0);
+  const examples: { where: string; repository: string | null }[] = [];
+  for (const path of tracked.stdout.split('\0').filter(path => path && !path.startsWith('test/'))) {
+    const lines = read(path).split('\n');
+    lines.forEach((line, index) => {
+      const uses = /^(\s*#?)\s*(?:-\s+)?uses:\s*['"]?[\w.-]+\/[\w.-]+\/\.github\/actions\/squad-init@/.exec(line);
+      if (!uses) return;
+      // An example inside YAML comments keeps the same `#` prefix on every line.
+      const comment = uses[1].endsWith('#') ? uses[1] : '';
+      const body = (text: string) => (text.startsWith(comment) ? text.slice(comment.length) : null);
+      const keyColumn = body(line)!.indexOf('uses:');
+      let inWith = false;
+      let repository: string | null = null;
+      for (const next of lines.slice(index + 1)) {
+        const text = body(next);
+        if (text === null || !text.trim() || text.trim().startsWith('```')) break;
+        const column = text.search(/\S/);
+        if (column < keyColumn) break;
+        if (column === keyColumn) {
+          inWith = /^with:\s*(?:#.*)?$/.test(text.trim());
+          continue;
+        }
+        const value = inWith ? /^repository:\s*['"]?([^'"\s#]+)['"]?\s*(?:#.*)?$/.exec(text.trim()) : null;
+        if (value) repository = value[1];
+      }
+      examples.push({ where: `${path}:${index + 1}`, repository });
+    });
+  }
+  return examples;
+}
+
 function pinnedInstallShell(platform: NodeJS.Platform = process.platform): string {
   const install = action.runs.steps.find((step: { id?: string }) => step.id === 'install');
   expect(install).toBeDefined();
@@ -43,11 +93,11 @@ set -eu
 url="$2"
 printf '%s\\n' "$url" >> "$PWD/fetches"
 case "$url" in
-  https://api.github.com/repos/bradygaster/squad/releases/latest)
+  https://api.github.com/repos/github/squad/releases/latest)
     printf '{"tag_name":"v1.0.0"}\\n';;
-  https://github.com/bradygaster/squad/releases/download/v1.0.0/squad-linux-x64.tar.gz)
+  https://github.com/github/squad/releases/download/v1.0.0/squad-linux-x64.tar.gz)
     printf 'release archive' > "$4";;
-  https://github.com/bradygaster/squad/releases/download/v1.0.0/SHA256SUMS.txt)
+  https://github.com/github/squad/releases/download/v1.0.0/SHA256SUMS.txt)
     case "$TEST_MODE" in
       download-failure) exit 22;;
       missing) printf '${digest}  squad-darwin-arm64.tar.gz\\n' > "$4";;
@@ -81,8 +131,8 @@ ${install.run}
       cwd: scratch,
       env: {
         ...process.env,
-        INPUT_VERSION: action.inputs.version.default,
-        INPUT_REPO: action.inputs.repository.default,
+        INPUT_VERSION: activationInput('version'),
+        INPUT_REPO: activationInput('repository'),
         TEST_MODE: mode,
       },
       encoding: 'utf8',
@@ -117,7 +167,7 @@ describe('Squad standalone activation latest-release default', () => {
 
     expect(install, 'workflows/shared/squad.md must retain the standalone install step').toBeDefined();
     expect(install).toContain(
-      `uses: bradygaster/squad/.github/actions/squad-init@${revision}`,
+      `uses: github/squad/.github/actions/squad-init@${revision}`,
     );
     expect(install).toContain("skip-init: 'true'");
     expect(install, 'workflows/shared/squad.md must use the action default, not a version input')
@@ -131,7 +181,7 @@ describe('Squad standalone activation latest-release default', () => {
   });
 
   it('binds the exact independently retrieved action and installer to the activation pin', () => {
-    expect(approved.repository).toBe('bradygaster/squad');
+    expect(approved.repository).toBe('github/squad');
     expect(approved.revision).toBe(revision);
     const digests = {
       [actionPath]: 'c759c5425c710db59a1a33f4a59f53117a2f2e25c1f0df4e41f27507afd82aa8',
@@ -154,17 +204,45 @@ describe('Squad standalone activation latest-release default', () => {
       .toContain('installer="${repo_root}/scripts/install.sh"');
   });
 
+  it('passes repository explicitly because the pinned action still defaults to the superseded owner', () => {
+    expect(action.inputs.repository.default, `squad-init@${revision} repository default`).toBe('bradygaster/squad');
+    expect(
+      activationInput('repository'),
+      `workflows/shared/squad.md must pass repository to squad-init@${revision}, whose default is bradygaster/squad`,
+    ).toBe('github/squad');
+  });
+
+  it('passes repository: github/squad in every squad-init example a reader could pin to an older revision', () => {
+    const examples = squadInitExamples();
+    expect([...new Set(examples.map(({ where }) => where.replace(/:\d+$/, '')))], 'files with squad-init examples')
+      .toEqual(expect.arrayContaining([
+        '.github/actions/squad-init/action.yml',
+        'docs/src/content/docs/features/standalone-install.md',
+        'workflows/shared/squad.md',
+      ]));
+    expect(
+      examples.filter(({ repository }) => repository !== 'github/squad')
+        .map(({ where, repository }) => `${where}: repository ${repository ?? 'not passed'}`),
+      `squad-init examples without repository: github/squad; squad-init@${revision} defaults it to `
+        + `${action.inputs.repository.default}`,
+    ).toEqual([]);
+  });
+
   it('executes the pinned action latest default with a verified platform archive', () => {
     const result = runPinnedInstall('valid');
+    expect(
+      result.fetches.trim().split('\n'),
+      `squad-init@${revision} downloads with workflows/shared/squad.md inputs `
+        + `(repository=${activationInput('repository')}, version=${activationInput('version')})`,
+    ).toEqual([
+      'https://api.github.com/repos/github/squad/releases/latest',
+      'https://github.com/github/squad/releases/download/v1.0.0/squad-linux-x64.tar.gz',
+      'https://github.com/github/squad/releases/download/v1.0.0/SHA256SUMS.txt',
+    ]);
     expect(result.status, result.output).toBe(0);
     expect(result.output).toContain('Checksum verified');
     expect(result.extracted).toBe(true);
     expect(result.outputs).toContain('version=1.0.0');
-    expect(result.fetches.trim().split('\n')).toEqual([
-      'https://api.github.com/repos/bradygaster/squad/releases/latest',
-      'https://github.com/bradygaster/squad/releases/download/v1.0.0/squad-linux-x64.tar.gz',
-      'https://github.com/bradygaster/squad/releases/download/v1.0.0/SHA256SUMS.txt',
-    ]);
   }, 65_000);
 
   it('reports premature action failure before reading the download trace', () => {

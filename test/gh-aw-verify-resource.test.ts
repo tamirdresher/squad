@@ -5,12 +5,15 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'nod
 import { dirname, join, resolve } from 'node:path';
 import {
   CONTRACT_DESTINATION,
+  LEGACY_PACKAGE_NAMES,
   OWNERSHIP_DESTINATION,
   PACKAGE_NAME,
+  packageOwnershipDestination,
 } from '../workflows/shared/squad-install-verifier.mjs';
 import { createFirstInstallFixture } from './helpers/gh-aw-install-fixture.js';
 
 const revision = 'a'.repeat(40);
+const [LEGACY_PACKAGE_NAME] = LEGACY_PACKAGE_NAMES;
 const verifier = resolve('workflows/shared/squad-install-verifier.mjs');
 const workspaceRoot = resolve('.test-workspaces');
 const roots: string[] = [];
@@ -18,7 +21,9 @@ const workflowMutations: ReadonlyArray<
   readonly [string, (text: string, source: string) => string]
 > = [
   ['owner', (text, source) =>
-    text.replace(source, source.replace('bradygaster/', 'attacker/'))],
+    text.replace(source, source.replace('github/', 'attacker/'))],
+  ['legacy owner', (text, source) =>
+    text.replace(source, source.replace(PACKAGE_NAME, LEGACY_PACKAGE_NAME))],
   ['repo', (text, source) =>
     text.replace(source, source.replace('/squad/', '/other/'))],
   ['workflow', (text, source) =>
@@ -40,13 +45,16 @@ function write(root: string, path: string, content: string | Buffer): void {
   writeFileSync(destination, content);
 }
 
-function makeConsumer(sourceBinding: 'workflow' | 'package' = 'workflow'): string {
+function makeConsumer(
+  sourceBinding: 'workflow' | 'package' = 'workflow',
+  packageName: string = PACKAGE_NAME,
+): string {
   mkdirSync(workspaceRoot, { recursive: true });
   const root = mkdtempSync(join(workspaceRoot, 'gh-aw-verify-resource-'));
   roots.push(root);
-  const fixture = createFirstInstallFixture(revision, sourceBinding);
+  const fixture = createFirstInstallFixture(revision, sourceBinding, packageName);
   for (const [path, content] of fixture.consumerFiles) write(root, path, content);
-  write(root, OWNERSHIP_DESTINATION, `${JSON.stringify(fixture.provenance, null, 2)}\n`);
+  write(root, packageOwnershipDestination(packageName), `${JSON.stringify(fixture.provenance, null, 2)}\n`);
   return root;
 }
 
@@ -81,6 +89,16 @@ describe('gh-aw: consumer resource verification', () => {
       const destination = '.github/workflows/squad-review.md';
       const result = runVerify(root, destination);
       expect(result.status, result.stderr).toBe(0);
+      expect(result.stdout.trim()).toMatch(/^[0-9a-f]{64}$/);
+    },
+  );
+
+  it.each(['workflow', 'package'] as const)(
+    'exercises the shipped --verify-resource CLI against a legacy bradygaster/squad/workflows %s-bound install',
+    sourceBinding => {
+      const root = makeConsumer(sourceBinding, LEGACY_PACKAGE_NAME);
+      const result = runVerify(root, '.github/workflows/squad-review.md');
+      expect(result.status, `legacy ${sourceBinding} binding: ${result.stderr}`).toBe(0);
       expect(result.stdout.trim()).toMatch(/^[0-9a-f]{64}$/);
     },
   );

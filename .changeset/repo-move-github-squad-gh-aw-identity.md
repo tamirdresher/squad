@@ -1,0 +1,6 @@
+---
+'@bradygaster/squad-cli': patch
+'@bradygaster/squad-sdk': patch
+---
+
+Update the shipped gh-aw-enlistment skill for the repository's new home, `github/squad`. It now installs the gh-aw package as `github/squad/workflows`, links to the docs guide's new address, and allowlists the `github/squad/.github/actions/squad-init` action. Before installing or upgrading, it checks that the chosen Squad revision declares `github/squad/workflows` in its package manifest, and stops otherwise. It no longer suggests installing an older revision as `bradygaster/squad/workflows`, because such revisions download the Squad CLI from the separately controlled `bradygaster/squad` fork. It also explains how to move an installation off that legacy identity, which the install verifier accepts only so that existing installations can move. That upgrade stops before removing anything if the forced reinstall fails, and until it is committed, its strict compile gate accepts only the four expected squad-init owner-replacement warnings. Its staging gate also permits deleting any other Squad ownership record the install verifier tells you to delete, such as a duplicate or case-variant record, but never the `github/squad/workflows` record that gh-aw writes.
