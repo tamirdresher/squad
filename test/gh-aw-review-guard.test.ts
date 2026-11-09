@@ -567,6 +567,62 @@ describe('independent Squad review guard', () => {
     expect(output.items[0].body).toContain('"reviewer_agent":"@squad/base-controlled-review"');
   });
 
+  it.each(['COMMENT', 'REQUEST_CHANGES'])(
+    'requires an actual independent review after human fallback validation (%s)',
+    async event => {
+      const f = fixture();
+      makeBootstrapPrFallback(f);
+      f.state.reviews = [];
+      // No registry or PR provenance comment exists before the Cast is accepted.
+      expect(f.state.comments).toEqual([]);
+      await expect(reviewTarget(f.env, f.get, { requireBootstrapRunSuccess: true }))
+        .resolves.toMatchObject({
+          author_agent: '@squad/base-controlled-bootstrap',
+          reviewer_agent: '@squad/base-controlled-review',
+          head_sha: HEAD,
+        });
+      expect(f.state.calls.some(route => route.endsWith('/contents/.squad/casting/registry.json'))).toBe(false);
+      expect(f.state.calls).toContain(`repos/${REPOSITORY}/issues`);
+      expect(f.state.calls).toContain(`repos/${REPOSITORY}/actions/runs/29`);
+      const workspace = mkdtempSync(join(tmpdir(), 'squad-review-fallback-contract-'));
+      workspaces.push(workspace);
+      const path = join(workspace, 'output.json');
+      const noop = process.env.SQUAD_REVIEW_NOOP_RECEIPT
+        ? readFileSync(process.env.SQUAD_REVIEW_NOOP_RECEIPT, 'utf8')
+        : JSON.stringify({ items: [{
+          type: 'noop',
+          message: 'No attribution or base registry; the PR author is human, so the bot exception does not apply.',
+        }] });
+      writeFileSync(path, noop);
+      await expect(enforceReviewOutputs({ ...f.env, GH_AW_AGENT_OUTPUT: path }, f.get))
+        .rejects.toThrow('exactly one review is required; noop cannot clear review');
+      expect(readFileSync(path, 'utf8')).toBe(noop);
+
+      writeFileSync(path, JSON.stringify({ items: [{
+        type: 'submit_pull_request_review', event, body: 'Independent diff findings.',
+      }] }));
+      await enforceReviewOutputs({ ...f.env, GH_AW_AGENT_OUTPUT: path }, f.get);
+      const output = JSON.parse(readFileSync(path, 'utf8'));
+      expect(output.items[0].event).toBe('COMMENT');
+      expect(output.items[0].body).toContain('"result":"' + event + '"');
+      expect(output.items[0].body).toContain('"head_sha":"' + HEAD + '"');
+      expect(output.items[0].body).toContain('"reviewer_agent":"@squad/base-controlled-review"');
+    },
+  );
+
+  it('does not use a human PR body or comment to rescue an unsigned fallback', async () => {
+    const f = fixture();
+    makeBootstrapPrFallback(f);
+    f.pr.body = makeBootstrapPrFallbackIssue({
+      headBranch: f.pr.head.ref, baseBranch: f.pr.base.ref,
+    }).body;
+    f.state.comments.push({
+      user: f.pr.user, created_at: START, updated_at: START, body: f.pr.body,
+    });
+    f.state.repoIssues = [];
+    await expect(reviewTarget(f.env, f.get)).rejects.toThrow('missing base-controlled bootstrap PR fallback issue');
+  });
+
   it('requires successful base-controlled bootstrap completion at the clearing gate for the fallback path too', async () => {
     const f = fixture();
     makeBootstrapPrFallback(f);

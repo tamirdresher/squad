@@ -810,6 +810,98 @@ describe('automatic Squad bootstrap workflow', () => {
     expect(result.stdout).toBe('Squad bootstrap validation passed.\n');
   });
 
+  it('validates the actual producer examples as a complete Cast and proposals payload', () => {
+    const fixture = createFixture();
+    const example = (heading: string) => {
+      const section = WORKFLOW.split(`### ${heading}\n`)[1];
+      const content = section?.match(/```markdown\n([\s\S]*?)\n```/)?.[1];
+      expect(content, `missing producer example: ${heading}`).toBeTruthy();
+      return content!;
+    };
+    const sources = example('Coordinator Cast-source example');
+    const coordinator = coordinatorMarkdown().replace(
+      /## Cast sources\n[\s\S]*?(?=\n## Routing work)/,
+      `${sources}\n${active.map(({ id }) => `- \`.squad/agents/${id}/charter.md\``).join('\n')}\n`,
+    );
+    write(fixture.root, '.github/agents/squad.agent.md', coordinator);
+    const files = fixture.payload.files as { path: string; content: string }[];
+    files.find(file => file.path === '.github/agents/squad.agent.md')!.content = coordinator;
+    const proposal = example('Proposal-format example');
+    fixture.payload.issue_body = issueBody().replace(
+      /### P1 —[\s\S]*?(?=\n## Recommended sequence)/,
+      ['P1', 'P2', 'P3'].map(id => proposal.replaceAll('P1', id)).join('\n\n') + '\n',
+    );
+    writeFileSync(fixture.payloadPath, JSON.stringify(fixture.payload));
+    const result = validateFixture(fixture);
+    expect(result.status, result.stderr).toBe(0);
+    expect(result.stdout).toBe('Squad bootstrap validation passed.\n');
+  });
+
+  it.each(['wrong heading', 'links only in support section'])(
+    'rejects emitted coordinator shape: %s',
+    shape => {
+      const fixture = createFixture();
+      const builtinLinks = builtins.map(({ id }) => `- [${id}](.squad/agents/${id}/charter.md)`).join('\n');
+      let coordinator = coordinatorMarkdown();
+      if (shape === 'wrong heading') {
+        coordinator = coordinator.replace('## Cast sources', '## Source files');
+      } else {
+        for (const { id, name } of builtins) {
+          coordinator = coordinator.replace(`- ${name}: \`.squad/agents/${id}/charter.md\`\n`, '');
+        }
+        coordinator = coordinator.replace('## Built-in Support Agents\n', `## Built-in Support Agents\n\n${builtinLinks}\n`);
+      }
+      write(fixture.root, '.github/agents/squad.agent.md', coordinator);
+      (fixture.payload.files as { path: string; content: string }[])
+        .find(file => file.path === '.github/agents/squad.agent.md')!.content = coordinator;
+      writeFileSync(fixture.payloadPath, JSON.stringify(fixture.payload));
+      const result = validateFixture(fixture);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('coordinator:');
+      expect(result.stderr).toContain('"## Cast sources"');
+      if (shape !== 'wrong heading') {
+        expect(result.stderr).toContain('must reference exactly the four required built-in charters');
+      }
+    },
+  );
+
+  it.each(['backticked identifier', 'command only in launch summary'])(
+    'rejects emitted proposal shape: %s',
+    shape => {
+      const fixture = createFixture();
+      if (shape === 'backticked identifier') {
+        fixture.payload.issue_body = issueBody().replace(
+          '- **Evidence:** `package.json`',
+          '- **Evidence:** `package.json` declares `createClient`.',
+        );
+      } else {
+        const command = '/squad research Focus only on proposal P1: strengthen runtime contracts.';
+        fixture.payload.issue_body = issueBody().replace(command, '')
+          .replace('## How to launch work\n', `## How to launch work\n\n${command}\n`);
+      }
+      writeFileSync(fixture.payloadPath, JSON.stringify(fixture.payload));
+      const result = validateFixture(fixture);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain(shape === 'backticked identifier'
+        ? 'createClient' : 'P1 is missing its focused research command');
+    },
+  );
+
+  it.skipIf(!process.env.SQUAD_CAST_COORDINATOR_RECEIPT)(
+    'reproduces the Cast-source rejection on an original local coordinator receipt',
+    () => {
+      const fixture = createFixture();
+      const coordinator = readFileSync(process.env.SQUAD_CAST_COORDINATOR_RECEIPT!, 'utf8');
+      write(fixture.root, '.github/agents/squad.agent.md', coordinator);
+      (fixture.payload.files as { path: string; content: string }[])
+        .find(file => file.path === '.github/agents/squad.agent.md')!.content = coordinator;
+      writeFileSync(fixture.payloadPath, JSON.stringify(fixture.payload));
+      const result = validateFixture(fixture);
+      expect(result.status).not.toBe(0);
+      expect(result.stderr).toContain('coordinator: "## Cast sources" must reference exactly the four required built-in charters');
+    },
+  );
+
   it.each([
     BOOTSTRAP_ISSUE_TITLE,
     '[Agentic Research] octo/other — initial proposals',

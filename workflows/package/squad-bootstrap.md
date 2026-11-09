@@ -808,8 +808,33 @@ Keep both out of `## Members`. Inside `## Coding Agent`, emit exactly one
 standalone line `<!-- copilot-auto-assign: false -->` (without backticks in the
 file), not an inline table annotation. These sections and the disabled marker
 are validated before the Cast can be published.
-The coordinator has concrete Cast-source paths and one synchronized,
-nonzero Team Capabilities block. Remove bootstrap specialist directories not
+The coordinator must contain exactly one literal `## Cast sources` section.
+Inside that section, before the next H2 heading, list the six shared Cast
+paths, every active specialist charter, and all four built-in charter paths.
+Links under `## Built-in Support Agents` do not satisfy `## Cast sources`;
+keep the former for support-agent behavior, not as a substitute source list.
+Use this source-list example, adding every selected specialist's concrete
+charter path inside the same section (never use globs):
+
+### Coordinator Cast-source example
+
+```markdown
+## Cast sources
+
+- `.squad/team.md`
+- `.squad/routing.md`
+- `.squad/casting/registry.json`
+- `.squad/casting/history.json`
+- `.squad/casting/policy.json`
+- `meet-the-squad.md`
+- `.squad/agents/scribe/charter.md`
+- `.squad/agents/ralph/charter.md`
+- `.squad/agents/rai/charter.md`
+- `.squad/agents/fact-checker/charter.md`
+```
+
+The coordinator also has one synchronized, nonzero Team Capabilities block.
+Remove bootstrap specialist directories not
 selected by this Cast, but never remove or rewrite the four built-ins.
 
 In the coordinator and team introduction, describe Scribe as silently merging
@@ -880,9 +905,16 @@ The issue body must:
 6. Present 3-5 proposals with consecutive stable IDs (`P1`, `P2`, ...). Each
    proposal heading is `### Pn — Title` and contains non-empty bullets named
    `Evidence`, `Why it matters`, and `How the Squad facilitates it`. Evidence
-   cites at least one concrete existing repository path in backticks.
+   uses exact `- **Evidence:**` bullet syntax. Every backtick span in this
+   bullet must be a concrete existing repository-relative file or directory
+   path, without line suffixes. Keep code identifiers, symbols, commands and
+   explanatory prose outside backticks in this bullet. If scope is committed,
+   at least one cited path must be under a scope root.
 7. Give each proposal a copyable command beginning
-   `/squad research Focus only on proposal Pn:`.
+   `/squad research Focus only on proposal Pn:` inside that proposal's own
+   `### Pn — Title` section, before the next proposal or
+   `## Recommended sequence`. Commands collected only under
+   `## How to launch work` do not satisfy this per-proposal requirement.
 8. Include valid examples for several proposals and all proposals:
    `/squad research Evaluate proposals P1 and P2 together...` and
    `/squad research Evaluate proposals P1 through Pn...`.
@@ -903,6 +935,24 @@ Bootstrap recovery never creates, updates, or deletes research comments.
 
 Keep the issue concise and evidence-led. Do not copy the detailed research
 exemplar's long audit format.
+
+### Proposal-format example
+
+This is one proposal's shape, not a complete issue. Repeat it with consecutive
+IDs for 3-5 proposals. Replace the illustrative path with an existing in-scope
+path and keep symbols in plain text within Evidence:
+
+```markdown
+### P1 — Strengthen runtime contracts
+
+- **Evidence:** `package.json` declares the runtime entry point; inspect createClient behavior.
+- **Why it matters:** Runtime changes need stable contracts.
+- **How the Squad facilitates it:** The selected specialists assess boundaries and regression coverage.
+
+~~~text
+/squad research Focus only on proposal P1: assess runtime contracts and regression coverage.
+~~~
+```
 
 ## Validation and output
 

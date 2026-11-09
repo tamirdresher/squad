@@ -149,6 +149,34 @@ function assertReviewerContract(workflow: string): void {
   expect(workflow).toContain('Human approval remains mandatory.');
 }
 
+function assertBootstrapEligibilityContract(workflow: string): void {
+  const gate = workflow.split('## Trigger and target gate\n')[1]?.split('## Provenance decision tree')[0] ?? '';
+  expect(gate).toContain('when the attribution file returns an actual 404');
+  expect(gate).toContain('**Bot-opened Cast:**');
+  expect(gate).toContain('**Human-opened Profile A fallback:**');
+  expect(gate).toContain('validateBootstrapPrFallbackAttribution');
+  expect(gate).toContain('**PR base SHA**, never');
+  expect(gate).toContain('[squad] Manual pull request creation required for the Cast branch');
+  expect(gate).toContain('unedited `github-actions[bot]` / `Bot` issue');
+  expect(gate).toContain('A copied marker, human-authored issue, edited issue, author comment,');
+  expect(gate).toContain('After either bootstrap path validates');
+  expect(gate).toContain('Eligibility is not a verdict');
+  expect(gate).not.toContain('Read `.squad-review.json` at the exact PR head SHA and the committed');
+}
+
+describe('bootstrap review producer eligibility', () => {
+  it.each(['workflows/squad-review.md', 'workflows/package/squad-review.md'])(
+    'documents both guard-supported paths in the delivered producer %s',
+    path => assertBootstrapEligibilityContract(read(path)),
+  );
+
+  it('detects the original bot-only contract and PR-head trust-source mutations', () => {
+    const botOnly = REVIEWER.replace(/\n2\. \*\*Human-opened Profile A fallback:\*\*[\s\S]*?(?=\nA fresh-reset generation)/, '');
+    expect(() => assertBootstrapEligibilityContract(botOnly)).toThrow();
+    expect(() => assertBootstrapEligibilityContract(REVIEWER.replace('**PR base SHA**', '**PR head SHA**'))).toThrow();
+  });
+});
+
 interface CompiledContract {
   lock: string;
   safeOutputs: Record<string, Record<string, unknown>>;
