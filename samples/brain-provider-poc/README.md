@@ -323,12 +323,25 @@ $env:BRAIN_FLUID_MODE = 'azure'
 npm run fluid -- create
 ```
 
-Use an existing Azure Fluid Relay and an existing HTTPS application token
+The sample's ordinary Azure entry point uses an existing relay and HTTPS application token
 service. The sample POSTs `{tenantId, documentId}` with the user's application
 bearer and expects `{jwt}`; the service must authenticate the caller, enforce
 document ACLs, mint/refresh correctly scoped relay JWTs, and keep relay signing
-keys server-side. No keys are accepted here. No billable resources or consent
-are provisioned. Without those resources this lane is BLOCKED.
+keys server-side. No keys are accepted by this entry point, which does not
+provision infrastructure. That application token-service path was not exercised.
+A separate HTTPS auth service is not required for every hosted proof: an
+in-memory server-side test token provider would suffice for the isolated comparison.
+
+The approved optional hosted comparison was **attempted and BLOCKED before
+container creation**: Azure API `2022-06-01` Basic provisioning in East US 2
+returned HTTP 500 twice; a supported West Europe alternative using the **same
+relay resource ID** returned HTTP 409 / `InvalidResourceLocation`. **Zero hosted
+content assertions ran**, and no signing keys were retrieved. The exact temporary
+resource group was deleted; its absence was independently verified, and GET of
+the exact attempted relay returned 404. No billable test resources remain.
+`Microsoft.FluidRelay` subscription provider registration remains enabled; this
+is not a deployed relay resource. Hosted Fluid remains optional: the ordinary
+user default is existing OneDrive/SharePoint or Google Drive, without Azure provisioning.
 
 ## Conflict and durability contracts
 

@@ -134,11 +134,29 @@
     "reason": "No suitably authorized delegated bearer and explicit test folder supplied. Coordinator separately reported Azure CLI Graph /me/drive 404 and known business drive 403; this does not establish that the user's OneDrive is absent."
   },
   "azureFluidRelayLive": {
-    "status": "NOT_RUN",
-    "required": ["existing relay endpoint and tenant", "existing HTTPS application token service", "per-user application authorization"],
+    "status": "BLOCKED",
+    "scope": "Actual approved optional hosted comparison; blocked before container creation, not a hosted replication PASS.",
+    "sampleEntryPointRequirements": ["existing relay endpoint and tenant", "existing HTTPS application token service", "per-user application authorization"],
+    "isolatedServerSideComparisonAuth": "An in-memory server-side test token provider would suffice; a separate HTTPS auth service is not required for every possible hosted proof.",
     "entryPointImplementedAndTypechecked": true,
-    "resourcesProvisioned": false,
-    "reason": "Optional hosted Fluid lane was not provisioned; prioritized requested existing-services/no-provisioning user path. Existing application JWT service still required."
+    "apiVersion": "2022-06-01",
+    "provisioningAttempts": [
+      { "region": "eastus2", "storageSku": "basic", "httpStatus": 500, "result": "Internal Server Error" },
+      { "region": "westeurope", "sameRelayResourceId": true, "httpStatus": 409, "result": "Conflict / InvalidResourceLocation" },
+      { "region": "eastus2", "sameRelayResourceId": true, "httpStatus": 500, "result": "Internal Server Error" }
+    ],
+    "hostedContentAssertions": 0,
+    "applicationTokenServiceExercised": false,
+    "signingKeysRetrieved": false,
+    "cleanup": {
+      "status": "PASS",
+      "exactTemporaryResourceGroupDeleted": true,
+      "exactResourceGroupExistsAfterDeletion": false,
+      "exactRelayGetAfterCleanupHttpStatus": 404,
+      "remainingBillableResources": 0,
+      "subscriptionProviderRegistration": "Microsoft.FluidRelay remains registered; registration is not a deployed relay resource."
+    },
+    "reason": "Azure Basic relay provisioning failed in bounded attempts before container creation. Existing-service OneDrive/SharePoint or Google Drive remains the no-Azure-provisioning ordinary-user default."
   },
   "actualSecondMachine": { "status": "BLOCKED", "reason": "No second-host execution performed; README supplies reproducible protocol." },
   "actualSeparateAuthenticatedPrincipals": { "status": "BLOCKED", "reason": "No two independently authenticated accounts executed these adapters; mock token labels and Tinylicious identities are not principal evidence." },
