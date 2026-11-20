@@ -1,0 +1,28 @@
+{
+  "name": "squad-brain-provider-poc",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "test": "tsx --test test/*.test.ts",
+    "typecheck": "tsc --noEmit",
+    "brain": "tsx src/cli.ts",
+    "cloud:probe": "tsx src/cloud-probe.ts",
+    "cloud:client": "tsx src/cloud-client.ts",
+    "fluid": "tsx src/fluid.ts",
+    "fluid:server": "node src/fluid-server.cjs",
+    "test:fluid": "tsx test/fluid.integration.ts"
+  },
+  "dependencies": {
+    "@fluidframework/azure-client": "3.13.0",
+    "@fluidframework/tinylicious-client": "3.13.0",
+    "fluid-framework": "3.13.0",
+    "yjs": "13.6.33"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tinylicious": "7.0.1",
+    "tsx": "^4.20.0",
+    "typescript": "~5.9.3"
+  }
+}

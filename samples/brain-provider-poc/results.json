@@ -1,0 +1,158 @@
+{
+  "kind": "poc-evidence",
+  "date": "2026-11-20",
+  "scope": "new samples/brain-provider-poc only; synthetic data; no production backend migration",
+  "sdkIntegration": {
+    "status": "PASS",
+    "path": "unmodified SquadState -> existing StorageProvider interface -> isolated OperationStorage",
+    "claimsFullInteractiveSquadCliSession": false
+  },
+  "localCoreAndMockedRest": {
+    "status": "PASS",
+    "command": "npm test",
+    "passed": 12,
+    "failed": 0,
+    "skipped": 0,
+    "independentNodeProcesses": true,
+    "independentCaches": true,
+    "actualSeparatePrincipals": false,
+    "realCloudRequests": false,
+    "contracts": [
+      "Squad agent CRUD and decision serialization/append",
+      "offline same/different-entry concurrency and conflict preservation",
+      "restart durability and failed-upload outbox retention",
+      "idempotent/reordered updates, tombstones and namespace isolation",
+      "explicit rejection of atomic rename/create-if-absent",
+      "genuine Drive/Graph adapters over injected mocked HTTP",
+      "pagination, authorization failures, bounded safe retries and download bearer boundary",
+      "provider registry extensibility"
+    ]
+  },
+  "typecheck": { "status": "PASS", "command": "npm run typecheck" },
+  "oneDriveDelegatedMcpLive": {
+    "status": "PASS",
+    "transport": "live OneDrive via host-authorized sharepoint-local MCP tools; not direct Graph REST adapter",
+    "resourcesProvisioned": false,
+    "signingKeysOrExtractedBearerTokensUsed": false,
+    "syntheticImmutableCloudBundlesUploaded": 4,
+    "durableClientCaches": 3,
+    "independentNodeProcesses": true,
+    "physicalHosts": 1,
+    "authenticatedPrincipals": 1,
+    "simulatedMultipleMachines": true,
+    "copiedReplicaCaches": false,
+    "peerDataSource": "actual authorized MCP cloud list/read results, relayed by host to waiting client processes",
+    "hostMayFanOutCurrentCloudResponses": true,
+    "commands": ["npm run cloud:client -- seed", "npm run cloud:client -- edit a", "npm run cloud:client -- edit b", "npm run cloud:client -- sync", "npm run cloud:client -- verify", "npm run cloud:client -- resolve-delete", "npm run cloud:client -- verify-final", "npm run cloud:client -- verify-empty"],
+    "measuredAssertions": {
+      "agents": ["synthetic-cloud-a", "synthetic-cloud-b"],
+      "decisions": ["Synthetic baseline", "Synthetic offline a", "Synthetic offline b"],
+      "offlineFragmentsPreserved": ["offline-a", "offline-b"],
+      "concurrentFullWritesPreserved": ["concurrent-version-a", "concurrent-version-b"],
+      "conflictResolved": "resolved-after-cloud-convergence",
+      "notesDeletedAndTombstoneRetained": true,
+      "lateJoinFreshCacheDownloadedAllBundles": 4,
+      "lateJoinCloudReplayOrder": ["offline-b", "offline-a", "baseline", "resolution-and-tombstone"],
+      "restartVerificationClients": 3,
+      "finalPendingPerClient": 0,
+      "differentNamespaceOverSameRealCloudFolderEmpty": true
+    },
+    "cloudArtifacts": "Four tiny synthetic files retained in the explicit test folder; private IDs/URLs intentionally omitted."
+  },
+  "ordinaryUserSetup": {
+    "implemented": "Delegated adapter can reuse an already signed-in host tool connection, with no Azure deployment or extracted bearer.",
+    "notImplemented": ["standalone Microsoft/Google OAuth", "account/folder picker", "saved setup wizard", "automatic background sync"],
+    "intendedDefault": "Existing OneDrive/SharePoint or Google Drive sign-in and shared-folder selection, not Azure provisioning."
+  },
+  "realCliSmoke": {
+    "squadCliStatus": {
+      "status": "PASS",
+      "command": "node cli.js status (from isolated synthetic cloud-derived projection)",
+      "observed": "Active squad: repo; resolved isolated model-smoke/.squad rather than the real repository brain."
+    },
+    "copilotModelAuthentication": {
+      "status": "PASS",
+      "observed": "Actual Copilot CLI model request returned AUTH_SMOKE_OK."
+    },
+    "customSquadAgentReadback": {
+      "status": "BLOCKED",
+      "attempts": 2,
+      "command": "copilot --agent Squad with view-only access to isolated cloud-derived state",
+      "observed": "Managed MCP policy settlement failed before MCP discovery; 30000ms settlement deadline exceeded.",
+      "policyBypassed": false
+    },
+    "standardCopilotCliCloudBrainReadback": {
+      "status": "PASS",
+      "command": "copilot -C isolated-model-smoke with view-only tools and an actual model request",
+      "observedMarker": "CLOUD_BRAIN_READBACK_OK",
+      "observedAgents": ["synthetic-cloud-a", "synthetic-cloud-b"],
+      "observedDecisionTitles": ["2026-11-20: Synthetic baseline", "2026-11-20: Synthetic offline a", "2026-11-20: Synthetic offline b"],
+      "customSquadCoordinator": false,
+      "policyBypassed": false
+    },
+    "projection": "Actual cloud-downloaded late-join replica was materialized to an isolated synthetic squad; local roster derived from its synchronized agent directories.",
+    "claimsTransparentProductionCliCloudWrites": false
+  },
+  "dependencySource": {
+    "registry": "https://packagefeedproxy.microsoft.io/npm/",
+    "resolvedTarballHost": "ms-feed-25.pkgs.visualstudio.com",
+    "resolvedTarballCount": 409,
+    "publicRegistryFallbackUsed": false
+  },
+  "outboxMutationProof": {
+    "status": "PASS",
+    "mutation": "Temporarily acknowledged an actual pending chunk before its upload in src/storage.ts.",
+    "observed": "Focused durable-offline/auth test failed with pending 0 !== 1, demonstrating detection of silent outbox loss.",
+    "mutationReverted": true
+  },
+  "fluidLocalService": {
+    "status": "PASS",
+    "command": "npm run fluid:server; npm run test:fluid",
+    "service": "official Tinylicious 7.0.1",
+    "clientLibraries": "Fluid 3.13.0",
+    "httpReadinessStatus": 200,
+    "actualRealService": true,
+    "independentClientsAndCaches": true,
+    "independentNodeProcesses": true,
+    "offlineReplicaRestart": true,
+    "verifiedAgents": ["synthetic-fluid-a", "synthetic-fluid-b"],
+    "verifiedContentFragments": ["offline-a", "offline-b"],
+    "claimsServerRestartDurability": false,
+    "actualSeparatePrincipals": false
+  },
+  "googleDriveLive": {
+    "status": "BLOCKED",
+    "command": "npm run cloud:probe -- gdrive",
+    "required": ["GOOGLE_ACCESS_TOKEN", "GOOGLE_DRIVE_FOLDER_ID", "agreed BRAIN_NAMESPACE", "distinct local BRAIN_CACHE"],
+    "reason": "No authorized bearer token and explicitly shared test folder supplied; no credentials extracted from tools or caches."
+  },
+  "graphOneDriveSharePointLive": {
+    "status": "BLOCKED",
+    "scope": "direct Graph REST adapter only; the separate delegated MCP OneDrive lane above passed actual cloud verification",
+    "command": "npm run cloud:probe -- graph",
+    "required": ["MS_GRAPH_ACCESS_TOKEN", "MS_GRAPH_DRIVE_ID", "MS_GRAPH_FOLDER_ID", "agreed BRAIN_NAMESPACE", "distinct local BRAIN_CACHE"],
+    "reason": "No suitably authorized delegated bearer and explicit test folder supplied. Coordinator separately reported Azure CLI Graph /me/drive 404 and known business drive 403; this does not establish that the user's OneDrive is absent."
+  },
+  "azureFluidRelayLive": {
+    "status": "NOT_RUN",
+    "required": ["existing relay endpoint and tenant", "existing HTTPS application token service", "per-user application authorization"],
+    "entryPointImplementedAndTypechecked": true,
+    "resourcesProvisioned": false,
+    "reason": "Optional hosted Fluid lane was not provisioned; prioritized requested existing-services/no-provisioning user path. Existing application JWT service still required."
+  },
+  "actualSecondMachine": { "status": "BLOCKED", "reason": "No second-host execution performed; README supplies reproducible protocol." },
+  "actualSeparateAuthenticatedPrincipals": { "status": "BLOCKED", "reason": "No two independently authenticated accounts executed these adapters; mock token labels and Tinylicious identities are not principal evidence." },
+  "loop": { "status": "NOT_IMPLEMENTED", "reason": "Custom Fluid app is not Loop; no invented general-purpose Loop Graph synchronization API." },
+  "documentationSyncReview": {
+    "scope": "isolated SDK sample, not teampilot runtime",
+    "status": "PASS",
+    "notes": "Sample README documents new commands/contracts, actual live MCP evidence, host relay, and intended easy-user auth versus unimplemented UX; production runtime/status extension/helper registries and real brain/config remain unchanged."
+  },
+  "sourcePrivacyAudit": {
+    "status": "PASS",
+    "sourceFilesChecked": 21,
+    "excludedRuntimeArtifacts": [".runs", "node_modules"],
+    "privateLiveDriveOrFolderIdsIncluded": false,
+    "personalUrlsOrOperatorIdentityIncluded": false
+  }
+}
